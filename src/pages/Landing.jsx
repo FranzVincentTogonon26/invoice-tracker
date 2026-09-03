@@ -1,19 +1,10 @@
 import { motion } from "framer-motion";
 import { ArrowRight, Check, Sparkles } from "lucide-react";
-import { useEffect } from "react";
 import { Link } from "react-router-dom";
 
 import InvoiceWall from "../components/landing/invoice-wall";
 
 export default function Landing() {
-  useEffect(() => {
-    const prev = document.documentElement.getAttribute("data-theme");
-    document.documentElement.setAttribute("data-theme", "light");
-    return () => {
-      if (prev) document.documentElement.setAttribute("data-theme", "light");
-    };
-  }, []);
-
   return (
     <div className="min-h-screen bg-white text-[#0c1a17] overflow-x-clip antialiased">
       {/* Nav Section */}
