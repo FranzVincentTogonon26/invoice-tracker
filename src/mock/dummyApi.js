@@ -1,7 +1,8 @@
 import { getToken } from "../api/auth";
-import { store, round2, effectiveStatus, nid  } from "./dummyData";
+import { store, round2, effectiveStatus, nid, computeTotals } from "./dummyData";
 
 const iso = (d) => d.toISOString();
+const ymd = (d) => d.toISOString().slice(0, 10);
 const daysAgo = (n) => {
   const d = new Date();
   d.setDate(d.getDate() - n);
@@ -145,6 +146,144 @@ export const mock = {
         revenueSeries: series,
         recentInvoices: recent,
       };
+    },
+  },
+
+  /* ── Invoices ── */
+  invoices: {
+    async list(params = {}) {
+      await delay();
+      const { q, status, client_id } = params || {};
+
+      let rows = store.invoices.slice();
+
+      if (client_id) {
+        rows = rows.filter((i) => i.client_id === client_id);
+      }
+      if (status) {
+        rows = rows.filter((i) => effectiveStatus(i) === status);
+      }
+      if (q && String(q).trim()) {
+        const needle = String(q).trim().toLowerCase();
+        rows = rows.filter((i) => {
+          const c = clientById(i.client_id);
+          return [i.invoice_number, c?.name, c?.company]
+            .filter(Boolean)
+            .some((v) => v.toLowerCase().includes(needle));
+        });
+      }
+
+      rows.sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
+      return rows.map(serInvoiceList);
+    },
+
+    async get(id) {
+      await delay();
+      const inv = store.invoices.find((i) => i.id === id);
+      if (!inv) throw { status: 404, message: "Invoice not found" };
+      const c = clientById(inv.client_id);
+      return {
+        ...clone(inv),
+        client_name: c?.name || null,
+        client_company: c?.company || "",
+        effective_status: effectiveStatus(inv),
+      };
+    },
+
+    async create(payload) {
+      await delay();
+      const taxRate = payload.tax_rate ?? 0;
+      const discount = payload.discount ?? 0;
+      const totals = computeTotals(payload.items || [], taxRate, discount);
+      const inv = {
+        id: nid("inv"),
+        client_id: payload.client_id || null,
+        invoice_number: `INV-${String(store.settings.next_seq).padStart(4, "0")}`,
+        status: ["draft", "sent", "paid"].includes(payload.status)
+          ? payload.status
+          : "draft",
+        issue_date: payload.issue_date || ymd(new Date()),
+        due_date: payload.due_date || null,
+        currency: payload.currency || "USD",
+        tax_rate: taxRate,
+        discount: totals.discount,
+        subtotal: totals.subtotal,
+        tax_amount: totals.taxAmount,
+        total: totals.total,
+        notes: payload.notes || "",
+        terms: payload.terms || "",
+        paid_at: null,
+        created_at: nowIso(),
+        items: totals.items.map((it) => ({ id: nid("li"), ...it })),
+      };
+      store.settings.next_seq += 1;
+      store.invoices.unshift(inv);
+      const c = clientById(inv.client_id);
+      return {
+        ...clone(inv),
+        client_name: c?.name || null,
+        client_company: c?.company || "",
+        effective_status: effectiveStatus(inv),
+      };
+    },
+
+    async update(id, payload) {
+      await delay();
+      const inv = store.invoices.find((i) => i.id === id);
+      if (!inv) throw { status: 404, message: "Invoice not found" };
+
+      const { items, tax_rate, discount, ...rest } = payload || {};
+      Object.assign(inv, rest);
+
+      if (items !== undefined || tax_rate !== undefined || discount !== undefined) {
+        const nextItems = items !== undefined ? items : inv.items;
+        const nextTaxRate = tax_rate !== undefined ? tax_rate : inv.tax_rate;
+        const nextDiscount = discount !== undefined ? discount : inv.discount;
+        const totals = computeTotals(nextItems, nextTaxRate, nextDiscount);
+        inv.items = totals.items.map((it) => ({ id: nid("li"), ...it }));
+        inv.tax_rate = nextTaxRate;
+        inv.discount = totals.discount;
+        inv.subtotal = totals.subtotal;
+        inv.tax_amount = totals.taxAmount;
+        inv.total = totals.total;
+      }
+
+      const c = clientById(inv.client_id);
+      return {
+        ...clone(inv),
+        client_name: c?.name || null,
+        client_company: c?.company || "",
+        effective_status: effectiveStatus(inv),
+      };
+    },
+
+    async setStatus(id, status) {
+      await delay();
+      const inv = store.invoices.find((i) => i.id === id);
+      if (!inv) throw { status: 404, message: "Invoice not found" };
+      if (!["draft", "sent", "paid"].includes(status)) {
+        throw { status: 422, message: `Invalid status: ${status}` };
+      }
+      inv.status = status;
+      if (status === "paid" && !inv.paid_at) inv.paid_at = nowIso();
+      if (status !== "paid") inv.paid_at = null;
+      const c = clientById(inv.client_id);
+      return {
+        ...clone(inv),
+        client_name: c?.name || null,
+        client_company: c?.company || "",
+        effective_status: effectiveStatus(inv),
+      };
+    },
+
+    async remove(id) {
+      await delay();
+      const before = store.invoices.length;
+      store.invoices = store.invoices.filter((i) => i.id !== id);
+      if (store.invoices.length === before) {
+        throw { status: 404, message: "Invoice not found" };
+      }
+      return { ok: true };
     },
   },
 

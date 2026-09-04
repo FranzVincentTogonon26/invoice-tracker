@@ -9,4 +9,5 @@ export const clearToken = () => localStorage.removeItem(TOKEN_KEY);
 export const authApi = {
   me: () => mock.auth.me(),
   login: (payload) => mock.auth.login(payload),
+  register: (payload) => mock.auth.register(payload),
 };

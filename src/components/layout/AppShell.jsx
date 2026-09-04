@@ -9,6 +9,14 @@ export function AppShell() {
   const location = useLocation();
   const [paletteOpen, setPaletteOpen] = useState(false);
 
+  // Close the palette when the route changes (adjust state during render —
+  // the documented alternative to a setState-in-effect).
+  const [lastPath, setLastPath] = useState(location.pathname);
+  if (lastPath !== location.pathname) {
+    setLastPath(location.pathname);
+    setPaletteOpen(false);
+  }
+
   const openPalette = useCallback(() => setPaletteOpen(true), []);
   const closePalette = useCallback(() => setPaletteOpen(false), []);
 
@@ -27,11 +35,6 @@ export function AppShell() {
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
   }, []);
-
-  // close on route change
-  useEffect(() => {
-    setPaletteOpen(false);
-  }, [location.pathname]);
 
   return (
     <div className="min-h-screen flex bg-[var(--bg)]">

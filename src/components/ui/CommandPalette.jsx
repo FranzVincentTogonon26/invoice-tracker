@@ -72,6 +72,14 @@ function scoreMatch(query, text) {
 }
 
 export function CommandPalette({ open, onClose }) {
+  return (
+    <AnimatePresence>
+      {open && <PaletteBody onClose={onClose} />}
+    </AnimatePresence>
+  );
+}
+
+function PaletteBody({ onClose }) {
   const navigate = useNavigate();
   const [query, setQuery] = useState("");
   const [activeIdx, setActiveIdx] = useState(0);
@@ -81,14 +89,11 @@ export function CommandPalette({ open, onClose }) {
   const { data: invoices } = useInvoices();
   const { data: clients } = useClients();
 
+  // Fresh mount on every open, so query/activeIdx start clean.
   useEffect(() => {
-    if (open) {
-      setQuery("");
-      setActiveIdx(0);
-      const t = setTimeout(() => inputRef.current?.focus(), 30);
-      return () => clearTimeout(t);
-    }
-  }, [open]);
+    const t = setTimeout(() => inputRef.current?.focus(), 30);
+    return () => clearTimeout(t);
+  }, []);
 
   const items = useMemo(() => {
     const invoiceItems = (invoices || []).map((i) => ({
@@ -120,8 +125,6 @@ export function CommandPalette({ open, onClose }) {
       .sort((a, b) => b.score - a.score)
       .map((x) => x.it);
   }, [invoices, clients, query]);
-
-  useEffect(() => setActiveIdx(0), [query]);
 
   useEffect(() => {
     const el = listRef.current?.querySelector(`[data-idx="${activeIdx}"]`);
@@ -216,89 +219,88 @@ export function CommandPalette({ open, onClose }) {
   }
 
   return (
-    <AnimatePresence>
-      {open && (
-        <motion.div
-          className="fixed inset-0 z-50 flex items-start justify-center pt-[14vh] px-4"
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          exit={{ opacity: 0 }}
-          transition={{ duration: 0.15 }}
-        >
-          <div
-            className="absolute inset-0 bg-[var(--ink)]/30 backdrop-blur-sm"
-            onClick={onClose}
+    <motion.div
+      className="fixed inset-0 z-50 flex items-start justify-center pt-[14vh] px-4"
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      exit={{ opacity: 0 }}
+      transition={{ duration: 0.15 }}
+    >
+      <div
+        className="absolute inset-0 bg-[var(--ink)]/30 backdrop-blur-sm"
+        onClick={onClose}
+      />
+      <motion.div
+        role="dialog"
+        aria-label="Command palette"
+        initial={{ opacity: 0, y: -8, scale: 0.98 }}
+        animate={{ opacity: 1, y: 0, scale: 1 }}
+        exit={{ opacity: 0, y: -4, scale: 0.98 }}
+        transition={{ duration: 0.18, ease: [0.16, 1, 0.3, 1] }}
+        className="relative w-full max-w-[640px] rounded-3xl bg-[var(--surface)] border border-[var(--border)] shadow-hover overflow-hidden"
+      >
+        <div className="flex items-center gap-3 px-5 h-14 border-b border-[var(--border)]">
+          <Search size={16} className="text-[var(--ink-muted)] shrink-0" />
+          <input
+            ref={inputRef}
+            value={query}
+            onChange={(e) => {
+              setQuery(e.target.value);
+              setActiveIdx(0);
+            }}
+            onKeyDown={handleKeyDown}
+            placeholder="Search invoices, clients, or jump to a page..."
+            className="flex-1 bg-transparent outline-none text-sm text-[var(--ink)] placeholder:text-[var(--ink-muted)]"
           />
-          <motion.div
-            role="dialog"
-            aria-label="Command palette"
-            initial={{ opacity: 0, y: -8, scale: 0.98 }}
-            animate={{ opacity: 1, y: 0, scale: 1 }}
-            exit={{ opacity: 0, y: -4, scale: 0.98 }}
-            transition={{ duration: 0.18, ease: [0.16, 1, 0.3, 1] }}
-            className="relative w-full max-w-[640px] rounded-3xl bg-[var(--surface)] border border-[var(--border)] shadow-hover overflow-hidden"
-          >
-            <div className="flex items-center gap-3 px-5 h-14 border-b border-[var(--border)]">
-              <Search size={16} className="text-[var(--ink-muted)] shrink-0" />
-              <input
-                ref={inputRef}
-                value={query}
-                onChange={(e) => setQuery(e.target.value)}
-                onKeyDown={handleKeyDown}
-                placeholder="Search invoices, clients, or jump to a page..."
-                className="flex-1 bg-transparent outline-none text-sm text-[var(--ink)] placeholder:text-[var(--ink-muted)]"
-              />
-              <kbd className="hidden sm:inline-flex items-center gap-1 text-[10px] px-2 h-6 rounded-md bg-[var(--surface-2)] text-[var(--ink-muted)] border border-[var(--border)] font-medium">
-                Esc
-              </kbd>
-            </div>
+          <kbd className="hidden sm:inline-flex items-center gap-1 text-[10px] px-2 h-6 rounded-md bg-[var(--surface-2)] text-[var(--ink-muted)] border border-[var(--border)] font-medium">
+            Esc
+          </kbd>
+        </div>
 
-            <div ref={listRef} className="max-h-[52vh] overflow-y-auto p-2">
-              {items.length === 0 && (
-                <div className="text-center text-sm text-[var(--ink-muted)] py-10">
-                  No matches for &ldquo;{query}&rdquo;
+        <div ref={listRef} className="max-h-[52vh] overflow-y-auto p-2">
+          {items.length === 0 && (
+            <div className="text-center text-sm text-[var(--ink-muted)] py-10">
+              No matches for &ldquo;{query}&rdquo;
+            </div>
+          )}
+
+          {groups.map((g) =>
+            g.items.length ? (
+              <div key={g.key} className="mb-1">
+                <div className="px-3 pt-2 pb-1 text-[10px] uppercase tracking-wider text-[var(--ink-muted)] font-semibold">
+                  {g.title}
                 </div>
-              )}
-
-              {groups.map((g) =>
-                g.items.length ? (
-                  <div key={g.key} className="mb-1">
-                    <div className="px-3 pt-2 pb-1 text-[10px] uppercase tracking-wider text-[var(--ink-muted)] font-semibold">
-                      {g.title}
-                    </div>
-                    <div className="flex flex-col gap-0.5">
-                      {g.items.map(renderItem)}
-                    </div>
-                  </div>
-                ) : null,
-              )}
-            </div>
-
-            <div className="flex items-center justify-between px-5 h-10 border-t border-[var(--border)] bg-[var(--surface-2)]/60 text-[11px] text-[var(--ink-muted)]">
-              <div className="flex items-center gap-3">
-                <span className="flex items-center gap-1">
-                  <kbd className="px-1.5 h-5 rounded bg-[var(--surface)] border border-[var(--border)] inline-flex items-center">
-                    ↑
-                  </kbd>
-                  <kbd className="px-1.5 h-5 rounded bg-[var(--surface)] border border-[var(--border)] inline-flex items-center">
-                    ↓
-                  </kbd>
-                  to navigate
-                </span>
-                <span className="flex items-center gap-1">
-                  <kbd className="px-1.5 h-5 rounded bg-[var(--surface)] border border-[var(--border)] inline-flex items-center">
-                    ↵
-                  </kbd>
-                  to select
-                </span>
+                <div className="flex flex-col gap-0.5">
+                  {g.items.map(renderItem)}
+                </div>
               </div>
-              <span>
-                {items.length} result{items.length === 1 ? "" : "s"}
-              </span>
-            </div>
-          </motion.div>
-        </motion.div>
-      )}
-    </AnimatePresence>
+            ) : null,
+          )}
+        </div>
+
+        <div className="flex items-center justify-between px-5 h-10 border-t border-[var(--border)] bg-[var(--surface-2)]/60 text-[11px] text-[var(--ink-muted)]">
+          <div className="flex items-center gap-3">
+            <span className="flex items-center gap-1">
+              <kbd className="px-1.5 h-5 rounded bg-[var(--surface)] border border-[var(--border)] inline-flex items-center">
+                ↑
+              </kbd>
+              <kbd className="px-1.5 h-5 rounded bg-[var(--surface)] border border-[var(--border)] inline-flex items-center">
+                ↓
+              </kbd>
+              to navigate
+            </span>
+            <span className="flex items-center gap-1">
+              <kbd className="px-1.5 h-5 rounded bg-[var(--surface)] border border-[var(--border)] inline-flex items-center">
+                ↵
+              </kbd>
+              to select
+            </span>
+          </div>
+          <span>
+            {items.length} result{items.length === 1 ? "" : "s"}
+          </span>
+        </div>
+      </motion.div>
+    </motion.div>
   );
 }

@@ -40,39 +40,19 @@ export function AuthProvider({ children }) {
     }
   }, [clearAuth]);
 
+  // Restore the session from a stored token on mount (e.g. after a refresh).
   useEffect(() => {
     let cancelled = false;
 
     (async () => {
-      if (!getToken()) {
-        if (!cancelled) {
-          clearAuth();
-          setLoading(false);
-        }
-        return;
-      }
-
-      try {
-        const { user } = await authApi.me();
-
-        if (!cancelled) {
-          setUser(user);
-        }
-      } catch {
-        if (!cancelled) {
-          clearAuth();
-        }
-      } finally {
-        if (!cancelled) {
-          setLoading(false);
-        }
-      }
+      if (cancelled) return;
+      await refresh();
     })();
 
     return () => {
       cancelled = true;
     };
-  }, [clearAuth]);
+  }, [refresh]);
 
   const handleAuth = useCallback(({ user, token }) => {
     setToken(token);
@@ -114,6 +94,7 @@ export function AuthProvider({ children }) {
   );
 }
 
+// eslint-disable-next-line react-refresh/only-export-components -- context + hook belong together
 export function useAuth() {
   const ctx = useContext(AuthContext);
 
