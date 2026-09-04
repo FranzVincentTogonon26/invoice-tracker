@@ -11,8 +11,8 @@ import {
   CornerDownLeft,
 } from "lucide-react";
 import { cn, formatMoney } from "@/lib/utils";
-// import { useInvoices } from "@/hooks/useInvoices";
-// import { useClients } from "@/hooks/useClients";
+import { useInvoices } from "@/hooks/useInvoices";
+import { useClients } from "@/hooks/useClients";
 
 const NAV_ITEMS = [
   {
@@ -78,11 +78,8 @@ export function CommandPalette({ open, onClose }) {
   const inputRef = useRef(null);
   const listRef = useRef(null);
 
-  //   const { data: invoices } = useInvoices();
-  //   const { data: clients } = useClients();
-
-  const { data: invoices } = null;
-  const { data: clients } = null;
+  const { data: invoices } = useInvoices();
+  const { data: clients } = useClients();
 
   useEffect(() => {
     if (open) {

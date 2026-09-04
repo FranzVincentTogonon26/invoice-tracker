@@ -5,22 +5,20 @@ import {
   Users,
   Receipt,
   Wallet,
-  Package,
   BarChart3,
   Settings,
   LogOut,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/context/AuthContext";
-// import AILogo from "./AILogo";
+import AILogo from "../ui/AILogo";
 
 const NAV = [
   { to: "/dashboard", icon: LayoutGrid, label: "Dashboard" },
-  { to: "/invoices", icon: FileText, label: "Invoices" },
-  { to: "/clients", icon: Users, label: "Clients" },
+  { to: "/budget", icon: FileText, label: "Budget" },
+  { to: "/employee", icon: Users, label: "Employee" },
   { to: "/expenses", icon: Receipt, label: "Expenses" },
   { to: "/payments", icon: Wallet, label: "Payments" },
-  { to: "/items", icon: Package, label: "Items" },
   { to: "/reports", icon: BarChart3, label: "Reports" },
 ];
 
@@ -112,17 +110,17 @@ export function Sidebar() {
           )}
         >
           <div className="h-12 w-12 flex items-center justify-center shrink-0">
-            {/* <AILogo /> */}
+            <AILogo />
           </div>
           <span
             className={cn(
-              "ml-2 font-display text-base font-semibold text-[var(--ink)] whitespace-nowrap",
+              "ml-0 font-display text-base font-semibold text-[var(--ink)] whitespace-nowrap",
               "opacity-0 -translate-x-1",
               "transition-[opacity,transform] duration-200 ease-out",
               "group-hover/sidebar:opacity-100 group-hover/sidebar:translate-x-0 group-hover/sidebar:delay-100",
             )}
           >
-            Invoicer
+            Invoice Tracker
           </span>
         </div>
 
