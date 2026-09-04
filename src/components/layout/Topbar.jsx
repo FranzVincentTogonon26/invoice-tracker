@@ -1,18 +1,18 @@
-import { Sun, Moon } from "lucide-react";
+import { Sun, Moon, Search } from "lucide-react";
 import { IconButton } from "@/components/ui/IconButton";
 import { useTheme } from "@/context/ThemeContext";
 import { useAuth } from "@/context/AuthContext";
 import { NotificationsPopover } from "../ui/NotificationsPopover";
 
 
-export function Topbar() {
+export function Topbar({ onOpenPalette }) {
   const { theme, toggle } = useTheme();
   const { user } = useAuth();
   const firstName = user?.name?.split(" ")[0] || "there";
 
-  // const isMac =
-  //   typeof navigator !== "undefined" &&
-  //   /Mac|iPhone|iPad/i.test(navigator.platform);
+  const isMac =
+    typeof navigator !== "undefined" &&
+    /Mac|iPhone|iPad/i.test(navigator.platform);
 
   return (
     <header className="flex items-start justify-between gap-6 mb-8">
@@ -26,7 +26,7 @@ export function Topbar() {
       </div>
 
       <div className="flex items-center gap-3 shrink-0">
-        {/* <button
+        <button
           type="button"
           onClick={onOpenPalette}
           className="hidden lg:flex items-center gap-3 h-11 w-[360px] rounded-full bg-[var(--surface)] border border-[var(--border)] pl-5 pr-1.5 shadow-card transition-shadow hover:shadow-hover text-left"
@@ -46,7 +46,7 @@ export function Topbar() {
           className="lg:hidden"
         >
           <Search size={16} />
-        </IconButton> */}
+        </IconButton>
 
         <IconButton onClick={toggle} title="Toggle theme">
           {theme === "light" ? <Moon size={16} /> : <Sun size={16} />}

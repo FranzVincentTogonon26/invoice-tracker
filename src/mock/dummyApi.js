@@ -1,5 +1,5 @@
 import { getToken } from "../api/auth";
-import { store, round2, effectiveStatus } from "./dummyData";
+import { store, round2, effectiveStatus, nid  } from "./dummyData";
 
 const iso = (d) => d.toISOString();
 const daysAgo = (n) => {
@@ -12,6 +12,7 @@ const delay = (ms = 280) => new Promise((r) => setTimeout(r, ms));
 const clone = (o) => JSON.parse(JSON.stringify(o));
 
 const clientById = (id) => store.clients.find((c) => c.id === id) || null;
+const nowIso = () => new Date().toISOString();
 
 const user = {
   id: "user_demo",
@@ -36,7 +37,12 @@ function lastMonths(n) {
   const arr = [];
   for (let i = n - 1; i >= 0; i--) {
     const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
-    arr.push({ d, label: d.toLocaleString("en-US", { month: "short" }), ym: `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`, key: `${d.getFullYear()}-${d.getMonth()}` });
+    arr.push({
+      d,
+      label: d.toLocaleString("en-US", { month: "short" }),
+      ym: `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`,
+      key: `${d.getFullYear()}-${d.getMonth()}`,
+    });
   }
   return arr;
 }
@@ -44,7 +50,12 @@ function lastMonths(n) {
 function serInvoiceList(inv) {
   const c = clientById(inv.client_id);
   const { items, ...rest } = inv; // eslint-disable-line no-unused-vars
-  return { ...rest, client_name: c?.name || null, client_company: c?.company || "", effective_status: effectiveStatus(inv) };
+  return {
+    ...rest,
+    client_name: c?.name || null,
+    client_company: c?.company || "",
+    effective_status: effectiveStatus(inv),
+  };
 }
 
 export const mock = {
@@ -134,6 +145,84 @@ export const mock = {
         revenueSeries: series,
         recentInvoices: recent,
       };
+    },
+  },
+
+  /* ── Clients ── */
+  clients: {
+    async list() {
+      await delay();
+      return store.clients.map((c) => {
+        const invs = store.invoices.filter((i) => i.client_id === c.id);
+        return {
+          ...clone(c),
+          invoice_count: invs.length,
+          total_billed: round2(invs.reduce((s, i) => s + i.total, 0)),
+          outstanding: round2(
+            invs
+              .filter((i) => i.status !== "paid")
+              .reduce((s, i) => s + i.total, 0),
+          ),
+        };
+      });
+    },
+    async get(id) {
+      await delay();
+      const client = clientById(id);
+      if (!client) throw { status: 404, message: "Client not found" };
+      const invoices = store.invoices
+        .filter((i) => i.client_id === id)
+        .map((i) => ({
+          id: i.id,
+          invoice_number: i.invoice_number,
+          status: i.status,
+          issue_date: i.issue_date,
+          due_date: i.due_date,
+          total: i.total,
+          currency: i.currency,
+          created_at: i.created_at,
+        }));
+      const totalBilled = round2(invoices.reduce((s, i) => s + i.total, 0));
+      const outstanding = round2(
+        invoices
+          .filter((i) => i.status !== "paid")
+          .reduce((s, i) => s + i.total, 0),
+      );
+      return {
+        client: clone(client),
+        invoices,
+        stats: { totalBilled, outstanding, count: invoices.length },
+      };
+    },
+    async create(payload) {
+      await delay();
+      const client = {
+        id: nid("cl"),
+        name: payload.name,
+        email: payload.email || "",
+        company: payload.company || "",
+        phone: payload.phone || "",
+        address: payload.address || "",
+        notes: payload.notes || "",
+        created_at: nowIso(),
+      };
+      store.clients.unshift(client);
+      return clone(client);
+    },
+    async update(id, payload) {
+      await delay();
+      const client = clientById(id);
+      if (!client) throw { status: 404, message: "Client not found" };
+      Object.assign(client, payload);
+      return clone(client);
+    },
+    async remove(id) {
+      await delay();
+      store.clients = store.clients.filter((c) => c.id !== id);
+      store.invoices.forEach((i) => {
+        if (i.client_id === id) i.client_id = null;
+      });
+      return { ok: true };
     },
   },
 };
