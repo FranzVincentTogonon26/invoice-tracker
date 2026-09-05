@@ -5,12 +5,10 @@ import {
   AuthField,
   AuthPrimaryButton,
 } from "@/components/auth/AuthShell";
-import { ArrowRight, Loader2, Lock, Mail, Sparkles } from "lucide-react";
+import { ArrowRight, Loader2, Lock, Mail } from "lucide-react";
 import { Link, useNavigate } from "react-router-dom";
 import { useAuth } from "@/context/AuthContext";
 import { useState } from "react";
-
-const DEMO = { email: "franzvincenttogonon@gmail.com", password: "123456" };
 
 export default function Login() {
   const { login } = useAuth();
@@ -19,11 +17,6 @@ export default function Login() {
   const [loading, setLoading] = useState(false);
   const [form, setForm] = useState({ email: "", password: "" });
   const [err, setErr] = useState("");
-
-  function fillDemo() {
-    setForm({ ...DEMO });
-    setErr("");
-  }
 
   async function onSubmit(e) {
     e.preventDefault();
@@ -98,22 +91,6 @@ export default function Login() {
               )}
             </AuthPrimaryButton>
           </div>
-
-          <div className="flex items-center gap-3">
-            <div className="h-px flex-1 bg-[var(--border)]" />
-            <span className="text-[11px] uppercase tracking-wider text-[var(--ink-muted)] font-semibold">
-              or
-            </span>
-            <div className="h-px flex-1 bg-[var(--border)]" />
-          </div>
-
-          <button
-            type="button"
-            onClick={fillDemo}
-            className="w-full h-12 rounded-2xl border border-dashed border-[var(--accent)]/40 bg-[var(--accent-soft)]/40 text-sm font-semibold text-[var(--accent-strong)] hover:bg-[var(--accent-soft)] transition-colors inline-flex items-center justify-center gap-2"
-          >
-            <Sparkles size={14} /> Use demo credentials
-          </button>
         </form>
 
         <div className="text-sm text-[var(--ink-muted)] text-center mt-8">

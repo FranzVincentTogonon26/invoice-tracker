@@ -1,13 +1,13 @@
-import { mock } from "../mock/dummyApi";
+import { apiClient, clearToken, getToken, setToken } from "./client";
 
-const TOKEN_KEY = "token";
-
-export const getToken = () => localStorage.getItem(TOKEN_KEY);
-export const setToken = (token) => localStorage.setItem(TOKEN_KEY, token);
-export const clearToken = () => localStorage.removeItem(TOKEN_KEY);
+// Re-exported so consumers can import token helpers alongside the auth API
+export { clearToken, getToken, setToken };
 
 export const authApi = {
-  me: () => mock.auth.me(),
-  login: (payload) => mock.auth.login(payload),
-  register: (payload) => mock.auth.register(payload),
+  me: () => apiClient.get("/auth/me").then((r) => r.data),
+  login: (payload) =>
+    apiClient.post("/auth/login", payload).then((r) => r.data),
+  register: (payload) =>
+    apiClient.post("/auth/register", payload).then((r) => r.data),
+  logout: () => apiClient.post("/auth/logout").then((r) => r.data),
 };

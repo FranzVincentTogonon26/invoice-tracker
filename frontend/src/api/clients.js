@@ -1,4 +1,4 @@
-import { mock } from "@/mock/dummyApi";
+// import { mock } from "@/mock/dummyApi";
 // import { apiClient } from "./client";
 
 export const clientsApi = {
@@ -10,9 +10,9 @@ export const clientsApi = {
   // remove: (id) => apiClient.delete(`/clients/${id}`).then((r) => r.data),
 
   // ── Mock (local data) ──
-  list: () => mock.clients.list(),
-  get: (id) => mock.clients.get(id),
-  create: (payload) => mock.clients.create(payload),
-  update: (id, payload) => mock.clients.update(id, payload),
-  remove: (id) => mock.clients.remove(id),
+  // list: () => mock.clients.list(),
+  // get: (id) => mock.clients.get(id),
+  // create: (payload) => mock.clients.create(payload),
+  // update: (id, payload) => mock.clients.update(id, payload),
+  // remove: (id) => mock.clients.remove(id),
 };

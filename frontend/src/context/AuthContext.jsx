@@ -55,6 +55,9 @@ export function AuthProvider({ children }) {
   }, [refresh]);
 
   const handleAuth = useCallback(({ user, token }) => {
+    if (!token) {
+      throw new Error("Authentication failed: no token received.");
+    }
     setToken(token);
     setUser(user);
   }, []);
@@ -68,7 +71,20 @@ export function AuthProvider({ children }) {
 
   const register = useCallback(
     async (payload) => {
-      handleAuth(await authApi.register(payload));
+      const response = await authApi.register(payload);
+
+      // Accounts created with a pending status get no token until an admin
+      // approves them — surface the message instead of storing a fake session.
+      if (!response.token) {
+        const pendingError = new Error(
+          response.message ||
+            "Account created. It is awaiting administrator approval.",
+        );
+        pendingError.accountPending = true;
+        throw pendingError;
+      }
+
+      handleAuth(response);
     },
     [handleAuth],
   );

@@ -1,4 +1,4 @@
-import { mock } from "@/mock/dummyApi";
+// import { mock } from "@/mock/dummyApi";
 // import { apiClient } from "./client";
 
 export const invoicesApi = {
@@ -11,10 +11,10 @@ export const invoicesApi = {
   // remove: (id) => apiClient.delete(`/invoices/${id}`).then((r) => r.data),
 
   // ── Mock (local data) ──
-  list: (params = {}) => mock.invoices.list(params),
-  get: (id) => mock.invoices.get(id),
-  create: (payload) => mock.invoices.create(payload),
-  update: (id, payload) => mock.invoices.update(id, payload),
-  setStatus: (id, status) => mock.invoices.setStatus(id, status),
-  remove: (id) => mock.invoices.remove(id),
+  // list: (params = {}) => mock.invoices.list(params),
+  // get: (id) => mock.invoices.get(id),
+  // create: (payload) => mock.invoices.create(payload),
+  // update: (id, payload) => mock.invoices.update(id, payload),
+  // setStatus: (id, status) => mock.invoices.setStatus(id, status),
+  // remove: (id) => mock.invoices.remove(id),
 };

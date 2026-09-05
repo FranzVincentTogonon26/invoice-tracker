@@ -1,4 +1,4 @@
-import { mock } from "@/mock/dummyApi";
+// import { mock } from "@/mock/dummyApi";
 // import { apiClient } from "./client";
 
 export const dashboardApi = {
@@ -6,5 +6,5 @@ export const dashboardApi = {
   // get: () => apiClient.get("/dashboard").then((r) => r.data),
 
   // ── Mock (local data) ──
-  get: () => mock.dashboard.get(),
+  // get: () => mock.dashboard.get(),
 };
