@@ -69,22 +69,37 @@ export function AuthProvider({ children }) {
     [handleAuth],
   );
 
+  const issuedOtp = useCallback(async (payload) => {
+    return authApi.issuedOtp(payload);
+  }, []);
+
   const register = useCallback(
     async (payload) => {
       const response = await authApi.register(payload);
 
-      // Accounts created with a pending status get no token until an admin
-      // approves them — surface the message instead of storing a fake session.
-      if (!response.token) {
-        const pendingError = new Error(
-          response.message ||
-            "Account created. It is awaiting administrator approval.",
-        );
-        pendingError.accountPending = true;
-        throw pendingError;
+      // Only the first user (admin, active) receives a token at registration
+      // and gets an immediate session. Employees are pending approval — the
+      // backend sends no token, so they stay unauthenticated (see Register).
+      if (response.token) {
+        handleAuth(response);
       }
 
-      handleAuth(response);
+      return response;
+    },
+    [handleAuth],
+  );
+
+  const verifyOtp = useCallback(
+    async (payload) => {
+      const response = await authApi.verifyOtp(payload);
+
+      // Active users get a token and an immediate session; pending users
+      // still await administrator approval (response.message explains it).
+      if (response.token) {
+        handleAuth(response);
+      }
+
+      return response;
     },
     [handleAuth],
   );
@@ -94,6 +109,10 @@ export function AuthProvider({ children }) {
     setLoading(false);
   }, [clearAuth]);
 
+  const resendOtp = useCallback(async (payload) => {
+    return authApi.resendOtp(payload);
+  }, []);
+
   return (
     <AuthContext.Provider
       value={{
@@ -102,6 +121,9 @@ export function AuthProvider({ children }) {
         refresh,
         login,
         register,
+        issuedOtp,
+        verifyOtp,
+        resendOtp,
         logout,
       }}
     >

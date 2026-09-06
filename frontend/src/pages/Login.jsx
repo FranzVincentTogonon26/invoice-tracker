@@ -25,8 +25,8 @@ export default function Login() {
     try {
       await login(form);
       nav("/dashboard");
-    } catch (e) {
-      setErr(e.message || "Login failed");
+    } catch (error) {
+      setErr(error.message || "Login failed");
     } finally {
       setLoading(false);
     }

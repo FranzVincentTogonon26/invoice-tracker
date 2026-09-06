@@ -26,13 +26,26 @@ class User {
 
   // Create User (hashes the plaintext password before storing)
   static async createUser({ name, email, password }) {
+    let role,
+      status = null;
     const hashedPassword = await bcrypt.hash(password, SALT_ROUNDS);
 
+    const countUsers = await query(`SELECT COUNT(*) FROM users`);
+    if (parseInt(countUsers.rows[0].count) === 0) {
+      // If this is the first user, make them an admin and active by default
+      role = "admin";
+      status = "active";
+    } else {
+      // Otherwise, new users are created with a pending status and no role
+      role = "employee";
+      status = "pending";
+    }
+
     const result = await query(
-      `INSERT INTO users (name, email, password)
-       VALUES ($1, $2, $3)
+      `INSERT INTO users (name, email, password, role, status)
+       VALUES ($1, $2, $3, $4, $5)
        RETURNING ${SAFE_COLUMNS}`,
-      [name, email, hashedPassword],
+      [name, email, hashedPassword, role, status],
     );
     return result.rows[0];
   }

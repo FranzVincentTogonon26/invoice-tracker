@@ -9,26 +9,66 @@ import { ArrowRight, Loader2, Lock, Mail, User } from "lucide-react";
 import { Link, useNavigate } from "react-router-dom";
 import { useAuth } from "@/context/AuthContext";
 import { useState } from "react";
+import { OtpModal } from "@/components/auth/OtpModal";
 
 export default function Register() {
-  const { register } = useAuth();
+  const { register, issuedOtp, verifyOtp, resendOtp } = useAuth();
   const nav = useNavigate();
   const [form, setForm] = useState({ name: "", email: "", password: "" });
   const [err, setErr] = useState("");
+  const [notice, setNotice] = useState("");
   const [loading, setLoading] = useState(false);
+  const [showOtp, setShowOtp] = useState(false);
 
   async function onSubmit(e) {
     e.preventDefault();
     setErr("");
+    setNotice("");
     setLoading(true);
     try {
-      await register(form);
-      nav("/dashboard");
+      // Creates the account — the backend emails the OTP via Resend
+      await issuedOtp({ email: form.email, name: form.name });
+      setShowOtp(true);
     } catch (e) {
       setErr(e.message || "Registration failed");
     } finally {
       setLoading(false);
     }
+  }
+
+  // Called by the OTP modal when the user submits the 6-digit code
+  async function onVerified(code) {
+    await verifyOtp({ email: form.email, otp: code });
+    setShowOtp(false);
+    try {
+      const result = await register(form);
+
+      // Admins receive a token at registration — start the session and go
+      // straight to the dashboard.
+      if (result.token) {
+        nav("/dashboard");
+        return;
+      }
+
+      // Employees get no token (pending approval) — stay on this page and
+      // explain why, instead of showing it as an error.
+      setNotice(
+        result.message ||
+          "Your account is awaiting administrator approval.",
+      );
+      setForm({
+        name: "",
+        email: "",
+        password: "",
+      });
+    } catch (err) {
+      setErr(err.message || "Something went wrong during registration.");
+    }
+  }
+
+  // Called by the OTP modal's resend button
+  async function onResend() {
+    await resendOtp({ email: form.email, name: form.name });
   }
   return (
     <AuthShell
@@ -84,6 +124,12 @@ export default function Register() {
             icon={Lock}
           />
 
+          {notice && (
+            <div className="text-xs text-[var(--accent-strong)] bg-[var(--accent)]/10 rounded-2xl px-4 py-4 leading-snug">
+              {notice}
+            </div>
+          )}
+
           <AuthErrorBanner>{err}</AuthErrorBanner>
 
           <div className="pt-1">
@@ -118,6 +164,14 @@ export default function Register() {
           We never share your billing data with third parties.
         </p>
       </motion.div>
+
+      <OtpModal
+        open={showOtp}
+        email={form.email}
+        onClose={() => setShowOtp(false)}
+        onVerify={onVerified}
+        onResend={onResend}
+      />
     </AuthShell>
   );
 }

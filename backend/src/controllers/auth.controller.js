@@ -1,12 +1,28 @@
 import bcrypt from "bcryptjs";
+import crypto from "node:crypto";
 import User from "../models/user.model.js";
+import Otp from "../models/otp.model.js";
 import ApiError from "../utils/ApiError.js";
 import jwtToken from "../utils/jwt.js";
 import { validate } from "../utils/validate.js";
-import { loginSchema, registerSchema } from "../validations/auth.validation.js";
+import { sendOtpEmail, OTP_EXPIRY_MINUTES } from "../utils/mailer.js";
+import {
+  loginSchema,
+  registerSchema,
+  verifyOtpSchema,
+  resendOtpSchema,
+} from "../validations/auth.validation.js";
 
 // Strips sensitive fields before a user object is returned to clients
 const sanitize = ({ password, ...safe }) => safe;
+
+const OTP_TTL_MS = OTP_EXPIRY_MINUTES * 60 * 1000;
+const OTP_RESEND_COOLDOWN_MS = 45 * 1000;
+const OTP_SALT_ROUNDS = 10;
+
+const code = crypto.randomInt(0, 1_000_000).toString().padStart(6, "0");
+const otpHash = await bcrypt.hash(code, OTP_SALT_ROUNDS);
+const expiresAt = new Date(Date.now() + OTP_TTL_MS);
 
 const ensureUserCanLogin = (user) => {
   if (user.status === "active") return;
@@ -35,6 +51,30 @@ const buildAuthResponse = (user) => {
   return { user: sanitize(user), token };
 };
 
+export const issuedOtp = async (req, res, next) => {
+  try {
+    const { email, name } = validate(resendOtpSchema, req.body);
+
+    await sendOtpEmail({
+      to: email,
+      name,
+      otp: code,
+    });
+
+    await Otp.upsert({
+      email,
+      otpHash,
+      expiresAt,
+    });
+
+    return res.json({
+      message: `Successfully issued 6-digit verification code. Please check your email: ${email}`,
+    });
+  } catch (err) {
+    next(err);
+  }
+};
+
 export const login = async (req, res, next) => {
   try {
     const { email, password } = validate(loginSchema, req.body);
@@ -54,7 +94,6 @@ export const login = async (req, res, next) => {
     ensureUserCanLogin(user);
 
     return res.json({
-      message: "Signed in successfully.",
       ...buildAuthResponse(user),
     });
   } catch (err) {
@@ -78,16 +117,82 @@ export const register = async (req, res, next) => {
       password,
     });
 
-    if (user.status.toLowerCase() !== "active") {
-      return res.status(201).json({
-        message:
-          "Your account has been created and is awaiting administrator approval.",
+    if (user.role === "admin" && user.status === "active") {
+      return res.json({
+        ...buildAuthResponse(user),
       });
     }
 
-    return res.status(201).json({
-      message: "Account created successfully.",
-      ...buildAuthResponse(user),
+    return res.json({
+      message:
+        "Email verified. Your account is awaiting administrator approval.",
+    });
+  } catch (err) {
+    next(err);
+  }
+};
+
+export const verifyOtp = async (req, res, next) => {
+  try {
+    const { email, otp } = validate(verifyOtpSchema, req.body);
+
+    const record = await Otp.findByEmail(email);
+
+    if (!record || new Date(record.expires_at) <= new Date()) {
+      throw ApiError.badRequest(
+        "Invalid or expired verification code.",
+        "OTP_INVALID",
+      );
+    }
+
+    const matches = await bcrypt.compare(otp, record.otp);
+
+    if (!matches) {
+      throw ApiError.badRequest(
+        "Invalid or expired verification code.",
+        "OTP_INVALID",
+      );
+    }
+
+    await Otp.deleteByEmail(email);
+    return res.json({
+      message: "Email verified successfully.",
+    });
+  } catch (err) {
+    next(err);
+  }
+};
+
+export const resendOtp = async (req, res, next) => {
+  try {
+    const { email, name } = validate(resendOtpSchema, req.body);
+
+    const emailExist = await Otp.findByEmail(email);
+
+    // Basic anti-spam cooldown while a code is still unverified
+    if (
+      emailExist &&
+      Date.now() - new Date(emailExist.created_at).getTime() <
+        OTP_RESEND_COOLDOWN_MS
+    ) {
+      throw ApiError.tooManyRequests(
+        "Please wait a moment before requesting another code.",
+        "OTP_RATE_LIMITED",
+      );
+    }
+
+    if (emailExist) {
+      await Otp.upsert({ email, otpHash, expiresAt });
+      await sendOtpEmail({ to: email, name, otp: code });
+
+      return res.json({
+        message: `Successfully issued 6-digit verification code. Please check your email: ${email}`,
+      });
+    }
+
+    // Generic message — never reveal whether the account exists
+    return res.json({
+      message: "If that account exists, a new verification code is on its way.",
     });
   } catch (err) {
     next(err);

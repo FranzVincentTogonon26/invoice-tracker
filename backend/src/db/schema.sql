@@ -19,9 +19,9 @@ CREATE TABLE IF NOT EXISTS users (
 -- OTP
 
 CREATE TABLE IF NOT EXISTS otp (
-    user_id         UUID PRIMARY KEY REFERENCES users(user_id) ON DELETE CASCADE,
+    id              UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     otp             VARCHAR(255) NOT NULL,
-    status          INTEGER NOT NULL DEFAULT 0,
+    email           VARCHAR(255) UNIQUE NOT NULL,
     expires_at      TIMESTAMPTZ NOT NULL,
     created_at      TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
