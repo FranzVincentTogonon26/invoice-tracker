@@ -20,9 +20,15 @@ const OTP_TTL_MS = OTP_EXPIRY_MINUTES * 60 * 1000;
 const OTP_RESEND_COOLDOWN_MS = 45 * 1000;
 const OTP_SALT_ROUNDS = 10;
 
-const code = crypto.randomInt(0, 1_000_000).toString().padStart(6, "0");
-const otpHash = await bcrypt.hash(code, OTP_SALT_ROUNDS);
-const expiresAt = new Date(Date.now() + OTP_TTL_MS);
+// Each request must generate a FRESH code. A module-level code would be shared
+// by every user, and its expiry would be frozen at server boot — after ~10
+// minutes every verification would fail until the next restart.
+const generateOtp = async () => {
+  const code = crypto.randomInt(0, 1_000_000).toString().padStart(6, "0");
+  const otpHash = await bcrypt.hash(code, OTP_SALT_ROUNDS);
+  const expiresAt = new Date(Date.now() + OTP_TTL_MS);
+  return { code, otpHash, expiresAt };
+};
 
 const ensureUserCanLogin = (user) => {
   if (user.status === "active") return;
@@ -54,6 +60,7 @@ const buildAuthResponse = (user) => {
 export const issuedOtp = async (req, res, next) => {
   try {
     const { email, name } = validate(resendOtpSchema, req.body);
+    const { code, otpHash, expiresAt } = await generateOtp();
 
     await sendOtpEmail({
       to: email,
@@ -139,13 +146,13 @@ export const verifyOtp = async (req, res, next) => {
     const record = await Otp.findByEmail(email);
 
     if (!record || new Date(record.expires_at) <= new Date()) {
-      throw ApiError.badRequest("Invalid verification code.", "OTP_INVALID");
+      throw ApiError.badRequest("Expired verification code.", "OTP_EXPIRED");
     }
 
     const matches = await bcrypt.compare(otp, record.otp);
 
     if (!matches) {
-      throw ApiError.badRequest("Expired verification code.", "OTP_INVALID");
+      throw ApiError.badRequest("Invalid verification code.", "OTP_INVALID");
     }
 
     await Otp.deleteByEmail(email);
@@ -176,8 +183,12 @@ export const resendOtp = async (req, res, next) => {
     }
 
     if (emailExist) {
-      await Otp.upsert({ email, otpHash, expiresAt });
+      const { code, otpHash, expiresAt } = await generateOtp();
+
+      // Send first, then persist — if sending fails, the previous (still
+      // valid) code is not lost, and the user can retry the resend.
       await sendOtpEmail({ to: email, name, otp: code });
+      await Otp.upsert({ email, otpHash, expiresAt });
 
       return res.json({
         message: `Successfully issued 6-digit verification code. Please check your email: ${email}`,

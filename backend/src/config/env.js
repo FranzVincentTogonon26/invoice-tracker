@@ -1,5 +1,12 @@
+import path from "node:path";
+import { fileURLToPath } from "node:url";
 import dotenv from "dotenv";
-dotenv.config({ quiet: true });
+
+// Resolve .env relative to the backend package root (backend/.env) so the app
+// boots no matter which directory the npm script is invoked from. Without this,
+// dotenv looks in process.cwd() — e.g. backend/ — and finds nothing.
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
+dotenv.config({ path: path.resolve(__dirname, "../../.env"), quiet: true });
 
 export const ENV = {
   PORT: process.env.PORT || 8000,
@@ -9,11 +16,17 @@ export const ENV = {
   JWT_SECRET: process.env.JWT_SECRET,
   DATABASE_URL: process.env.DATABASE_URL,
   RESEND_API_KEY: process.env.RESEND_API_KEY,
-  EMAIL_FROM: process.env.EMAIL_FROM || "Invoice Tracker <onboarding@resend.dev>",
+  EMAIL_FROM:
+    process.env.EMAIL_FROM || "Invoice Tracker <onboarding@resend.dev>",
 };
 
 // Fail fast with a clear message instead of failing obscurely at request time
-const REQUIRED_ENV_KEYS = ["JWT_SECRET", "DATABASE_URL", "CLIENT_URL", "RESEND_API_KEY"];
+const REQUIRED_ENV_KEYS = [
+  "JWT_SECRET",
+  "DATABASE_URL",
+  "CLIENT_URL",
+  "RESEND_API_KEY",
+];
 
 for (const key of REQUIRED_ENV_KEYS) {
   if (!ENV[key]) {
