@@ -41,7 +41,7 @@ function NavItem({ to, icon: Icon, label }) {
           className={cn(
             ROW_BASE,
             isActive
-              ? "bg-[var(--ink)] text-[var(--bg)] shadow-card"
+              ? "bg-[var(--accent-soft)] text-[var(--accent-strong)] shadow-card"
               : "text-[var(--ink-muted)] hover:bg-[var(--surface-2)] hover:text-[var(--ink)]",
           )}
         >

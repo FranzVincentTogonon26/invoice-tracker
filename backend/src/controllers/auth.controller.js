@@ -139,19 +139,13 @@ export const verifyOtp = async (req, res, next) => {
     const record = await Otp.findByEmail(email);
 
     if (!record || new Date(record.expires_at) <= new Date()) {
-      throw ApiError.badRequest(
-        "Invalid or expired verification code.",
-        "OTP_INVALID",
-      );
+      throw ApiError.badRequest("Invalid verification code.", "OTP_INVALID");
     }
 
     const matches = await bcrypt.compare(otp, record.otp);
 
     if (!matches) {
-      throw ApiError.badRequest(
-        "Invalid or expired verification code.",
-        "OTP_INVALID",
-      );
+      throw ApiError.badRequest("Expired verification code.", "OTP_INVALID");
     }
 
     await Otp.deleteByEmail(email);
