@@ -2,8 +2,7 @@ import { Sun, Moon, Search } from "lucide-react";
 import { IconButton } from "@/components/ui/IconButton";
 import { useTheme } from "@/context/ThemeContext";
 import { useAuth } from "@/context/AuthContext";
-import { NotificationsPopover } from "../ui/NotificationsPopover";
-
+import { NotificationsPopover } from "../../ui/NotificationsPopover";
 
 export function Topbar({ onOpenPalette }) {
   const { theme, toggle } = useTheme();

@@ -1,19 +1,83 @@
 import { createBrowserRouter, Navigate } from "react-router-dom";
 
-import RootRedirect from "@/components/auth/RootRedirect";
-import ProtectedShell from "@/components/auth/ProtectedShell";
+import RootRedirect from "../components/auth/RootRedirect";
+import ProtectedShell from "../components/auth/ProtectedShell";
+import RoleGuard from "../components/auth/RoleGuard";
 
-import Login from "@/pages/Login";
-import Register from "@/pages/Register";
-import Dashboard from "@/pages/Dashboard";
+import AdminShell from "../components/layout/AdminShell";
+import EmployeeShell from "../components/layout/EmployeeShell";
+
+import Login from "../pages/Login";
+import Register from "../pages/Register";
+
+import AdminDashboard from "../pages/admin/AdminDashboard";
+import AdminEmployees from "../pages/admin/AdminEmployees";
+import AdminProfile from "../pages/admin/AdminProfile";
+
+import EmployeeDashboard from "../pages/employee/EmployeeDashboard";
+import EmployeeProfile from "../pages/employee/EmployeeProfile";
+
+import { USER_ROLES } from "../constants";
 
 export const router = createBrowserRouter([
-  { path: "/", element: <RootRedirect /> },
-  { path: "/login", element: <Login /> },
-  { path: "/register", element: <Register /> },
+  {
+    path: "/",
+    element: <RootRedirect />,
+  },
+  {
+    path: "/login",
+    element: <Login />,
+  },
+  {
+    path: "/register",
+    element: <Register />,
+  },
   {
     element: <ProtectedShell />,
-    children: [{ path: "/dashboard", element: <Dashboard /> }],
+    children: [
+      {
+        element: <RoleGuard allowedRoles={[USER_ROLES.ADMIN]} />,
+        children: [
+          {
+            path: "/admin",
+            element: <AdminShell />,
+            children: [
+              {
+                path: "dashboard",
+                element: <AdminDashboard />,
+              },
+              {
+                path: "employees",
+                element: <AdminEmployees />,
+              },
+              {
+                path: "profile",
+                element: <AdminProfile />,
+              },
+            ],
+          },
+        ],
+      },
+      {
+        element: <RoleGuard allowedRoles={[USER_ROLES.EMPLOYEE]} />,
+        children: [
+          {
+            path: "/employee",
+            element: <EmployeeShell />,
+            children: [
+              {
+                path: "dashboard",
+                element: <EmployeeDashboard />,
+              },
+              {
+                path: "profile",
+                element: <EmployeeProfile />,
+              },
+            ],
+          },
+        ],
+      },
+    ],
   },
   {
     path: "*",

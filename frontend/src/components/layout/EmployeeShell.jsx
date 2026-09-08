@@ -1,11 +1,11 @@
 import { AnimatePresence, motion } from "framer-motion";
-import { Topbar } from "./Topbar";
-import { Sidebar } from "./Sidebar";
+import { Topbar } from "./admin/Topbar";
+import { Sidebar } from "./admin/Sidebar";
 import { Outlet, useLocation } from "react-router-dom";
 import { useCallback, useEffect, useState } from "react";
 import { CommandPalette } from "../ui/CommandPalette";
 
-export function AppShell() {
+export default function EmployeeShell() {
   const location = useLocation();
   const [paletteOpen, setPaletteOpen] = useState(false);
 
