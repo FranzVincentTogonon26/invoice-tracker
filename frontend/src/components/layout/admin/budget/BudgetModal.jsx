@@ -6,6 +6,12 @@ import { Select, PAYMENT_METHODS } from "../../../ui/Select";
 import { Button } from "../../../ui/Button";
 import { useBudgetMutations } from "../../../../hooks/useBudget";
 
+const initialForm = {
+  description: "",
+  amount: "",
+  method: "",
+};
+
 function Field({ label, children }) {
   return (
     <label className="block">
@@ -19,18 +25,52 @@ function Field({ label, children }) {
 
 const BudgetModal = ({ open, onClose }) => {
   const { create } = useBudgetMutations();
-  const [form, setForm] = useState(null);
+  const [form, setForm] = useState(initialForm);
   const [err, setErr] = useState("");
   const [saving, setSaving] = useState(false);
 
   const set = (k) => (e) => setForm((f) => ({ ...f, [k]: e.target.value }));
 
+  const handleClose = () => {
+    if (saving) return;
+
+    setForm(initialForm);
+    setErr("");
+    onClose();
+  };
+
+  const handleMethodChange = (value) => {
+    setForm((current) => ({
+      ...current,
+      method: value,
+    }));
+
+    if (err) {
+      setErr("");
+    }
+  };
+
   async function onSubmit(e) {
     e.preventDefault();
+    setErr("");
+    // form can still be null if the user submits without touching any field
+    if (!form) {
+      setErr("Please fill in the budget details first.");
+      return;
+    }
+
+    const amount = Number(form.amount);
+
     setSaving(true);
     try {
-      const payload = { ...form, amount: Number(form.amount) || 0 };
+      const payload = {
+        description: form.description.trim(),
+        amount,
+        method: form.method,
+      };
       await create.mutateAsync(payload);
+      setForm(initialForm);
+      setErr("");
       onClose();
     } catch (error) {
       setErr(error.message || "Couldn't save budget");
@@ -68,7 +108,7 @@ const BudgetModal = ({ open, onClose }) => {
                 </h3>
                 <button
                   type="button"
-                  onClick={onClose}
+                  onClick={handleClose}
                   className="h-8 w-8 rounded-full flex items-center justify-center text-[var(--ink-muted)] hover:bg-[var(--surface-2)]"
                 >
                   <X size={16} />
@@ -94,7 +134,7 @@ const BudgetModal = ({ open, onClose }) => {
                 <Field label="Payment Method">
                   <Select
                     value={form?.method}
-                    onChange={(v) => setForm((f) => ({ ...f, method: v }))}
+                    onChange={handleMethodChange}
                     options={PAYMENT_METHODS}
                     placeholder="Select payment method"
                   />
@@ -124,7 +164,7 @@ const BudgetModal = ({ open, onClose }) => {
                 </motion.div>
               )}
               <div className="flex items-center justify-end gap-2 mt-6">
-                <Button type="button" variant="outline" onClick={onClose}>
+                <Button type="button" variant="outline" onClick={handleClose}>
                   Cancel
                 </Button>
                 <Button type="submit" variant="accent" disabled={saving}>
