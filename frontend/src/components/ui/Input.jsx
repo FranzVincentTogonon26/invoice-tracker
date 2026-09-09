@@ -7,7 +7,10 @@ export const Input = forwardRef(
       ref={ref}
       type={type}
       className={cn(
-        "h-10 w-full rounded-full border border-[var(--border)] bg-[var(--surface)] px-4 text-sm text-[var(--ink)] placeholder:text-[var(--ink-muted)] outline-none transition-colors focus:border-[var(--accent)]/50 focus:ring-2 focus:ring-[var(--accent)]/15 disabled:opacity-50",
+        "h-10 w-full appearance-none rounded-full border border-[var(--border)] bg-[var(--surface)] px-4 text-sm text-[var(--ink)] placeholder:text-[var(--ink-muted)] outline-none transition-colors focus:border-[var(--accent)]/50 focus:ring-2 focus:ring-[var(--accent)]/15 disabled:opacity-50",
+        "[appearance:textfield]",
+        "[&::-webkit-inner-spin-button]:appearance-none",
+        "[&::-webkit-outer-spin-button]:appearance-none",
         className,
       )}
       {...props}
@@ -15,6 +18,20 @@ export const Input = forwardRef(
   ),
 );
 Input.displayName = "Input";
+
+export const TextArea = forwardRef(({ className, ...props }, ref) => (
+  <textarea
+    rows={3}
+    ref={ref}
+    className={cn(
+      "w-full rounded-2xl border border-[var(--border)] bg-[var(--surface)] px-4 py-3 text-sm text-[var(--ink)] placeholder:text-[var(--ink-muted)] outline-none resize-y focus:border-[var(--accent)]/50 focus:ring-2 focus:ring-[var(--accent)]/15",
+      className,
+    )}
+    {...props}
+  />
+));
+TextArea.displayName = "TextArea";
+
 
 export const SearchInput = forwardRef(
   ({ className, leftIcon, rightSlot, ...props }, ref) => (

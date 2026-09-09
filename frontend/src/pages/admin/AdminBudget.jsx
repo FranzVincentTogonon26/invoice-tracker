@@ -1,9 +1,9 @@
 import {
   BadgeCheck,
   BadgeInfo,
-  BadgeMinus,
   PhilippinePesoIcon,
   Plus,
+  TrendingUp,
 } from "lucide-react";
 import { PageHeader } from "../../components/ui/PageHeader";
 
@@ -20,8 +20,10 @@ import {
 import { useState } from "react";
 import EmployeeBudget from "../../components/layout/admin/budget/EmployeeBudget";
 import BudgetTransaction from "../../components/layout/admin/budget/BudgetTransaction";
+import BudgetModal from "../../components/layout/admin/budget/BudgetModal";
 
 export default function AdminBudget() {
+  const [modal, setModal] = useState(null);
   const [tab, setTab] = useState("employee_budget");
 
   return (
@@ -31,8 +33,10 @@ export default function AdminBudget() {
         description="Manage and monitor your budget and transactions."
         actions={
           <div className="flex items-center gap-2">
-            <Button variant="soft">
+            <Button variant="soft" onClick={() => setModal({})}>
               <Plus size={16} /> Add Budget
+              {/* <LoaderIcon size={16} className="animate-spin" /> Waiting for
+              approval */}
             </Button>
             <Button variant="accent">Budget Issued</Button>
           </div>
@@ -43,18 +47,18 @@ export default function AdminBudget() {
         <StatCard
           label="Total Budget"
           value={formatMoney(20000)}
-          icon={PhilippinePesoIcon}
+          icon={TrendingUp}
           accent
         />
         <StatCard
-          label="Total Remaining"
+          label="Cash On Hand"
           value={formatMoney(9000)}
-          icon={BadgeCheck}
+          icon={PhilippinePesoIcon}
         />
         <StatCard
           label="Total Issued"
           value={formatMoney(10000)}
-          icon={BadgeMinus}
+          icon={BadgeCheck}
         />
 
         <StatCard
@@ -82,6 +86,8 @@ export default function AdminBudget() {
           </TabsContent>
         </div>
       </Tabs>
+
+      <BudgetModal open={!!modal} onClose={() => setModal(null)} />
     </div>
   );
 }

@@ -6,9 +6,7 @@ const EmployeeBudget = () => {
       <CardHeader>
         <div>
           <CardTitle>Employee Budget</CardTitle>
-          <CardDescription>
-            View and manage budgets assigned to employees.
-          </CardDescription>
+          <CardDescription>Manage employee budget allocations.</CardDescription>
         </div>
       </CardHeader>
     </Card>

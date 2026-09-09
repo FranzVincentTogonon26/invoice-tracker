@@ -52,9 +52,14 @@ CREATE TABLE IF NOT EXISTS budget (
     id              UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     user_id         UUID NOT NULL REFERENCES users(user_id) ON DELETE CASCADE,
     amount          DECIMAL(12,2) NOT NULL,
-    covered_cost    DECIMAL(12,2) NOT NULL DEFAULT 0,
-    method          TEXT NOT NULL,
-    status          INTEGER NOT NULL DEFAULT 0,
+    description     TEXT NOT NULL,
+    method          VARCHAR(255) NOT NULL,
+    status          VARCHAR(20) NOT NULL DEFAULT 'pending'
+                    CHECK (status IN ('draft', 'approved', 'cancelled', 'pending')),
+    approved_by     VARCHAR(255) NOT NULL,
+    submitted_at    TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    approved_at     TIMESTAMPTZ,
+    cancelled_at    TIMESTAMPTZ,
     created_at      TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     updated_at      TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
