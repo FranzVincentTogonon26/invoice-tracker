@@ -12,6 +12,7 @@ import Register from "../pages/Register";
 
 import AdminDashboard from "../pages/admin/AdminDashboard";
 import AdminEmployees from "../pages/admin/AdminEmployees";
+import AdminBudget from "../pages/admin/AdminBudget";
 import AdminProfile from "../pages/admin/AdminProfile";
 
 import EmployeeDashboard from "../pages/employee/EmployeeDashboard";
@@ -45,6 +46,10 @@ export const router = createBrowserRouter([
               {
                 path: "dashboard",
                 element: <AdminDashboard />,
+              },
+              {
+                path: "budget",
+                element: <AdminBudget />,
               },
               {
                 path: "employees",

@@ -15,7 +15,7 @@ import AILogo from "../../ui/AILogo";
 
 const NAV = [
   { to: "/dashboard", icon: LayoutGrid, label: "Dashboard" },
-  { to: "/budget", icon: FileText, label: "Budget" },
+  { to: "/admin/budget", icon: FileText, label: "Budget" },
   { to: "/employee", icon: Users, label: "Employee" },
   { to: "/expenses", icon: Receipt, label: "Expenses" },
   { to: "/payments", icon: Wallet, label: "Payments" },
@@ -35,7 +35,7 @@ const LABEL_BASE =
 
 function NavItem({ to, icon: Icon, label }) {
   return (
-    <NavLink to={to} title={label} className="block">
+    <NavLink to={to} className="block">
       {({ isActive }) => (
         <div
           className={cn(
