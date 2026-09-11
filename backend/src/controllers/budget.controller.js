@@ -11,7 +11,6 @@ export const createBudget = async (req, res, next) => {
 
     // user_id comes from the verified JWT (req.user), never from the client
     const newBudget = await Budget.createBudget({
-      user_id: req.user.id,
       amount: parsedAmount,
       description: String(description).trim(),
       method,
@@ -19,6 +18,15 @@ export const createBudget = async (req, res, next) => {
     });
 
     res.status(201).json({ budget: newBudget });
+  } catch (err) {
+    next(err);
+  }
+};
+
+export const employeesWithBudget = async (req, res, next) => {
+  try {
+    const employeesWithBudget = await Budget.employeesWithBudget();
+    res.status(200).json(employeesWithBudget);
   } catch (err) {
     next(err);
   }

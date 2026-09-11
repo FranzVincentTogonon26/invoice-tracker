@@ -1,15 +1,18 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
-import { Loader2, X } from "lucide-react";
+import { Calendar1Icon, Loader2, PhilippinePesoIcon, X } from "lucide-react";
 import { Input, TextArea } from "../../../ui/Input";
-import { Select, PAYMENT_METHODS } from "../../../ui/Select";
+import { Select } from "../../../ui/Select";
+import { SelectEmployee } from "../../../ui/SelectEmployee";
 import { Button } from "../../../ui/Button";
-import { useBudgetMutations } from "../../../../hooks/useBudget";
+import toast from "react-hot-toast";
 
 const initialForm = {
-  description: "",
+  employee: "",
   amount: "",
   method: "",
+  description: "",
+  note: "",
 };
 
 function Field({ label, children }) {
@@ -23,57 +26,94 @@ function Field({ label, children }) {
   );
 }
 
-const BudgetModal = ({ open, onClose }) => {
-  const { create } = useBudgetMutations();
+const BudgetModal = ({ open, transaction, onClose, create, employees = [] }) => {
   const [form, setForm] = useState(initialForm);
   const [err, setErr] = useState("");
   const [saving, setSaving] = useState(false);
 
-  const set = (k) => (e) => setForm((f) => ({ ...f, [k]: e.target.value }));
+  // works for both native inputs (event) and Listbox selects (raw value)
+  const set = (k) => (e) =>
+    setForm((f) => ({ ...f, [k]: e?.target ? e.target.value : e }));
+
+  const [prevOpen, setPrevOpen] = useState(open);
+  if (prevOpen !== open) {
+    setPrevOpen(open);
+    setForm({ ...initialForm });
+    setErr("");
+    setSaving(false);
+  }
 
   const handleClose = () => {
     if (saving) return;
 
-    setForm(initialForm);
+    setForm({ ...initialForm });
     setErr("");
     onClose();
   };
 
-  const handleMethodChange = (value) => {
-    setForm((current) => ({
-      ...current,
-      method: value,
-    }));
+  // Close on Escape while open (never while saving)
+  useEffect(() => {
+    if (!open) return;
 
-    if (err) {
-      setErr("");
-    }
+    const onKeyDown = (e) => {
+      if (e.key === "Escape" && !saving) {
+        setForm({ ...initialForm });
+        setErr("");
+        onClose();
+      }
+    };
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [open, saving, onClose]);
+
+  const isAddBudget = transaction === "addBudget";
+
+  // Client-side validation mirroring `POST /budgets` zod rules
+  const validate = () => {
+    if (!form.employee && !isAddBudget)
+      return "Please select an employee first.";
+    if (!form.method) return "Please select a payment method.";
+    if (!form.description || form.description.trim().length < 2)
+      return "Description is required.";
+    if (!String(form.amount).trim()) return "Amount is required.";
+
+    const amount = Number(form.amount);
+    if (Number.isNaN(amount)) return "Amount must be a valid number.";
+    if (amount <= 0) return "Amount must be greater than zero.";
+
+    return "";
   };
 
   async function onSubmit(e) {
     e.preventDefault();
     setErr("");
-    // form can still be null if the user submits without touching any field
-    if (!form) {
-      setErr("Please fill in the budget details first.");
+
+    const validationError = validate();
+    if (validationError) {
+      setErr(validationError);
       return;
     }
 
-    const amount = Number(form.amount);
-
     setSaving(true);
     try {
-      const payload = {
+      // `POST /budgets` expects a flat body: { description, amount, method }
+      const body = {
         description: form.description.trim(),
-        amount,
+        amount: Number(form.amount),
         method: form.method,
       };
-      await create.mutateAsync(payload);
-      setForm(initialForm);
+      await create.mutateAsync(body);
+      setForm({ ...initialForm });
       setErr("");
       onClose();
+      toast.success(
+        isAddBudget
+          ? "Budget added successfully!"
+          : "Budget issued successfully!",
+      );
     } catch (error) {
-      setErr(error.message || "Couldn't save budget");
+      // axios interceptor rejects with `response.data` ({ message, ... })
+      setErr(error?.message || "Couldn't save budget");
     } finally {
       setSaving(false);
     }
@@ -92,7 +132,10 @@ const BudgetModal = ({ open, onClose }) => {
           className="fixed inset-0 z-50 flex items-center justify-center p-4"
           exit={{ opacity: 0 }}
         >
-          <div className="absolute inset-0 bg-[var(--ink)]/30 backdrop-blur-sm flex items-center justify-center">
+          <div
+            className="absolute inset-0 bg-[var(--ink)]/30 backdrop-blur-sm flex items-center justify-center"
+            onClick={handleClose}
+          >
             <motion.form
               onSubmit={onSubmit}
               onClick={(e) => e.stopPropagation()}
@@ -104,7 +147,7 @@ const BudgetModal = ({ open, onClose }) => {
             >
               <div className="flex items-center justify-between mb-5">
                 <h3 className="font-display text-lg font-semibold tracking-tight">
-                  Add Budget
+                  {transaction === "addBudget" ? "Add Budget" : "Issued Budget"}
                 </h3>
                 <button
                   type="button"
@@ -114,46 +157,98 @@ const BudgetModal = ({ open, onClose }) => {
                   <X size={16} />
                 </button>
               </div>
-              <div className="space-y-3">
-                <Field label="Description">
-                  <TextArea
-                    value={form?.description}
-                    onChange={set("description")}
-                    placeholder="What was this for?"
-                  />
-                </Field>
-                <Field label="Amount">
-                  <Input
-                    value={form?.amount}
-                    onChange={set("amount")}
-                    min="0"
-                    type="number"
-                    placeholder="0.00"
-                  />
-                </Field>
-                <Field label="Payment Method">
-                  <Select
-                    value={form?.method}
-                    onChange={handleMethodChange}
-                    options={PAYMENT_METHODS}
-                    placeholder="Select payment method"
-                  />
-                </Field>
-                <Field label="Date Added">
-                  <div className="flex h-10 w-full items-center rounded-full border border-[var(--border)] bg-[var(--surface)] px-4 text-sm text-[var(--ink)] outline-none">
-                    {today}
-                  </div>
-                </Field>
-                <Field label="Approved To">
-                  <div className="flex h-10 w-full items-center justify-between rounded-full border border-[var(--border)] bg-[var(--surface)] px-4 text-sm text-[var(--ink)] outline-none">
-                    <span>Franz Vincent</span>
-                    <div className="flex items-center justify-center gap-1.5 rounded-full border border-[var(--border)] bg-[var(--surface-2)] px-2.5 py-1 text-xs text-[var(--ink-muted)]">
-                      <span className="h-1.5 w-1.5 rounded-full bg-[var(--accent)] shadow-[0_0_8px_var(--accent)] animate-pulse" />
-                      Connected
+
+              {transaction === "addBudget" ? (
+                <div className="space-y-3">
+                  <Field label="Today">
+                    <div className="flex h-10 w-full items-center justify-start gap-2 rounded-full border border-[var(--border)] bg-[var(--surface)] px-4 text-sm text-[var(--ink)] outline-none">
+                      <Calendar1Icon
+                        size={16}
+                        className="text-[var(--ink-muted)]"
+                      />
+                      <span>{today}</span>
                     </div>
-                  </div>
-                </Field>
-              </div>
+                  </Field>
+                  <Field label="Approved to">
+                    <div className="flex h-10 w-full items-center gap-2 justify-start rounded-full border border-[var(--border)] bg-[var(--surface)] px-1.5 text-sm text-[var(--ink)] outline-none">
+                      <div className="h-7.5 w-7.5 rounded-full bg-[var(--accent-soft)] text-[var(--accent-strong)] font-semibold flex items-center justify-center text-sm ring-2 ring-[var(--surface)] shrink-0">
+                        {"F"}
+                      </div>
+                      <span>Franz Vincent</span>
+                    </div>
+                  </Field>
+                  <Field label="Amount">
+                    <Input
+                      value={form?.amount}
+                      onChange={set("amount")}
+                      min="0"
+                      type="number"
+                      placeholder="0.00"
+                      Icon={PhilippinePesoIcon}
+                    />
+                  </Field>
+                  <Field label="Payment Method">
+                    <Select
+                      value={form?.method}
+                      onChange={set("method")}
+                      placeholder="Select payment method"
+                      disabled={saving}
+                    />
+                  </Field>
+                  <Field label="Description">
+                    <TextArea
+                      value={form?.description}
+                      onChange={set("description")}
+                      placeholder="What was this for?"
+                    />
+                  </Field>
+                </div>
+              ) : (
+                <div className="space-y-3">
+                  <Field label="Employee Name">
+                    <SelectEmployee
+                      employees={employees}
+                      value={form?.employee}
+                      onChange={set("employee")}
+                      placeholder="Select Employee"
+                      disabled={saving}
+                    />
+                  </Field>
+                  <Field label="Amount">
+                    <Input
+                      value={form?.amount}
+                      onChange={set("amount")}
+                      min="0"
+                      type="number"
+                      placeholder="0.00"
+                      Icon={PhilippinePesoIcon}
+                    />
+                  </Field>
+                  <Field label="Description">
+                    <Input
+                      value={form?.description}
+                      onChange={set("description")}
+                      placeholder="What was this for?"
+                    />
+                  </Field>
+                  <Field label="Payment Method">
+                    <Select
+                      value={form?.method}
+                      onChange={set("method")}
+                      placeholder="Select payment method"
+                      disabled={saving}
+                    />
+                  </Field>
+                  <Field label="Notes">
+                    <TextArea
+                      value={form?.note}
+                      onChange={set("note")}
+                      placeholder="Add note..."
+                    />
+                  </Field>
+                </div>
+              )}
+
               {err && (
                 <motion.div
                   initial={{ opacity: 0, y: -4 }}
@@ -169,7 +264,7 @@ const BudgetModal = ({ open, onClose }) => {
                 </Button>
                 <Button type="submit" variant="accent" disabled={saving}>
                   {saving && <Loader2 size={14} className="animate-spin" />}
-                  Add Budget
+                  {transaction === "addBudget" ? "Add Budget" : "Issue Budget"}
                 </Button>
               </div>
             </motion.form>

@@ -1,11 +1,11 @@
-import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { budgetsApi } from "../api/budget";
 
 /* ── Budget ──────────────────────────────────────────────────── */
-// export const budgetsKey = (params) => ["budgets", params || {}];
-// export function useBudgets(params) {
-//   return useQuery({ queryKey: budgetsKey(params), queryFn: () => budgetsApi.list(params) });
-// }
+export const budgetsKey = (params) => ["budgets", params || {}];
+export function useBudgets(params) {
+  return useQuery({ queryKey: budgetsKey(params), queryFn: () => budgetsApi.list(params) });
+}
 export function useBudgetMutations() {
   const qc = useQueryClient();
   const invalidate = () => {

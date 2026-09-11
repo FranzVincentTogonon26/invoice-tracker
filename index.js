@@ -1,6 +1,6 @@
 import concurrently from "concurrently";
 
-concurrently(
+const { result } = concurrently(
   [
     {
       name: "server",
@@ -19,3 +19,12 @@ concurrently(
     restartTries: 0, // optional: how many times to restart on crash
   },
 );
+
+// concurrently rejects with an array of failed/killed commands.
+// Without this catch, Node crashes with ERR_UNHANDLED_REJECTION
+// on top of the original error, polluting the logs.
+result.catch((failedCommands) => {
+  if (Array.isArray(failedCommands) && failedCommands.length > 0) {
+    process.exitCode = 1; // preserve failure exit code for npm
+  }
+});

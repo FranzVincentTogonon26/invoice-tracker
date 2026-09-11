@@ -16,7 +16,7 @@ const badgeVariants = cva(
       },
     },
     defaultVariants: { tone: "neutral" },
-  }
+  },
 );
 
 export function Badge({ className, tone, ...props }) {
@@ -25,15 +25,16 @@ export function Badge({ className, tone, ...props }) {
 
 // Maps an invoice status → badge tone + label. Kept here so every table,
 // list, and detail view renders status consistently.
-export const INVOICE_STATUS = {
+export const STATUS = {
   draft: { tone: "neutral", label: "Draft" },
   sent: { tone: "accent", label: "Sent" },
   paid: { tone: "success", label: "Paid" },
   overdue: { tone: "danger", label: "Overdue" },
+  pending: { tone: "danger", label: "Pending" },
 };
 
 export function StatusBadge({ status, className }) {
-  const s = INVOICE_STATUS[status] || INVOICE_STATUS.draft;
+  const s = STATUS[status] || STATUS.draft;
   return (
     <Badge tone={s.tone} className={className}>
       <span className="h-1.5 w-1.5 rounded-full bg-current opacity-80" />
