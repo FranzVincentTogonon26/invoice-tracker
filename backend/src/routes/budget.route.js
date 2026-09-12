@@ -10,13 +10,14 @@ router.get(
   "/",
   authMiddleware,
   requireAdminAccess,
-  budgetController.employeesWithBudget,
+  budgetController.budgetTransaction,
 );
-router.post(
-  "/",
+router.post("/", authMiddleware, requireAdminAccess, budgetController.create);
+router.delete(
+  "/:referenceId",
   authMiddleware,
   requireAdminAccess,
-  budgetController.createBudget,
+  budgetController.deleteReference,
 );
 
 export default router;

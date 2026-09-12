@@ -1,23 +1,15 @@
-import { useCallback, useEffect, useId, useRef, useState } from "react";
+import {
+  useCallback,
+  useEffect,
+  useId,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import { AnimatePresence, motion } from "framer-motion";
-import { Check, ChevronDown } from "lucide-react";
+import { Check, ChevronDown, Search } from "lucide-react";
 import { cn } from "@/lib/utils";
 
-/**
- * Generic headless listbox used by `Select` and `SelectEmployee`.
- *
- * Props:
- * - `options`: array of `{ value, label }` (label may be any node)
- * - `value`: the selected `value` (or "" / null / undefined)
- * - `onChange`: called with the selected `value`
- * - `placeholder`: rendered when nothing is selected
- * - `renderTrigger`: optional `(selectedOption) => node` to customize the button
- * - `renderOption`: optional `(option, { selected }) => node` to customize rows
- * - `buttonClassName`: extra classes for the trigger button
- *
- * Keyboard nav (arrows/home/end/enter/space/escape/tab), outside-click close,
- * a11y listbox/option roles, framer-motion menu animation.
- */
 export default function Listbox({
   options,
   value,
@@ -28,15 +20,27 @@ export default function Listbox({
   buttonClassName,
   disabled = false,
   align = "start",
+  searchable = false,
 }) {
   const [open, setOpen] = useState(false);
   const [activeIndex, setActiveIndex] = useState(-1);
+  const [search, setSearch] = useState("");
   const rootRef = useRef(null);
   const buttonRef = useRef(null);
   const listId = useId();
 
   const selectedIndex = options.findIndex((option) => option.value === value);
   const selectedOption = selectedIndex >= 0 ? options[selectedIndex] : null;
+
+  const filteredOptions = useMemo(() => {
+    const query = search.trim().toLowerCase();
+    if (!query) return options;
+    return options.filter((option) =>
+      typeof option.label === "string"
+        ? option.label.toLowerCase().includes(query)
+        : true,
+    );
+  }, [options, search]);
 
   const commit = (option) => {
     setOpen(false);
@@ -50,6 +54,11 @@ export default function Listbox({
     setActiveIndex(-1);
     buttonRef.current?.focus();
   }, []);
+
+  // Clear the search whenever the dropdown closes
+  useEffect(() => {
+    if (!open) setSearch("");
+  }, [open]);
 
   // Close on outside click while open
   useEffect(() => {
@@ -77,7 +86,9 @@ export default function Listbox({
     switch (e.key) {
       case "ArrowDown":
         e.preventDefault();
-        setActiveIndex((i) => Math.min(i < 0 ? 0 : i + 1, options.length - 1));
+        setActiveIndex((i) =>
+          Math.min(i < 0 ? 0 : i + 1, filteredOptions.length - 1),
+        );
         break;
       case "ArrowUp":
         e.preventDefault();
@@ -89,20 +100,54 @@ export default function Listbox({
         break;
       case "End":
         e.preventDefault();
-        setActiveIndex(options.length - 1);
+        setActiveIndex(filteredOptions.length - 1);
         break;
       case "Enter":
       case " ":
         e.preventDefault();
-        if (activeIndex >= 0) commit(options[activeIndex]);
+        {
+          const activeOption = filteredOptions[activeIndex];
+          if (activeOption) commit(activeOption);
+        }
         break;
       case "Escape":
         e.preventDefault();
+        e.stopPropagation();
         close();
         break;
       case "Tab":
         setOpen(false);
         setActiveIndex(-1);
+        break;
+      default:
+        break;
+    }
+  };
+
+  // Keyboard support while typing in the search box
+  const handleSearchKeyDown = (e) => {
+    switch (e.key) {
+      case "ArrowDown":
+        e.preventDefault();
+        setActiveIndex((i) =>
+          Math.min(i < 0 ? 0 : i + 1, filteredOptions.length - 1),
+        );
+        break;
+      case "ArrowUp":
+        e.preventDefault();
+        setActiveIndex((i) => Math.max(i < 0 ? 0 : i - 1, 0));
+        break;
+      case "Enter":
+        e.preventDefault();
+        {
+          const activeOption = filteredOptions[activeIndex];
+          if (activeOption) commit(activeOption);
+        }
+        break;
+      case "Escape":
+        e.preventDefault();
+        e.stopPropagation();
+        close();
         break;
       default:
         break;
@@ -150,10 +195,7 @@ export default function Listbox({
 
       <AnimatePresence>
         {open && (
-          <motion.ul
-            id={listId}
-            role="listbox"
-            tabIndex={-1}
+          <motion.div
             initial={{ opacity: 0, y: 6, scale: 0.98 }}
             animate={{ opacity: 1, y: 0, scale: 1 }}
             exit={{ opacity: 0, y: 4, scale: 0.98 }}
@@ -163,42 +205,83 @@ export default function Listbox({
               align === "end" ? "right-0" : "left-0",
             )}
           >
-            {options.map((option, index) => {
-              const selected = option.value === value;
-              const active = index === activeIndex;
+            {searchable && (
+              <div className="border-b border-[var(--border)] px-3 pb-2 pt-1">
+                <div className="relative flex items-center">
+                  <Search
+                    size={14}
+                    aria-hidden
+                    className="pointer-events-none absolute left-3 text-[var(--ink-muted)]"
+                  />
+                  <input
+                    type="text"
+                    value={search}
+                    autoFocus
+                    aria-label="Search options"
+                    placeholder="Search..."
+                    onChange={(e) => {
+                      setSearch(e.target.value);
+                      setActiveIndex(0);
+                    }}
+                    onKeyDown={handleSearchKeyDown}
+                    className="h-8 w-full rounded-full border border-[var(--border)] bg-[var(--surface-2)] pl-8 pr-3 text-sm text-[var(--ink)] outline-none placeholder:text-[var(--ink-muted)] transition-colors focus-visible:border-[var(--accent)]/50"
+                  />
+                </div>
+              </div>
+            )}
 
-              return (
-                <li
-                  key={option.value ?? index}
-                  role="option"
-                  aria-selected={selected}
-                  onMouseEnter={() => setActiveIndex(index)}
-                  onClick={() => commit(option)}
-                  className={cn(
-                    "flex cursor-pointer items-center gap-2 px-4 py-2.5 text-sm transition-colors",
-                    selected
-                      ? "text-[var(--accent-strong)] font-medium"
-                      : "text-[var(--ink)]",
-                    active && "bg-[var(--accent-soft)]",
-                  )}
-                >
-                  {renderOption ? (
-                    renderOption(option, { selected })
-                  ) : (
-                    <>
-                      <span className="truncate flex-1">{option.label}</span>
-                      {selected && (
-                        <Check
-                          size={14}
-                          className="shrink-0 text-[var(--accent-strong)]"
-                        />
-                      )}
-                    </>
-                  )}
-                </li>
-              );
-            })}
-          </motion.ul>
+            <motion.ul
+              id={listId}
+              role="listbox"
+              tabIndex={-1}
+              className="max-h-60 overflow-y-auto"
+            >
+              {filteredOptions.map((option, index) => {
+                const selected = option.value === value;
+                const active = index === activeIndex;
+
+                return (
+                  <li
+                    key={option.value ?? index}
+                    role="option"
+                    aria-selected={selected}
+                    onMouseEnter={() => setActiveIndex(index)}
+                    onClick={(e) => {
+                      e.preventDefault();
+                      commit(option);
+                    }}
+                    className={cn(
+                      "flex cursor-pointer items-center gap-2 px-4 py-2.5 text-sm transition-colors",
+                      selected
+                        ? "text-[var(--accent-strong)] font-medium"
+                        : "text-[var(--ink)]",
+                      active && "bg-[var(--surface-2)]",
+                    )}
+                  >
+                    {renderOption ? (
+                      renderOption(option, { selected })
+                    ) : (
+                      <>
+                        <span className="truncate flex-1">{option.label}</span>
+                        {selected && (
+                          <Check
+                            size={14}
+                            className="shrink-0 text-[var(--accent-strong)]"
+                          />
+                        )}
+                      </>
+                    )}
+                  </li>
+                );
+              })}
+            </motion.ul>
+
+            {filteredOptions.length === 0 && (
+              <div className="px-4 py-3 text-sm text-[var(--ink-muted)]">
+                No matches found
+              </div>
+            )}
+          </motion.div>
         )}
       </AnimatePresence>
     </div>

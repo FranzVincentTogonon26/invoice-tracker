@@ -24,7 +24,8 @@ export default function Login() {
     setLoading(true);
     try {
       await login(form);
-      nav("/dashboard");
+      // RootRedirect sends the user to the correct dashboard for their role.
+      nav("/");
     } catch (error) {
       setErr(error.message || "Login failed");
     } finally {

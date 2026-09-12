@@ -13,7 +13,7 @@ export function EmployeeAvatar({ name, avatarUrl, className }) {
   const fallback = (
     <span
       className={cn(
-        "h-7.5 w-7.5 rounded-full bg-[var(--accent-soft)] text-[var(--accent-strong)] font-semibold flex items-center justify-center text-sm ring-2 ring-[var(--surface)] shrink-0",
+        "h-7.5 w-7.5 rounded-full bg-[var(--accent-soft)] text-[var(--accent-strong)] font-semibold flex items-center justify-center text-sm ring-1 ring-[var(--surface)] shrink-0",
         className,
       )}
       aria-hidden
@@ -51,6 +51,7 @@ export const SelectEmployee = ({
   onChange,
   placeholder,
   disabled,
+  searchable = true,
 }) => {
   const options = employees.map((employee) => ({
     value: employee.user_id,
@@ -71,9 +72,10 @@ export const SelectEmployee = ({
       onChange={onChange}
       placeholder={placeholder || "Select employee"}
       disabled={disabled}
+      searchable={searchable}
       renderTrigger={(selectedOption) =>
         selectedOption ? (
-          <span className="flex items-center gap-2 min-w-0">
+          <span className="flex items-center gap-2 min-w-0 -ml-1.5">
             {renderAvatar(selectedOption.label, selected?.avatar_url)}
             <span className="truncate">{selectedOption.label}</span>
           </span>
@@ -87,7 +89,9 @@ export const SelectEmployee = ({
         <>
           {renderAvatar(option.label, option.employee?.avatar_url)}
           <span className="truncate flex-1">{option.label}</span>
-          {isSelected && <span className="shrink-0 text-[var(--accent-strong)]">✓</span>}
+          {isSelected && (
+            <span className="shrink-0 text-[var(--accent-strong)]">✓</span>
+          )}
         </>
       )}
     />

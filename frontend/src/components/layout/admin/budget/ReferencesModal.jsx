@@ -1,0 +1,288 @@
+import { useEffect, useState } from "react";
+import { AnimatePresence, motion } from "framer-motion";
+import {
+  AlertCircle,
+  Check,
+  Hash,
+  Loader2,
+  Plus,
+  Trash2,
+  X,
+} from "lucide-react";
+import { Input } from "../../../ui/Input";
+import { Button } from "../../../ui/Button";
+import toast from "react-hot-toast";
+
+import { formatDate } from "../../../../lib/utils";
+import { useBudgetMutations } from "../../../../hooks/useBudget";
+
+const ReferencesModal = ({
+  open,
+  references = [],
+  onAdd,
+  onDelete,
+  onClose,
+}) => {
+  const { create, removeReference: remove } = useBudgetMutations();
+  const [newRef, setNewRef] = useState("");
+  const [err, setErr] = useState("");
+  const [adding, setAdding] = useState(false);
+  const [deletingId, setDeletingId] = useState(null);
+
+  // Reset the form each time the modal opens
+  const [prevOpen, setPrevOpen] = useState(open);
+  if (prevOpen !== open) {
+    setPrevOpen(open);
+    setNewRef("");
+    setErr("");
+    setAdding(false);
+    setDeletingId(null);
+  }
+
+  const handleClose = () => {
+    if (adding || deletingId) return;
+    setNewRef("");
+    setErr("");
+    onClose();
+  };
+
+  const handleAdd = async (e) => {
+    e.preventDefault();
+    setErr("");
+
+    const label = newRef.trim();
+    if (!label) {
+      setErr("Reference name/label is required.");
+      return;
+    }
+
+    setAdding(true);
+    try {
+      const created = await create.mutateAsync({
+        type: "addBudgetReference",
+        label,
+      });
+      await onAdd?.(created);
+
+      setNewRef("");
+      onClose();
+      toast.success(`Reference "${label}" added!`);
+    } catch (error) {
+      setErr(error?.message || "Couldn't add reference");
+    } finally {
+      setAdding(false);
+    }
+  };
+
+  // Deletes the reference row in the DB, drops it from the parent's local
+  // list and clears the dropdown selection if it was selected.
+  const handleDelete = async (referenceId) => {
+    if (adding || deletingId) return;
+    setErr("");
+    setDeletingId(referenceId);
+    try {
+      await remove.mutateAsync(referenceId);
+      onDelete?.(referenceId);
+      toast.success("Reference removed!");
+    } catch (error) {
+      setErr(error?.message || "Couldn't remove reference");
+    } finally {
+      setDeletingId(null);
+    }
+  };
+
+  // Close on Escape while open (never while adding/deleting). stopPropagation
+  // keeps the parent BudgetModal's window-level Escape handler from also firing.
+  useEffect(() => {
+    if (!open) return;
+
+    const onKeyDown = (e) => {
+      if (e.key === "Escape" && !adding && !deletingId) {
+        e.stopPropagation();
+        setNewRef("");
+        setErr("");
+        onClose();
+      }
+    };
+    window.addEventListener("keydown", onKeyDown, true);
+    return () => window.removeEventListener("keydown", onKeyDown, true);
+  }, [open, adding, deletingId, onClose]);
+
+  return (
+    <AnimatePresence>
+      {open && (
+        <motion.div
+          className="fixed inset-0 z-[60] flex items-center justify-center p-4"
+          exit={{ opacity: 0 }}
+        >
+          <div
+            onClick={handleClose}
+            className="absolute inset-0 bg-[var(--ink)]/30 backdrop-blur-sm flex items-center justify-center"
+          >
+            <motion.div
+              onClick={(e) => e.stopPropagation()}
+              role="dialog"
+              aria-modal="true"
+              aria-labelledby="references-modal-title"
+              initial={{ opacity: 0, y: 12, scale: 0.98 }}
+              animate={{ opacity: 1, y: 0, scale: 1 }}
+              exit={{ opacity: 0, y: 8, scale: 0.98 }}
+              transition={{ duration: 0.2, ease: [0.16, 1, 0.3, 1] }}
+              className="relative w-full max-w-[600px] rounded-3xl bg-[var(--surface)] border border-[var(--border)] shadow-hover p-6"
+            >
+              <div className="flex items-center justify-between mb-4">
+                <h3
+                  id="references-modal-title"
+                  className="font-display text-lg font-semibold tracking-tight"
+                >
+                  Budget Source Reference
+                </h3>
+                <button
+                  type="button"
+                  onClick={handleClose}
+                  className="h-8 w-8 rounded-full flex items-center justify-center text-[var(--ink-muted)] hover:bg-[var(--surface-2)]"
+                >
+                  <X size={16} />
+                </button>
+              </div>
+
+              {/* Add-new-reference form */}
+              <form onSubmit={handleAdd} className="flex items-center gap-2">
+                <Input
+                  value={newRef}
+                  onChange={(e) => setNewRef(e.target.value)}
+                  placeholder="New reference label…"
+                  Icon={Hash}
+                  disabled={adding}
+                  autoFocus
+                />
+                <Button
+                  type="submit"
+                  variant="soft"
+                  size="icon"
+                  disabled={adding}
+                  aria-label="Add new reference"
+                >
+                  {adding ? (
+                    <Loader2 size={16} className="animate-spin" />
+                  ) : (
+                    <Plus size={16} />
+                  )}
+                </Button>
+              </form>
+
+              {/* References table */}
+              <div className="mt-4 overflow-hidden rounded-2xl border border-[var(--border)]">
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr className="bg-[var(--surface-2)] text-[10px] uppercase tracking-wider text-[var(--ink-muted)]">
+                      <th className="px-4 py-2.5 text-left font-semibold">
+                        Reference Id
+                      </th>
+                      <th className="px-4 py-2.5 text-left font-semibold">
+                        Source Name
+                      </th>
+                      <th className="px-4 py-2.5 text-right font-semibold">
+                        Date Created
+                      </th>
+                      <th className="px-4 py-2.5 text-right font-semibold"></th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {references.map((reference) => (
+                      <tr
+                        key={reference.reference_id}
+                        className="border-t border-[var(--border)] first:border-t-0 hover:bg-[var(--surface-2)]/60 transition-colors"
+                      >
+                        <td
+                          title={reference.reference_id}
+                          className="px-4 py-2.5 font-mono text-[13px] text-[var(--ink)] break-all"
+                        >
+                          {`${(reference.reference_id ?? "").slice(0, 8)}-xxxxx`}
+                        </td>
+                        <td className="px-4 py-2.5 text-[13px] text-[var(--ink)] max-w-[160px] truncate">
+                          {reference.label ?? "—"}
+                        </td>
+                        <td className="px-4 py-2.5 text-right text-xs text-[var(--ink-muted)] whitespace-nowrap">
+                          {formatDate(
+                            reference.created_at ?? reference.date_created,
+                          )}
+                        </td>
+                        <td className="px-4 py-2.5 text-right whitespace-nowrap">
+                          {/* `active` is a COUNT of issued budgets using this
+                              reference (backend budgetReference query). In-use
+                              references (active > 0) are locked — show a
+                              success-themed Check instead of the delete
+                              button; unused ones (active === 0) stay
+                              deletable. */}
+                          {Number(reference.active) > 0 ? (
+                            <span
+                              title={`In use by ${reference.active} issued budget${
+                                Number(reference.active) === 1 ? "" : "s"
+                              } — cannot be deleted`}
+                              className="inline-flex h-5 w-5 items-center justify-center rounded-full bg-[var(--success)]/12 text-[var(--success)] cursor-default select-none"
+                            >
+                              <Check size={10} strokeWidth={2.5} />
+                            </span>
+                          ) : (
+                            <button
+                              type="button"
+                              onClick={() =>
+                                handleDelete(reference.reference_id)
+                              }
+                              disabled={adding || deletingId !== null}
+                              aria-label={`Delete reference ${
+                                reference.label || reference.reference_id
+                              }`}
+                              className="inline-flex h-7 w-7 items-center justify-center rounded-full text-[var(--ink-muted)] transition-colors hover:bg-[var(--danger)]/10 hover:text-[var(--danger)] disabled:pointer-events-none disabled:opacity-40"
+                            >
+                              {deletingId === reference.reference_id ? (
+                                <Loader2 size={13} className="animate-spin" />
+                              ) : (
+                                <Trash2 size={13} />
+                              )}
+                            </button>
+                          )}
+                        </td>
+                      </tr>
+                    ))}
+                    {references.length === 0 && (
+                      <tr>
+                        <td
+                          colSpan={4}
+                          className="px-4 py-6 text-center text-sm text-[var(--ink-muted)]"
+                        >
+                          No references yet — add one above.
+                        </td>
+                      </tr>
+                    )}
+                  </tbody>
+                </table>
+              </div>
+
+              {err && (
+                <motion.div
+                  initial={{ opacity: 0, y: -4 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  role="alert"
+                  className="flex items-start gap-2 text-xs text-[var(--danger)] bg-[var(--danger)]/10 border border-[var(--danger)]/20 rounded-xl px-3.5 py-2.5 leading-snug mt-4"
+                >
+                  <AlertCircle size={14} className="mt-px shrink-0" />
+                  {err}
+                </motion.div>
+              )}
+
+              <div className="flex items-center justify-end gap-2 mt-5 pt-4 border-t border-[var(--border)]">
+                <Button type="button" variant="outline" onClick={handleClose}>
+                  Close
+                </Button>
+              </div>
+            </motion.div>
+          </div>
+        </motion.div>
+      )}
+    </AnimatePresence>
+  );
+};
+
+export default ReferencesModal;

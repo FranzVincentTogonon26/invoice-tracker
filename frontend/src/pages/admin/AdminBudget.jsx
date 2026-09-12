@@ -18,11 +18,11 @@ import {
   TabsTrigger,
 } from "../../components/ui/Tabs";
 import { useState } from "react";
+import { useNavigate } from "react-router-dom";
+import { useBudgets, useBudgetMutations } from "../../hooks/useBudget";
 import EmployeeBudget from "../../components/layout/admin/budget/EmployeeBudget";
 import BudgetTransaction from "../../components/layout/admin/budget/BudgetTransaction";
 import BudgetModal from "../../components/layout/admin/budget/BudgetModal";
-import { useNavigate } from "react-router-dom";
-import { useBudgets, useBudgetMutations } from "../../hooks/useBudget";
 import BudgetIssuedTransaction from "../../components/layout/admin/budget/BudgetIssuedTransaction";
 
 export default function AdminBudget() {
@@ -32,18 +32,10 @@ export default function AdminBudget() {
   const [modalType, setModalType] = useState(null);
   const [tab, setTab] = useState("employee_budget");
 
-  // Budget rows from `GET /budgets`: { user_id, name, total_amount,
-  // total_budget_issued, recent_date } — used for stats, the employee
-  // tab, and the employee dropdown in BudgetModal.
-  const budgets = Array.isArray(data) ? data : [];
-  const totalBudgetAmount = budgets.reduce(
-    (sum, budget) => sum + (Number(budget.total_amount) || 0),
-    0,
-  );
-  const totalIssued = budgets.reduce(
-    (sum, budget) => sum + (Number(budget.total_budget_issued) || 0),
-    0,
-  );
+  // const overview = data?.budgetOverview ?? [];
+  const budgets = data?.employeeBudgets ?? [];
+  const employees = data?.employees ?? [];
+  const budgetReferences = data?.budgetReference ?? [];
 
   return (
     <div className="space-y-6">
@@ -52,10 +44,7 @@ export default function AdminBudget() {
         description="Manage and monitor your budget and transactions."
         actions={
           <div className="flex items-center gap-2">
-            <Button
-              variant="soft"
-              onClick={() => setModalType("addBudget")}
-            >
+            <Button variant="soft" onClick={() => setModalType("addBudget")}>
               <Plus size={16} /> Add Budget
             </Button>
             <Button
@@ -68,10 +57,10 @@ export default function AdminBudget() {
         }
       />
 
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5 mb-6 ">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
         <StatCard
           label="Total Budget"
-          value={formatMoney(totalBudgetAmount)}
+          value={formatMoney(10000)}
           icon={TrendingUp}
           accent
         />
@@ -83,7 +72,7 @@ export default function AdminBudget() {
         />
         <StatCard
           label="Total Issued"
-          value={totalIssued}
+          value={formatMoney(10000)}
           icon={BadgeCheck}
         />
 
@@ -97,7 +86,7 @@ export default function AdminBudget() {
       </div>
 
       <Tabs value={tab} onValueChange={setTab}>
-        <TabsList>
+        <TabsList className="max-w-full overflow-x-auto">
           <TabsTrigger value="employee_budget">Employees Budget</TabsTrigger>
           <TabsTrigger value="budget_transaction">
             Budget Transaction
@@ -128,7 +117,8 @@ export default function AdminBudget() {
         open={modalType !== null}
         transaction={modalType}
         create={create}
-        employees={budgets}
+        employees={employees}
+        budgetReferences={budgetReferences}
         onClose={() => setModalType(null)}
       />
     </div>

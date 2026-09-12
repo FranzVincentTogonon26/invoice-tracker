@@ -23,6 +23,13 @@ apiClient.interceptors.response.use(
       clearToken();
       if (!location.pathname.startsWith("/login")) location.assign("/login");
     }
-    return Promise.reject(error.response?.data);
+    // Preserve the HTTP status alongside the API error body so callers can
+    // distinguish definitive auth rejections (401/403) from server failures
+    // (network errors, 502 from the dev proxy, 5xx) that should NOT log
+    // the user out.
+    return Promise.reject({
+      ...error.response?.data,
+      status: error.response?.status,
+    });
   },
 );

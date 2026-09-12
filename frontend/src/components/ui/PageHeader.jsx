@@ -2,7 +2,7 @@ import { cn } from "@/lib/utils";
 
 export function PageHeader({ title, description, actions, className }) {
   return (
-    <div className={cn("flex items-end justify-between gap-4 mb-6", className)}>
+    <div className={cn("flex items-end justify-between gap-4", className)}>
       <div>
         <h2 className="font-display text-2xl font-semibold tracking-tight text-[var(--ink)]">
           {title}

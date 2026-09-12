@@ -32,8 +32,14 @@ export function AuthProvider({ children }) {
       const { user } = await authApi.me();
       setUser(user);
       return user;
-    } catch {
-      clearAuth();
+    } catch (err) {
+      // Only a definitive auth rejection invalidates the session. Server
+      // failures (network errors, 5xx, 502 from the dev proxy when the
+      // backend is briefly down) keep the token so the session can be
+      // restored on the next refresh once the backend is reachable again.
+      if (err?.status === 401 || err?.status === 403) {
+        clearAuth();
+      }
       return null;
     } finally {
       setLoading(false);
