@@ -13,21 +13,34 @@ const EmployeeBudget = ({ employeeIssuedBudget = [], isLoading, onOpen }) => {
         </div>
       </CardHeader>
       {isLoading ? (
-        <div className="py-10 text-center text-sm text-[var(--ink-muted)] space-y-1">
-          <span className="flex justify-center items-center">
-            <Loader
-              size={20}
-              className="text-[var(--ink-muted)] animate-spin"
-            />
-          </span>
-          <span>Loading budgets…</span>
+        /* Loading state — spinner in the app's muted tile, consistent with
+           the empty state below. */
+        <div className="py-12 flex flex-col items-center text-center">
+          <div className="h-14 w-14 rounded-2xl bg-[var(--surface-2)] text-[var(--ink-muted)] flex items-center justify-center">
+            <Loader size={22} className="animate-spin" />
+          </div>
+          <p className="mt-4 text-sm text-[var(--ink-muted)]">
+            Loading budgets…
+          </p>
         </div>
       ) : employeeIssuedBudget.length === 0 ? (
-        <div className="py-10 text-center text-sm text-[var(--ink-muted)] space-y-1">
-          <span className="flex justify-center items-center">
-            <Wallet size={40} className="text-[var(--ink-muted)]" />
-          </span>
-          <span>No Budget Issued..</span>
+        /* Empty state — icon in the app's soft-accent tile with a clear
+           title + hint, matching the icon-in-tile pattern used in
+           BudgetModal and OtpModal. */
+        <div className="py-12 flex flex-col items-center text-center">
+          <div className="h-14 w-14 rounded-2xl bg-[var(--accent-soft)] text-[var(--accent-strong)] flex items-center justify-center">
+            <Wallet size={24} />
+          </div>
+          <p className="mt-4 text-sm font-semibold text-[var(--ink)]">
+            No budgets issued yet
+          </p>
+          <p className="mt-1 max-w-xs text-xs leading-relaxed text-[var(--ink-muted)]">
+            Budgets you issue to employees will show up here. Use the{" "}
+            <span className="font-medium text-[var(--accent-strong)]">
+              Budget Issued
+            </span>{" "}
+            button to create the first one.
+          </p>
         </div>
       ) : (
         <div className="flex flex-col divide-y divide-[var(--border)]">

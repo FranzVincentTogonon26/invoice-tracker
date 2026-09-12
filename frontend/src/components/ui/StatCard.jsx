@@ -37,6 +37,12 @@ export function StatCard({
   delta,
   chart = "line",
   data = [],
+  // `breakdown` is opt-in: pass an array of { label, value, hint?, tone? } to
+  // render the list section. Passing [] renders an empty state, omitting it
+  // renders no list at all.
+  breakdown,
+  breakdownCaption = "Per reference",
+  loading = false,
   icon: Icon,
   accent = false,
 }) {
@@ -45,6 +51,45 @@ export function StatCard({
   const ChartCmp = chart === "bars" ? MiniBars : MiniLine;
   const displayValue = value == null || value === "" ? "—" : value;
   const hasData = Array.isArray(data) && data.length > 0;
+  const hasBreakdown = Array.isArray(breakdown);
+
+  // Skeleton placeholders keep the 4-column grid from jumping while the
+  // overview query loads.
+  if (loading) {
+    return (
+      <Card
+        variant={accent ? "accent" : "default"}
+        className={cn("relative overflow-hidden", accent && "text-white")}
+      >
+        <div className="flex items-center gap-2">
+          <div
+            className={cn(
+              "h-7 w-7 rounded-full animate-pulse",
+              accent ? "bg-white/15" : "bg-[var(--surface-2)]",
+            )}
+          />
+          <div
+            className={cn(
+              "h-3 w-20 rounded animate-pulse",
+              accent ? "bg-white/15" : "bg-[var(--surface-2)]",
+            )}
+          />
+        </div>
+        <div
+          className={cn(
+            "mt-3 h-8 w-28 rounded-lg animate-pulse",
+            accent ? "bg-white/15" : "bg-[var(--surface-2)]",
+          )}
+        />
+        <div
+          className={cn(
+            "mt-3 h-14 rounded-lg animate-pulse",
+            accent ? "bg-white/10" : "bg-[var(--surface-2)]",
+          )}
+        />
+      </Card>
+    );
+  }
 
   return (
     <Card
@@ -57,7 +102,7 @@ export function StatCard({
             {Icon && (
               <div
                 className={cn(
-                  "h-7 w-7 rounded-full flex items-center justify-center",
+                  "h-7 w-7 rounded-full flex items-center justify-center shrink-0",
                   accent
                     ? "bg-white/15 text-white"
                     : "bg-[var(--accent-soft)] text-[var(--accent-strong)]",
@@ -68,15 +113,15 @@ export function StatCard({
             )}
             <span
               className={cn(
-                "text-xs",
+                "text-xs font-medium truncate",
                 accent ? "text-white/70" : "text-[var(--ink-muted)]",
               )}
             >
               {label}
             </span>
           </div>
-          <div className="flex items-baseline gap-1">
-            <span className="font-display tabular text-3xl font-semibold tracking-tight">
+          <div className="flex items-baseline gap-1 min-w-0">
+            <span className="font-display tabular text-2xl sm:text-3xl font-semibold tracking-tight truncate">
               {displayValue}
             </span>
             {suffix && (
@@ -98,6 +143,91 @@ export function StatCard({
               {positive ? "+" : ""}
               {delta}%
             </Badge>
+          )}
+
+          {hasBreakdown && (
+            <div
+              className={cn(
+                "mt-3 border-t pt-2.5",
+                accent ? "border-white/20" : "border-[var(--border)]",
+              )}
+            >
+              {/* Caption + count header */}
+              <div className="flex items-center justify-between gap-2 mb-1.5">
+                <span
+                  className={cn(
+                    "text-[10px] font-semibold uppercase tracking-wider",
+                    accent ? "text-white/60" : "text-[var(--ink-muted)]",
+                  )}
+                >
+                  {breakdownCaption}
+                </span>
+                <span
+                  className={cn(
+                    "text-[10px] font-semibold tabular rounded-full px-1.5 py-0.5",
+                    accent
+                      ? "bg-white/10 text-white/70"
+                      : "bg-[var(--surface-2)] text-[var(--ink-muted)]",
+                  )}
+                >
+                  {breakdown.length}
+                </span>
+              </div>
+
+              {breakdown.length === 0 ? (
+                <p
+                  className={cn(
+                    "text-[11px] italic py-1",
+                    accent ? "text-white/60" : "text-[var(--ink-muted)]",
+                  )}
+                >
+                  No records yet
+                </p>
+              ) : (
+                /* Height-capped scroll area — the card never blows past the
+                   grid row no matter how many references exist. The app-wide
+                   `scrollbar-slim` utility hides the scrollbar visually. */
+                <ul className="max-h-36 space-y-1 overflow-y-auto scrollbar-slim pr-1 -mr-1">
+                  {breakdown.map((item, i) => (
+                    <li
+                      key={item.key ?? i}
+                      className="flex items-center justify-between gap-2 text-xs"
+                    >
+                      {/* Single-line row: label with the date inline after it
+                         (same pattern as SelectReference rows) */}
+                      <span
+                        className={cn(
+                          "min-w-0 truncate",
+                          accent ? "text-white/90" : "text-[var(--ink-muted)]",
+                        )}
+                      >
+                        {item.label ?? "—"}
+                        {item.hint != null && (
+                          <span className="text-[10px] opacity-60">
+                            {" · "}
+                            {item.hint}
+                          </span>
+                        )}
+                      </span>
+                      <span
+                        className={cn(
+                          "shrink-0 font-semibold tabular",
+                          item.tone === "danger"
+                            ? "text-[var(--danger)]"
+                            : item.tone === "success"
+                              ? "text-[var(--success)]"
+                              : accent
+                                ? "text-white"
+                                : "text-[var(--ink)]",
+                        )}
+                      >
+                        {item.value ?? "—"}
+                      </span>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </div>
           )}
         </div>
 

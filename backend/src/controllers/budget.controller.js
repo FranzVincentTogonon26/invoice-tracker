@@ -67,6 +67,24 @@ export const create = async (req, res, next) => {
   }
 };
 
+// Balance summary for one budget reference — powers the live "Balance"
+// readout in the issuedBudget form (allocated vs issued vs remaining).
+export const referenceBalance = async (req, res, next) => {
+  try {
+    const { referenceId } = req.params;
+    const UUID_RE =
+      /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+    if (!UUID_RE.test(referenceId || ""))
+      throw ApiError.badRequest("Invalid reference id", "VALIDATION_ERROR");
+
+    const summary = await Budget.referenceBalance(referenceId);
+    return res.status(200).json({ balance: summary });
+  } catch (err) {
+    next(err);
+  }
+};
+
 // Deletes a budget reference row. This is a hard DELETE — the `budget` /
 // `budget_issued_reference` rows that reference it are destroyed along with
 // it (ON DELETE CASCADE).

@@ -10,7 +10,7 @@ import { PageHeader } from "../../components/ui/PageHeader";
 import { Button } from "../../components/ui/Button";
 import { StatCard } from "../../components/ui/StatCard";
 
-import { formatMoney } from "../../lib/utils";
+import { formatMoney, formatDate } from "../../lib/utils";
 import {
   Tabs,
   TabsContent,
@@ -32,7 +32,36 @@ export default function AdminBudget() {
   const [modalType, setModalType] = useState(null);
   const [tab, setTab] = useState("employee_budget");
 
-  // const overview = data?.budgetOverview ?? [];
+  const overview = data?.budgetOverview ?? {};
+  const overviewBudget = overview.overviewBudget ?? [];
+  const overviewIssuedBudget = overview.overviewIssuedBudget ?? [];
+  const totalBudget = overview.totalBudget ?? 0;
+  const totalIssued = overview.totalIssued ?? 0;
+  // Cash On Hand = Total Budget − Total Issued (allocated funds not yet
+  // handed out to employees).
+  const cashOnHand = totalBudget - totalIssued;
+
+  // Per-reference remaining balance: allocated − issued, matched on
+  // `reference_id`. pg returns DECIMAL as strings — cast with Number().
+  const issuedByReference = new Map(
+    overviewIssuedBudget.map((row) => [
+      row.reference_id,
+      Number(row.amount || 0),
+    ]),
+  );
+  const cashOnHandBreakdown = overviewBudget.map((row, i) => {
+    const issued = issuedByReference.get(row.reference_id) ?? 0;
+    const remaining = Number(row.amount || 0) - issued;
+    return {
+      key: i,
+      label: row.label ?? "Untitled reference",
+      value: formatMoney(remaining),
+      hint: formatDate(row.created_at),
+      // Over-issued references (more handed out than allocated) flag red.
+      tone: remaining < 0 ? "danger" : undefined,
+    };
+  });
+
   const budgets = data?.employeeBudgets ?? [];
   const employees = data?.employees ?? [];
   const budgetReferences = data?.budgetReference ?? [];
@@ -60,20 +89,38 @@ export default function AdminBudget() {
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
         <StatCard
           label="Total Budget"
-          value={formatMoney(10000)}
+          value={formatMoney(totalBudget)}
           icon={TrendingUp}
           accent
+          loading={isLoading}
+          breakdownCaption="Allocated"
+          breakdown={overviewBudget.map((row, i) => ({
+            key: i,
+            label: row.label ?? "Untitled reference",
+            value: formatMoney(row.amount),
+            hint: formatDate(row.created_at),
+          }))}
         />
-        {/* No backend source yet — placeholder values */}
         <StatCard
           label="Cash On Hand"
-          value={formatMoney(9000)}
+          value={formatMoney(cashOnHand)}
           icon={PhilippinePesoIcon}
+          loading={isLoading}
+          breakdownCaption="Remaining"
+          breakdown={cashOnHandBreakdown}
         />
         <StatCard
           label="Total Issued"
-          value={formatMoney(10000)}
+          value={formatMoney(totalIssued)}
           icon={BadgeCheck}
+          loading={isLoading}
+          breakdownCaption="Issued"
+          breakdown={overviewIssuedBudget.map((row, i) => ({
+            key: i,
+            label: row.label ?? "Untitled reference",
+            value: formatMoney(row.amount),
+            hint: formatDate(row.created_at),
+          }))}
         />
 
         {/* No backend source yet — placeholder values */}
@@ -82,6 +129,7 @@ export default function AdminBudget() {
           value={5}
           suffix={formatMoney(1000)}
           icon={BadgeInfo}
+          loading={isLoading}
         />
       </div>
 

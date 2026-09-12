@@ -30,3 +30,21 @@ export function useBudgetMutations() {
     }),
   };
 }
+
+// Live balance summary for a single budget reference (issuedBudget form).
+// Only fetched when `enabled` and a reference is actually selected — the
+// key nests under ["budgets", …] so the shared `invalidate()` above also
+// refetches this after every create/remove.
+export function useBudgetBalance(referenceId, enabled = true) {
+  const query = useQuery({
+    queryKey: ["budgets", "balance", referenceId || null],
+    queryFn: () => budgetsApi.referenceBalance(referenceId),
+    enabled: Boolean(enabled && referenceId),
+  });
+
+  return {
+    ...query,
+    // Empty references legitimately return zeros — never resolve to undefined
+    data: query.data ?? { allocated: 0, issued: 0, balance: 0 },
+  };
+}

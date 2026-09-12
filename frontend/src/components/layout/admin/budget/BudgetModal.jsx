@@ -4,7 +4,9 @@ import {
   Calendar1Icon,
   Loader2,
   PhilippinePesoIcon,
+  WalletIcon,
   AlertCircle,
+  Lock,
   X,
   Plus,
 } from "lucide-react";
@@ -15,6 +17,9 @@ import { SelectEmployee } from "../../../ui/SelectEmployee";
 import { SelectReference } from "../../../ui/SelectReference";
 import { Button } from "../../../ui/Button";
 import ReferencesModal from "./ReferencesModal";
+import { useBudgetBalance } from "../../../../hooks/useBudget";
+import useSmoothScroll from "../../../../hooks/useSmoothScroll";
+import { formatMoney } from "../../../../lib/utils";
 import toast from "react-hot-toast";
 
 // Approver is fixed for now (admin-issued budgets are always self-approved)
@@ -33,6 +38,10 @@ const initialForm = {
 // limit; these keep entries tidy and power the live character counters).
 const DESCRIPTION_MAX = 200;
 const NOTE_MAX = 150;
+
+// Error banners auto-dismiss after this long (ms); AnimatePresence plays the
+// smooth fade/slide/height-collapse exit when the message clears.
+const ERROR_VISIBLE_MS = 5000;
 
 // Quick-fill amounts for the money input — one tap fills the field, avoiding
 // typos on numeric keyboards. Values match common budget tranches.
@@ -92,6 +101,142 @@ function ContextCard({ icon, title, subtitle, badge, badgeTone = "neutral" }) {
   );
 }
 
+// Live balance readout for the issuedBudget flow — fetches the selected
+// reference's allocated (budget rows) vs issued (issued_budget rows) amounts
+// and renders the remaining balance. Three visual states:
+//   1. no selection → dashed hint card ("select a source to see balance")
+//   2. loading      → skeleton pulse (no layout shift)
+//   3. loaded       → headline balance + allocated/issued grid breakdown,
+//                     degrading to a warning treatment when fully depleted
+function BalanceCard({ summary, isLoading, referenceId, projection, exceeds }) {
+  const EMPTY = { allocated: 0, issued: 0, balance: 0 };
+
+  if (!referenceId) {
+    return (
+      <div className="flex items-center gap-3 rounded-2xl border border-dashed border-[var(--border)] bg-[var(--surface-2)]/40 px-3.5 py-3">
+        <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-[var(--surface-2)] text-[var(--ink-muted)]">
+          <WalletIcon size={15} />
+        </div>
+        <div className="flex-1 min-w-0">
+          <p className="text-sm font-semibold text-[var(--ink-muted)]">
+            Balance
+          </p>
+          <p className="text-xs leading-snug text-[var(--ink-muted)]">
+            Select a budget source to view its remaining balance.
+          </p>
+        </div>
+      </div>
+    );
+  }
+
+  if (isLoading) {
+    return (
+      <div className="rounded-2xl border border-[var(--border)] bg-[var(--surface-2)]/60 px-3.5 py-3 shadow-card">
+        <div className="flex items-center gap-3">
+          <div className="h-9 w-9 shrink-0 animate-pulse rounded-full bg-[var(--border)]" />
+          <div className="flex-1 space-y-1.5">
+            <div className="h-2.5 w-24 animate-pulse rounded bg-[var(--border)]" />
+            <div className="h-6 w-36 animate-pulse rounded bg-[var(--border)]" />
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  const { allocated, issued, balance } = summary ?? EMPTY;
+  const depleted = balance <= 0;
+
+  return (
+    <div
+      className={`rounded-2xl border px-3.5 py-3 shadow-card ${
+        exceeds
+          ? "border-[var(--danger)]/30 bg-[var(--danger)]/10"
+          : depleted
+          ? "border-[var(--warning)]/30 bg-[var(--warning)]/10"
+          : "border-[var(--border)] bg-[var(--surface-2)]/60"
+      }`}
+    >
+      <div className="flex items-center gap-3">
+        <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-[var(--accent-soft)] text-[var(--accent-strong)] ring-1 ring-[var(--surface)]">
+          <WalletIcon size={15} />
+        </div>
+        <div className="flex-1 min-w-0">
+          <p className="text-[11px] font-semibold uppercase tracking-wider text-[var(--ink-muted)]">
+            Balance
+          </p>
+          <p
+            className={`flex items-center gap-1 text-2xl font-semibold tracking-tight tabular ${
+              exceeds
+                ? "text-[var(--danger)]"
+                : depleted
+                ? "text-[var(--warning)]"
+                : "text-[var(--ink)]"
+            }`}
+          >
+            <PhilippinePesoIcon size={20} className="shrink-0 opacity-70" />
+            {Number(balance).toLocaleString("en-PH", {
+              minimumFractionDigits: 2,
+              maximumFractionDigits: 2,
+            })}
+          </p>
+        </div>
+        <Badge tone={exceeds || depleted ? "warning" : "accent"}>
+          {exceeds ? "Insufficient" : depleted ? "Depleted" : "Funded"}
+        </Badge>
+      </div>
+
+      {/* Breakdown: allocated vs already-issued, side by side on a grid */}
+      <div className="mt-3 grid grid-cols-2 gap-2 border-t border-[var(--border)] pt-3">
+        <div className="min-w-0">
+          <p className="text-[10px] font-semibold uppercase tracking-wider text-[var(--ink-muted)]">
+            Allocated
+          </p>
+          <p className="truncate text-sm font-semibold tabular">
+            {formatMoney(allocated)}
+          </p>
+        </div>
+        <div className="min-w-0 text-right">
+          <p className="text-[10px] font-semibold uppercase tracking-wider text-[var(--ink-muted)]">
+            Issued
+          </p>
+          <p className="truncate text-sm font-semibold tabular">
+            {formatMoney(issued)}
+          </p>
+        </div>
+      </div>
+
+      {/* Live projection: balance minus the amount currently typed. Slides in
+          only once a valid amount is entered; red when it would over-issue. */}
+      <AnimatePresence initial={false}>
+        {projection != null && (
+          <motion.div
+            initial={{ opacity: 0, height: 0 }}
+            animate={{ opacity: 1, height: "auto" }}
+            exit={{ opacity: 0, height: 0 }}
+            transition={{ duration: 0.25, ease: "easeOut" }}
+            className="overflow-hidden"
+          >
+            <div className="mt-2 flex items-center justify-between border-t border-[var(--border)] pt-2">
+              <p className="text-[10px] font-semibold uppercase tracking-wider text-[var(--ink-muted)]">
+                After this issue
+              </p>
+              <p
+                className={`truncate text-sm font-semibold tabular ${
+                  projection > balance
+                    ? "text-[var(--danger)]"
+                    : "text-[var(--accent-strong)]"
+                }`}
+              >
+                {formatMoney(balance - projection)}
+              </p>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </div>
+  );
+}
+
 // Money input with a live formatted peso preview and one-tap quick-fill
 // presets — confirms the parsed amount at a glance and avoids typos on
 // numeric keyboards. Kept here (not in ui/) since it is budget-form specific.
@@ -138,6 +283,55 @@ function AmountInput({ value, onChange, disabled }) {
         </div>
       </div>
     </div>
+  );
+}
+
+// Amount field with a reference lock — the input (and its quick-fill presets)
+// stay disabled until a budget reference is chosen, so an amount can never be
+// entered against a non-existent source. Interactions while locked trigger a
+// toast nudge plus an inline animated hint explaining what's missing.
+// `children` renders extra live warnings (e.g. the over-balance alert).
+function AmountField({ value, onChange, saving, locked, children }) {
+  return (
+    <Field label="Amount">
+      <div
+        onClick={
+          locked
+            ? () =>
+                toast.error(
+                  "Select a budget reference first, then enter an amount.",
+                  { id: "amount-locked" },
+                )
+            : undefined
+        }
+        className={locked ? "cursor-not-allowed" : undefined}
+      >
+        <AmountInput
+          value={value}
+          onChange={onChange}
+          disabled={saving || locked}
+        />
+        <AnimatePresence initial={false}>
+          {locked && (
+            <motion.div
+              initial={{ opacity: 0, y: -4, height: 0 }}
+              animate={{ opacity: 1, y: 0, height: "auto" }}
+              exit={{ opacity: 0, y: -4, height: 0 }}
+              transition={{ duration: 0.25, ease: "easeOut" }}
+              role="status"
+              className="flex items-start gap-2 overflow-hidden text-xs text-[var(--warning)] bg-[var(--warning)]/10 border border-[var(--warning)]/20 rounded-xl px-3.5 py-2.5 leading-snug mt-1.5"
+            >
+              <Lock size={14} className="mt-px shrink-0" />
+              <span>
+                Locked — select a budget source first to enable the amount
+                input.
+              </span>
+            </motion.div>
+          )}
+        </AnimatePresence>
+        {children}
+      </div>
+    </Field>
   );
 }
 
@@ -220,6 +414,101 @@ const BudgetModal = ({
 
   const isAddBudget = transaction === "addBudget";
 
+  // issuedBudget flow: fetch the selected reference's balance (allocated vs
+  // issued vs remaining) as soon as a reference is chosen. Key nests under
+  // ["budgets"] so the create/remove mutations invalidate it automatically.
+  const balanceQuery = useBudgetBalance(form.reference_id, !isAddBudget);
+
+  // Smooth eased wheel scrolling for the modal body (scrub feel)
+  const bodyRef = useSmoothScroll();
+
+  // Auto-reveal errors: when an error appears (validation or server failure),
+  // scroll the body until the WHOLE banner is visible. The banner animates
+  // its height in (framer-motion), so a one-shot scrollIntoView measures it
+  // at height 0 and leaves the message clipped below — instead we nudge the
+  // container across several frames until the banner's edges settle fully
+  // inside the visible area. Only the modal container is scrolled (never the
+  // page behind the modal).
+  const errRef = useRef(null);
+  useEffect(() => {
+    if (!err) return undefined;
+    const container = bodyRef.current;
+    if (!container) return undefined;
+
+    const margin = 16; // breathing room around the banner
+    let rafId = null;
+    let frames = 0;
+    let settled = 0;
+
+    // Per-frame scrollTop math must not use CSS smooth-scrolling, or each
+    // nudge restarts an animation and never converges.
+    container.style.scrollBehavior = "auto";
+
+    const step = () => {
+      const banner = errRef.current;
+      if (banner) {
+        const cRect = container.getBoundingClientRect();
+        const bRect = banner.getBoundingClientRect();
+
+        // Clipped below the visible area → scroll down by the deficit
+        if (bRect.bottom + margin > cRect.bottom) {
+          container.scrollTop += bRect.bottom + margin - cRect.bottom;
+        }
+        // Clipped above the visible area → scroll up by the deficit
+        if (bRect.top - margin < cRect.top) {
+          container.scrollTop -= cRect.top - (bRect.top - margin);
+        }
+
+        // Fully visible for 2 consecutive frames → done early. Otherwise the
+        // banner is still growing (mount animation) and needs more nudges.
+        const fullyVisible =
+          bRect.top - margin >= cRect.top &&
+          bRect.bottom + margin <= cRect.bottom;
+        settled = fullyVisible ? settled + 1 : 0;
+      }
+
+      frames += 1;
+      // Cap at ~1s of frames — covers the banner's mount animation with slack
+      if (settled < 2 && frames < 60) rafId = requestAnimationFrame(step);
+    };
+
+    rafId = requestAnimationFrame(step);
+    return () => {
+      cancelAnimationFrame(rafId);
+      container.style.scrollBehavior = "";
+    };
+  }, [err]);
+
+  // Auto-dismiss: clear the error after ERROR_VISIBLE_MS so stale messages
+  // don't linger. Restarted every time a new error appears; clearing triggers
+  // the smooth exit animation below via AnimatePresence.
+  useEffect(() => {
+    if (!err) return undefined;
+
+    const id = setTimeout(() => setErr(""), ERROR_VISIBLE_MS);
+    return () => clearTimeout(id);
+  }, [err]);
+
+  // Live over-balance feedback for the amount input (issuedBudget flow).
+  // The typed amount is compared against the fetched remaining balance:
+  // exceeding it shows an inline warning under the input, tints the balance
+  // card and turns the "After this issue" projection negative. Submitting
+  // still runs the full validation guard + error banner.
+  const amountNum = Number(form.amount);
+  const amountEntered =
+    String(form.amount ?? "").trim() !== "" &&
+    !Number.isNaN(amountNum) &&
+    amountNum > 0;
+  const remaining = Number(balanceQuery.data?.balance ?? 0);
+  const exceedsBalance =
+    !isAddBudget && balanceQuery.isSuccess && amountEntered && amountNum > remaining;
+  const projection = !isAddBudget && amountEntered ? amountNum : null;
+
+  // Amount stays locked until a budget reference is selected — applies to
+  // BOTH flows (addBudget + issuedBudget), since submit validation requires
+  // the source first. Clicking the locked field nudges with a toast + hint.
+  const amountLocked = !form.reference_id;
+
   // Client-side validation mirroring `POST /budgets` zod rules
   const validate = () => {
     if (isAddBudget && !form.reference_id)
@@ -234,6 +523,16 @@ const BudgetModal = ({
     const amount = Number(form.amount);
     if (Number.isNaN(amount)) return "Amount must be a valid number.";
     if (amount <= 0) return "Amount must be greater than zero.";
+
+    // issuedBudget: block over-issuing past the selected reference's
+    // remaining balance (only enforced once the balance query has data)
+    if (!isAddBudget && balanceQuery.isSuccess) {
+      const remaining = Number(balanceQuery.data?.balance ?? 0);
+      if (amount > remaining)
+        return `Amount exceeds the remaining balance of ${formatMoney(
+          remaining,
+        )} for this budget source.`;
+    }
 
     return "";
   };
@@ -298,20 +597,36 @@ const BudgetModal = ({
           className="fixed inset-0 z-50 flex items-center justify-center p-4"
           exit={{ opacity: 0 }}
         >
-          <div className="absolute inset-0 bg-[var(--ink)]/30 backdrop-blur-sm flex items-center justify-center">
+          <div
+            onClick={handleClose}
+            className="absolute inset-0 bg-[var(--ink)]/40 backdrop-blur-sm flex items-center justify-center"
+          >
             <motion.form
               onSubmit={onSubmit}
               onClick={(e) => e.stopPropagation()}
+              aria-labelledby="budget-modal-title"
               initial={{ opacity: 0, y: 12, scale: 0.98 }}
               animate={{ opacity: 1, y: 0, scale: 1 }}
               exit={{ opacity: 0, y: 8, scale: 0.98 }}
               transition={{ duration: 0.2, ease: [0.16, 1, 0.3, 1] }}
-              className="relative w-full max-w-[500px] rounded-3xl bg-[var(--surface)] border border-[var(--border)] shadow-hover p-6"
+              className="relative flex w-full max-w-[500px] flex-col max-h-[calc(100dvh-2rem)] rounded-3xl bg-[var(--surface)] border border-[var(--border)] shadow-hover p-6 sm:p-7"
             >
-              <div className="flex items-center justify-between mb-5">
-                <h3 className="font-display text-lg font-semibold tracking-tight">
-                  {transaction === "addBudget" ? "Add Budget" : "Issued Budget"}
-                </h3>
+              <div className="flex shrink-0 items-start justify-between mb-6">
+                <div className="min-w-0">
+                  <h3
+                    id="budget-modal-title"
+                    className="font-display text-lg font-semibold tracking-tight"
+                  >
+                    {transaction === "addBudget"
+                      ? "Add Budget"
+                      : "Issued Budget"}
+                  </h3>
+                  <p className="mt-1 text-xs leading-snug text-[var(--ink-muted)]">
+                    {transaction === "addBudget"
+                      ? "Top up a budget reference with new funds."
+                      : "Allocate funds from a budget reference to an employee."}
+                  </p>
+                </div>
                 <button
                   type="button"
                   onClick={handleClose}
@@ -321,8 +636,14 @@ const BudgetModal = ({
                 </button>
               </div>
 
+              {/* Scrollable body — header and footer stay pinned; only this
+                  area scrolls when the form grows past the viewport */}
+              <div
+                ref={bodyRef}
+                className="scrollbar-slim min-h-0 flex-1 overflow-y-auto"
+              >
               {transaction === "addBudget" ? (
-                <div className="space-y-3">
+                <div className="space-y-5">
                   {/* Read-only context strip: date + approver, collapsed into one
                       summary card instead of two stacked display rows */}
                   <ContextCard
@@ -340,7 +661,6 @@ const BudgetModal = ({
                     }
                     badge="Approver"
                   />
-
                   <Field
                     label="Budget Reference"
                     hint="Select the budget reference (source and date)."
@@ -368,13 +688,12 @@ const BudgetModal = ({
                       </Button>
                     </div>
                   </Field>
-                  <Field label="Amount">
-                    <AmountInput
-                      value={form?.amount}
-                      onChange={set("amount")}
-                      disabled={saving}
-                    />
-                  </Field>
+                  <AmountField
+                    value={form?.amount}
+                    onChange={set("amount")}
+                    saving={saving}
+                    locked={amountLocked}
+                  />
                   <Field label="Transaction Method">
                     <Select
                       value={form?.method}
@@ -392,7 +711,7 @@ const BudgetModal = ({
                   </Field>
                 </div>
               ) : (
-                <div className="space-y-3">
+                <div className="space-y-5">
                   {/* Read-only context strip: today's issuance date */}
                   <ContextCard
                     icon={
@@ -405,6 +724,15 @@ const BudgetModal = ({
                     badge="Today"
                     badgeTone="accent"
                   />
+
+                  <BalanceCard
+                    summary={balanceQuery.data}
+                    isLoading={balanceQuery.isLoading || balanceQuery.isFetching}
+                    referenceId={form.reference_id}
+                    projection={projection}
+                    exceeds={exceedsBalance}
+                  />
+
                   <Field
                     label="Budget Reference"
                     hint="Select the budget reference (source and date)."
@@ -429,13 +757,45 @@ const BudgetModal = ({
                       disabled={saving}
                     />
                   </Field>
-                  <Field label="Amount">
-                    <AmountInput
-                      value={form?.amount}
-                      onChange={set("amount")}
-                      disabled={saving}
-                    />
-                  </Field>
+                  <AmountField
+                    value={form?.amount}
+                    onChange={set("amount")}
+                    saving={saving}
+                    locked={amountLocked}
+                  >
+                    {/* Live over-balance warning — appears as soon as the
+                        typed amount exceeds the remaining balance, so the
+                        user is told before hitting submit */}
+                    <AnimatePresence initial={false}>
+                      {exceedsBalance && (
+                        <motion.div
+                          initial={{ opacity: 0, y: -4, height: 0 }}
+                          animate={{ opacity: 1, y: 0, height: "auto" }}
+                          exit={{ opacity: 0, y: -4, height: 0 }}
+                          transition={{ duration: 0.25, ease: "easeOut" }}
+                          role="alert"
+                          className="flex items-start gap-2 overflow-hidden text-xs text-[var(--danger)] bg-[var(--danger)]/10 border border-[var(--danger)]/20 rounded-xl px-3.5 py-2.5 leading-snug mt-1.5"
+                        >
+                          <AlertCircle size={14} className="mt-px shrink-0" />
+                          <span>
+                            Input{" "}
+                            <span className="font-semibold tabular">
+                              {formatMoney(amountNum)}
+                            </span>{" "}
+                            is greater than the remaining balance of{" "}
+                            <span className="font-semibold tabular">
+                              {formatMoney(remaining)}
+                            </span>
+                            . Enter an amount up to{" "}
+                            <span className="font-semibold tabular">
+                              {formatMoney(remaining)}
+                            </span>
+                            .
+                          </span>
+                        </motion.div>
+                      )}
+                    </AnimatePresence>
+                  </AmountField>
                   <Field
                     label="Transaction Method"
                     hint="How the budget will be released."
@@ -478,17 +838,31 @@ const BudgetModal = ({
                 </div>
               )}
 
-              {err && (
-                <motion.div
-                  initial={{ opacity: 0, y: -4 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  className="flex items-start gap-2 text-xs text-[var(--danger)] bg-[var(--danger)]/10 border border-[var(--danger)]/20 rounded-xl px-3.5 py-2.5 leading-snug mt-4"
-                >
-                  <AlertCircle size={14} className="mt-px shrink-0" />
-                  {err}
-                </motion.div>
-              )}
-              <div className="flex items-center justify-end gap-2 mt-6 pt-5 border-t border-[var(--border)]">
+              <AnimatePresence initial={false}>
+                {err && (
+                  <motion.div
+                    ref={errRef}
+                    data-error
+                    role="alert"
+                    initial={{ opacity: 0, y: -4, height: 0, marginTop: 0 }}
+                    animate={{ opacity: 1, y: 0, height: "auto", marginTop: 16 }}
+                    exit={{
+                      opacity: 0,
+                      y: -4,
+                      height: 0,
+                      marginTop: 0,
+                      transition: { duration: 0.25, ease: "easeOut" },
+                    }}
+                    className="flex items-start gap-2 overflow-hidden text-xs text-[var(--danger)] bg-[var(--danger)]/10 border border-[var(--danger)]/20 rounded-xl px-3.5 py-2.5 leading-snug mt-4"
+                  >
+                    <AlertCircle size={14} className="mt-px shrink-0" />
+                    {err}
+                  </motion.div>
+                )}
+              </AnimatePresence>
+              </div>
+
+              <div className="flex shrink-0 items-center justify-end gap-2 mt-6 pt-5 border-t border-[var(--border)]">
                 <Button type="button" variant="outline" onClick={handleClose}>
                   Cancel
                 </Button>

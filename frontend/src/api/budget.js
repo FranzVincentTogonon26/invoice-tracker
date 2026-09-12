@@ -11,4 +11,9 @@ export const budgetsApi = {
   // Deletes a budget reference row (hard delete, cascades to dependent rows)
   removeReference: (referenceId) =>
     apiClient.delete(`/budgets/${referenceId}`).then((r) => r.data),
+  // Balance summary for one budget reference (allocated / issued / remaining)
+  referenceBalance: (referenceId) =>
+    apiClient
+      .get(`/budgets/balance/${referenceId}`)
+      .then((r) => r.data.balance),
 };

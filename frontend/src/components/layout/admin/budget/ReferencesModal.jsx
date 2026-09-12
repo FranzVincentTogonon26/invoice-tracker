@@ -15,6 +15,11 @@ import toast from "react-hot-toast";
 
 import { formatDate } from "../../../../lib/utils";
 import { useBudgetMutations } from "../../../../hooks/useBudget";
+import useSmoothScroll from "../../../../hooks/useSmoothScroll";
+
+// Error banners auto-dismiss after this long (ms); AnimatePresence plays the
+// smooth fade/slide/height-collapse exit when the message clears.
+const ERROR_VISIBLE_MS = 5000;
 
 const ReferencesModal = ({
   open,
@@ -24,10 +29,22 @@ const ReferencesModal = ({
   onClose,
 }) => {
   const { create, removeReference: remove } = useBudgetMutations();
+  // Smooth eased wheel scrolling for the references table (scrub feel)
+  const tableRef = useSmoothScroll();
   const [newRef, setNewRef] = useState("");
   const [err, setErr] = useState("");
   const [adding, setAdding] = useState(false);
   const [deletingId, setDeletingId] = useState(null);
+
+  // Auto-dismiss: clear the error after ERROR_VISIBLE_MS so stale messages
+  // don't linger. Restarted every time a new error appears; clearing triggers
+  // the smooth exit animation below via AnimatePresence.
+  useEffect(() => {
+    if (!err) return undefined;
+
+    const id = setTimeout(() => setErr(""), ERROR_VISIBLE_MS);
+    return () => clearTimeout(id);
+  }, [err]);
 
   // Reset the form each time the modal opens
   const [prevOpen, setPrevOpen] = useState(open);
@@ -128,15 +145,20 @@ const ReferencesModal = ({
               animate={{ opacity: 1, y: 0, scale: 1 }}
               exit={{ opacity: 0, y: 8, scale: 0.98 }}
               transition={{ duration: 0.2, ease: [0.16, 1, 0.3, 1] }}
-              className="relative w-full max-w-[600px] rounded-3xl bg-[var(--surface)] border border-[var(--border)] shadow-hover p-6"
+              className="relative flex w-full max-w-[600px] flex-col max-h-[calc(100dvh-2rem)] rounded-3xl bg-[var(--surface)] border border-[var(--border)] shadow-hover p-6 sm:p-7"
             >
-              <div className="flex items-center justify-between mb-4">
-                <h3
-                  id="references-modal-title"
-                  className="font-display text-lg font-semibold tracking-tight"
-                >
-                  Budget Source Reference
-                </h3>
+              <div className="flex shrink-0 items-start justify-between mb-5">
+                <div className="min-w-0">
+                  <h3
+                    id="references-modal-title"
+                    className="font-display text-lg font-semibold tracking-tight"
+                  >
+                    Budget Source Reference
+                  </h3>
+                  <p className="mt-1 text-xs leading-snug text-[var(--ink-muted)]">
+                    Manage the source references budgets are allocated from.
+                  </p>
+                </div>
                 <button
                   type="button"
                   onClick={handleClose}
@@ -147,7 +169,7 @@ const ReferencesModal = ({
               </div>
 
               {/* Add-new-reference form */}
-              <form onSubmit={handleAdd} className="flex items-center gap-2">
+              <form onSubmit={handleAdd} className="flex shrink-0 items-center gap-2">
                 <Input
                   value={newRef}
                   onChange={(e) => setNewRef(e.target.value)}
@@ -171,11 +193,15 @@ const ReferencesModal = ({
                 </Button>
               </form>
 
-              {/* References table */}
-              <div className="mt-4 overflow-hidden rounded-2xl border border-[var(--border)]">
+              {/* References table — scrolls on its own so the header, the
+                  add form and the footer stay pinned when the list is long */}
+              <div
+                ref={tableRef}
+                className="scrollbar-slim mt-5 max-h-[50vh] min-h-0 flex-1 overflow-y-auto rounded-2xl border border-[var(--border)]"
+              >
                 <table className="w-full text-sm">
                   <thead>
-                    <tr className="bg-[var(--surface-2)] text-[10px] uppercase tracking-wider text-[var(--ink-muted)]">
+                    <tr className="sticky top-0 z-10 bg-[var(--surface-2)] text-[10px] uppercase tracking-wider text-[var(--ink-muted)]">
                       <th className="px-4 py-2.5 text-left font-semibold">
                         Reference Id
                       </th>
@@ -260,19 +286,28 @@ const ReferencesModal = ({
                 </table>
               </div>
 
-              {err && (
-                <motion.div
-                  initial={{ opacity: 0, y: -4 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  role="alert"
-                  className="flex items-start gap-2 text-xs text-[var(--danger)] bg-[var(--danger)]/10 border border-[var(--danger)]/20 rounded-xl px-3.5 py-2.5 leading-snug mt-4"
-                >
-                  <AlertCircle size={14} className="mt-px shrink-0" />
-                  {err}
-                </motion.div>
-              )}
+              <AnimatePresence initial={false}>
+                {err && (
+                  <motion.div
+                    initial={{ opacity: 0, y: -4, height: 0, marginTop: 0 }}
+                    animate={{ opacity: 1, y: 0, height: "auto", marginTop: 16 }}
+                    exit={{
+                      opacity: 0,
+                      y: -4,
+                      height: 0,
+                      marginTop: 0,
+                      transition: { duration: 0.25, ease: "easeOut" },
+                    }}
+                    role="alert"
+                    className="flex items-start gap-2 overflow-hidden text-xs text-[var(--danger)] bg-[var(--danger)]/10 border border-[var(--danger)]/20 rounded-xl px-3.5 py-2.5 leading-snug mt-4"
+                  >
+                    <AlertCircle size={14} className="mt-px shrink-0" />
+                    {err}
+                  </motion.div>
+                )}
+              </AnimatePresence>
 
-              <div className="flex items-center justify-end gap-2 mt-5 pt-4 border-t border-[var(--border)]">
+              <div className="flex shrink-0 items-center justify-end gap-2 mt-5 pt-5 border-t border-[var(--border)]">
                 <Button type="button" variant="outline" onClick={handleClose}>
                   Close
                 </Button>

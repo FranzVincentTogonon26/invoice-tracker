@@ -121,3 +121,18 @@ body {
 [data-theme="dark"] ::-webkit-scrollbar-thumb:hover {
   background: rgba(255, 255, 255, 0.14);
 }
+
+/* Scrollbars for compact scrollable panels (modals, lists) — fully hidden.
+   Scrolling via wheel, trackpad, touch and keyboard keeps working; only the
+   visual bar is removed. */
+.scrollbar-slim {
+  scrollbar-width: none; /* Firefox: hide the gutter entirely */
+  -ms-overflow-style: none; /* legacy Edge/IE */
+  scroll-behavior: smooth; /* ease programmatic/keyboard scrolls */
+  overscroll-behavior: contain; /* don't chain to the page behind modals */
+}
+.scrollbar-slim::-webkit-scrollbar {
+  display: none; /* Chrome / Edge / Safari */
+  width: 0;
+  height: 0;
+}
