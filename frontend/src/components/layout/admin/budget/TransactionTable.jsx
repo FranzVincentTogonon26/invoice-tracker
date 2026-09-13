@@ -25,11 +25,11 @@ const TransactionTable = ({ rows, role, onAction }) => (
   <>
     {/* Desktop — semantic table with fixed column proportions */}
     <div
-      className="hidden overflow-x-auto md:block"
+      className="hidden overflow-x-auto md:block rounded-xl border border-[var(--border)]"
       tabIndex={0}
       aria-label="Budget transactions"
     >
-      <table className="w-full min-w-[900px] table-fixed border-collapse text-left border-1 border-[var(--border)] rounded-full">
+      <table className="w-full min-w-[900px] table-fixed border-collapse text-left">
         <caption className="sr-only">
           Budget transactions with description, amount, payment method,
           approver, added and approved timestamps, and status
