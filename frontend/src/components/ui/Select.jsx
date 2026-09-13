@@ -32,7 +32,8 @@ export const MethodIcon = ({ method, className }) => {
  */
 export const Select = ({ options, value, onChange, placeholder, disabled }) => {
   const methodOptions = useMemo(
-    () => (Array.isArray(options) && options.length ? options : PAYMENT_METHODS),
+    () =>
+      Array.isArray(options) && options.length ? options : PAYMENT_METHODS,
     [options],
   );
 
@@ -50,7 +51,8 @@ export const Select = ({ options, value, onChange, placeholder, disabled }) => {
             <span className="truncate">{selectedOption.label}</span>
           </span>
         ) : (
-          <span className="truncate text-[var(--ink-muted)]">
+          <span className="flex min-w-0 items-center gap-2 truncate text-[var(--ink-muted)]">
+            <MethodIcon />
             {placeholder || "Select payment method"}
           </span>
         )
