@@ -107,7 +107,7 @@ export const deleteReference = async (req, res, next) => {
   }
 };
 
-export const budgetTransaction = async (req, res, next) => {
+export const budgetInfo = async (req, res, next) => {
   try {
     const [budgetOverview, employeeBudgets, employees, budgetReference] =
       await Promise.all([
@@ -123,6 +123,16 @@ export const budgetTransaction = async (req, res, next) => {
       employees,
       budgetReference,
     });
+  } catch (err) {
+    next(err);
+  }
+};
+
+export const budgetTransaction = async (req, res, next) => {
+  try {
+    // Forward `status` / `search` query params so the list can be filtered.
+    const budgetTransaction = await Budget.budgetTransaction(req.query);
+    res.json({ budgetTransaction });
   } catch (err) {
     next(err);
   }

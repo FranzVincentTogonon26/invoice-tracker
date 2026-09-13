@@ -13,6 +13,19 @@ export function useBudgets(params) {
   // instead of `undefined` so consumers never crash on missing data.
   return { ...query, data: query.data ?? [] };
 }
+
+export function useBudgetTransaction(params) {
+  const query = useQuery({
+    queryKey: budgetsKey(params),
+    queryFn: () => budgetsApi.budgetTransaction(params),
+  });
+
+  // The API returns `{ budgetTransaction: [...] }` — unwrap to the plain array
+  // so consumers can map over `data` directly. Resolves to `[]` while loading
+  // or on failure instead of `undefined`.
+  return { ...query, data: query.data?.budgetTransaction ?? [] };
+}
+
 export function useBudgetMutations() {
   const qc = useQueryClient();
   const invalidate = () => {

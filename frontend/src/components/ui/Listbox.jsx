@@ -166,7 +166,7 @@ export default function Listbox({
         aria-expanded={open}
         aria-controls={open ? listId : undefined}
         className={cn(
-          "group flex h-10 w-full items-center justify-between gap-2 rounded-full border border-[var(--border)] bg-[var(--surface)] px-4 text-sm text-[var(--ink)] outline-none transition-colors",
+          "group flex  w-full items-center justify-between gap-2 rounded-full border border-[var(--border)] bg-[var(--surface)] px-4 py-5 shadow-card text-sm text-[var(--ink)] outline-none transition-colors",
           "hover:border-[var(--accent)]/40 focus-visible:border-[var(--accent)]/50 focus-visible:ring-2 focus-visible:ring-[var(--accent)]/15",
           "disabled:cursor-not-allowed disabled:opacity-50",
           buttonClassName,
@@ -177,8 +177,8 @@ export default function Listbox({
         ) : (
           <span
             className={cn(
-              "truncate",
-              !selectedOption && "text-[var(--ink-muted)]",
+              "text-xs font-semibold transition-colors text-[var(--ink-muted)]",
+              !selectedOption && "text-[var(--ink-muted)] ",
             )}
           >
             {selectedOption ? selectedOption.label : placeholder}

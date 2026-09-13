@@ -31,6 +31,9 @@ export const STATUS = {
   paid: { tone: "success", label: "Paid" },
   overdue: { tone: "danger", label: "Overdue" },
   pending: { tone: "danger", label: "Pending" },
+  // Budget statuses (see `BUDGET_STATUS_TABS` in constants)
+  added: { tone: "success", label: "Added" },
+  cancelled: { tone: "warning", label: "Cancelled" },
 };
 
 export function StatusBadge({ status, className }) {

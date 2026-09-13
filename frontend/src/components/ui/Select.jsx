@@ -14,7 +14,7 @@ const METHOD_ICONS = {
   e_wallet: Wallet,
 };
 
-const MethodIcon = ({ method, className }) => {
+export const MethodIcon = ({ method, className }) => {
   const Icon = METHOD_ICONS[method] ?? CreditCard;
   return (
     <Icon

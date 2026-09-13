@@ -2,14 +2,7 @@ import { query } from "../config/db.js";
 
 class Budget {
   // Budget Overview
-  // - `overviewBudget`: one row per open budget_reference — { label, created_at,
-  //   amount } where `amount` is the SUM of that reference's `budget.amount`
-  //   rows. Grouping by reference keeps the breakdown readable when a
-  //   reference has several budget entries.
-  // - `overviewIssuedBudget`: one row per reference with SUM(i.amount) as the
-  //   issued subtotal — { label, created_at, amount }.
-  // `totalBudget` / `totalIssued` are pre-summed server-side because pg
-  // returns DECIMAL(12,2) as strings — summing them in JS would concatenate.
+
   static async budgetOverview() {
     const overviewBudget = await query(
       `SELECT
@@ -25,11 +18,6 @@ class Budget {
       [],
     );
 
-    // Issued breakdown: one row per reference with SUM(i.amount) as the
-    // subtotal. `GROUP BY bir.reference_id` alone is NOT valid here — every
-    // non-aggregated column in the SELECT (and in ORDER BY) must be in the
-    // GROUP BY clause, so we group by the reference identity columns and sort
-    // by br.created_at (i.created_at is per-entry and can't survive grouping).
     const overviewIssuedBudget = await query(
       `SELECT
           br.reference_id,
@@ -88,8 +76,8 @@ class Budget {
     approved_by,
   }) {
     const result = await query(
-      `INSERT INTO budget (reference_id, amount, description, method, approved_by)
-       VALUES ($1, $2, $3, $4, $5)
+      `INSERT INTO budget (reference_id, amount, description, method, approved_by, approved_at)
+       VALUES ($1, $2, $3, $4, $5, NOW())
        RETURNING *`,
       [reference_id, amount, description, method, approved_by],
     );
@@ -128,24 +116,28 @@ class Budget {
     return result.rows[0];
   }
 
-  // Lists Employee Budgets
-  // `issued_budget` has no `user_id`/`status` columns — the employee link and
-  // open/closed status live on `budget_issued_reference` (via issued_ref_id).
   static async employeesWithBudget() {
     const result = await query(
       `SELECT
+          bir.id AS issued_ref_id,
           bir.user_id,
           u.name,
-          SUM(i.amount) as total_amount,
-          MAX(i.created_at) as recent_date,
-          COUNT(bir.user_id) as total_budget_issued
-       FROM issued_budget i
-          JOIN budget_issued_reference bir ON i.issued_ref_id = bir.id
+          br.reference_id,
+          br.label,
+          COUNT(i.id)::int AS total_budget_issued,
+          COALESCE(SUM(i.amount), 0) AS total_amount,
+          MAX(i.created_at) AS recent_date
+       FROM budget_issued_reference bir
           LEFT JOIN users u
           ON bir.user_id = u.user_id
+          LEFT JOIN budget_reference br
+          ON br.reference_id = bir.reference_id
+          LEFT JOIN issued_budget i
+          ON i.issued_ref_id = bir.id
        WHERE bir.status = 'open'
-       GROUP BY bir.user_id, u.user_id, u.name
-       ORDER BY MAX(i.created_at) DESC`,
+       GROUP BY bir.id, bir.user_id, u.user_id, u.name,
+                br.reference_id, br.label
+       ORDER BY u.name ASC, bir.created_at DESC`,
       [],
     );
 
@@ -211,6 +203,49 @@ class Budget {
       [referenceId],
     );
     return result.rows[0] ?? null;
+  }
+
+  // Budget Transaction — all budget rows with their reference label.
+  // Optional filters:
+  //   - `status`: 'draft' | 'cancelled' | 'added'; 'all' (or falsy) skips the filter
+  //   - `search`: matched against description and reference label (ILIKE)
+  // NOTE: `RETURNING` is only valid on INSERT/UPDATE/DELETE — this is a SELECT,
+  // so the columns are selected directly and ALL rows are returned (the UI
+  // renders a list, not a single row).
+  static async budgetTransaction({ status, search } = {}) {
+    const where = [];
+    const params = [];
+
+    if (status && status !== "all") {
+      params.push(status);
+      where.push(`b.status = $${params.length}`);
+    }
+    if (search && search.trim()) {
+      params.push(`%${search.trim()}%`);
+      where.push(
+        `(b.description ILIKE $${params.length} OR br.label ILIKE $${params.length})`,
+      );
+    }
+
+    // `::float8` casts DECIMAL (returned by pg as strings) to a JS number.
+    const result = await query(
+      `SELECT
+          b.id,
+          b.description,
+          b.amount::float8 AS amount,
+          b.method,
+          b.status,
+          b.approved_by,
+          b.approved_at,
+          b.created_at,
+          br.label
+       FROM budget b
+       LEFT JOIN budget_reference br ON br.reference_id = b.reference_id
+       ${where.length ? `WHERE ${where.join(" AND ")}` : ""}
+       ORDER BY b.created_at DESC`,
+      params,
+    );
+    return result.rows;
   }
 }
 

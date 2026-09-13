@@ -4,6 +4,8 @@ export const budgetsApi = {
   // ── Real API ──
   list: (params = {}) =>
     apiClient.get("/budgets", { params }).then((r) => r.data),
+  budgetTransaction: (params = {}) =>
+    apiClient.get("/budgets/transaction", { params }).then((r) => r.data),
   create: (payload) =>
     apiClient
       .post("/budgets", payload)

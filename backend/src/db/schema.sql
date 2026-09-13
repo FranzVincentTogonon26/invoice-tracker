@@ -76,20 +76,18 @@ CREATE TABLE IF NOT EXISTS budget (
     amount         DECIMAL(12,2) NOT NULL,
     description    TEXT NOT NULL,
     method         VARCHAR(255) NOT NULL,
-    status         VARCHAR(20) NOT NULL DEFAULT 'pending'
+    status         VARCHAR(20) NOT NULL DEFAULT 'added' 
                    CHECK (
                        status IN (
-                           'draft',
-                           'approved',
+                           'draft', 
                            'cancelled',
-                           'pending'
+                           'added' 
                        )
                    ),
     approved_by    VARCHAR(255) NOT NULL,
     submitted_at   TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     approved_at    TIMESTAMPTZ,
     cancelled_at   TIMESTAMPTZ,
-    date_cancel    TIMESTAMPTZ,
     created_at     TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     updated_at     TIMESTAMPTZ NOT NULL DEFAULT NOW(),
 

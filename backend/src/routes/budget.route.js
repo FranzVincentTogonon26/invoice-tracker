@@ -10,12 +10,15 @@ router.get(
   "/",
   authMiddleware,
   requireAdminAccess,
+  budgetController.budgetInfo,
+);
+router.get(
+  "/transaction",
+  authMiddleware,
+  requireAdminAccess,
   budgetController.budgetTransaction,
 );
 router.post("/", authMiddleware, requireAdminAccess, budgetController.create);
-// Balance summary for one budget reference (issuedBudget form readout).
-// Declared before the generic DELETE — method-based, but keeps explicit
-// segments ahead of parameterized ones for clarity.
 router.get(
   "/balance/:referenceId",
   authMiddleware,

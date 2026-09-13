@@ -152,8 +152,8 @@ function BalanceCard({ summary, isLoading, referenceId, projection, exceeds }) {
         exceeds
           ? "border-[var(--danger)]/30 bg-[var(--danger)]/10"
           : depleted
-          ? "border-[var(--warning)]/30 bg-[var(--warning)]/10"
-          : "border-[var(--border)] bg-[var(--surface-2)]/60"
+            ? "border-[var(--warning)]/30 bg-[var(--warning)]/10"
+            : "border-[var(--border)] bg-[var(--surface-2)]/60"
       }`}
     >
       <div className="flex items-center gap-3">
@@ -169,8 +169,8 @@ function BalanceCard({ summary, isLoading, referenceId, projection, exceeds }) {
               exceeds
                 ? "text-[var(--danger)]"
                 : depleted
-                ? "text-[var(--warning)]"
-                : "text-[var(--ink)]"
+                  ? "text-[var(--warning)]"
+                  : "text-[var(--ink)]"
             }`}
           >
             <PhilippinePesoIcon size={20} className="shrink-0 opacity-70" />
@@ -501,7 +501,10 @@ const BudgetModal = ({
     amountNum > 0;
   const remaining = Number(balanceQuery.data?.balance ?? 0);
   const exceedsBalance =
-    !isAddBudget && balanceQuery.isSuccess && amountEntered && amountNum > remaining;
+    !isAddBudget &&
+    balanceQuery.isSuccess &&
+    amountEntered &&
+    amountNum > remaining;
   const projection = !isAddBudget && amountEntered ? amountNum : null;
 
   // Amount stays locked until a budget reference is selected — applies to
@@ -597,10 +600,7 @@ const BudgetModal = ({
           className="fixed inset-0 z-50 flex items-center justify-center p-4"
           exit={{ opacity: 0 }}
         >
-          <div
-            onClick={handleClose}
-            className="absolute inset-0 bg-[var(--ink)]/40 backdrop-blur-sm flex items-center justify-center"
-          >
+          <div className="absolute inset-0 bg-[var(--ink)]/40 backdrop-blur-sm flex items-center justify-center">
             <motion.form
               onSubmit={onSubmit}
               onClick={(e) => e.stopPropagation()}
@@ -642,224 +642,231 @@ const BudgetModal = ({
                 ref={bodyRef}
                 className="scrollbar-slim min-h-0 flex-1 overflow-y-auto"
               >
-              {transaction === "addBudget" ? (
-                <div className="space-y-5">
-                  {/* Read-only context strip: date + approver, collapsed into one
+                {transaction === "addBudget" ? (
+                  <div className="space-y-5">
+                    {/* Read-only context strip: date + approver, collapsed into one
                       summary card instead of two stacked display rows */}
-                  <ContextCard
-                    icon={
-                      <div className="h-9 w-9 shrink-0 rounded-full bg-[var(--accent-soft)] text-[var(--accent-strong)] font-semibold text-sm flex items-center justify-center ring-1 ring-[var(--surface)]">
-                        {APPROVER.charAt(0)}
-                      </div>
-                    }
-                    title={APPROVER}
-                    subtitle={
-                      <span className="flex items-center gap-1.5">
-                        <Calendar1Icon size={11} className="shrink-0" />
-                        {today}
-                      </span>
-                    }
-                    badge="Approver"
-                  />
-                  <Field
-                    label="Budget Reference"
-                    hint="Select the budget reference (source and date)."
-                  >
-                    <div className="flex items-center gap-2">
-                      <div className="flex-1 min-w-0">
-                        <SelectReference
-                          references={references}
-                          value={form?.reference_id}
-                          onChange={set("reference_id")}
-                          placeholder="Select budget source"
+                    <ContextCard
+                      icon={
+                        <div className="h-9 w-9 shrink-0 rounded-full bg-[var(--accent-soft)] text-[var(--accent-strong)] font-semibold text-sm flex items-center justify-center ring-1 ring-[var(--surface)]">
+                          {APPROVER.charAt(0)}
+                        </div>
+                      }
+                      title={APPROVER}
+                      subtitle={
+                        <span className="flex items-center gap-1.5">
+                          <Calendar1Icon size={11} className="shrink-0" />
+                          {today}
+                        </span>
+                      }
+                      badge="Approver"
+                    />
+                    <Field
+                      label="Budget Reference"
+                      hint="Select the budget reference (source and date)."
+                    >
+                      <div className="flex items-center gap-2">
+                        <div className="flex-1 min-w-0">
+                          <SelectReference
+                            references={references}
+                            value={form?.reference_id}
+                            onChange={set("reference_id")}
+                            placeholder="Select budget source"
+                            disabled={saving}
+                          />
+                        </div>
+                        <Button
+                          type="button"
+                          variant="soft"
+                          size="icon"
+                          onClick={() => setRefsOpen(true)}
                           disabled={saving}
-                        />
+                          aria-label="Add new reference"
+                          title="Add new reference"
+                        >
+                          <Plus size={16} />
+                        </Button>
                       </div>
-                      <Button
-                        type="button"
-                        variant="soft"
-                        size="icon"
-                        onClick={() => setRefsOpen(true)}
+                    </Field>
+                    <AmountField
+                      value={form?.amount}
+                      onChange={set("amount")}
+                      saving={saving}
+                      locked={amountLocked}
+                    />
+                    <Field label="Transaction Method">
+                      <Select
+                        value={form?.method}
+                        onChange={set("method")}
+                        placeholder="Select transaction method"
                         disabled={saving}
-                        aria-label="Add new reference"
-                        title="Add new reference"
-                      >
-                        <Plus size={16} />
-                      </Button>
-                    </div>
-                  </Field>
-                  <AmountField
-                    value={form?.amount}
-                    onChange={set("amount")}
-                    saving={saving}
-                    locked={amountLocked}
-                  />
-                  <Field label="Transaction Method">
-                    <Select
-                      value={form?.method}
-                      onChange={set("method")}
-                      placeholder="Select transaction method"
-                      disabled={saving}
+                      />
+                    </Field>
+                    <Field label="Description">
+                      <TextArea
+                        value={form?.description}
+                        onChange={set("description")}
+                        placeholder="What was this for?"
+                      />
+                    </Field>
+                  </div>
+                ) : (
+                  <div className="space-y-5">
+                    {/* Read-only context strip: today's issuance date */}
+                    <ContextCard
+                      icon={
+                        <div className="h-9 w-9 shrink-0 rounded-full bg-[var(--accent-soft)] text-[var(--accent-strong)] flex items-center justify-center ring-1 ring-[var(--surface)]">
+                          <Calendar1Icon size={15} />
+                        </div>
+                      }
+                      title={today}
+                      subtitle="Issuance date"
+                      badge="Today"
+                      badgeTone="accent"
                     />
-                  </Field>
-                  <Field label="Description">
-                    <TextArea
-                      value={form?.description}
-                      onChange={set("description")}
-                      placeholder="What was this for?"
-                    />
-                  </Field>
-                </div>
-              ) : (
-                <div className="space-y-5">
-                  {/* Read-only context strip: today's issuance date */}
-                  <ContextCard
-                    icon={
-                      <div className="h-9 w-9 shrink-0 rounded-full bg-[var(--accent-soft)] text-[var(--accent-strong)] flex items-center justify-center ring-1 ring-[var(--surface)]">
-                        <Calendar1Icon size={15} />
-                      </div>
-                    }
-                    title={today}
-                    subtitle="Issuance date"
-                    badge="Today"
-                    badgeTone="accent"
-                  />
 
-                  <BalanceCard
-                    summary={balanceQuery.data}
-                    isLoading={balanceQuery.isLoading || balanceQuery.isFetching}
-                    referenceId={form.reference_id}
-                    projection={projection}
-                    exceeds={exceedsBalance}
-                  />
+                    <BalanceCard
+                      summary={balanceQuery.data}
+                      isLoading={
+                        balanceQuery.isLoading || balanceQuery.isFetching
+                      }
+                      referenceId={form.reference_id}
+                      projection={projection}
+                      exceeds={exceedsBalance}
+                    />
 
-                  <Field
-                    label="Budget Reference"
-                    hint="Select the budget reference (source and date)."
-                  >
-                    <SelectReference
-                      references={references}
-                      value={form?.reference_id}
-                      onChange={set("reference_id")}
-                      placeholder="Select budget source"
-                      disabled={saving}
-                    />
-                  </Field>
-                  <Field
-                    label="Employee"
-                    hint="The budget will be issued to this employee."
-                  >
-                    <SelectEmployee
-                      employees={employees}
-                      value={form?.employee}
-                      onChange={set("employee")}
-                      placeholder="Select employee"
-                      disabled={saving}
-                    />
-                  </Field>
-                  <AmountField
-                    value={form?.amount}
-                    onChange={set("amount")}
-                    saving={saving}
-                    locked={amountLocked}
-                  >
-                    {/* Live over-balance warning — appears as soon as the
+                    <Field
+                      label="Budget Reference"
+                      hint="Select the budget reference (source and date)."
+                    >
+                      <SelectReference
+                        references={references}
+                        value={form?.reference_id}
+                        onChange={set("reference_id")}
+                        placeholder="Select budget source"
+                        disabled={saving}
+                      />
+                    </Field>
+                    <Field
+                      label="Employee"
+                      hint="The budget will be issued to this employee."
+                    >
+                      <SelectEmployee
+                        employees={employees}
+                        value={form?.employee}
+                        onChange={set("employee")}
+                        placeholder="Select employee"
+                        disabled={saving}
+                      />
+                    </Field>
+                    <AmountField
+                      value={form?.amount}
+                      onChange={set("amount")}
+                      saving={saving}
+                      locked={amountLocked}
+                    >
+                      {/* Live over-balance warning — appears as soon as the
                         typed amount exceeds the remaining balance, so the
                         user is told before hitting submit */}
-                    <AnimatePresence initial={false}>
-                      {exceedsBalance && (
-                        <motion.div
-                          initial={{ opacity: 0, y: -4, height: 0 }}
-                          animate={{ opacity: 1, y: 0, height: "auto" }}
-                          exit={{ opacity: 0, y: -4, height: 0 }}
-                          transition={{ duration: 0.25, ease: "easeOut" }}
-                          role="alert"
-                          className="flex items-start gap-2 overflow-hidden text-xs text-[var(--danger)] bg-[var(--danger)]/10 border border-[var(--danger)]/20 rounded-xl px-3.5 py-2.5 leading-snug mt-1.5"
-                        >
-                          <AlertCircle size={14} className="mt-px shrink-0" />
-                          <span>
-                            Input{" "}
-                            <span className="font-semibold tabular">
-                              {formatMoney(amountNum)}
-                            </span>{" "}
-                            is greater than the remaining balance of{" "}
-                            <span className="font-semibold tabular">
-                              {formatMoney(remaining)}
+                      <AnimatePresence initial={false}>
+                        {exceedsBalance && (
+                          <motion.div
+                            initial={{ opacity: 0, y: -4, height: 0 }}
+                            animate={{ opacity: 1, y: 0, height: "auto" }}
+                            exit={{ opacity: 0, y: -4, height: 0 }}
+                            transition={{ duration: 0.25, ease: "easeOut" }}
+                            role="alert"
+                            className="flex items-start gap-2 overflow-hidden text-xs text-[var(--danger)] bg-[var(--danger)]/10 border border-[var(--danger)]/20 rounded-xl px-3.5 py-2.5 leading-snug mt-1.5"
+                          >
+                            <AlertCircle size={14} className="mt-px shrink-0" />
+                            <span>
+                              Input{" "}
+                              <span className="font-semibold tabular">
+                                {formatMoney(amountNum)}
+                              </span>{" "}
+                              is greater than the remaining balance of{" "}
+                              <span className="font-semibold tabular">
+                                {formatMoney(remaining)}
+                              </span>
+                              . Enter an amount up to{" "}
+                              <span className="font-semibold tabular">
+                                {formatMoney(remaining)}
+                              </span>
+                              .
                             </span>
-                            . Enter an amount up to{" "}
-                            <span className="font-semibold tabular">
-                              {formatMoney(remaining)}
-                            </span>
-                            .
-                          </span>
-                        </motion.div>
-                      )}
-                    </AnimatePresence>
-                  </AmountField>
-                  <Field
-                    label="Transaction Method"
-                    hint="How the budget will be released."
-                  >
-                    <Select
-                      value={form?.method}
-                      onChange={set("method")}
-                      placeholder="Select transaction method"
-                      disabled={saving}
-                    />
-                  </Field>
-                  <Field
-                    label="Description"
-                    hint="A short summary shown in the transaction list."
-                    count={(form?.description || "").length}
-                    max={DESCRIPTION_MAX}
-                  >
-                    <TextArea
-                      value={form?.description}
-                      onChange={set("description")}
-                      placeholder="What was this for?"
-                      maxLength={DESCRIPTION_MAX}
-                      rows={2}
-                    />
-                  </Field>
-                  <Field
-                    label="Notes"
-                    optional
-                    count={(form?.note || "").length}
-                    max={NOTE_MAX}
-                  >
-                    <TextArea
-                      value={form?.note}
-                      onChange={set("note")}
-                      placeholder="Add note..."
-                      maxLength={NOTE_MAX}
-                      rows={2}
-                    />
-                  </Field>
-                </div>
-              )}
-
-              <AnimatePresence initial={false}>
-                {err && (
-                  <motion.div
-                    ref={errRef}
-                    data-error
-                    role="alert"
-                    initial={{ opacity: 0, y: -4, height: 0, marginTop: 0 }}
-                    animate={{ opacity: 1, y: 0, height: "auto", marginTop: 16 }}
-                    exit={{
-                      opacity: 0,
-                      y: -4,
-                      height: 0,
-                      marginTop: 0,
-                      transition: { duration: 0.25, ease: "easeOut" },
-                    }}
-                    className="flex items-start gap-2 overflow-hidden text-xs text-[var(--danger)] bg-[var(--danger)]/10 border border-[var(--danger)]/20 rounded-xl px-3.5 py-2.5 leading-snug mt-4"
-                  >
-                    <AlertCircle size={14} className="mt-px shrink-0" />
-                    {err}
-                  </motion.div>
+                          </motion.div>
+                        )}
+                      </AnimatePresence>
+                    </AmountField>
+                    <Field
+                      label="Transaction Method"
+                      hint="How the budget will be released."
+                    >
+                      <Select
+                        value={form?.method}
+                        onChange={set("method")}
+                        placeholder="Select transaction method"
+                        disabled={saving}
+                      />
+                    </Field>
+                    <Field
+                      label="Description"
+                      hint="A short summary shown in the transaction list."
+                      count={(form?.description || "").length}
+                      max={DESCRIPTION_MAX}
+                    >
+                      <TextArea
+                        value={form?.description}
+                        onChange={set("description")}
+                        placeholder="What was this for?"
+                        maxLength={DESCRIPTION_MAX}
+                        rows={2}
+                      />
+                    </Field>
+                    <Field
+                      label="Notes"
+                      optional
+                      count={(form?.note || "").length}
+                      max={NOTE_MAX}
+                    >
+                      <TextArea
+                        value={form?.note}
+                        onChange={set("note")}
+                        placeholder="Add note..."
+                        maxLength={NOTE_MAX}
+                        rows={2}
+                      />
+                    </Field>
+                  </div>
                 )}
-              </AnimatePresence>
+
+                <AnimatePresence initial={false}>
+                  {err && (
+                    <motion.div
+                      ref={errRef}
+                      data-error
+                      role="alert"
+                      initial={{ opacity: 0, y: -4, height: 0, marginTop: 0 }}
+                      animate={{
+                        opacity: 1,
+                        y: 0,
+                        height: "auto",
+                        marginTop: 16,
+                      }}
+                      exit={{
+                        opacity: 0,
+                        y: -4,
+                        height: 0,
+                        marginTop: 0,
+                        transition: { duration: 0.25, ease: "easeOut" },
+                      }}
+                      className="flex items-start gap-2 overflow-hidden text-xs text-[var(--danger)] bg-[var(--danger)]/10 border border-[var(--danger)]/20 rounded-xl px-3.5 py-2.5 leading-snug mt-4"
+                    >
+                      <AlertCircle size={14} className="mt-px shrink-0" />
+                      {err}
+                    </motion.div>
+                  )}
+                </AnimatePresence>
               </div>
 
               <div className="flex shrink-0 items-center justify-end gap-2 mt-6 pt-5 border-t border-[var(--border)]">

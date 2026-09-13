@@ -193,21 +193,41 @@ export function StatCard({
                       key={item.key ?? i}
                       className="flex items-center justify-between gap-2 text-xs"
                     >
-                      {/* Single-line row: label with the date inline after it
-                         (same pattern as SelectReference rows) */}
-                      <span
-                        className={cn(
-                          "min-w-0 truncate",
-                          accent ? "text-white/90" : "text-[var(--ink-muted)]",
-                        )}
-                      >
-                        {item.label ?? "—"}
-                        {item.hint != null && (
-                          <span className="text-[10px] opacity-60">
-                            {" · "}
-                            {item.hint}
-                          </span>
-                        )}
+                      {/* Dot + label grouped in one flex unit so the marker
+                         stays glued to the text — `justify-between` on the
+                         row would otherwise push the dot, label and value
+                         apart. Rounded-dot pattern echoes SelectReference
+                         metadata dots; tone-tinted to match the value. */}
+                      <span className="flex min-w-0 items-center gap-1.5">
+                        <span
+                          aria-hidden
+                          className={cn(
+                            "h-1.5 w-1.5 shrink-0 rounded-full",
+                            item.tone === "danger"
+                              ? "bg-[var(--danger)]"
+                              : item.tone === "success"
+                                ? "bg-[var(--success)]"
+                                : accent
+                                  ? "bg-white/40"
+                                  : "bg-[var(--accent)]/60",
+                          )}
+                        />
+                        {/* Single-line row: label with the date inline after
+                           it (same pattern as SelectReference rows) */}
+                        <span
+                          className={cn(
+                            "min-w-0 truncate",
+                            accent ? "text-white/90" : "text-[var(--ink-muted)]",
+                          )}
+                        >
+                          {item.label ?? "—"}
+                          {item.hint != null && (
+                            <span className="text-[10px] opacity-60">
+                              {" · "}
+                              {item.hint}
+                            </span>
+                          )}
+                        </span>
                       </span>
                       <span
                         className={cn(

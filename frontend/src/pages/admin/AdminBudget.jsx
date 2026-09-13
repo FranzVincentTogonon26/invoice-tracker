@@ -102,7 +102,7 @@ export default function AdminBudget() {
           }))}
         />
         <StatCard
-          label="Cash On Hand"
+          label="My Vault"
           value={formatMoney(cashOnHand)}
           icon={PhilippinePesoIcon}
           loading={isLoading}
@@ -126,15 +126,15 @@ export default function AdminBudget() {
         {/* No backend source yet — placeholder values */}
         <StatCard
           label="Overdue"
-          value={5}
-          suffix={formatMoney(1000)}
+          value={0}
+          suffix={formatMoney(0.0)}
           icon={BadgeInfo}
           loading={isLoading}
         />
       </div>
 
       <Tabs value={tab} onValueChange={setTab}>
-        <TabsList className="max-w-full overflow-x-auto">
+        <TabsList className="max-w-full overflow-x-auto rounded-full bg-[var(--surface)] border border-[var(--border)] shadow-card">
           <TabsTrigger value="employee_budget">Employees Budget</TabsTrigger>
           <TabsTrigger value="budget_transaction">
             Budget Transaction
