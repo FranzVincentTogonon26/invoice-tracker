@@ -4,6 +4,13 @@ import ApiError from "../utils/ApiError.js";
 import { validate } from "../utils/validate.js";
 import { createbudgetSchema } from "../validations/budget.validation.js";
 
+// Shared UUID shape check for path params (same regex the other handlers use).
+const UUID_RE =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+// Statuses a cancelled transaction may be restored to by the undo action.
+const RESTORE_STATUSES = ["added", "closed"];
+
 export const create = async (req, res, next) => {
   try {
     // `note` was used below but never destructured -- that crashed the
@@ -133,6 +140,50 @@ export const budgetTransaction = async (req, res, next) => {
     // Forward `status` / `search` query params so the list can be filtered.
     const budgetTransaction = await Budget.budgetTransaction(req.query);
     res.json({ budgetTransaction });
+  } catch (err) {
+    next(err);
+  }
+};
+
+// Cancels a budget transaction (budget.status -> 'cancelled'). Responds with
+// the previous status so the UI can offer an undo window.
+export const cancelBudget = async (req, res, next) => {
+  try {
+    const { id } = req.params;
+
+    if (!UUID_RE.test(id || ""))
+      throw ApiError.badRequest("Invalid budget id", "VALIDATION_ERROR");
+
+    const result = await Budget.cancelBudget(id);
+    if (!result)
+      throw ApiError.notFound("Budget not found", "BUDGET_NOT_FOUND");
+
+    return res.status(200).json({
+      previousStatus: result.previousStatus,
+      budget: result.budget,
+    });
+  } catch (err) {
+    next(err);
+  }
+};
+
+// Undo a cancellation — restores the transaction's previous status and clears
+// the cancelled_at stamp.
+export const restoreBudget = async (req, res, next) => {
+  try {
+    const { id } = req.params;
+    const { status } = req.body ?? {};
+
+    if (!UUID_RE.test(id || ""))
+      throw ApiError.badRequest("Invalid budget id", "VALIDATION_ERROR");
+    if (!RESTORE_STATUSES.includes(status))
+      throw ApiError.badRequest("Invalid restore status", "VALIDATION_ERROR");
+
+    const restored = await Budget.restoreBudget(id, status);
+    if (!restored)
+      throw ApiError.notFound("Budget not found", "BUDGET_NOT_FOUND");
+
+    return res.status(200).json({ budget: restored });
   } catch (err) {
     next(err);
   }

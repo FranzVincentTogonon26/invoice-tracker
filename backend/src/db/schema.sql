@@ -79,7 +79,7 @@ CREATE TABLE IF NOT EXISTS budget (
     status         VARCHAR(20) NOT NULL DEFAULT 'added' 
                    CHECK (
                        status IN (
-                           'draft', 
+                           'closed', 
                            'cancelled',
                            'added' 
                        )

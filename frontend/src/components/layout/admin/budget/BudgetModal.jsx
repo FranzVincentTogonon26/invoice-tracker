@@ -262,7 +262,7 @@ function AmountInput({ value, onChange, disabled }) {
       />
       <div className="mt-1.5 flex items-center justify-between gap-2">
         <span
-          className={`truncate text-[11px] font-medium tabular leading-snug ${
+          className={`font-semibold truncate text-[14px] font-medium tabular leading-snug ${
             preview ? "text-[var(--accent-strong)]" : "text-[var(--ink-muted)]"
           }`}
         >

@@ -1,5 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
+import { motion } from "framer-motion";
 import {
+  Ban,
   ChevronLeft,
   ChevronRight,
   NotebookPen,
@@ -7,12 +9,16 @@ import {
   Search,
   X,
 } from "lucide-react";
+import toast from "react-hot-toast";
 import { Card, CardDescription, CardHeader, CardTitle } from "../../../ui/Card";
 import { cn, formatMoney } from "../../../../lib/utils";
 import { SearchInput } from "../../../ui/Input";
 import Listbox from "../../../ui/Listbox";
 
-import { useBudgetTransaction } from "../../../../hooks/useBudget";
+import {
+  useBudgetMutations,
+  useBudgetTransaction,
+} from "../../../../hooks/useBudget";
 import { useAuth } from "../../../../context/AuthContext";
 import {
   BUDGET_STATUS_TABS,
@@ -24,6 +30,12 @@ import TransactionTable from "./TransactionTable";
 
 // Client-side page size — the API returns the full filtered list.
 const PAGE_SIZE = 100;
+
+// How long the "Undo" window stays open after a cancellation (ms). The
+// backend commits the cancel immediately; while this window runs the Undo
+// button can restore the transaction's previous status. Once it closes, the
+// cancelled status becomes permanent.
+const UNDO_WINDOW_MS = 6000;
 
 const METHOD_FILTER_OPTIONS = [
   { value: "all", label: "All methods" },
@@ -47,7 +59,7 @@ const pageItems = (count, current) => {
   return items;
 };
 
-const BudgetTransaction = () => {
+const BudgetTransaction = ({ valueRemaining }) => {
   const { user } = useAuth();
   // This screen is admin-gated (`requireAdminAccess`); fall back to admin so
   // the actions menu keeps working if the role is momentarily unavailable.
@@ -64,6 +76,22 @@ const BudgetTransaction = () => {
     const timer = setTimeout(() => setDebouncedSearch(search), 300);
     return () => clearTimeout(timer);
   }, [search]);
+
+  // Filter setters — every filter change also snaps back to the first page.
+  // (Event-handler reset instead of an effect; the page clamp below keeps
+  // out-of-range pages safe either way.)
+  const updateStatus = (key) => {
+    setStatus(key);
+    setPage(0);
+  };
+  const updateMethod = (value) => {
+    setMethod(value);
+    setPage(0);
+  };
+  const updateSearch = (value) => {
+    setSearch(value);
+    setPage(0);
+  };
 
   const { data, isLoading, error, refetch } = useBudgetTransaction({
     status,
@@ -93,13 +121,17 @@ const BudgetTransaction = () => {
   );
 
   // Running total of the filtered list — shown in the summary footer.
+  // Cancelled transactions are excluded: they no longer affect the budget,
+  // so they must not count toward the total.
   const total = useMemo(
-    () => filteredRows.reduce((sum, r) => sum + (Number(r.amount) || 0), 0),
+    () =>
+      filteredRows.reduce(
+        (sum, r) =>
+          r.status === "cancelled" ? sum : sum + (Number(r.amount) || 0),
+        0,
+      ),
     [filteredRows],
   );
-
-  // Reset to the first page whenever any filter changes.
-  useEffect(() => setPage(0), [status, method, debouncedSearch]);
 
   const rangeStart =
     filteredRows.length === 0 ? 0 : currentPage * PAGE_SIZE + 1;
@@ -110,16 +142,59 @@ const BudgetTransaction = () => {
     status !== "all" || method !== "all" || search.trim().length > 0;
 
   const clearFilters = () => {
-    setStatus("all");
-    setMethod("all");
-    setSearch("");
+    updateStatus("all");
+    updateMethod("all");
+    updateSearch("");
   };
 
-  // Row-level mutations (approve/reject/cancel/delete) have no budget API
-  // endpoints yet — the menu is fully validated per status + role via
-  // `getAvailableActions` and ready to be wired to mutations here.
-  const handleAction = (action, transaction) => {
-    console.info(`[budget] "${action}" on transaction ${transaction.id}`);
+  const { cancelTransaction, restoreTransaction } = useBudgetMutations();
+
+  // Row-level mutations route through here. `cancel` hits the backend
+  // (budget.status -> 'cancelled') and opens a short undo window — undoing
+  // restores the transaction's previous status before the change is treated
+  // as permanent. `restore` hits the backend directly and sets the
+  // transaction's status back to 'added' (budget.status -> 'added').
+  const handleAction = async (action, transaction) => {
+    if (action === "restore") {
+      try {
+        await restoreTransaction.mutateAsync({
+          id: transaction.id,
+          status: "added",
+        });
+        toast.success("Transaction restored");
+      } catch (err) {
+        toast.error(err?.message || "Couldn't restore transaction");
+      }
+      return;
+    }
+    if (action !== "cancel") return;
+    try {
+      const result = await cancelTransaction.mutateAsync(transaction.id);
+      const previousStatus = result?.previousStatus ?? "added";
+      toast.custom(
+        (t) => (
+          <CancelUndoToast
+            transaction={transaction}
+            visible={t.visible}
+            onUndo={async () => {
+              toast.dismiss(t.id);
+              try {
+                await restoreTransaction.mutateAsync({
+                  id: transaction.id,
+                  status: previousStatus,
+                });
+                toast.success("Cancellation undone");
+              } catch (err) {
+                toast.error(err?.message || "Couldn't undo cancellation");
+              }
+            }}
+          />
+        ),
+        { duration: UNDO_WINDOW_MS, position: "bottom-center" },
+      );
+    } catch (err) {
+      toast.error(err?.message || "Couldn't cancel transaction");
+    }
   };
 
   return (
@@ -138,7 +213,7 @@ const BudgetTransaction = () => {
               {BUDGET_STATUS_TABS.map((t) => (
                 <button
                   key={t.key}
-                  onClick={() => setStatus(t.key)}
+                  onClick={() => updateStatus(t.key)}
                   className={cn(
                     "h-8 rounded-full px-4 text-xs font-semibold transition-colors",
                     status === t.key
@@ -155,7 +230,7 @@ const BudgetTransaction = () => {
               <Listbox
                 options={METHOD_FILTER_OPTIONS}
                 value={method}
-                onChange={setMethod}
+                onChange={updateMethod}
                 placeholder="All methods"
                 buttonClassName="h-9"
               />
@@ -166,12 +241,12 @@ const BudgetTransaction = () => {
               leftIcon={<Search size={16} />}
               placeholder="Search..."
               value={search}
-              onChange={(e) => setSearch(e.target.value)}
+              onChange={(e) => updateSearch(e.target.value)}
               rightSlot={
                 search ? (
                   <button
                     type="button"
-                    onClick={() => setSearch("")}
+                    onClick={() => updateSearch("")}
                     aria-label="Clear search"
                     className="flex h-8 w-8 items-center justify-center rounded-full text-[var(--ink-muted)] transition-colors hover:bg-[var(--surface-2)] hover:text-[var(--ink)]"
                   >
@@ -202,6 +277,7 @@ const BudgetTransaction = () => {
               rows={pageRows}
               role={role}
               onAction={handleAction}
+              valueRemaining={valueRemaining}
             />
 
             {/* Footer — "Showing X–Y of N", running total, and pagination */}
@@ -266,6 +342,47 @@ const BudgetTransaction = () => {
 };
 
 /* ── Local building blocks ──────────────────────────────────────────────── */
+
+// Toast shown after a transaction is cancelled at the backend. Gives the
+// admin an "Undo" button for the duration of the undo window (the draining
+// bar tracks the remaining time); once the window closes the cancellation
+// becomes permanent and the toast auto-dismisses.
+const CancelUndoToast = ({ transaction, visible, onUndo }) => (
+  <div
+    className={cn(
+      "pointer-events-auto relative flex w-[min(92vw,420px)] items-center gap-3 overflow-hidden rounded-2xl border border-[var(--border)] bg-[var(--surface)] px-3 shadow-hover transition-opacity",
+      visible ? "opacity-100" : "opacity-0",
+    )}
+  >
+    <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-[var(--danger)]/12 text-[var(--danger)]">
+      <Ban size={16} aria-hidden />
+    </div>
+    <div className="min-w-0 flex-1 py-2.5">
+      <p className="text-sm font-semibold text-[var(--ink)]">
+        Transaction cancelled
+      </p>
+      <p className="truncate text-xs text-[var(--ink-muted)]">
+        {transaction.description || "Budget transaction"} ·{" "}
+        {formatMoney(Number(transaction.amount) || 0)} — cancelling permanently…
+      </p>
+    </div>
+    <button
+      type="button"
+      onClick={onUndo}
+      className="h-8 shrink-0 rounded-full bg-[var(--accent-soft)] px-3.5 text-xs font-semibold text-[var(--accent-strong)] transition-colors hover:bg-[var(--accent-soft)]/80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)]/40"
+    >
+      Undo
+    </button>
+    {/* Remaining-time bar — drains linearly over the undo window. */}
+    <motion.div
+      aria-hidden
+      initial={{ width: "100%" }}
+      animate={{ width: "0%" }}
+      transition={{ duration: UNDO_WINDOW_MS / 1000, ease: "linear" }}
+      className="absolute bottom-0 left-0 h-0.5 bg-[var(--danger)]/70"
+    />
+  </div>
+);
 
 const PagerButton = ({
   label,

@@ -4,58 +4,80 @@ import { cn, formatDate, formatMoney, formatTime } from "../../../../lib/utils";
 import { ApproverCell } from "./ApproverCell";
 import { PaymentMethod, methodLabel } from "./PaymentMethod";
 import { TransactionActions } from "./TransactionActions";
-import { HandCoinsIcon } from "lucide-react";
+import { BanknoteCheck } from "lucide-react";
 
 /**
  * Desktop table row. `<tr>` cells follow the fixed column proportions set in
  * `TransactionTable` — Description · Amount (right) · Method · Approved By ·
- * Added / Approved · Status · Actions.
+ * Date Added · Status (center) · Actions (right).
  */
-export function TransactionRow({ transaction: t, role, onAction, openUp }) {
+export function TransactionRow({
+  transaction: t,
+  role,
+  onAction,
+  valueRemaining,
+}) {
   return (
-    <tr className="border-b border-[var(--border)] transition-colors last:border-b-0 hover:bg-[var(--surface-2)]/60">
+    <tr className=" border-b border-[var(--border)] transition-colors last:border-b-0 hover:bg-[var(--surface-2)]/60">
+      {/* Description */}
       <td className="px-4 py-3 pl-5 align-middle">
         <p className="text-sm font-semibold leading-snug text-[var(--ink)]">
           {t.description}
         </p>
+
         {t.label && (
-          <p className="flex mt-0.5 truncate text-xs text-[var(--ink-muted)] gap-2">
-            <HandCoinsIcon size={15} />
-            <span className="capitalize">{t.label}</span>
+          <p className="mt-1 flex items-center gap-1.5 text-xs text-[var(--ink-muted)]">
+            <BanknoteCheck size={15} className="shrink-0" strokeWidth={2} />
+            <span className="min-w-0 truncate capitalize">{t.label}</span>
           </p>
         )}
       </td>
+
+      {/* Amount */}
       <td className="px-4 py-3 text-right align-middle">
-        <span className="text-sm font-semibold text-[var(--ink)] tabular">
+        <span className="text-sm font-semibold tabular-nums text-[var(--ink)]">
           {formatMoney(t.amount)}
         </span>
       </td>
+
+      {/* Payment Method */}
       <td className="px-4 py-3 align-middle">
         <Badge tone="neutral" className="capitalize">
           <PaymentMethod method={t.method} />
         </Badge>
       </td>
+
+      {/* Approved By */}
       <td className="px-4 py-3 align-middle">
         <ApproverCell name={t.approved_by} approvedAt={t.approved_at} />
       </td>
+
+      {/* Date */}
       <td className="px-4 py-3 align-middle">
-        <p className="text-xs leading-none text-[var(--ink)] tabular">
+        <p className="text-xs leading-none tabular-nums text-[var(--ink)]">
           {formatDate(t.created_at)}
         </p>
-        <p className="mt-1 text-[10px] leading-none text-[var(--ink-muted)] tabular">
+
+        <p className="mt-1 text-[10px] leading-none tabular-nums text-[var(--ink-muted)]">
           {formatTime(t.created_at)}
         </p>
       </td>
-      <td className="px-4 py-3 text-center">
+
+      {/* Status */}
+      <td className="px-4 py-3 text-center align-middle">
         <StatusBadge status={t.status} />
       </td>
-      <td className="px-4 py-3 pr-5 text-right align-middle">
-        <TransactionActions
-          transaction={t}
-          role={role}
-          onAction={onAction}
-          openUp={openUp}
-        />
+
+      {/* Actions */}
+      <td className="w-[1%] px-4 py-3 pr-5 text-right align-middle">
+        <div className="flex justify-end transition-opacity duration-150 ">
+          <TransactionActions
+            transaction={t}
+            role={role}
+            onAction={onAction}
+            valueRemaining={valueRemaining}
+          />
+        </div>
       </td>
     </tr>
   );
@@ -65,7 +87,12 @@ export function TransactionRow({ transaction: t, role, onAction, openUp }) {
  * Mobile transaction card — every column's information stays accessible in a
  * compact stacked layout (employees often use the app from their phones).
  */
-export function TransactionCard({ transaction: t, role, onAction }) {
+export function TransactionCard({
+  transaction: t,
+  role,
+  onAction,
+  valueRemaining,
+}) {
   return (
     <div className="rounded-2xl border border-[var(--border)] bg-[var(--surface)] p-4 shadow-card transition-shadow hover:shadow-hover">
       <div className="flex items-start justify-between gap-3">
@@ -79,7 +106,12 @@ export function TransactionCard({ transaction: t, role, onAction }) {
             </p>
           )}
         </div>
-        <TransactionActions transaction={t} role={role} onAction={onAction} />
+        <TransactionActions
+          transaction={t}
+          role={role}
+          onAction={onAction}
+          valueRemaining={valueRemaining}
+        />
       </div>
 
       <div className="mt-3 flex items-center justify-between gap-3">

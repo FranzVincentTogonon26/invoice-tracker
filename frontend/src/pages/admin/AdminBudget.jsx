@@ -153,7 +153,7 @@ export default function AdminBudget() {
             />
           </TabsContent>
           <TabsContent value="budget_transaction">
-            <BudgetTransaction />
+            <BudgetTransaction valueRemaining={cashOnHand} />
           </TabsContent>
           <TabsContent value="budget_issued_transaction">
             <BudgetIssuedTransaction />

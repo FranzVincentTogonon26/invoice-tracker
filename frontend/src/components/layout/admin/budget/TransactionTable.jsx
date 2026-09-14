@@ -2,13 +2,15 @@ import { cn } from "../../../../lib/utils";
 import { TransactionCard, TransactionRow } from "./TransactionRow";
 
 // Column proportions from the design spec: Description gets the most space
-// because it holds the primary transaction information.
-const COLUMN_WIDTHS = ["30%", "14%", "15%", "18%", "14%", "9%", "56px"];
+// because it holds the primary transaction information. The percentages sum to
+// exactly 100% so `table-fixed` never overflows the scroll container — sizing
+// verified against the table's 900px min-width.
+const COLUMN_WIDTHS = ["27%", "11%", "13%", "18%", "13%", "10%", "5%"];
 
 const HEADERS = [
   { label: "Description" },
   { label: "Amount", align: "right" },
-  { label: "Method" },
+  { label: "Payment Method" },
   { label: "Approved By" },
   { label: "Date Added" },
   { label: "Status", align: "center" },
@@ -21,18 +23,18 @@ const HEADERS = [
  * and horizontal scrolling when space is tight (keyboard/touch reachable).
  * Mobile: stacked transaction cards so nothing becomes unreadable.
  */
-const TransactionTable = ({ rows, role, onAction }) => (
+const TransactionTable = ({ rows, role, onAction, valueRemaining }) => (
   <>
     {/* Desktop — semantic table with fixed column proportions */}
     <div
-      className="hidden overflow-x-auto md:block rounded-xl border border-[var(--border)]"
+      className="hidden overflow-x-auto rounded-xl border border-[var(--border)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)]/30 md:block"
       tabIndex={0}
       aria-label="Budget transactions"
     >
       <table className="w-full min-w-[900px] table-fixed border-collapse text-left">
         <caption className="sr-only">
           Budget transactions with description, amount, payment method,
-          approver, added and approved timestamps, and status
+          approver, date added, and status
         </caption>
         <colgroup>
           {COLUMN_WIDTHS.map((width, i) => (
@@ -64,13 +66,13 @@ const TransactionTable = ({ rows, role, onAction }) => (
           </tr>
         </thead>
         <tbody>
-          {rows.map((t, i) => (
+          {rows.map((t) => (
             <TransactionRow
               key={t.id}
               transaction={t}
               role={role}
               onAction={onAction}
-              openUp={i >= rows.length - 2}
+              valueRemaining={valueRemaining}
             />
           ))}
         </tbody>
@@ -85,6 +87,7 @@ const TransactionTable = ({ rows, role, onAction }) => (
           transaction={t}
           role={role}
           onAction={onAction}
+          valueRemaining={valueRemaining}
         />
       ))}
     </div>

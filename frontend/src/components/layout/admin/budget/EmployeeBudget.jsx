@@ -97,14 +97,14 @@ const EmployeeBudget = ({ employeeIssuedBudget = [], isLoading, onOpen }) => {
                 key={group.user_id}
                 type="button"
                 onClick={() => onOpen(group.user_id)}
-                className={`group/row w-full overflow-hidden rounded-xl border border-[var(--border)] bg-[var(--surface)] text-left shadow-card transition-all duration-200 hover:-translate-y-0.5 hover:border-[var(--accent)]/30 hover:bg-[var(--accent)]/5 hover:shadow-hover active:scale-[0.99] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)]/30 ${
+                className={`group/row w-full overflow-hidden rounded-xl border border-[var(--border)] bg-[var(--surface)] text-left transition-all duration-200  hover:border-[var(--accent)]/30 hover:bg-[var(--accent)]/5 hover:shadow-hover active:scale-[0.99] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)]/30 ${
                   hasMultipleRefs ? "px-3.5 py-3" : "px-3.5 py-2"
                 }`}
               >
                 {/* Employee header — identity left, aggregate total right */}
                 <div className="flex items-center gap-3">
                   <div
-                    className={`flex shrink-0 select-none items-center justify-center rounded-full bg-[var(--accent-soft)] font-bold text-[var(--accent-strong)] ring-2 ring-[var(--accent)]/15 transition-all duration-200 group-hover/row:scale-105 group-hover/row:ring-[var(--accent)]/40 ${
+                    className={`flex shrink-0 select-none items-center justify-center rounded-full bg-[var(--accent-soft)] font-bold text-[var(--accent-strong)] ring-1 ring-[var(--accent)]/15 transition-all duration-200 group-hover/row:scale-105 group-hover/row:ring-[var(--accent)]/40 ${
                       hasMultipleRefs
                         ? "h-9 w-9 text-[13px]"
                         : "h-8 w-8 text-xs"
@@ -121,10 +121,14 @@ const EmployeeBudget = ({ employeeIssuedBudget = [], isLoading, onOpen }) => {
                       {group.budgets.length === 1 ? "budget" : "budgets"} ·{" "}
                       {labelList.length}{" "}
                       {labelList.length === 1 ? "reference" : "references"}
-                      {/* Compact variant: fold the lone reference's label into
-                          the meta line so no details are lost */}
                       {!hasMultipleRefs && singleRef && (
-                        <> · {singleRef.label}</>
+                        <>
+                          {" "}
+                          ·{" "}
+                          <span className="font-semibold">
+                            {singleRef.label}
+                          </span>
+                        </>
                       )}
                     </p>
                   </div>

@@ -1,5 +1,6 @@
 import { cva } from "class-variance-authority";
 import { cn } from "@/lib/utils";
+import { STATUS } from "../../constants";
 
 const badgeVariants = cva(
   "inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-semibold tracking-tight tabular",
@@ -22,19 +23,6 @@ const badgeVariants = cva(
 export function Badge({ className, tone, ...props }) {
   return <span className={cn(badgeVariants({ tone }), className)} {...props} />;
 }
-
-// Maps an invoice status → badge tone + label. Kept here so every table,
-// list, and detail view renders status consistently.
-export const STATUS = {
-  draft: { tone: "neutral", label: "Draft" },
-  sent: { tone: "accent", label: "Sent" },
-  paid: { tone: "success", label: "Paid" },
-  overdue: { tone: "danger", label: "Overdue" },
-  pending: { tone: "danger", label: "Pending" },
-  // Budget statuses (see `BUDGET_STATUS_TABS` in constants)
-  added: { tone: "success", label: "Added" },
-  cancelled: { tone: "warning", label: "Cancelled" },
-};
 
 export function StatusBadge({ status, className }) {
   const s = STATUS[status] || STATUS.draft;

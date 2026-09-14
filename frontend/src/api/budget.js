@@ -18,4 +18,11 @@ export const budgetsApi = {
     apiClient
       .get(`/budgets/balance/${referenceId}`)
       .then((r) => r.data.balance),
+  // Cancels a budget transaction (budget.status -> 'cancelled'). Returns
+  // `{ previousStatus, budget }` so the UI can offer an undo window.
+  cancelTransaction: (id) =>
+    apiClient.patch(`/budgets/${id}/cancel`).then((r) => r.data),
+  // Undo a cancellation — restores the transaction's previous status.
+  restoreTransaction: (id, status) =>
+    apiClient.patch(`/budgets/${id}/restore`, { status }).then((r) => r.data),
 };

@@ -17,6 +17,8 @@ const buttonVariants = cva(
           "bg-transparent text-[var(--ink)] hover:bg-[var(--surface-2)]",
         soft:
           "bg-[var(--accent-soft)] text-[var(--accent-strong)] hover:bg-[var(--accent-soft)]/80",
+        danger:
+          "bg-[var(--danger)] text-white hover:bg-[var(--danger)]/85 active:scale-[0.98]",
       },
       size: {
         sm: "h-8 px-3 text-xs rounded-full",
@@ -40,5 +42,3 @@ export const Button = forwardRef(
   )
 );
 Button.displayName = "Button";
-
-export { buttonVariants };

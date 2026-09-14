@@ -12,7 +12,7 @@ class Budget {
           COALESCE(SUM(b.amount), 0) AS amount
        FROM budget_reference br
        LEFT JOIN budget b ON b.reference_id = br.reference_id
-       WHERE br.status = 'open'
+       WHERE b.status != 'cancelled'
        GROUP BY br.reference_id, br.label, br.created_at
        ORDER BY br.created_at DESC`,
       [],
@@ -173,7 +173,7 @@ class Budget {
           COALESCE((
             SELECT SUM(b.amount)
             FROM budget b
-            WHERE b.reference_id = $1
+            WHERE b.reference_id = $1 AND b.status != 'cancelled'
           ), 0) AS allocated,
           COALESCE((
             SELECT SUM(i.amount)
@@ -207,7 +207,7 @@ class Budget {
 
   // Budget Transaction — all budget rows with their reference label.
   // Optional filters:
-  //   - `status`: 'draft' | 'cancelled' | 'added'; 'all' (or falsy) skips the filter
+  //   - `status`: 'closed' | 'cancelled' | 'added'; 'all' (or falsy) skips the filter
   //   - `search`: matched against description and reference label (ILIKE)
   // NOTE: `RETURNING` is only valid on INSERT/UPDATE/DELETE — this is a SELECT,
   // so the columns are selected directly and ALL rows are returned (the UI
@@ -246,6 +246,44 @@ class Budget {
       params,
     );
     return result.rows;
+  }
+
+  // Cancel a budget transaction — sets status = 'cancelled' and stamps
+  // cancelled_at. Returns the previous status (so the UI can offer an undo)
+  // plus the updated row, or null when the id does not exist.
+  static async cancelBudget(id) {
+    const existing = await query(
+      `SELECT id, status FROM budget WHERE id = $1`,
+      [id],
+    );
+    const previous = existing.rows[0] ?? null;
+    if (!previous) return null;
+
+    const result = await query(
+      `UPDATE budget
+          SET status = 'cancelled',
+              cancelled_at = NOW(),
+              updated_at = NOW()
+        WHERE id = $1
+        RETURNING *`,
+      [id],
+    );
+    return { previousStatus: previous.status, budget: result.rows[0] };
+  }
+
+  // Undo a cancellation — restore the transaction to its previous status
+  // ('added' | 'closed') and clear the cancellation stamp.
+  static async restoreBudget(id, status) {
+    const result = await query(
+      `UPDATE budget
+          SET status = $2,
+              cancelled_at = NULL,
+              updated_at = NOW()
+        WHERE id = $1
+        RETURNING *`,
+      [id, status],
+    );
+    return result.rows[0] ?? null;
   }
 }
 
