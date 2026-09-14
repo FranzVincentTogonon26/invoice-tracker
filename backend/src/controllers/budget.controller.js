@@ -145,6 +145,17 @@ export const budgetTransaction = async (req, res, next) => {
   }
 };
 
+export const budgetIssuedTransaction = async (req, res, next) => {
+  try {
+    const budgetIssuedTransaction = await Budget.budgetIssuedTransaction(
+      req.query,
+    );
+    res.json({ budgetIssuedTransaction });
+  } catch (err) {
+    next(err);
+  }
+};
+
 // Cancels a budget transaction (budget.status -> 'cancelled'). Responds with
 // the previous status so the UI can offer an undo window.
 export const cancelBudget = async (req, res, next) => {

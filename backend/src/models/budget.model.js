@@ -205,6 +205,59 @@ class Budget {
     return result.rows[0] ?? null;
   }
 
+  // Budget Issued Transaction — every `issued_budget` row joined to its parent
+  // `budget_issued_reference`, the receiving employee, and the source budget
+  // reference label (shown as "Source of Funds").
+  // Optional filter:
+  //   - `search`: matched against employee name, description, notes and the
+  //     reference label (ILIKE)
+  // NOTE: `RETURNING` is only valid on INSERT/UPDATE/DELETE — this is a
+  // SELECT, so the columns are selected directly and ALL rows are returned
+  // (the UI renders a list, not a single row). `bib.*` / `ib.*` shorthand is
+  // deliberately avoided: both tables share `id`, `notes` and `created_at`,
+  // so the column names would collide in the result set.
+  static async budgetIssuedTransaction({ search } = {}) {
+    const params = [];
+
+    if (search && search.trim()) {
+      params.push(`%${search.trim()}%`);
+    }
+
+    const searchClause = params.length
+      ? `WHERE (u.name ILIKE $1
+              OR ib.description ILIKE $1
+              OR ib.notes ILIKE $1
+              OR br.label ILIKE $1)`
+      : "";
+
+    // `::float8` casts DECIMAL (returned by pg as strings) to a JS number.
+    const result = await query(
+      `SELECT
+          ib.id,
+          ib.issued_ref_id,
+          bib.reference_id,
+          br.label AS source_of_funds,
+          u.user_id,
+          u.name AS employee,
+          u.role AS employee_role,
+          u.avatar_url,
+          ib.description,
+          ib.notes,
+          ib.amount::float8 AS amount,
+          ib.method,
+          ib.created_at AS date_issued,
+          bib.status
+       FROM budget_issued_reference bib
+       JOIN issued_budget ib ON ib.issued_ref_id = bib.id
+       JOIN users u ON u.user_id = bib.user_id
+       LEFT JOIN budget_reference br ON br.reference_id = bib.reference_id
+       ${searchClause}
+       ORDER BY ib.created_at DESC`,
+      params,
+    );
+    return result.rows;
+  }
+
   // Budget Transaction — all budget rows with their reference label.
   // Optional filters:
   //   - `status`: 'closed' | 'cancelled' | 'added'; 'all' (or falsy) skips the filter

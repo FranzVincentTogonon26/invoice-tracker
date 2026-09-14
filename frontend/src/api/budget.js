@@ -6,6 +6,11 @@ export const budgetsApi = {
     apiClient.get("/budgets", { params }).then((r) => r.data),
   budgetTransaction: (params = {}) =>
     apiClient.get("/budgets/transaction", { params }).then((r) => r.data),
+  // Issued budget transactions (issued_budget joined to its reference/employee)
+  budgetIssuedTransaction: (params = {}) =>
+    apiClient
+      .get("/budgets/issued_transaction", { params })
+      .then((r) => r.data),
   create: (payload) =>
     apiClient
       .post("/budgets", payload)

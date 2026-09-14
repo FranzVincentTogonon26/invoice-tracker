@@ -209,13 +209,13 @@ const BudgetTransaction = ({ valueRemaining }) => {
         {/* Search + filters — compact controls consistent with the dashboard */}
         <div className="mb-5 flex flex-col gap-3 lg:flex-row lg:items-center">
           <div className="flex flex-wrap items-center gap-2">
-            <div className="flex w-fit items-center gap-1 rounded-full border border-[var(--border)] bg-[var(--surface)] p-1 shadow-card">
+            <div className="flex w-fit items-center gap-1 rounded-full border border-[var(--border)] bg-[var(--surface)] p-1 ">
               {BUDGET_STATUS_TABS.map((t) => (
                 <button
                   key={t.key}
                   onClick={() => updateStatus(t.key)}
                   className={cn(
-                    "h-8 rounded-full px-4 text-xs font-semibold transition-colors",
+                    "h-7 rounded-full px-4 text-xs font-semibold transition-colors",
                     status === t.key
                       ? "bg-[var(--ink)] text-[var(--bg)]"
                       : "text-[var(--ink-muted)] hover:text-[var(--ink)]",

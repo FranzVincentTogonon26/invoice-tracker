@@ -10,7 +10,7 @@ const COLUMN_WIDTHS = ["27%", "11%", "13%", "18%", "13%", "10%", "5%"];
 const HEADERS = [
   { label: "Description" },
   { label: "Amount", align: "right" },
-  { label: "Payment Method" },
+  { label: "Payment" },
   { label: "Approved By" },
   { label: "Date Added" },
   { label: "Status", align: "center" },

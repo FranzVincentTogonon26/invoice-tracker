@@ -26,6 +26,21 @@ export function useBudgetTransaction(params) {
   return { ...query, data: query.data?.budgetTransaction ?? [] };
 }
 
+export function useBudgetIssuedTransaction(params) {
+  const query = useQuery({
+    // Own key namespace — sharing `budgetsKey(params)` with
+    // `useBudgetTransaction` would make both hooks clobber each other's
+    // cached list whenever their params match.
+    queryKey: ["budgets", "issuedTransaction", params || {}],
+    queryFn: () => budgetsApi.budgetIssuedTransaction(params),
+  });
+
+  // The API returns `{ budgetIssuedTransaction: [...] }` — unwrap to the
+  // plain array so consumers can map over `data` directly. Resolves to `[]`
+  // while loading or on failure instead of `undefined`.
+  return { ...query, data: query.data?.budgetIssuedTransaction ?? [] };
+}
+
 export function useBudgetMutations() {
   const qc = useQueryClient();
   const invalidate = () => {

@@ -195,7 +195,7 @@ export function TransactionActions({
           onClick={confirmRestore}
           className={cn(
             "inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-xs font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--danger)]/30",
-            "text-[var(--ink-muted)] hover:bg-[var(--info)]/10 hover:text-[var(--info)]",
+            "text-[var(--ink-muted)] hover:bg-[var(--ink)]/14 hover:text-[var(--ink)]",
             className,
           )}
         >
@@ -268,7 +268,7 @@ export function TransactionActions({
                 <div className="mt-5 flex items-center justify-end gap-2">
                   <Button
                     ref={initialFocusRef}
-                    variant="ghost"
+                    variant="outline"
                     size="sm"
                     onClick={closeDialog}
                   >
@@ -324,7 +324,7 @@ export function TransactionActions({
 
                 <div className="mt-5 flex items-center justify-end gap-2">
                   <Button
-                    variant="ghost"
+                    variant="outline"
                     size="sm"
                     onClick={closeDialog}
                     disabled={pending}

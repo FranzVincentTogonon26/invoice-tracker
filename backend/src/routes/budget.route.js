@@ -18,8 +18,12 @@ router.get(
   requireAdminAccess,
   budgetController.budgetTransaction,
 );
-// Cancels a budget transaction (budget.status -> 'cancelled'). The response
-// includes the previous status so the UI can offer an undo window.
+router.get(
+  "/issued_transaction",
+  authMiddleware,
+  requireAdminAccess,
+  budgetController.budgetIssuedTransaction,
+);
 router.patch(
   "/:id/cancel",
   authMiddleware,
