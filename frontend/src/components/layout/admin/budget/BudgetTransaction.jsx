@@ -23,7 +23,7 @@ import {
 import TransactionTable from "./TransactionTable";
 
 // Client-side page size — the API returns the full filtered list.
-const PAGE_SIZE = 8;
+const PAGE_SIZE = 100;
 
 const METHOD_FILTER_OPTIONS = [
   { value: "all", label: "All methods" },

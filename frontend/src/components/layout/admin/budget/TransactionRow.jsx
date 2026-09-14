@@ -4,6 +4,7 @@ import { cn, formatDate, formatMoney, formatTime } from "../../../../lib/utils";
 import { ApproverCell } from "./ApproverCell";
 import { PaymentMethod, methodLabel } from "./PaymentMethod";
 import { TransactionActions } from "./TransactionActions";
+import { HandCoinsIcon } from "lucide-react";
 
 /**
  * Desktop table row. `<tr>` cells follow the fixed column proportions set in
@@ -13,39 +14,31 @@ import { TransactionActions } from "./TransactionActions";
 export function TransactionRow({ transaction: t, role, onAction, openUp }) {
   return (
     <tr className="border-b border-[var(--border)] transition-colors last:border-b-0 hover:bg-[var(--surface-2)]/60">
-      {/* Description — primary title, muted reference label underneath */}
-      <td className="px-4 py-4 pl-5 align-middle">
+      <td className="px-4 py-3 pl-5 align-middle">
         <p className="text-sm font-semibold leading-snug text-[var(--ink)]">
           {t.description}
         </p>
         {t.label && (
-          <p className="mt-0.5 truncate text-xs text-[var(--ink-muted)]">
+          <p className="flex mt-0.5 truncate text-xs text-[var(--ink-muted)] gap-2">
+            <HandCoinsIcon size={15} />
             <span className="capitalize">{t.label}</span>
           </p>
         )}
       </td>
-
-      {/* Amount — prominent, right-aligned Philippine peso */}
-      <td className="px-4 py-4 text-right align-middle">
+      <td className="px-4 py-3 text-right align-middle">
         <span className="text-sm font-semibold text-[var(--ink)] tabular">
           {formatMoney(t.amount)}
         </span>
       </td>
-
-      {/* Method — circular accent icon chip + label */}
-      <td className="px-4 py-4 align-middle">
+      <td className="px-4 py-3 align-middle">
         <Badge tone="neutral" className="capitalize">
           <PaymentMethod method={t.method} />
         </Badge>
       </td>
-
-      {/* Approved By — avatar + name + approval recency */}
-      <td className="px-4 py-4 align-middle">
+      <td className="px-4 py-3 align-middle">
         <ApproverCell name={t.approved_by} approvedAt={t.approved_at} />
       </td>
-
-      {/* Added / Approved — date and time stacked on two lines */}
-      <td className="px-4 py-4 align-middle">
+      <td className="px-4 py-3 align-middle">
         <p className="text-xs leading-none text-[var(--ink)] tabular">
           {formatDate(t.created_at)}
         </p>
@@ -53,14 +46,10 @@ export function TransactionRow({ transaction: t, role, onAction, openUp }) {
           {formatTime(t.created_at)}
         </p>
       </td>
-
-      {/* Status — compact rounded badge with status dot */}
-      <td className="px-4 py-4 align-middle">
+      <td className="px-4 py-3 text-center">
         <StatusBadge status={t.status} />
       </td>
-
-      {/* Actions — three-dot menu */}
-      <td className="px-4 py-4 pr-5 text-right align-middle">
+      <td className="px-4 py-3 pr-5 text-right align-middle">
         <TransactionActions
           transaction={t}
           role={role}

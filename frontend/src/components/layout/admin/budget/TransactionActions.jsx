@@ -3,7 +3,7 @@ import { AnimatePresence, motion } from "framer-motion";
 import {
   Ban,
   CheckCircle2,
-  EllipsisVertical,
+  EllipsisIcon,
   Eye,
   Pencil,
   Trash2,
@@ -143,7 +143,7 @@ export function TransactionActions({
         onKeyDown={handleTriggerKeyDown}
         className="flex h-8 w-8 items-center justify-center rounded-full text-[var(--ink-muted)] transition-colors hover:bg-[var(--surface-2)] hover:text-[var(--ink)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)]/30"
       >
-        <EllipsisVertical size={16} aria-hidden />
+        <EllipsisIcon size={20} strokeWidth={2} aria-hidden />
       </button>
 
       <AnimatePresence>

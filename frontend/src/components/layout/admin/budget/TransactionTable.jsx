@@ -10,8 +10,8 @@ const HEADERS = [
   { label: "Amount", align: "right" },
   { label: "Method" },
   { label: "Approved By" },
-  { label: "Added / Approved" },
-  { label: "Status" },
+  { label: "Date Added" },
+  { label: "Status", align: "center" },
   { label: "Actions", srOnly: true, align: "right" },
 ];
 
@@ -47,7 +47,11 @@ const TransactionTable = ({ rows, role, onAction }) => (
                 scope="col"
                 className={cn(
                   "border-b border-[var(--border)] px-4 py-2.5 text-[11px] font-bold uppercase tracking-wider text-[var(--ink-muted)] first:pl-5 last:pr-5",
-                  h.align === "right" && "text-right",
+                  {
+                    "text-left": h.align === "left",
+                    "text-center": h.align === "center",
+                    "text-right": h.align === "right",
+                  },
                 )}
               >
                 {h.srOnly ? (
@@ -66,8 +70,6 @@ const TransactionTable = ({ rows, role, onAction }) => (
               transaction={t}
               role={role}
               onAction={onAction}
-              // Open the menu upwards for the last rows so it never extends
-              // past the bottom of the scroll container.
               openUp={i >= rows.length - 2}
             />
           ))}
