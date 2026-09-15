@@ -11,6 +11,10 @@ const UUID_RE =
 // Statuses a cancelled transaction may be restored to by the undo action.
 const RESTORE_STATUSES = ["added", "closed"];
 
+// Statuses a cancelled issued transaction may be restored to (its reference
+// status is 'open' | 'close' | 'cancel', so the only undo target is 'open').
+const RESTORE_ISSUED_STATUSES = ["open"];
+
 export const create = async (req, res, next) => {
   try {
     // `note` was used below but never destructured -- that crashed the
@@ -195,6 +199,63 @@ export const restoreBudget = async (req, res, next) => {
       throw ApiError.notFound("Budget not found", "BUDGET_NOT_FOUND");
 
     return res.status(200).json({ budget: restored });
+  } catch (err) {
+    next(err);
+  }
+};
+
+// Cancels an issued budget transaction — flips the parent
+// `budget_issued_reference.status` to 'cancel'. Responds with the previous
+// status so the UI can offer restore feedback.
+export const cancelIssuedTransaction = async (req, res, next) => {
+  try {
+    const { id } = req.params;
+
+    if (!UUID_RE.test(id || ""))
+      throw ApiError.badRequest(
+        "Invalid issued transaction id",
+        "VALIDATION_ERROR",
+      );
+
+    const result = await Budget.cancelIssuedTransaction(id);
+    if (!result)
+      throw ApiError.notFound(
+        "Issued transaction not found",
+        "ISSUED_TRANSACTION_NOT_FOUND",
+      );
+
+    return res.status(200).json({
+      previousStatus: result.previousStatus,
+      issuedReference: result.issuedReference,
+    });
+  } catch (err) {
+    next(err);
+  }
+};
+
+// Undo an issued cancellation — restores the reference to its previous status
+// ('open').
+export const restoreIssuedTransaction = async (req, res, next) => {
+  try {
+    const { id } = req.params;
+    const { status } = req.body ?? {};
+
+    if (!UUID_RE.test(id || ""))
+      throw ApiError.badRequest(
+        "Invalid issued transaction id",
+        "VALIDATION_ERROR",
+      );
+    if (!RESTORE_ISSUED_STATUSES.includes(status))
+      throw ApiError.badRequest("Invalid restore status", "VALIDATION_ERROR");
+
+    const restored = await Budget.restoreIssuedTransaction(id, status);
+    if (!restored)
+      throw ApiError.notFound(
+        "Issued transaction not found",
+        "ISSUED_TRANSACTION_NOT_FOUND",
+      );
+
+    return res.status(200).json({ issuedReference: restored });
   } catch (err) {
     next(err);
   }

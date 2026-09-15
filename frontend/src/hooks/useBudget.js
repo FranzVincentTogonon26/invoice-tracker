@@ -66,6 +66,17 @@ export function useBudgetMutations() {
       mutationFn: ({ id, status }) => budgetsApi.restoreTransaction(id, status),
       onSuccess: invalidate,
     }),
+    // Cancels an issued budget transaction (status -> 'cancel')
+    cancelIssuedTransaction: useMutation({
+      mutationFn: budgetsApi.cancelIssuedTransaction,
+      onSuccess: invalidate,
+    }),
+    // Undo an issued cancellation — restores the reference's previous status
+    restoreIssuedTransaction: useMutation({
+      mutationFn: ({ id, status }) =>
+        budgetsApi.restoreIssuedTransaction(id, status),
+      onSuccess: invalidate,
+    }),
   };
 }
 

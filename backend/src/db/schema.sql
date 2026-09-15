@@ -102,7 +102,7 @@ CREATE TABLE IF NOT EXISTS budget_issued_reference (
     user_id         UUID NOT NULL REFERENCES users(user_id) ON DELETE CASCADE,
     notes           TEXT,
     covered_amount  DECIMAL(12,2),
-    status          VARCHAR(20) NOT NULL DEFAULT 'open' CHECK (status IN ('open', 'close')),
+    status          VARCHAR(20) NOT NULL DEFAULT 'open' CHECK (status IN ('open', 'close', 'cancel')),
     date_cut_off    TIMESTAMPTZ,
     date_forwarded  TIMESTAMPTZ,
     created_at      TIMESTAMPTZ NOT NULL DEFAULT NOW(),

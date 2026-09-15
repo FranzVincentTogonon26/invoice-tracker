@@ -1,16 +1,10 @@
 import { useEffect, useMemo, useState } from "react";
 import { motion } from "framer-motion";
-import {
-  Ban,
-  ChevronLeft,
-  ChevronRight,
-  NotebookPen,
-  RotateCcw,
-  Search,
-  X,
-} from "lucide-react";
+import { Ban, NotebookPen, Search, X } from "lucide-react";
 import toast from "react-hot-toast";
 import { Card, CardDescription, CardHeader, CardTitle } from "../../../ui/Card";
+import { EmptyState, ErrorState, LoadingSkeleton } from "../../../ui/DataState";
+import { Pager } from "../../../ui/Pager";
 import { cn, formatMoney } from "../../../../lib/utils";
 import { SearchInput } from "../../../ui/Input";
 import Listbox from "../../../ui/Listbox";
@@ -41,23 +35,6 @@ const METHOD_FILTER_OPTIONS = [
   { value: "all", label: "All methods" },
   ...PAYMENT_METHODS,
 ];
-
-// Compact page-number window for the pager ("1 … 4 5 6 … 12").
-const pageItems = (count, current) => {
-  if (count <= 7) return Array.from({ length: count }, (_, i) => i);
-  const items = [0];
-  if (current > 2) items.push("…");
-  for (
-    let i = Math.max(1, current - 1);
-    i <= Math.min(count - 2, current + 1);
-    i++
-  ) {
-    items.push(i);
-  }
-  if (current < count - 3) items.push("…");
-  items.push(count - 1);
-  return items;
-};
 
 const BudgetTransaction = ({ valueRemaining }) => {
   const { user } = useAuth();
@@ -259,17 +236,28 @@ const BudgetTransaction = ({ valueRemaining }) => {
         </div>
 
         {isLoading ? (
-          <LoadingSkeleton />
+          <LoadingSkeleton rows={6} />
         ) : error ? (
           <ErrorState
-            hasActiveFilters={hasActiveFilters}
-            clearFilters={clearFilters}
-            refetch={refetch}
+            title="Couldn't load transactions"
+            message="Something went wrong while fetching budget activity."
+            onRetry={refetch}
+            onClearFilters={hasActiveFilters ? clearFilters : undefined}
           />
         ) : filteredRows.length === 0 ? (
           <EmptyState
-            hasActiveFilters={hasActiveFilters}
-            clearFilters={clearFilters}
+            icon={NotebookPen}
+            title={
+              hasActiveFilters
+                ? "No transactions match your filters"
+                : "No budget transactions yet"
+            }
+            message={
+              hasActiveFilters
+                ? "Try a different status, method or search term."
+                : "Issued and added budget activity will appear here."
+            }
+            onClear={hasActiveFilters ? clearFilters : undefined}
           />
         ) : (
           <>
@@ -293,45 +281,11 @@ const BudgetTransaction = ({ valueRemaining }) => {
                 </span>
               </p>
               {pageCount > 1 && (
-                <nav
-                  aria-label="Pagination"
-                  className="flex items-center gap-1"
-                >
-                  <PagerButton
-                    label="Previous page"
-                    disabled={currentPage === 0}
-                    onClick={() => setPage(currentPage - 1)}
-                  >
-                    <ChevronLeft size={14} />
-                  </PagerButton>
-                  {pageItems(pageCount, currentPage).map((item, i) =>
-                    item === "…" ? (
-                      <span
-                        key={`ellipsis-${i}`}
-                        className="px-1 text-xs text-[var(--ink-muted)]"
-                      >
-                        …
-                      </span>
-                    ) : (
-                      <PagerButton
-                        key={item}
-                        label={`Page ${item + 1}`}
-                        active={item === currentPage}
-                        ariaCurrent={item === currentPage}
-                        onClick={() => setPage(item)}
-                      >
-                        {item + 1}
-                      </PagerButton>
-                    ),
-                  )}
-                  <PagerButton
-                    label="Next page"
-                    disabled={currentPage >= pageCount - 1}
-                    onClick={() => setPage(currentPage + 1)}
-                  >
-                    <ChevronRight size={14} />
-                  </PagerButton>
-                </nav>
+                <Pager
+                  page={currentPage}
+                  pageCount={pageCount}
+                  onChange={setPage}
+                />
               )}
             </div>
           </>
@@ -381,115 +335,6 @@ const CancelUndoToast = ({ transaction, visible, onUndo }) => (
       transition={{ duration: UNDO_WINDOW_MS / 1000, ease: "linear" }}
       className="absolute bottom-0 left-0 h-0.5 bg-[var(--danger)]/70"
     />
-  </div>
-);
-
-const PagerButton = ({
-  label,
-  children,
-  active = false,
-  ariaCurrent,
-  disabled = false,
-  onClick,
-}) => (
-  <button
-    type="button"
-    aria-label={label}
-    aria-current={ariaCurrent ? "page" : undefined}
-    disabled={disabled}
-    onClick={onClick}
-    className={cn(
-      "flex h-8 min-w-8 items-center justify-center rounded-full border px-2 text-xs font-semibold transition-colors",
-      active
-        ? "border-transparent bg-[var(--accent-strong)] text-white"
-        : "border-[var(--border)] text-[var(--ink-muted)] hover:bg-[var(--surface-2)] hover:text-[var(--ink)]",
-      disabled && "pointer-events-none opacity-40",
-    )}
-  >
-    {children}
-  </button>
-);
-
-const LoadingSkeleton = () => (
-  <div className="divide-y divide-[var(--border)]" aria-hidden>
-    {Array.from({ length: 6 }).map((_, i) => (
-      <div key={i} className="flex items-center gap-4 px-5 py-4">
-        <div className="min-w-0 flex-1 space-y-2">
-          <div className="h-4 w-2/5 animate-pulse rounded bg-[var(--border)]" />
-          <div className="h-2.5 w-1/4 animate-pulse rounded bg-[var(--border)]" />
-        </div>
-        <div className="hidden h-4 w-20 animate-pulse rounded bg-[var(--border)] md:block" />
-        <div className="hidden h-7 w-7 animate-pulse rounded-full bg-[var(--border)] md:block" />
-        <div className="hidden h-9 w-9 animate-pulse rounded-full bg-[var(--border)] md:block" />
-        <div className="hidden h-8 w-16 animate-pulse rounded bg-[var(--border)] md:block" />
-        <div className="h-6 w-16 animate-pulse rounded-full bg-[var(--border)]" />
-      </div>
-    ))}
-  </div>
-);
-
-const ErrorState = ({ hasActiveFilters, clearFilters, refetch }) => (
-  <div className="flex flex-col items-center py-16 text-center">
-    <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-[var(--danger)]/12 text-[var(--danger)]">
-      <RotateCcw size={20} />
-    </div>
-    <p className="mt-4 text-sm font-semibold text-[var(--ink)]">
-      Couldn&apos;t load transactions
-    </p>
-    <p className="mt-1.5 max-w-xs text-xs leading-relaxed text-[var(--ink-muted)]">
-      Something went wrong while fetching budget activity.
-    </p>
-    {hasActiveFilters ? (
-      <button
-        type="button"
-        onClick={clearFilters}
-        className="mt-4 inline-flex h-8 items-center gap-1.5 rounded-full border border-[var(--border)] px-3.5 text-xs font-semibold text-[var(--accent-strong)] transition-colors hover:bg-[var(--accent-soft)]"
-      >
-        <RotateCcw size={12} />
-        Clear filters
-      </button>
-    ) : (
-      <button
-        type="button"
-        onClick={() => refetch()}
-        className="mt-4 inline-flex h-8 items-center gap-1.5 rounded-full border border-[var(--border)] px-3.5 text-xs font-semibold text-[var(--accent-strong)] transition-colors hover:bg-[var(--accent-soft)]"
-      >
-        <RotateCcw size={12} />
-        Try again
-      </button>
-    )}
-  </div>
-);
-
-const EmptyState = ({ hasActiveFilters, clearFilters }) => (
-  <div className="flex flex-col items-center py-16 text-center">
-    <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-[var(--accent-soft)] text-[var(--accent-strong)]">
-      <NotebookPen size={20} />
-    </div>
-    <p className="mt-4 text-sm font-semibold text-[var(--ink)]">
-      {hasActiveFilters
-        ? "No transactions match your filters"
-        : "No budget transactions yet"}
-    </p>
-    {hasActiveFilters ? (
-      <>
-        <p className="mt-1.5 text-xs text-[var(--ink-muted)]">
-          Try a different status, method or search term.
-        </p>
-        <button
-          type="button"
-          onClick={clearFilters}
-          className="mt-4 inline-flex h-8 items-center gap-1.5 rounded-full border border-[var(--border)] px-3.5 text-xs font-semibold text-[var(--accent-strong)] transition-colors hover:bg-[var(--accent-soft)]"
-        >
-          <RotateCcw size={12} />
-          Clear filters
-        </button>
-      </>
-    ) : (
-      <p className="mt-1.5 max-w-xs text-xs leading-relaxed text-[var(--ink-muted)]">
-        Issued and added budget activity will appear here.
-      </p>
-    )}
   </div>
 );
 

@@ -1,4 +1,4 @@
-import { CalendarDays, Check } from "lucide-react";
+import { Check, HandCoins } from "lucide-react";
 import Listbox from "./Listbox";
 import { formatDate } from "../../lib/utils";
 
@@ -32,7 +32,7 @@ export const SelectReference = ({
   const renderOption = (option, { selected: isSelected }) => (
     <>
       <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-[var(--accent-soft)] text-[var(--accent-strong)]">
-        <CalendarDays size={13} aria-hidden />
+        <HandCoins size={13} aria-hidden />
       </span>
       <span className="flex-1 min-w-0 space-y-0.5">
         <span className="block truncate text-sm font-medium">
@@ -63,7 +63,7 @@ export const SelectReference = ({
       renderTrigger={(selectedOption) =>
         selectedOption ? (
           <span className="flex min-w-0 items-center gap-2">
-            <CalendarDays
+            <HandCoins
               size={14}
               aria-hidden
               className="shrink-0 text-[var(--ink-muted)]"
@@ -75,7 +75,7 @@ export const SelectReference = ({
           </span>
         ) : (
           <span className="flex min-w-0 items-center gap-2 text-[var(--ink-muted)]">
-            <CalendarDays size={14} aria-hidden className="shrink-0" />
+            <HandCoins size={14} aria-hidden className="shrink-0" />
             <span className="truncate">{placeholder || "Select source"}</span>
           </span>
         )

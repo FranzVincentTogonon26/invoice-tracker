@@ -179,7 +179,7 @@ class Budget {
             SELECT SUM(i.amount)
             FROM issued_budget i
             JOIN budget_issued_reference bir ON i.issued_ref_id = bir.id
-            WHERE bir.reference_id = $1
+            WHERE bir.status = 'open' AND bir.reference_id = $1
           ), 0) AS issued`,
       [referenceId],
     );
@@ -335,6 +335,56 @@ class Budget {
         WHERE id = $1
         RETURNING *`,
       [id, status],
+    );
+    return result.rows[0] ?? null;
+  }
+
+  // Cancel an issued budget transaction — flips the parent
+  // `budget_issued_reference.status` to 'cancel'. The UI row is keyed by
+  // `issued_budget.id`, but the status lives on the reference it belongs to,
+  // so the parent is resolved via `issued_ref_id` first. Returns the previous
+  // status plus the updated reference row, or null when the id does not exist.
+  static async cancelIssuedTransaction(id) {
+    const existing = await query(
+      `SELECT bir.id, bir.status
+         FROM budget_issued_reference bir
+         JOIN issued_budget ib ON ib.issued_ref_id = bir.id
+        WHERE ib.id = $1`,
+      [id],
+    );
+    const previous = existing.rows[0] ?? null;
+    if (!previous) return null;
+
+    const result = await query(
+      `UPDATE budget_issued_reference
+          SET status = 'cancel'
+        WHERE id = $1
+        RETURNING *`,
+      [previous.id],
+    );
+    return { previousStatus: previous.status, issuedReference: result.rows[0] };
+  }
+
+  // Undo an issued cancellation — restores the parent reference to its
+  // previous status ('open'). Accepts the same `issued_budget.id` and resolves
+  // the parent reference before updating.
+  static async restoreIssuedTransaction(id, status) {
+    const existing = await query(
+      `SELECT bir.id
+         FROM budget_issued_reference bir
+         JOIN issued_budget ib ON ib.issued_ref_id = bir.id
+        WHERE ib.id = $1`,
+      [id],
+    );
+    const reference = existing.rows[0] ?? null;
+    if (!reference) return null;
+
+    const result = await query(
+      `UPDATE budget_issued_reference
+          SET status = $2
+        WHERE id = $1
+        RETURNING *`,
+      [reference.id, status],
     );
     return result.rows[0] ?? null;
   }

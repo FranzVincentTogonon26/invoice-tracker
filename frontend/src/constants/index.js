@@ -26,6 +26,7 @@ export const STATUS = {
   added: { tone: "accent", label: "Added" },
   cancelled: { tone: "danger", label: "Cancelled" },
   // budget_issued_reference.status values (Budget Issued Transaction tab)
-  open: { tone: "success", label: "Open" },
-  close: { tone: "accent", label: "Closed" },
+  open: { tone: "accent", label: "Open" },
+  cancel: { tone: "danger", label: "Cancelled" },
+  close: { tone: "warning", label: "Closed" },
 };

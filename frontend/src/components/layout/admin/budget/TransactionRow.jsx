@@ -18,42 +18,51 @@ export function TransactionRow({
   valueRemaining,
 }) {
   return (
-    <tr className=" border-b border-[var(--border)] transition-colors last:border-b-0 hover:bg-[var(--surface-2)]/60">
+    <tr className="group border-b border-[var(--border)] transition-colors duration-150 last:border-b-0 hover:bg-[var(--accent)]/[0.04]">
       {/* Description */}
-      <td className="px-4 py-3 pl-5 align-middle">
+      <td className="relative px-4 py-3.5 pl-5 align-middle">
+        {/* Accent flight that fades in on row hover */}
+        <span
+          aria-hidden
+          className="absolute inset-y-3 left-0 w-0.5 rounded-full bg-[var(--accent-strong)] opacity-0 transition-opacity duration-150 group-hover:opacity-100"
+        />
         <p className="text-sm font-semibold leading-snug text-[var(--ink)]">
           {t.description}
         </p>
 
         {t.label && (
           <p className="mt-1 flex items-center gap-1.5 text-xs text-[var(--ink-muted)]">
-            <BanknoteCheck size={15} className="shrink-0" strokeWidth={2} />
+            <BanknoteCheck
+              size={15}
+              className="shrink-0 text-[var(--accent-strong)]"
+              strokeWidth={2}
+            />
             <span className="min-w-0 truncate capitalize">{t.label}</span>
           </p>
         )}
       </td>
 
       {/* Amount */}
-      <td className="px-4 py-3 text-right align-middle">
+      <td className="px-4 py-3.5 text-right align-middle">
         <span className="text-sm font-semibold tabular-nums text-[var(--ink)]">
           {formatMoney(t.amount)}
         </span>
       </td>
 
       {/* Payment Method */}
-      <td className="px-4 py-3 align-middle">
+      <td className="px-4 py-3.5 align-middle">
         <Badge tone="neutral" className="capitalize">
           <PaymentMethod method={t.method} />
         </Badge>
       </td>
 
       {/* Approved By */}
-      <td className="px-4 py-3 align-middle">
+      <td className="px-4 py-3.5 align-middle">
         <ApproverCell name={t.approved_by} approvedAt={t.approved_at} />
       </td>
 
       {/* Date */}
-      <td className="px-4 py-3 align-middle">
+      <td className="px-4 py-3.5 align-middle">
         <p className="text-xs leading-none tabular-nums text-[var(--ink)]">
           {formatDate(t.created_at)}
         </p>
@@ -64,13 +73,13 @@ export function TransactionRow({
       </td>
 
       {/* Status */}
-      <td className="px-4 py-3 text-center align-middle">
+      <td className="px-4 py-3.5 text-center align-middle">
         <StatusBadge status={t.status} />
       </td>
 
       {/* Actions */}
-      <td className="w-[1%] px-4 py-3 pr-5 text-right align-middle">
-        <div className="flex justify-end transition-opacity duration-150 ">
+      <td className="w-[1%] px-4 py-3.5 pr-5 text-right align-middle">
+        <div className="flex justify-end transition-opacity duration-150">
           <TransactionActions
             transaction={t}
             role={role}

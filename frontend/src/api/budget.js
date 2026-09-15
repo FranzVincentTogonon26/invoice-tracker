@@ -30,4 +30,15 @@ export const budgetsApi = {
   // Undo a cancellation — restores the transaction's previous status.
   restoreTransaction: (id, status) =>
     apiClient.patch(`/budgets/${id}/restore`, { status }).then((r) => r.data),
+  // Cancels an issued budget transaction (budget_issued_reference.status ->
+  // 'cancel'). Returns `{ previousStatus, issuedReference }`.
+  cancelIssuedTransaction: (id) =>
+    apiClient
+      .patch(`/budgets/issued_transaction/${id}/cancel`)
+      .then((r) => r.data),
+  // Undo an issued cancellation — restores the reference's previous status.
+  restoreIssuedTransaction: (id, status) =>
+    apiClient
+      .patch(`/budgets/issued_transaction/${id}/restore`, { status })
+      .then((r) => r.data),
 };

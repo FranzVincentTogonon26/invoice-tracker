@@ -24,6 +24,21 @@ router.get(
   requireAdminAccess,
   budgetController.budgetIssuedTransaction,
 );
+// Cancel an issued budget transaction (budget_issued_reference.status ->
+// 'cancel').
+router.patch(
+  "/issued_transaction/:id/cancel",
+  authMiddleware,
+  requireAdminAccess,
+  budgetController.cancelIssuedTransaction,
+);
+// Undo an issued cancellation — restores the reference's previous status.
+router.patch(
+  "/issued_transaction/:id/restore",
+  authMiddleware,
+  requireAdminAccess,
+  budgetController.restoreIssuedTransaction,
+);
 router.patch(
   "/:id/cancel",
   authMiddleware,
