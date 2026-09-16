@@ -29,4 +29,7 @@ export const STATUS = {
   open: { tone: "accent", label: "Open" },
   cancel: { tone: "danger", label: "Cancelled" },
   close: { tone: "warning", label: "Closed" },
+  // users.status values (Employees tab)
+  active: { tone: "success", label: "Active" },
+  inactive: { tone: "neutral", label: "Inactive" },
 };

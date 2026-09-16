@@ -45,13 +45,50 @@ export function StatCard({
   loading = false,
   icon: Icon,
   accent = false,
+  // Optional status tint for the icon tile, value and sparkline — mirrors the
+  // app's status colors (active → success, pending → warning, over → danger).
+  tone,
 }) {
   const positive = delta == null ? null : delta >= 0;
-  const color = accent ? "#FFFFFF" : "var(--accent)";
+  const color = accent
+    ? "#FFFFFF"
+    : tone === "success"
+      ? "var(--success)"
+      : tone === "warning"
+        ? "var(--warning)"
+        : tone === "danger"
+          ? "var(--danger)"
+          : "var(--accent)";
   const ChartCmp = chart === "bars" ? MiniBars : MiniLine;
   const displayValue = value == null || value === "" ? "—" : value;
   const hasData = Array.isArray(data) && data.length > 0;
   const hasBreakdown = Array.isArray(breakdown);
+  // Without a `breakdown` list, `breakdownCaption` (e.g. "Across all
+  // employees") is shown as a one-line footer hint instead of being ignored.
+  const hasCaption = !hasBreakdown && Boolean(breakdownCaption);
+
+  // Icon tile treatment — soft tinted squircle; `tone` overrides the default
+  // accent tint so status cards read at a glance.
+  const iconTile = accent
+    ? "bg-white/15 text-white"
+    : tone === "success"
+      ? "bg-[var(--success)]/12 text-[var(--success)]"
+      : tone === "warning"
+        ? "bg-[var(--warning)]/14 text-[var(--warning)]"
+        : tone === "danger"
+          ? "bg-[var(--danger)]/12 text-[var(--danger)]"
+          : "bg-[var(--accent-soft)] text-[var(--accent-strong)]";
+
+  // Value color — status tints carry meaning (green = active, amber = pending).
+  const valueColor = accent
+    ? "text-white"
+    : tone === "success"
+      ? "text-[var(--success)]"
+      : tone === "warning"
+        ? "text-[var(--warning)]"
+        : tone === "danger"
+          ? "text-[var(--danger)]"
+          : "text-[var(--ink)]";
 
   // Skeleton placeholders keep the 4-column grid from jumping while the
   // overview query loads.
@@ -61,32 +98,45 @@ export function StatCard({
         variant={accent ? "accent" : "default"}
         className={cn("relative overflow-hidden", accent && "text-white")}
       >
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2.5">
           <div
             className={cn(
-              "h-7 w-7 rounded-full animate-pulse",
+              "h-9 w-9 rounded-xl animate-pulse",
               accent ? "bg-white/15" : "bg-[var(--surface-2)]",
             )}
           />
           <div
             className={cn(
-              "h-3 w-20 rounded animate-pulse",
+              "h-3 w-24 rounded animate-pulse",
               accent ? "bg-white/15" : "bg-[var(--surface-2)]",
             )}
           />
         </div>
         <div
           className={cn(
-            "mt-3 h-8 w-28 rounded-lg animate-pulse",
+            "mt-3.5 h-8 w-28 rounded-lg animate-pulse",
             accent ? "bg-white/15" : "bg-[var(--surface-2)]",
           )}
         />
-        <div
-          className={cn(
-            "mt-3 h-14 rounded-lg animate-pulse",
-            accent ? "bg-white/10" : "bg-[var(--surface-2)]",
-          )}
-        />
+        {hasCaption && (
+          <div
+            className={cn(
+              "mt-2 h-2.5 w-24 rounded animate-pulse",
+              accent ? "bg-white/10" : "bg-[var(--surface-2)]",
+            )}
+          />
+        )}
+        {/* Only reserve the chart/breakdown slot when the caller actually
+            supplies that content — otherwise the skeleton renders taller
+            than the loaded card and the grid row jumps. */}
+        {(hasData || hasBreakdown) && (
+          <div
+            className={cn(
+              "mt-3 h-14 rounded-lg animate-pulse",
+              accent ? "bg-white/10" : "bg-[var(--surface-2)]",
+            )}
+          />
+        )}
       </Card>
     );
   }
@@ -94,26 +144,43 @@ export function StatCard({
   return (
     <Card
       variant={accent ? "accent" : "default"}
-      className={cn("relative overflow-hidden", accent && "text-white")}
+      className={cn(
+        "relative overflow-hidden",
+        accent && "text-white hover:shadow-hover",
+        !accent && "hover:-translate-y-0.5",
+      )}
     >
+      {/* Soft light bloom + hairline ring in the top-right corner of the hero
+          card — echoes the accent gradient using the existing tokens. */}
+      {accent && (
+        <>
+          <div
+            aria-hidden
+            className="pointer-events-none absolute inset-x-0 top-0 h-28 bg-[radial-gradient(ellipse_at_top_right,var(--accent-hero-2)_0%,transparent_70%)] opacity-50"
+          />
+          <div
+            aria-hidden
+            className="pointer-events-none absolute -right-5 -top-5 h-20 w-20 rounded-full border border-white/10"
+          />
+        </>
+      )}
+
       <div className="flex items-start justify-between gap-4">
-        <div className="space-y-2 min-w-0 flex-1">
-          <div className="flex items-center gap-2">
+        <div className="min-w-0 flex-1 space-y-2">
+          <div className="flex items-center gap-2.5">
             {Icon && (
-              <div
+              <span
                 className={cn(
-                  "h-7 w-7 rounded-full flex items-center justify-center shrink-0",
-                  accent
-                    ? "bg-white/15 text-white"
-                    : "bg-[var(--accent-soft)] text-[var(--accent-strong)]",
+                  "flex h-9 w-9 shrink-0 items-center justify-center rounded-xl",
+                  iconTile,
                 )}
               >
-                <Icon size={14} />
-              </div>
+                <Icon size={18} />
+              </span>
             )}
             <span
               className={cn(
-                "text-xs font-medium truncate",
+                "truncate text-xs font-semibold tracking-tight",
                 accent ? "text-white/70" : "text-[var(--ink-muted)]",
               )}
             >
@@ -121,7 +188,12 @@ export function StatCard({
             </span>
           </div>
           <div className="flex items-baseline gap-1 min-w-0">
-            <span className="font-display tabular text-2xl sm:text-3xl font-semibold tracking-tight truncate">
+            <span
+              className={cn(
+                "font-display tabular text-2xl sm:text-3xl font-semibold tracking-tight truncate",
+                valueColor,
+              )}
+            >
               {displayValue}
             </span>
             {suffix && (
@@ -143,6 +215,17 @@ export function StatCard({
               {positive ? "+" : ""}
               {delta}%
             </Badge>
+          )}
+
+          {hasCaption && (
+            <p
+              className={cn(
+                "text-[11px] font-medium tracking-tight",
+                accent ? "text-white/60" : "text-[var(--ink-muted)]",
+              )}
+            >
+              {breakdownCaption}
+            </p>
           )}
 
           {hasBreakdown && (

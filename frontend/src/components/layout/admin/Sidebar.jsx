@@ -16,7 +16,7 @@ import AILogo from "../../ui/AILogo";
 const NAV = [
   { to: "/dashboard", icon: LayoutGrid, label: "Dashboard" },
   { to: "/admin/budget", icon: FileText, label: "Budget" },
-  { to: "/employee", icon: Users, label: "Employee" },
+  { to: "/admin/employees", icon: Users, label: "Employee" },
   { to: "/expenses", icon: Receipt, label: "Expenses" },
   { to: "/payments", icon: Wallet, label: "Payments" },
   { to: "/reports", icon: BarChart3, label: "Reports" },
