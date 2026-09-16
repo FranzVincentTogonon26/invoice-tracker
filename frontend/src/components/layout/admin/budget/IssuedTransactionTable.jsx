@@ -32,15 +32,15 @@ export function IssuedTransactionTable({ rows, onAction }) {
     <>
       {/* Desktop — semantic table with fixed column proportions */}
       <div
-        className="hidden overflow-x-auto overflow-y-hidden rounded-2xl focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)]/30 md:block"
+        className="hidden overflow-x-auto rounded-3xl focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)]/30 md:block"
         tabIndex={0}
         aria-label="Budget issued transactions"
       >
-        <div className="relative min-w-[960px] overflow-hidden rounded-2xl border border-[var(--border)] bg-[var(--surface)] shadow-card">
+        <div className="relative min-w-[960px] overflow-hidden rounded-3xl border border-[var(--border)] bg-[var(--surface)] shadow-card">
           {/* Accent hairline running along the top edge */}
           <div
             aria-hidden
-            className="pointer-events-none absolute inset-x-4 top-0 h-px bg-[linear-gradient(90deg,transparent,var(--accent)/65,transparent)]"
+            className="pointer-events-none absolute inset-x-6 top-0 z-10 h-px bg-[linear-gradient(90deg,transparent,var(--accent)/65,transparent)]"
           />
           <table className="w-full table-fixed border-collapse text-left">
             <caption className="sr-only">
@@ -52,14 +52,14 @@ export function IssuedTransactionTable({ rows, onAction }) {
                 <col key={i} style={{ width }} />
               ))}
             </colgroup>
-            <thead>
-              <tr className="bg-[var(--surface-2)]/60">
+            <thead className="sticky top-0 z-[1]">
+              <tr className="bg-[var(--surface-2)]/80 backdrop-blur">
                 {HEADERS.map((h) => (
                   <th
                     key={h.label}
                     scope="col"
                     className={cn(
-                      "border-b border-[var(--border)] px-4 py-3 text-[10px] font-bold uppercase tracking-[0.12em] text-[var(--ink-muted)] first:pl-5 last:pr-5",
+                      "border-b border-[var(--border)] px-4 py-3.5 text-[10px] font-bold uppercase tracking-[0.14em] text-[var(--ink-muted)] first:pl-5 last:pr-5",
                       {
                         "text-left": h.align === "left",
                         "text-center": h.align === "center",
@@ -90,7 +90,7 @@ export function IssuedTransactionTable({ rows, onAction }) {
       </div>
 
       {/* Mobile — stacked transaction cards */}
-      <div className="flex flex-col gap-2.5 md:hidden">
+      <div className="flex flex-col gap-3 md:hidden">
         {rows.map((t) => (
           <IssuedTransactionCard
             key={t.id}

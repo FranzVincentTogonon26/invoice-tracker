@@ -108,7 +108,7 @@ export function IssuedTransactionRow({ transaction: t, onAction }) {
         />
       </td>
       <td className="px-4 py-3.5 align-middle">
-        <p className="text-[13px] font-medium leading-snug text-[var(--ink)]">
+        <p className="text-[13px] leading-snug text-[var(--ink)]">
           {t.description}
         </p>
       </td>
@@ -149,7 +149,11 @@ export function IssuedTransactionRow({ transaction: t, onAction }) {
  */
 export function IssuedTransactionCard({ transaction: t, onAction }) {
   return (
-    <div className="rounded-2xl border border-[var(--border)] bg-[var(--surface)] p-4 shadow-card transition-shadow hover:shadow-hover">
+    <div className="relative overflow-hidden rounded-3xl border border-[var(--border)] bg-[var(--surface)] p-4 shadow-card transition-shadow hover:shadow-hover">
+      <div
+        aria-hidden
+        className="pointer-events-none absolute inset-x-6 top-0 h-px bg-[linear-gradient(90deg,transparent,var(--accent)/60,transparent)]"
+      />
       <div className="flex items-center justify-between gap-3">
         <EmployeeCell
           name={t.employee}

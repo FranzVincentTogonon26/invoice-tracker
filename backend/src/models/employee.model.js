@@ -33,7 +33,7 @@ class Employee {
 
     const result = await query(
       `INSERT INTO users (name, email, password, role, status)
-       VALUES ($1, $2, $3, 'employee', 'active')
+       VALUES ($1, $2, $3, 'employee', 'pending')
        RETURNING ${this.SAFE_COLUMNS}`,
       [name, email, hashedPassword],
     );

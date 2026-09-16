@@ -1,8 +1,9 @@
 import { useMemo } from "react";
+import { motion } from "framer-motion";
 import { ChevronRight, Loader, Wallet } from "lucide-react";
 import { Card, CardDescription, CardHeader, CardTitle } from "../../../ui/Card";
 import { Badge } from "../../../ui/Badge";
-import { formatDate, formatMoney } from "../../../../lib/utils";
+import { cn, formatDate, formatMoney } from "../../../../lib/utils";
 
 const EmployeeBudget = ({ employeeIssuedBudget = [], isLoading, onOpen }) => {
   const groups = useMemo(
@@ -45,28 +46,38 @@ const EmployeeBudget = ({ employeeIssuedBudget = [], isLoading, onOpen }) => {
   );
 
   return (
-    <Card padding="lg">
+    <Card padding="lg" className="relative overflow-hidden rounded-3xl">
+      <div
+        aria-hidden
+        className="pointer-events-none absolute inset-x-6 top-0 h-px bg-[linear-gradient(90deg,transparent,var(--accent)/60,transparent)]"
+      />
       <CardHeader>
         <div>
-          <CardTitle>Employee with Budget</CardTitle>
-          <CardDescription>Manage employee budget allocations.</CardDescription>
+          <CardTitle className="text-base">Employee budgets</CardTitle>
+          <CardDescription>
+            {groups.length === 0
+              ? "Manage employee budget allocations."
+              : "Tap an employee to open their profile."}
+          </CardDescription>
         </div>
         {!isLoading && groups.length > 0 && (
-          <Badge tone="neutral" className="shrink-0">
+          <Badge tone="accent" className="shrink-0 tabular-nums">
             {groups.length} {groups.length === 1 ? "employee" : "employees"}
           </Badge>
         )}
       </CardHeader>
       {isLoading ? (
-        <div className="py-14 flex flex-col items-center text-center">
-          <Loader size={20} className="animate-spin text-[var(--ink-muted)]" />
-          <p className="mt-3 text-sm text-[var(--ink-muted)]">
-            Loading budgets…
+        <div className="py-14 flex flex-col items-center text-center" role="status" aria-label="Loading employee budgets">
+          <span className="flex h-11 w-11 items-center justify-center rounded-2xl bg-[var(--accent-soft)] text-[var(--accent-strong)]">
+            <Loader size={18} className="animate-spin" />
+          </span>
+          <p className="mt-3 text-sm font-medium text-[var(--ink-muted)]">
+            Gathering employee budgets…
           </p>
         </div>
       ) : employeeIssuedBudget.length === 0 ? (
         <div className="py-14 flex flex-col items-center text-center">
-          <div className="h-12 w-12 rounded-2xl bg-[var(--accent-soft)] text-[var(--accent-strong)] flex items-center justify-center">
+          <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-[var(--accent-soft)] text-[var(--accent-strong)]">
             <Wallet size={20} />
           </div>
           <p className="mt-4 text-sm font-semibold text-[var(--ink)]">
@@ -81,7 +92,13 @@ const EmployeeBudget = ({ employeeIssuedBudget = [], isLoading, onOpen }) => {
           </p>
         </div>
       ) : (
-        <div className="flex flex-col gap-2.5">
+        <motion.div
+          initial="hidden"
+          animate="show"
+          variants={{ hidden: {}, show: { transition: { staggerChildren: 0.05 } } }}
+          className="flex flex-col gap-3"
+          role="list"
+        >
           {groups.map((group) => {
             const labelList = Object.values(group.labelGroups);
             const total = labelList.reduce(
@@ -93,73 +110,90 @@ const EmployeeBudget = ({ employeeIssuedBudget = [], isLoading, onOpen }) => {
             const hasMultipleRefs = labelList.length > 1;
             const singleRef = labelList[0];
             return (
-              <button
+              <motion.button
                 key={group.user_id}
                 type="button"
+                variants={{
+                  hidden: { opacity: 0, y: 10 },
+                  show: { opacity: 1, y: 0, transition: { duration: 0.3 } },
+                }}
+                whileHover={{ y: -1 }}
+                whileTap={{ scale: 0.99 }}
                 onClick={() => onOpen(group.user_id)}
-                className={`group/row w-full overflow-hidden rounded-xl border border-[var(--border)] bg-[var(--surface)] text-left transition-all duration-200  hover:border-[var(--accent)]/30 hover:bg-[var(--accent)]/5 hover:shadow-hover active:scale-[0.99] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)]/30 ${
-                  hasMultipleRefs ? "px-3.5 py-3" : "px-3.5 py-2"
-                }`}
+                role="listitem"
+                aria-label={`Open ${group.name} budget profile, total ${formatMoney(total)}`}
+                className={cn(
+                  "group/row relative w-full overflow-hidden rounded-2xl border border-[var(--border)] bg-[var(--surface)] text-left shadow-card transition-colors duration-200 hover:border-[var(--accent)]/35 hover:shadow-hover focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)]/30",
+                  hasMultipleRefs ? "px-4 py-3.5" : "px-4 py-3",
+                )}
               >
+                <span
+                  aria-hidden
+                  className="pointer-events-none absolute inset-y-3 left-0 w-1 rounded-full bg-[var(--accent)] opacity-0 transition-opacity duration-200 group-hover/row:opacity-100"
+                />
                 {/* Employee header — identity left, aggregate total right */}
                 <div className="flex items-center gap-3">
                   <div
-                    className={`flex shrink-0 select-none items-center justify-center rounded-full bg-[var(--accent-soft)] font-bold text-[var(--accent-strong)] ring-1 ring-[var(--accent)]/15 transition-all duration-200 group-hover/row:scale-105 group-hover/row:ring-[var(--accent)]/40 ${
-                      hasMultipleRefs
-                        ? "h-9 w-9 text-[13px]"
-                        : "h-8 w-8 text-xs"
-                    }`}
+                    className={cn(
+                      "flex shrink-0 select-none items-center justify-center rounded-2xl bg-[var(--accent-soft)] font-bold text-[var(--accent-strong)] ring-1 ring-[var(--accent)]/15 transition-transform duration-200 group-hover/row:scale-105",
+                      hasMultipleRefs ? "h-10 w-10 text-sm" : "h-9 w-9 text-[13px]",
+                    )}
                   >
                     {group.name?.[0]?.toUpperCase() || "?"}
                   </div>
                   <div className="min-w-0 flex-1">
-                    <p className="truncate text-sm font-semibold text-[var(--ink)]">
+                    <p className="truncate text-sm font-semibold tracking-tight text-[var(--ink)]">
                       {group.name}
                     </p>
                     <p className="mt-0.5 truncate text-[11px] text-[var(--ink-muted)]">
-                      {group.budgets.length}{" "}
-                      {group.budgets.length === 1 ? "budget" : "budgets"} ·{" "}
-                      {labelList.length}{" "}
-                      {labelList.length === 1 ? "reference" : "references"}
+                      <span className="tabular-nums">
+                        {group.budgets.length}{" "}
+                        {group.budgets.length === 1 ? "budget" : "budgets"} ·{" "}
+                        {labelList.length}{" "}
+                        {labelList.length === 1 ? "reference" : "references"}
+                      </span>
                       {!hasMultipleRefs && singleRef && (
                         <>
                           {" "}
                           ·{" "}
-                          <span className="font-semibold">
+                          <span className="font-semibold text-[var(--ink)]">
                             {singleRef.label}
                           </span>
                         </>
                       )}
                     </p>
                   </div>
-                  <span className="shrink-0 text-sm font-semibold text-[var(--ink)] tabular-nums transition-colors duration-200 group-hover/row:text-[var(--accent-strong)]">
+                  <span className="hidden shrink-0 items-center gap-1 rounded-full bg-[var(--surface-2)] px-2.5 py-1 text-[11px] font-semibold text-[var(--ink-muted)] sm:inline-flex">
+                    Latest {formatDate(singleRef?.recent_date)}
+                  </span>
+                  <span className="shrink-0 font-display text-[15px] font-semibold text-[var(--ink)] tabular-nums transition-colors duration-200 group-hover/row:text-[var(--accent-strong)]">
                     {formatMoney(total)}
                   </span>
-                  <ChevronRight
-                    size={16}
-                    className="shrink-0 text-[var(--ink-muted)] transition-all duration-200 group-hover/row:translate-x-0.5 group-hover/row:text-[var(--accent)]"
-                  />
+                  <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full border border-[var(--border)] text-[var(--ink-muted)] transition-all duration-200 group-hover/row:border-[var(--accent)]/40 group-hover/row:bg-[var(--accent-soft)] group-hover/row:text-[var(--accent-strong)]">
+                    <ChevronRight size={14} />
+                  </span>
                 </div>
 
                 {/* References — soft inset rows: dot · label · count · date · total */}
                 {hasMultipleRefs && (
-                  <div className="mt-2.5 ml-12 overflow-hidden rounded-lg bg-[var(--surface-2)]">
+                  <div className="mt-3 overflow-hidden rounded-xl border border-[var(--border)]/70 bg-[var(--surface-2)]/70">
                     {labelList.map((labelGroup, i) => (
                       <div
                         key={labelGroup.label}
-                        className={`flex items-center gap-2.5 px-3 py-2 ${
-                          i > 0 ? "border-t border-[var(--border)]" : ""
-                        }`}
+                        className={cn(
+                          "flex items-center gap-2.5 px-3 py-2.5",
+                          i > 0 && "border-t border-[var(--border)]",
+                        )}
                       >
-                        <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-[var(--accent)]/50" />
+                        <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-[var(--accent)]/60" />
                         <span className="min-w-0 flex-1 truncate text-[12.5px] font-medium text-[var(--ink)]">
                           {labelGroup.label}
                         </span>
-                        <span className="shrink-0 text-[11px] text-[var(--ink-muted)]">
+                        <span className="shrink-0 rounded-full bg-[var(--surface)] px-2 py-0.5 text-[10px] font-semibold tabular-nums text-[var(--ink-muted)]">
                           {labelGroup.count}{" "}
                           {labelGroup.count === 1 ? "issue" : "issues"}
                         </span>
-                        <span className="hidden shrink-0 text-[11px] text-[var(--ink-muted)] sm:block">
+                        <span className="hidden shrink-0 text-[11px] tabular-nums text-[var(--ink-muted)] sm:block">
                           {formatDate(labelGroup.recent_date)}
                         </span>
                         <span className="min-w-[5.5rem] shrink-0 text-right text-[13px] font-semibold text-[var(--accent-strong)] tabular-nums">
@@ -169,10 +203,10 @@ const EmployeeBudget = ({ employeeIssuedBudget = [], isLoading, onOpen }) => {
                     ))}
                   </div>
                 )}
-              </button>
+              </motion.button>
             );
           })}
-        </div>
+          </motion.div>
       )}
     </Card>
   );

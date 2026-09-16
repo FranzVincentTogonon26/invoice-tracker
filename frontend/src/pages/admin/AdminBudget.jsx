@@ -1,14 +1,21 @@
+import { motion } from "framer-motion";
 import {
+  ArrowLeftRight,
   BadgeCheck,
-  BadgeInfo,
+  CircleCheck,
+  HandCoins,
   PhilippinePesoIcon,
   Plus,
+  ReceiptText,
   TrendingUp,
+  Users,
 } from "lucide-react";
 import { PageHeader } from "../../components/ui/PageHeader";
 
 import { Button } from "../../components/ui/Button";
 import { StatCard } from "../../components/ui/StatCard";
+import { Card } from "../../components/ui/Card";
+import { Badge } from "../../components/ui/Badge";
 
 import { formatMoney, formatDate } from "../../lib/utils";
 import {
@@ -24,6 +31,26 @@ import EmployeeBudget from "../../components/layout/admin/budget/EmployeeBudget"
 import BudgetTransaction from "../../components/layout/admin/budget/BudgetTransaction";
 import BudgetModal from "../../components/layout/admin/budget/BudgetModal";
 import BudgetIssuedTransaction from "../../components/layout/admin/budget/BudgetIssuedTransaction";
+
+const container = {
+  hidden: {},
+  show: { transition: { staggerChildren: 0.07, delayChildren: 0.02 } },
+};
+
+const item = {
+  hidden: { opacity: 0, y: 14 },
+  show: {
+    opacity: 1,
+    y: 0,
+    transition: { duration: 0.45, ease: [0.16, 1, 0.3, 1] },
+  },
+};
+
+const TAB_META = [
+  { value: "employee_budget", label: "Employees", icon: Users },
+  { value: "budget_transaction", label: "Transactions", icon: ReceiptText },
+  { value: "budget_issued_transaction", label: "Issued", icon: ArrowLeftRight },
+];
 
 export default function AdminBudget() {
   const nav = useNavigate();
@@ -66,85 +93,188 @@ export default function AdminBudget() {
   const employees = data?.employees ?? [];
   const budgetReferences = data?.budgetReference ?? [];
 
+  // UI-only derived values for the utilization bar (same totals, width math).
+  const totalBudgetNum = Number(totalBudget) || 0;
+  const totalIssuedNum = Number(totalIssued) || 0;
+  const utilization =
+    totalBudgetNum > 0
+      ? Math.min(100, (totalIssuedNum / totalBudgetNum) * 100)
+      : 0;
+
   return (
-    <div className="space-y-6">
+    <div className="space-y-5 pb-2">
       <PageHeader
         title="Budget"
-        description="Manage and monitor your budget and transactions."
+        description="Allocate funds, issue to employees, and track every move."
+        className="flex-col items-start gap-3 sm:flex-row sm:items-end sm:justify-between"
         actions={
-          <div className="flex items-center gap-2">
-            <Button variant="soft" onClick={() => setModalType("addBudget")}>
-              <Plus size={16} /> Add Budget
+          <div className="flex w-full flex-wrap items-center gap-2 sm:w-auto sm:justify-end">
+            <Button
+              variant="soft"
+              size="sm"
+              className="h-9"
+              onClick={() => setModalType("addBudget")}
+            >
+              <Plus size={15} /> Add Budget
             </Button>
             <Button
               variant="accent"
+              size="sm"
+              className="h-9"
               onClick={() => setModalType("issuedBudget")}
             >
-              Budget Issued
+              <HandCoins size={15} /> Issue Budget
             </Button>
           </div>
         }
       />
 
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
-        <StatCard
-          label="Total Budget"
-          value={formatMoney(totalBudget)}
-          icon={TrendingUp}
-          accent
-          loading={isLoading}
-          breakdownCaption="Allocated"
-          breakdown={overviewBudget.map((row, i) => ({
-            key: i,
-            label: row.label ?? "Untitled reference",
-            value: formatMoney(row.amount),
-            hint: formatDate(row.created_at),
-          }))}
-        />
-        <StatCard
-          label="My Vault"
-          value={formatMoney(cashOnHand)}
-          icon={PhilippinePesoIcon}
-          loading={isLoading}
-          breakdownCaption="Remaining"
-          breakdown={cashOnHandBreakdown}
-        />
-        <StatCard
-          label="Total Issued"
-          value={formatMoney(totalIssued)}
-          icon={BadgeCheck}
-          loading={isLoading}
-          breakdownCaption="Issued"
-          breakdown={overviewIssuedBudget.map((row, i) => ({
-            key: i,
-            label: row.label ?? "Untitled reference",
-            value: formatMoney(row.amount),
-            hint: formatDate(row.created_at),
-          }))}
-        />
+      {/* ── Overview: 3 equal KPIs + utilization bar + slim status strip.
+          Logic above untouched. */}
+      <section aria-label="Budget overview" className="space-y-4">
+        <motion.div
+          variants={container}
+          initial="hidden"
+          animate="show"
+          className="grid grid-cols-1 items-stretch gap-4 sm:gap-5 lg:grid-cols-3"
+        >
+          <motion.div variants={item} className="h-full min-w-0 [&>div]:h-full">
+            <StatCard
+              label="Total Budget"
+              value={formatMoney(totalBudget)}
+              icon={TrendingUp}
+              accent
+              loading={isLoading}
+              breakdownCaption="Allocated"
+              breakdown={overviewBudget.map((row, i) => ({
+                key: i,
+                label: row.label ?? "Untitled reference",
+                value: formatMoney(row.amount),
+                hint: formatDate(row.created_at),
+              }))}
+            />
+          </motion.div>
 
-        {/* No backend source yet — placeholder values */}
-        <StatCard
-          label="Overdue"
-          value={0}
-          suffix={formatMoney(0.0)}
-          icon={BadgeInfo}
-          loading={isLoading}
-        />
-      </div>
+          <motion.div variants={item} className="h-full min-w-0 [&>div]:h-full">
+            <StatCard
+              label="My Vault"
+              value={formatMoney(cashOnHand)}
+              icon={PhilippinePesoIcon}
+              loading={isLoading}
+              tone={Number(cashOnHand) < 0 ? "danger" : undefined}
+              breakdownCaption="Remaining"
+              breakdown={cashOnHandBreakdown}
+            />
+          </motion.div>
 
-      <Tabs value={tab} onValueChange={setTab}>
-        <TabsList className="max-w-full overflow-x-auto rounded-full bg-[var(--surface)] border border-[var(--border)] shadow-card">
-          <TabsTrigger value="employee_budget">Employees Budget</TabsTrigger>
-          <TabsTrigger value="budget_transaction">
-            Budget Transaction
-          </TabsTrigger>
-          <TabsTrigger value="budget_issued_transaction">
-            Budget Issued Transaction
-          </TabsTrigger>
-        </TabsList>
+          <motion.div variants={item} className="h-full min-w-0 [&>div]:h-full">
+            <StatCard
+              label="Total Issued"
+              value={formatMoney(totalIssued)}
+              icon={BadgeCheck}
+              loading={isLoading}
+              breakdownCaption="Issued"
+              breakdown={overviewIssuedBudget.map((row, i) => ({
+                key: i,
+                label: row.label ?? "Untitled reference",
+                value: formatMoney(row.amount),
+                hint: formatDate(row.created_at),
+              }))}
+            />
+          </motion.div>
+        </motion.div>
+        <motion.div
+          initial={{ opacity: 0, y: 12 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.45, ease: [0.16, 1, 0.3, 1], delay: 0.15 }}
+        >
+          <Card radius="lg" padding="md" className="relative overflow-hidden">
+            <div
+              aria-hidden
+              className="pointer-events-none absolute inset-x-6 top-0 h-px bg-[linear-gradient(90deg,transparent,var(--accent)/60,transparent)]"
+            />
+            <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+              <div className="min-w-0">
+                <p className="text-[11px] font-bold uppercase tracking-[0.12em] text-[var(--ink-muted)]">
+                  Allocation utilization
+                </p>
+                <p className="mt-1.5 flex flex-wrap items-baseline gap-x-2 font-display text-lg font-semibold tracking-tight text-[var(--ink)]">
+                  {utilization.toFixed(1)}% issued
+                  <span className="text-xs font-medium tabular-nums text-[var(--ink-muted)]">
+                    {formatMoney(totalIssued)} of {formatMoney(totalBudget)}
+                  </span>
+                </p>
+              </div>
+              <Badge tone="accent" className="w-fit shrink-0 tabular-nums">
+                <CircleCheck size={12} /> Vault {formatMoney(cashOnHand)}
+              </Badge>
+            </div>
+            <div
+              role="progressbar"
+              aria-valuemin={0}
+              aria-valuemax={100}
+              aria-valuenow={Number(utilization.toFixed(1))}
+              aria-label="Share of budget already issued"
+              className="mt-4 h-2 overflow-hidden rounded-full bg-[var(--surface-2)]"
+            >
+              <motion.div
+                initial={{ width: 0 }}
+                animate={{ width: `${utilization}%` }}
+                transition={{
+                  duration: 0.7,
+                  ease: [0.16, 1, 0.3, 1],
+                  delay: 0.2,
+                }}
+                className="h-full rounded-full bg-[linear-gradient(90deg,var(--accent-hero-2),var(--accent-hero))]"
+              />
+            </div>
+            <div className="mt-2.5 flex items-center justify-between gap-3 text-[11px] text-[var(--ink-muted)]">
+              <span className="shrink-0 tabular-nums">0%</span>
+              <span className="min-w-0 truncate text-center tabular-nums">
+                {overviewBudget.length}{" "}
+                {overviewBudget.length === 1 ? "reference" : "references"} ·{" "}
+                {overviewIssuedBudget.length} issued
+              </span>
+              <span className="shrink-0 tabular-nums">100%</span>
+            </div>
+          </Card>
+        </motion.div>
+        <div className="flex items-center gap-3 rounded-2xl border border-[var(--success)]/20 bg-[var(--success)]/[0.06] px-4 py-3">
+          <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-[var(--success)]/12 text-[var(--success)]">
+            <CircleCheck size={16} />
+          </span>
+          <p className="min-w-0 flex-1 truncate text-[13px] text-[var(--ink-muted)]">
+            <span className="font-semibold text-[var(--ink)]">All clear</span>
+            {" — no overdue budgets right now."}
+          </p>
+          <span className="shrink-0 font-display text-sm font-semibold tabular-nums text-[var(--ink)]">
+            {formatMoney(0)}
+          </span>
+        </div>
+      </section>
 
-        <div className="mt-6">
+      <Tabs value={tab} onValueChange={setTab} className="space-y-4">
+        <div className="sticky top-0 z-10 -mx-1 bg-[var(--bg)]/90 px-1 py-1.5 backdrop-blur-sm">
+          <div className="flex flex-col gap-2.5 sm:flex-row sm:items-center sm:justify-between">
+            <TabsList className="max-w-full gap-1 self-start overflow-x-auto rounded-full p-1">
+              {TAB_META.map(({ value, label, icon: Icon }) => (
+                <TabsTrigger key={value} value={value} className="px-4">
+                  <Icon size={14} aria-hidden className="shrink-0" />
+                  <span className="whitespace-nowrap">{label}</span>
+                </TabsTrigger>
+              ))}
+            </TabsList>
+            <p className="hidden shrink-0 pl-2 text-xs text-[var(--ink-muted)] lg:block">
+              {tab === "employee_budget" &&
+                "Click an employee to open profile."}
+              {tab === "budget_transaction" && "Added + issued activity."}
+              {tab === "budget_issued_transaction" &&
+                "Every issuance handed out."}
+            </p>
+          </div>
+        </div>
+
+        <div>
           <TabsContent value="employee_budget">
             <EmployeeBudget
               employeeIssuedBudget={budgets}

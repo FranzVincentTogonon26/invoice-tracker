@@ -1,17 +1,38 @@
+import { motion } from "framer-motion";
+import { AlertCircle, Check } from "lucide-react";
 import { Badge } from "../../../ui/Badge";
-import { cn, formatDate, formatMoney } from "../../../../lib/utils";
+import { cn, formatDate, formatMoney, formatTime } from "../../../../lib/utils";
 import EmployeeActions from "./EmployeeActions";
 
+// Placeholder spend amount used while the employees API has no spend
+// aggregate yet. Rows read `employee.total_spent` (or `employee.spent`) as
+// soon as the backend sends it and only fall back to this constant when the
+// field is missing, so the column never renders an empty cell.
+const DEFAULT_TOTAL_SPENT = 1000;
+
 // Column proportions — Employee gets the most space because it anchors the
-// row. Percentages sum to 100% so `table-fixed` never overflows the scroll
-// container (sizing verified against the 960px min-width).
-const COLUMN_WIDTHS = ["24%", "10%", "12%", "18%", "16%", "20%"];
+// row (avatar + name + email), "Remaining" has to fit the progress bar and its
+// caption, and Actions keeps room for the status button + delete trigger.
+// Percentages sum to 100% so `table-fixed` never overflows the scroll
+// container (sizing verified against the 1080px min-width).
+const COLUMN_WIDTHS = [
+  "20%", // Employee
+  "11%", // Status
+  "10%", // Issued Budget
+  "10%", // Total Spent
+  "15%", // Remaining (+ progress bar)
+  "8%", // Transactions
+  "9%", // Date Added
+  "17%", // Actions
+];
 
 const HEADERS = [
   { label: "Employee" },
-  { label: "Role", align: "center" },
   { label: "Status", align: "center" },
   { label: "Issued Budget", align: "right" },
+  { label: "Total Spent", align: "right" },
+  { label: "Remaining" },
+  { label: "Transactions", align: "center" },
   { label: "Date Added" },
   { label: "Actions", srOnly: true, align: "right" },
 ];
@@ -39,15 +60,114 @@ export function EmployeeStatusBadge({ status, className }) {
   );
 }
 
+/**
+ * Budget breakdown for one employee record — a single source of truth shared
+ * by the desktop table and the mobile cards so both always agree.
+ *
+ *   issued    → SUM(issued_budget.amount) handed out to the employee
+ *   spent     → the API's `total_spent` when present, otherwise the
+ *               DEFAULT_TOTAL_SPENT placeholder (never `undefined`)
+ *   remaining → issued budget minus total spent (negative = over-spent)
+ *   share     → remaining balance as a share of the issued budget, clamped to
+ *               0–100 exactly like the Budget page utilization bar
+ */
+function budgetBreakdown(employee) {
+  const issued = Math.max(0, Number(employee.issued_budget) || 0);
+  // Employees with nothing issued have spent nothing, so the placeholder only
+  // applies once a budget has actually been handed to them (otherwise every
+  // zero-budget row would read as over budget).
+  const fallbackSpent = issued > 0 ? DEFAULT_TOTAL_SPENT : 0;
+  const spent = Math.max(
+    0,
+    Number(employee.total_spent ?? employee.spent ?? fallbackSpent) || 0,
+  );
+  const remaining = issued - spent;
+  const share =
+    issued > 0 ? Math.min(100, Math.max(0, (remaining / issued) * 100)) : 0;
+
+  return { issued, spent, remaining, share: Number(share.toFixed(1)) };
+}
+
+/**
+ * Animated remaining-balance bar. Same formula, 0–100 semantics, gradient,
+ * easing curve, duration and delay as the Budget page's "Share of budget
+ * already issued" bar, so both screens read as one system.
+ *
+ * Presentation-only additions: a slimmer track (h-1.5) with an inset ring,
+ * and a success-tinted fill + subtle glow once the bar reaches 100%.
+ */
+function RemainingProgress({ share, label }) {
+  const isFull = share >= 100;
+
+  return (
+    <div className="flex items-center gap-1.5">
+      <div
+        role="progressbar"
+        aria-valuemin={0}
+        aria-valuemax={100}
+        aria-valuenow={Number(share)}
+        aria-label={label}
+        className="h-1 flex-1 overflow-hidden rounded-full bg-[var(--surface-2)] ring-1 ring-inset ring-[var(--border)]"
+      >
+        <motion.div
+          initial={{ width: 0 }}
+          animate={{ width: `${share}%` }}
+          transition={{
+            duration: 0.7,
+            ease: [0.16, 1, 0.3, 1],
+            delay: 0.2,
+          }}
+          className={cn(
+            "h-full rounded-full",
+            isFull
+              ? "bg-[linear-gradient(90deg,var(--success),var(--success))] shadow-[0_0_6px_1px_var(--success)]"
+              : "bg-[linear-gradient(90deg,var(--accent-hero-2),var(--accent-hero))]",
+          )}
+        />
+      </div>
+      {isFull && (
+        <span className="flex h-4 w-4 shrink-0 items-center justify-center rounded-full bg-[var(--success)]/12">
+          <Check size={10} strokeWidth={3} aria-hidden className="text-[var(--success)]" />
+        </span>
+      )}
+    </div>
+  );
+}
+
+/**
+ * Compact percentage pill shown above the bar. Success tone only at 100% left,
+ * danger tone only when the employee overspent — accent in between.
+ */
+function SharePill({ share, overSpent, className }) {
+  const tone = overSpent
+    ? "bg-[var(--danger)]/12 text-[var(--danger)]"
+    : share >= 100
+      ? "bg-[var(--success)]/12 text-[var(--success)]"
+      : "bg-[var(--accent-soft)] text-[var(--accent-strong)]";
+
+  return (
+    <span
+      className={cn(
+        "inline-flex shrink-0 items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-semibold tabular-nums",
+        tone,
+        className,
+      )}
+    >
+      {overSpent ? <AlertCircle size={10} aria-hidden /> : share >= 100 ? <Check size={10} aria-hidden /> : null}
+      {share}% left
+    </span>
+  );
+}
+
 /** Avatar circle with the employee's initial, name and email below it. */
 function EmployeeCell({ employee }) {
   return (
     <div className="flex min-w-0 items-center gap-3">
-      <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-[var(--accent-soft)] text-[13px] font-bold text-[var(--accent-strong)] ring-2 ring-[var(--accent)]/10">
+      <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-[linear-gradient(135deg,var(--accent-soft),var(--surface-2))] font-display text-sm font-bold tracking-tight text-[var(--accent-strong)] ring-1 ring-inset ring-[var(--accent)]/15 transition-transform duration-200 group-hover:rotate-[-6deg] group-hover:scale-[1.06] group-hover:ring-[var(--accent)]/30">
         {employee.name?.trim()?.[0]?.toUpperCase() || "?"}
       </span>
       <div className="min-w-0">
-        <p className="truncate text-sm font-semibold leading-snug text-[var(--ink)]">
+        <p className="truncate font-display text-sm font-semibold leading-snug tracking-tight text-[var(--ink)] transition-colors duration-150 group-hover:text-[var(--accent-strong)]">
           {employee.name}
         </p>
         <p className="mt-0.5 truncate text-[11px] leading-tight text-[var(--ink-muted)]">
@@ -60,48 +180,87 @@ function EmployeeCell({ employee }) {
 
 /** Desktop table row. */
 function EmployeeRow({ employee, pending, onAction }) {
+  const { issued, spent, remaining, share } = budgetBreakdown(employee);
+  // Spending more than the issued budget flips the remaining amount red — the
+  // same signal the Budget page uses for over-issued references.
+  const overSpent = remaining < 0;
+
   return (
-    <tr className="group border-b border-[var(--border)] transition-colors duration-150 last:border-b-0 hover:bg-[var(--accent)]/[0.04]">
+    <tr className="group border-b border-[var(--border)] transition-colors duration-150 last:border-b-0 odd:bg-[var(--surface)] even:bg-[var(--surface-2)]/40 hover:bg-[var(--accent)]/[0.04]">
       <td className="px-4 py-3.5 pl-5 align-middle">
         <EmployeeCell employee={employee} />
       </td>
-
-      {/* Role */}
-      <td className="px-4 py-3.5 text-center align-middle">
-        <Badge tone="neutral">Employee</Badge>
-      </td>
-
       {/* Status */}
-      <td className="px-4 py-3.5 text-center align-middle">
+      <td className="px-4 py-4 text-center align-middle">
         <EmployeeStatusBadge status={employee.status} />
       </td>
 
       {/* Issued Budget */}
-      <td className="px-4 py-3.5 text-right align-middle">
+      <td className="px-4 py-4 text-right align-middle">
         <p className="text-sm font-semibold tabular-nums text-[var(--ink)]">
-          {formatMoney(employee.issued_budget)}
+          {formatMoney(issued)}
         </p>
-        {Number(employee.issued_references) > 0 && (
-          <p className="mt-1 text-[10px] leading-none text-[var(--ink-muted)]">
-            {employee.issued_references}{" "}
-            {employee.issued_references === 1 ? "reference" : "references"}
-          </p>
+      </td>
+
+      {/* Total Spent — API `total_spent` when present, else the 1,000 default */}
+      <td className="px-4 py-4 text-right align-middle">
+        <p className="text-sm font-semibold tabular-nums text-[var(--ink)]">
+          {formatMoney(spent)}
+        </p>
+        {overSpent && (
+          <span className="mt-1 inline-flex items-center gap-1 rounded-full bg-[var(--danger)]/12 px-2 py-0.5 text-[10px] font-semibold leading-none text-[var(--danger)]">
+            <AlertCircle size={10} aria-hidden />
+            Over budget
+          </span>
         )}
       </td>
 
-      {/* Date Added */}
-      <td className="px-4 py-3.5 align-middle">
-        {employee.created_at ? (
-          <p className="text-xs leading-none tabular-nums text-[var(--ink)]">
-            {formatDate(employee.created_at)}
+      {/* Remaining — issued budget minus total spent, with the animated bar */}
+      <td className="px-4 py-4 align-middle">
+        <div className="flex items-baseline justify-between gap-2">
+          <p
+            className={cn(
+              "text-sm font-semibold tabular-nums",
+              overSpent ? "text-[var(--danger)]" : "text-[var(--ink)]",
+            )}
+          >
+            {formatMoney(remaining)}
           </p>
+          <SharePill share={share} overSpent={overSpent} />
+        </div>
+        <div className="mt-1.5">
+          <RemainingProgress
+            share={share}
+            label={`Remaining balance for ${employee.name ?? "employee"}`}
+          />
+        </div>
+      </td>
+
+      {/* Transactions — issued budget references tied to this employee */}
+      <td className="px-4 py-4 text-center align-middle">
+        <span className="inline-flex h-7 min-w-7 items-center justify-center rounded-full bg-[var(--surface-2)] px-2 text-xs font-semibold tabular-nums text-[var(--ink)] ring-1 ring-inset ring-[var(--border)]">
+          {Number(employee.issued_references) || 0}
+        </span>
+      </td>
+
+      {/* Date Added */}
+      <td className="px-4 py-4 align-middle">
+        {employee.created_at ? (
+          <div>
+            <p className="text-xs font-medium leading-none tabular-nums text-[var(--ink)]">
+              {formatDate(employee.created_at)}
+            </p>
+            <p className="mt-1 text-[10px] leading-none text-[var(--ink-muted)]">
+              {formatTime(employee.created_at)}
+            </p>
+          </div>
         ) : (
           <p className="text-xs leading-none text-[var(--ink-muted)]">—</p>
         )}
       </td>
 
       {/* Actions */}
-      <td className="px-4 py-3.5 pr-5 text-right align-middle">
+      <td className="px-4 py-4 pr-5 text-right align-middle">
         <EmployeeActions
           employee={employee}
           pending={pending}
@@ -112,8 +271,31 @@ function EmployeeRow({ employee, pending, onAction }) {
   );
 }
 
+/** Label + value pair used in the mobile card's budget strip. */
+function CardMetric({ label, value, tone }) {
+  return (
+    <div className="min-w-0">
+      <p className="text-[10px] font-bold uppercase tracking-[0.12em] text-[var(--ink-muted)]">
+        {label}
+      </p>
+      <p
+        className={cn(
+          "mt-1 truncate text-sm font-semibold tabular-nums",
+          tone === "danger" ? "text-[var(--danger)]" : "text-[var(--ink)]",
+        )}
+      >
+        {value}
+      </p>
+    </div>
+  );
+}
+
 /** Mobile employee card — every column stays readable in a stacked layout. */
 function EmployeeCard({ employee, pending, onAction }) {
+  const { issued, spent, remaining, share } = budgetBreakdown(employee);
+  const overSpent = remaining < 0;
+  const references = Number(employee.issued_references) || 0;
+
   return (
     <div className="rounded-2xl border border-[var(--border)] bg-[var(--surface)] p-4 shadow-card transition-shadow hover:shadow-hover">
       <div className="flex items-start justify-between gap-3">
@@ -121,17 +303,40 @@ function EmployeeCard({ employee, pending, onAction }) {
         <EmployeeStatusBadge status={employee.status} className="shrink-0" />
       </div>
 
-      <div className="mt-3 flex items-center justify-between gap-3">
-        <span className="text-sm font-semibold tabular-nums text-[var(--ink)]">
-          {formatMoney(employee.issued_budget)}
-        </span>
-        <span className="text-xs text-[var(--ink-muted)]">
-          {employee.created_at ? formatDate(employee.created_at) : "—"}
-        </span>
+      {/* Budget strip — issued / spent / remaining, mirroring the table */}
+      <div className="mt-3.5 grid grid-cols-3 gap-3 rounded-xl bg-[var(--surface-2)]/60 p-3 ring-1 ring-inset ring-[var(--border)]">
+        <CardMetric label="Issued" value={formatMoney(issued)} />
+        <CardMetric label="Spent" value={formatMoney(spent)} />
+        <CardMetric
+          label="Remaining"
+          value={formatMoney(remaining)}
+          tone={overSpent ? "danger" : undefined}
+        />
       </div>
 
-      <div className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-1.5 border-t border-[var(--border)] pt-3">
-        <Badge tone="neutral">Employee</Badge>
+      {/* Remaining-balance bar — the same animated component as the table row */}
+      <div className="mt-3">
+        <div className="mb-1.5 flex items-center justify-between gap-2">
+          <p className="text-[10px] font-bold uppercase tracking-[0.12em] text-[var(--ink-muted)]">
+            Remaining balance
+          </p>
+          <SharePill share={share} overSpent={overSpent} />
+        </div>
+        <RemainingProgress
+          share={share}
+          label={`Remaining balance for ${employee.name ?? "employee"}`}
+        />
+      </div>
+
+      <div className="mt-3.5 flex flex-wrap items-center gap-x-4 gap-y-1.5 border-t border-[var(--border)] pt-3.5">
+        <span className="text-xs tabular-nums text-[var(--ink-muted)]">
+          {employee.created_at
+            ? `${formatDate(employee.created_at)} · ${formatTime(employee.created_at)}`
+            : "—"}
+        </span>
+        <Badge tone="neutral">
+          {references} {references === 1 ? "reference" : "references"}
+        </Badge>
         <span className="ml-auto">
           <EmployeeActions
             employee={employee}
@@ -159,30 +364,33 @@ export function EmployeesTable({ rows, pending = false, onAction }) {
         tabIndex={0}
         aria-label="Employees"
       >
-        <div className="relative min-w-[960px] overflow-hidden rounded-2xl border border-[var(--border)] bg-[var(--surface)] shadow-card">
-          {/* Accent hairline running along the top edge */}
+        <div className="relative min-w-[1080px] overflow-hidden rounded-3xl border border-[var(--border)] bg-[var(--surface)] shadow-card">
           <div
             aria-hidden
-            className="pointer-events-none absolute inset-x-4 top-0 h-px bg-[linear-gradient(90deg,transparent,var(--accent)/65,transparent)]"
+            className="pointer-events-none absolute inset-x-6 top-0 h-px bg-[linear-gradient(90deg,transparent,var(--accent)/65,transparent)]"
+          />
+          <div
+            aria-hidden
+            className="pointer-events-none absolute inset-x-0 top-0 h-24 bg-[radial-gradient(ellipse_at_top,var(--accent-soft)_0%,transparent_70%)] opacity-60"
           />
           <table className="w-full table-fixed border-collapse text-left">
             <caption className="sr-only">
-              Employees with name, role, account status, issued budget, and
-              date added
+              Employees with name, account status, issued budget, total spent,
+              remaining balance, transactions, and date added
             </caption>
             <colgroup>
               {COLUMN_WIDTHS.map((width, i) => (
                 <col key={i} style={{ width }} />
               ))}
             </colgroup>
-            <thead>
-              <tr className="bg-[var(--surface-2)]/60">
+            <thead className="sticky top-0 z-10">
+              <tr className="bg-[var(--surface-2)]/80 backdrop-blur-sm">
                 {HEADERS.map((h) => (
                   <th
                     key={h.label}
                     scope="col"
                     className={cn(
-                      "border-b border-[var(--border)] px-4 py-3 text-[10px] font-bold uppercase tracking-[0.12em] text-[var(--ink-muted)] first:pl-5 last:pr-5",
+                      "border-b border-[var(--border)] px-4 py-3.5 text-[10px] font-bold uppercase tracking-[0.14em] text-[var(--ink-muted)] first:pl-5 last:pr-5",
                       {
                         "text-left": h.align === "left",
                         "text-center": h.align === "center",
@@ -193,7 +401,9 @@ export function EmployeesTable({ rows, pending = false, onAction }) {
                     {h.srOnly ? (
                       <span className="sr-only">{h.label}</span>
                     ) : (
-                      <span className="whitespace-nowrap">{h.label}</span>
+                      <span className="block truncate" title={h.label}>
+                        {h.label}
+                      </span>
                     )}
                   </th>
                 ))}

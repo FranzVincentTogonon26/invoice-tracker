@@ -151,7 +151,7 @@ const EmployeesModal = ({ open, onClose, create }) => {
                       type="email"
                       value={form.email}
                       onChange={set("email")}
-                      placeholder="name@company.com"
+                      placeholder="name@gmail.com"
                     />
                   </Field>
                   <Field

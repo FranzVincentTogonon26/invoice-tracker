@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
+import { motion } from "framer-motion";
 import {
   BadgeCheck,
   Clock3,
@@ -149,36 +150,112 @@ export default function AdminEmployees() {
         }
       />
 
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
-        <StatCard
-          label="Total Budget Issued"
-          value={formatMoney(overview.totalEmployeeIssued)}
-          icon={Wallet}
-          accent
-          breakdownCaption="Across all employees"
-          loading={overviewLoading}
-        />
-        <StatCard
-          label="Total Employees"
-          value={overview.totalEmployees}
-          icon={Users}
-          loading={overviewLoading}
-        />
-        <StatCard
-          label="Active Employees"
-          value={overview.activeEmployees}
-          icon={BadgeCheck}
-          tone="success"
-          loading={overviewLoading}
-        />
-        <StatCard
-          label="Pending Approval"
-          value={overview.pendingApproval}
-          icon={Clock3}
-          tone="warning"
-          loading={overviewLoading}
-        />
-      </div>
+      {/* Overview — modern 4-up KPI band.
+          Single responsive grid (1 → 2 → 4 cols) so every metric scans in
+          one row on desktop instead of a lonely full-width hero with three
+          cards stranded below it. The accent still flags the primary money
+          metric; tones flag status. Stagger comes from variants (one source
+          of truth) rather than hand-tuned delays, and each tile lifts
+          slightly on hover for a tactile feel. Logic / props are untouched. */}
+      <motion.div
+        variants={{
+          hidden: {},
+          show: {
+            transition: { staggerChildren: 0.08, delayChildren: 0.02 },
+          },
+        }}
+        initial="hidden"
+        animate="show"
+        className="grid grid-cols-1 gap-4 sm:grid-cols-2 sm:gap-5 xl:grid-cols-4"
+      >
+        <motion.div
+          variants={{
+            hidden: { opacity: 0, y: 16 },
+            show: {
+              opacity: 1,
+              y: 0,
+              transition: { duration: 0.45, ease: [0.16, 1, 0.3, 1] },
+            },
+          }}
+          whileHover={{ y: -3 }}
+          transition={{ type: "spring", stiffness: 380, damping: 28 }}
+          className="h-full [&>div]:h-full"
+        >
+          <StatCard
+            label="Total Budget Issued"
+            value={formatMoney(overview.totalEmployeeIssued)}
+            icon={Wallet}
+            accent
+            breakdownCaption="Across all employees"
+            loading={overviewLoading}
+          />
+        </motion.div>
+
+        <motion.div
+          variants={{
+            hidden: { opacity: 0, y: 16 },
+            show: {
+              opacity: 1,
+              y: 0,
+              transition: { duration: 0.45, ease: [0.16, 1, 0.3, 1] },
+            },
+          }}
+          whileHover={{ y: -3 }}
+          transition={{ type: "spring", stiffness: 380, damping: 28 }}
+          className="h-full [&>div]:h-full"
+        >
+          <StatCard
+            label="Total Employees"
+            value={overview.totalEmployees}
+            icon={Users}
+            loading={overviewLoading}
+          />
+        </motion.div>
+
+        <motion.div
+          variants={{
+            hidden: { opacity: 0, y: 16 },
+            show: {
+              opacity: 1,
+              y: 0,
+              transition: { duration: 0.45, ease: [0.16, 1, 0.3, 1] },
+            },
+          }}
+          whileHover={{ y: -3 }}
+          transition={{ type: "spring", stiffness: 380, damping: 28 }}
+          className="h-full [&>div]:h-full"
+        >
+          <StatCard
+            label="Active Employees"
+            value={overview.activeEmployees}
+            icon={BadgeCheck}
+            tone="success"
+            loading={overviewLoading}
+          />
+        </motion.div>
+
+        <motion.div
+          variants={{
+            hidden: { opacity: 0, y: 16 },
+            show: {
+              opacity: 1,
+              y: 0,
+              transition: { duration: 0.45, ease: [0.16, 1, 0.3, 1] },
+            },
+          }}
+          whileHover={{ y: -3 }}
+          transition={{ type: "spring", stiffness: 380, damping: 28 }}
+          className="h-full [&>div]:h-full"
+        >
+          <StatCard
+            label="Pending Approval"
+            value={overview.pendingApproval}
+            icon={Clock3}
+            tone="warning"
+            loading={overviewLoading}
+          />
+        </motion.div>
+      </motion.div>
 
       <Card padding="md">
         <CardHeader>

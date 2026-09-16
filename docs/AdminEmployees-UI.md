@@ -85,21 +85,36 @@ Everything re-uses the app's design tokens and `components/ui/*` primitives —
 
 Same conventions as the Budget transaction tables.
 
-**Desktop** — semantic `<table class="table-fixed">`, min-width 960px, inside an
+**Desktop** — semantic `<table class="table-fixed">`, min-width 1080px, inside an
 `overflow-x-auto rounded-2xl` wrapper with the accent hairline on top.
 
 | Column | Width | Cell content |
 |---|---|---|
-| Employee | 24% | initial avatar + name (+ email muted below) |
-| Role | 10% | `<Badge tone="neutral">Employee</Badge>` |
-| Status | 12% | `EmployeeStatusBadge` (success / warning / neutral dot) |
-| Issued Budget | 18% | right-aligned `formatMoney(issued_budget)` + reference count |
-| Date Added | 16% | `formatDate(created_at)` |
-| Actions | 20% | `<EmployeeActions>` (right aligned) |
+| Employee | 20% | initial avatar + name (+ email muted below) |
+| Status | 11% | `EmployeeStatusBadge` (success / warning / neutral dot) |
+| Issued Budget | 10% | right-aligned `formatMoney(issued_budget)` |
+| Total Spent | 10% | right-aligned `formatMoney(spent)`; "Over budget" in `--danger` when spent > issued |
+| Remaining | 15% | `formatMoney(issued − spent)` + animated progress bar + "N% left" caption |
+| Transactions | 8% | `issued_references` count |
+| Date Added | 9% | `formatDate(created_at)` |
+| Actions | 17% | `<EmployeeActions>` (right aligned) |
+
+**Remaining-balance bar.** One shared `RemainingProgress` component drives both
+the desktop row and the mobile card:
+
+- `spent` = `employee.total_spent` (or `employee.spent`) when the API sends it,
+  otherwise the **`DEFAULT_TOTAL_SPENT = 1000`** placeholder; an employee with
+  nothing issued is treated as `0` spent so no row is falsely "over budget".
+- `remaining` = `issued − spent` (negative → `--danger` + "Over budget").
+- bar width = `remaining / issued × 100`, clamped 0–100 — the same formula, 0–100
+  ARIA semantics, `Number(x.toFixed(1))` rounding, accent-hero gradient and
+  `[0.16, 1, 0.3, 1]` / 0.7s / 0.2s-delay motion as the Budget page utilization
+  bar, so both screens read as one system.
 
 **Mobile** — stacked `EmployeeCard`s (rounded-2xl, border, shadow-card):
-avatar/name/status on top, issued budget + date in the middle, role + actions
-in the footer strip.
+avatar/name/status on top, an Issued · Spent · Remaining metric strip, the same
+animated bar + "% left" caption, then date added, reference count and actions in
+the footer strip.
 
 **Status colors:** `active → success`, `pending → warning`, `inactive →
 neutral` (pending is *warning*, not danger — it's a queued, actionable state).
@@ -172,6 +187,11 @@ Notes:
 - `totalEmployeeIssued` = `SUM(issued_budget.amount)` joined through open
   `budget_issued_reference` rows — the total funding handed out to employees
   (NOT `allocated - issued`, which is the remaining/un-issued budget).
+- **`total_spent` is not part of the response yet.** The table therefore falls
+  back to `DEFAULT_TOTAL_SPENT = 1000` (see section 4) and picks up a real
+  `total_spent` / `spent` field automatically once `GET /employees` returns one
+  (e.g. `SUM(expenses.total_amount)` joined through the employee's
+  `budget_issued_reference` rows).
 
 ---
 

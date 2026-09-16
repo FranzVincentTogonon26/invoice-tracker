@@ -215,13 +215,9 @@ const BudgetIssuedTransaction = () => {
       <CardHeader>
         <div>
           <div className="flex items-center gap-2.5">
-            <CardTitle className="text-lg">Budget Issued Transactions</CardTitle>
-            <span
-              className="rounded-full bg-[var(--accent-soft)] px-2.5 py-0.5 text-[10px] font-bold tabular-nums text-[var(--accent-strong)]"
-              aria-label={`${rows.length} total ${rows.length === 1 ? "transaction" : "transactions"}`}
-            >
-              {rows.length}
-            </span>
+            <CardTitle className="text-lg">
+              Budget Issued Transactions
+            </CardTitle>
           </div>
           <CardDescription>
             Track and manage all budget issuances to employees.
@@ -269,10 +265,7 @@ const BudgetIssuedTransaction = () => {
           />
         ) : (
           <>
-            <IssuedTransactionTable
-              rows={pageRows}
-              onAction={handleAction}
-            />
+            <IssuedTransactionTable rows={pageRows} onAction={handleAction} />
 
             {/* Pagination */}
             <div className="mt-4 flex flex-col items-center justify-between gap-3 sm:flex-row">
