@@ -600,7 +600,7 @@ const BudgetModal = ({
           className="fixed inset-0 z-50 flex items-center justify-center p-4"
           exit={{ opacity: 0 }}
         >
-          <div className="absolute inset-0 bg-[var(--ink)]/40 backdrop-blur-sm flex items-center justify-center">
+          <div className="absolute inset-0 bg-[var(--ink)]/40 backdrop-blur-sm flex items-center justify-center px-2">
             <motion.form
               onSubmit={onSubmit}
               onClick={(e) => e.stopPropagation()}
@@ -810,7 +810,7 @@ const BudgetModal = ({
                       />
                     </Field>
                     <Field
-                      label="Description"
+                      label="Purpose"
                       hint="A short summary shown in the transaction list."
                       count={(form?.description || "").length}
                       max={DESCRIPTION_MAX}

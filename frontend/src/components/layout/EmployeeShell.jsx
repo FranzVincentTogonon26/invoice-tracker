@@ -40,7 +40,10 @@ export default function EmployeeShell() {
     <div className="min-h-screen flex bg-[var(--bg)]">
       <Sidebar />
 
-      <main className="flex-1 px-6 md:px-8 py-6 max-w-[1600px] mx-auto w-full">
+      {/* `pb-*` clears the fixed mobile dock (Sidebar) plus the device's home
+          indicator; from `md` up the rail is back in flow, so only the normal
+          padding applies. */}
+      <main className="flex-1 px-6 md:px-8 pt-6 pb-[calc(env(safe-area-inset-bottom)+6rem)] md:pb-6 max-w-[1600px] mx-auto w-full">
         <Topbar onOpenPalette={openPalette} />
 
         <AnimatePresence mode="wait">

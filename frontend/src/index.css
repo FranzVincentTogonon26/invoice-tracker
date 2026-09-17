@@ -136,3 +136,31 @@ body {
   width: 0;
   height: 0;
 }
+
+/* Scrollbars for INLINE scrollable panels inside cards (e.g. the StatCard
+   breakdown list). Same slim look, but deliberately WITHOUT
+   `overscroll-behavior: contain` / `scroll-behavior: smooth`:
+     - `contain` is a MODAL behaviour (stop the page scrolling behind a
+       dialog). On an inline list it traps the wheel: with only a few rows the
+       list has nothing to scroll, so a cursor resting over it swallowed the
+       wheel delta and the page could not scroll either; with many rows it kept
+       eating the delta at either end instead of handing it back to the page.
+     - forced `smooth` makes wheel/keyboard stepping feel laggy.
+   `auto` hands the wheel back to the page once the list can't scroll further,
+   and the bar stays thin (re-uses the global thumb colours) so the list still
+   reads as scrollable. */
+.scrollbar-inline {
+  scrollbar-width: thin; /* Firefox */
+  scrollbar-color: var(--border) transparent; /* Firefox */
+  overscroll-behavior: auto; /* never trap the page scroll */
+}
+.scrollbar-inline::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+.scrollbar-inline::-webkit-scrollbar-track {
+  background: transparent;
+}
+.scrollbar-inline::-webkit-scrollbar-thumb {
+  border-radius: 999px;
+}

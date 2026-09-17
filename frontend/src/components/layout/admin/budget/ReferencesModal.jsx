@@ -134,7 +134,7 @@ const ReferencesModal = ({
         >
           <div
             onClick={handleClose}
-            className="absolute inset-0 bg-[var(--ink)]/30 backdrop-blur-sm flex items-center justify-center"
+            className="absolute inset-0 bg-[var(--ink)]/30 backdrop-blur-sm flex items-center justify-center px-2"
           >
             <motion.div
               onClick={(e) => e.stopPropagation()}
@@ -169,7 +169,10 @@ const ReferencesModal = ({
               </div>
 
               {/* Add-new-reference form */}
-              <form onSubmit={handleAdd} className="flex shrink-0 items-center gap-2">
+              <form
+                onSubmit={handleAdd}
+                className="flex shrink-0 items-center gap-2"
+              >
                 <Input
                   value={newRef}
                   onChange={(e) => setNewRef(e.target.value)}
@@ -290,7 +293,12 @@ const ReferencesModal = ({
                 {err && (
                   <motion.div
                     initial={{ opacity: 0, y: -4, height: 0, marginTop: 0 }}
-                    animate={{ opacity: 1, y: 0, height: "auto", marginTop: 16 }}
+                    animate={{
+                      opacity: 1,
+                      y: 0,
+                      height: "auto",
+                      marginTop: 16,
+                    }}
                     exit={{
                       opacity: 0,
                       y: -4,

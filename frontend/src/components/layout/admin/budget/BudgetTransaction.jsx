@@ -175,7 +175,10 @@ const BudgetTransaction = ({ valueRemaining }) => {
   };
 
   return (
-    <Card padding="md">
+    <Card
+      padding="lg"
+      className="relative overflow-hidden rounded-3xl px-2 sm:px-6"
+    >
       <CardHeader>
         <div>
           <CardTitle className="text-lg">Budget Transactions</CardTitle>
@@ -186,13 +189,13 @@ const BudgetTransaction = ({ valueRemaining }) => {
         {/* Search + filters — compact controls consistent with the dashboard */}
         <div className="mb-5 flex flex-col gap-3 lg:flex-row lg:items-center">
           <div className="flex flex-wrap items-center gap-2">
-            <div className="flex w-fit items-center gap-1 rounded-full border border-[var(--border)] bg-[var(--surface)] p-1 ">
+            <div className="flex w-full items-center gap-1 rounded-full border border-[var(--border)] bg-[var(--surface)] p-1 sm:w-fit">
               {BUDGET_STATUS_TABS.map((t) => (
                 <button
                   key={t.key}
                   onClick={() => updateStatus(t.key)}
                   className={cn(
-                    "h-7 rounded-full px-4 text-xs font-semibold transition-colors",
+                    "h-7 flex-1 rounded-full px-2 text-xs font-semibold transition-colors sm:flex-none sm:px-4",
                     status === t.key
                       ? "bg-[var(--ink)] text-[var(--bg)]"
                       : "text-[var(--ink-muted)] hover:text-[var(--ink)]",
@@ -203,13 +206,12 @@ const BudgetTransaction = ({ valueRemaining }) => {
               ))}
             </div>
             {/* Optional payment-method filter (client-side) */}
-            <div className="w-[168px]">
+            <div className="w-full sm:w-[168px]">
               <Listbox
                 options={METHOD_FILTER_OPTIONS}
                 value={method}
                 onChange={updateMethod}
                 placeholder="All methods"
-                buttonClassName="h-9"
               />
             </div>
           </div>

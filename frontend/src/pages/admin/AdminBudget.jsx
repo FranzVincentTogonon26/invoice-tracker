@@ -254,11 +254,15 @@ export default function AdminBudget() {
       </section>
 
       <Tabs value={tab} onValueChange={setTab} className="space-y-4">
-        <div className="sticky top-0 z-10 -mx-1 bg-[var(--bg)]/90 px-1 py-1.5 backdrop-blur-sm">
+        <div className="sticky top-0 z-10 bg-[var(--bg)]/90 py-1.5 backdrop-blur-sm md:-mx-1 md:px-1">
           <div className="flex flex-col gap-2.5 sm:flex-row sm:items-center sm:justify-between">
-            <TabsList className="max-w-full gap-1 self-start overflow-x-auto rounded-full p-1">
+            <TabsList className="w-full max-w-full gap-1 overflow-x-auto rounded-full p-1 sm:w-auto sm:self-start">
               {TAB_META.map(({ value, label, icon: Icon }) => (
-                <TabsTrigger key={value} value={value} className="px-4">
+                <TabsTrigger
+                  key={value}
+                  value={value}
+                  className="grow px-2.5 sm:grow-0 sm:px-4"
+                >
                   <Icon size={14} aria-hidden className="shrink-0" />
                   <span className="whitespace-nowrap">{label}</span>
                 </TabsTrigger>

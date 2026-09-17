@@ -267,20 +267,16 @@ export function StatCard({
                   No records yet
                 </p>
               ) : (
-                /* Height-capped scroll area — the card never blows past the
-                   grid row no matter how many references exist. The app-wide
-                   `scrollbar-slim` utility hides the scrollbar visually. */
-                <ul className="max-h-36 space-y-1 overflow-y-auto scrollbar-slim pr-1 -mr-1">
+                <ul
+                  tabIndex={0}
+                  aria-label={`${breakdownCaption ?? "Breakdown"} — scrollable list`}
+                  className="max-h-36 space-y-1 overflow-y-auto scrollbar-inline pr-1 rounded-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)]/30"
+                >
                   {breakdown.map((item, i) => (
                     <li
                       key={item.key ?? i}
                       className="flex items-center justify-between gap-2 text-xs"
                     >
-                      {/* Dot + label grouped in one flex unit so the marker
-                         stays glued to the text — `justify-between` on the
-                         row would otherwise push the dot, label and value
-                         apart. Rounded-dot pattern echoes SelectReference
-                         metadata dots; tone-tinted to match the value. */}
                       <span className="flex min-w-0 items-center gap-1.5">
                         <span
                           aria-hidden
@@ -300,7 +296,9 @@ export function StatCard({
                         <span
                           className={cn(
                             "min-w-0 truncate",
-                            accent ? "text-white/90" : "text-[var(--ink-muted)]",
+                            accent
+                              ? "text-white/90"
+                              : "text-[var(--ink-muted)]",
                           )}
                         >
                           {item.label ?? "—"}

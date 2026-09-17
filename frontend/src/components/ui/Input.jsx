@@ -60,7 +60,7 @@ export const SearchInput = forwardRef(
       <input
         ref={ref}
         type="text"
-        className="flex-1 bg-transparent text-sm text-[var(--ink)] placeholder:text-[var(--ink-muted)] outline-none"
+        className="flex-1 bg-transparent text-xs text-[var(--ink)] placeholder:text-[var(--ink-muted)] outline-none"
         {...props}
       />
       {rightSlot}

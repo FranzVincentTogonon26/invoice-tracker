@@ -257,7 +257,10 @@ export default function AdminEmployees() {
         </motion.div>
       </motion.div>
 
-      <Card padding="md">
+      <Card
+        padding="lg"
+        className="relative overflow-hidden rounded-3xl px-2 sm:px-6"
+      >
         <CardHeader>
           <div>
             <CardTitle className="text-lg">All Employees</CardTitle>
@@ -277,7 +280,7 @@ export default function AdminEmployees() {
         {/* Search + status filter — compact controls consistent with the
             Budget Transactions card */}
         <div className="mb-5 flex flex-col gap-3 lg:flex-row lg:items-center">
-          <div className="flex w-fit items-center gap-1 rounded-full border border-[var(--border)] bg-[var(--surface)] p-1">
+          <div className="flex w-full items-center gap-1 rounded-full border border-[var(--border)] bg-[var(--surface)] p-1 sm:w-fit">
             {EMPLOYEE_STATUS_TABS.map((t) => (
               <button
                 key={t.key}

@@ -46,7 +46,10 @@ const EmployeeBudget = ({ employeeIssuedBudget = [], isLoading, onOpen }) => {
   );
 
   return (
-    <Card padding="lg" className="relative overflow-hidden rounded-3xl">
+    <Card
+      padding="lg"
+      className="relative overflow-hidden rounded-3xl px-2 sm:px-6"
+    >
       <div
         aria-hidden
         className="pointer-events-none absolute inset-x-6 top-0 h-px bg-[linear-gradient(90deg,transparent,var(--accent)/60,transparent)]"
@@ -67,7 +70,11 @@ const EmployeeBudget = ({ employeeIssuedBudget = [], isLoading, onOpen }) => {
         )}
       </CardHeader>
       {isLoading ? (
-        <div className="py-14 flex flex-col items-center text-center" role="status" aria-label="Loading employee budgets">
+        <div
+          className="py-14 flex flex-col items-center text-center"
+          role="status"
+          aria-label="Loading employee budgets"
+        >
           <span className="flex h-11 w-11 items-center justify-center rounded-2xl bg-[var(--accent-soft)] text-[var(--accent-strong)]">
             <Loader size={18} className="animate-spin" />
           </span>
@@ -95,7 +102,10 @@ const EmployeeBudget = ({ employeeIssuedBudget = [], isLoading, onOpen }) => {
         <motion.div
           initial="hidden"
           animate="show"
-          variants={{ hidden: {}, show: { transition: { staggerChildren: 0.05 } } }}
+          variants={{
+            hidden: {},
+            show: { transition: { staggerChildren: 0.05 } },
+          }}
           className="flex flex-col gap-3"
           role="list"
         >
@@ -136,7 +146,9 @@ const EmployeeBudget = ({ employeeIssuedBudget = [], isLoading, onOpen }) => {
                   <div
                     className={cn(
                       "flex shrink-0 select-none items-center justify-center rounded-2xl bg-[var(--accent-soft)] font-bold text-[var(--accent-strong)] ring-1 ring-[var(--accent)]/15 transition-transform duration-200 group-hover/row:scale-105",
-                      hasMultipleRefs ? "h-10 w-10 text-sm" : "h-9 w-9 text-[13px]",
+                      hasMultipleRefs
+                        ? "h-10 w-10 text-sm"
+                        : "h-9 w-9 text-[13px]",
                     )}
                   >
                     {group.name?.[0]?.toUpperCase() || "?"}
@@ -206,7 +218,7 @@ const EmployeeBudget = ({ employeeIssuedBudget = [], isLoading, onOpen }) => {
               </motion.button>
             );
           })}
-          </motion.div>
+        </motion.div>
       )}
     </Card>
   );

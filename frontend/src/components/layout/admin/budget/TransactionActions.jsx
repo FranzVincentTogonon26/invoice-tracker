@@ -325,7 +325,6 @@ export function TransactionActions({
                 <div className="mt-5 flex items-center justify-end gap-2">
                   <Button
                     variant="outline"
-                    size="sm"
                     onClick={closeDialog}
                     disabled={pending}
                   >
@@ -334,7 +333,6 @@ export function TransactionActions({
                   <Button
                     ref={initialFocusRef}
                     variant="danger"
-                    size="sm"
                     onClick={confirmCancel}
                     disabled={pending}
                   >

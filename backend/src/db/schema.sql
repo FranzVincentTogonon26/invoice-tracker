@@ -148,27 +148,18 @@ CREATE TABLE IF NOT EXISTS transfer_budget (
 
 CREATE TABLE IF NOT EXISTS expenses (
     id            UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    issued_ref_id UUID NOT NULL
-                  REFERENCES budget_issued_reference(id)
-                  ON DELETE CASCADE,
+    issued_ref_id UUID NOT NULL REFERENCES budget_issued_reference(id) ON DELETE CASCADE,
     description   TEXT NOT NULL,
-    category_id   UUID
-                  REFERENCES category(category_id)
-                  ON DELETE SET NULL,
+    category_id   UUID REFERENCES category(category_id) ON DELETE SET NULL,
     total_amount  DECIMAL(12,2) NOT NULL,
-    receipt_id    UUID
-                  REFERENCES receipt(id)
-                  ON DELETE SET NULL,
+    receipt_id    UUID REFERENCES receipt(id) ON DELETE SET NULL,
     discounted    DECIMAL(12,2),
     notes         TEXT,
     created_at    TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     updated_at    TIMESTAMPTZ NOT NULL DEFAULT NOW(),
 
     CHECK (total_amount >= 0),
-    CHECK (
-        discounted IS NULL
-        OR discounted >= 0
-    )
+    CHECK ( discounted IS NULL OR discounted >= 0 )
 );
 
 

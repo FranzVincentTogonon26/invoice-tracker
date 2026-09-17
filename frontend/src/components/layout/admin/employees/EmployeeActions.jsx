@@ -54,10 +54,10 @@ function DeleteDialog({ titleId, descriptionId, pending, onClose, onConfirm }) {
           from the database. This can&apos;t be undone.
         </p>
         <div className="mt-5 flex items-center justify-end gap-2">
-          <Button variant="outline" size="sm" onClick={onClose} disabled={pending}>
+          <Button variant="outline" onClick={onClose} disabled={pending}>
             Keep
           </Button>
-          <Button variant="danger" size="sm" onClick={onConfirm} disabled={pending}>
+          <Button variant="danger" onClick={onConfirm} disabled={pending}>
             {pending && (
               <Loader2 size={13} className="animate-spin" aria-hidden />
             )}

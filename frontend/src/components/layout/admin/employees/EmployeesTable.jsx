@@ -95,9 +95,22 @@ function budgetBreakdown(employee) {
  *
  * Presentation-only additions: a slimmer track (h-1.5) with an inset ring,
  * and a success-tinted fill + subtle glow once the bar reaches 100%.
+ *
+ * Special case: when the issued budget equals the total spent
+ * (issued > 0 && remaining === 0) the bar renders at 100% / full-state, because
+ * there is literally no remaining balance left — not because there is nothing
+ * to track. This keeps the bar honest for a 1000 − 1000 = 0 row without changing
+ * the `remaining = issued − spent` formula anywhere.
  */
-function RemainingProgress({ share, label }) {
-  const isFull = share >= 100;
+function RemainingProgress({ remaining, issued, share, label }) {
+  // The bar has no issue to track against (issued === 0) → empty track.
+  const noIssued = issued <= 0;
+  // Fully spent: issued budget equals the total spent, but there is still an
+  // issue to measure against.
+  const fullySpent = !noIssued && remaining <= 0;
+  // What the bar visually shows and reports via ARIA.
+  const displayed = noIssued ? 0 : fullySpent ? 100 : Number(share);
+  const isFull = displayed >= 100;
 
   return (
     <div className="flex items-center gap-1.5">
@@ -105,13 +118,14 @@ function RemainingProgress({ share, label }) {
         role="progressbar"
         aria-valuemin={0}
         aria-valuemax={100}
-        aria-valuenow={Number(share)}
+        aria-valuenow={displayed}
         aria-label={label}
+        aria-valuetext={noIssued ? "No issued budget tracked" : fullySpent ? "Budget fully spent" : `${displayed}% remaining`}
         className="h-1 flex-1 overflow-hidden rounded-full bg-[var(--surface-2)] ring-1 ring-inset ring-[var(--border)]"
       >
         <motion.div
           initial={{ width: 0 }}
-          animate={{ width: `${share}%` }}
+          animate={{ width: `${displayed}%` }}
           transition={{
             duration: 0.7,
             ease: [0.16, 1, 0.3, 1],
@@ -136,12 +150,18 @@ function RemainingProgress({ share, label }) {
 
 /**
  * Compact percentage pill shown above the bar. Success tone only at 100% left,
- * danger tone only when the employee overspent — accent in between.
+ * danger tone only when the employee overspent, success tone when fully spent
+ * (issued === spent) with "Fully spent" label — accent in between.
  */
-function SharePill({ share, overSpent, className }) {
+function SharePill({ remaining, issued, share, overSpent, className }) {
+  // Fully spent: there is an issued budget to compare against, and nothing
+  // remains (e.g. 1000 − 1000 = 0). This is the "budget exhausted" state,
+  // rendered in the success tier with "Fully spent" rather than "0% left".
+  const fullySpent = issued > 0 && remaining <= 0;
+
   const tone = overSpent
     ? "bg-[var(--danger)]/12 text-[var(--danger)]"
-    : share >= 100
+    : fullySpent
       ? "bg-[var(--success)]/12 text-[var(--success)]"
       : "bg-[var(--accent-soft)] text-[var(--accent-strong)]";
 
@@ -153,8 +173,8 @@ function SharePill({ share, overSpent, className }) {
         className,
       )}
     >
-      {overSpent ? <AlertCircle size={10} aria-hidden /> : share >= 100 ? <Check size={10} aria-hidden /> : null}
-      {share}% left
+      {overSpent ? <AlertCircle size={10} aria-hidden /> : fullySpent ? <Check size={10} aria-hidden /> : null}
+      {fullySpent ? "Fully spent" : share >= 100 ? "100% left" : `${Number(share)}% left`}
     </span>
   );
 }
@@ -226,10 +246,12 @@ function EmployeeRow({ employee, pending, onAction }) {
           >
             {formatMoney(remaining)}
           </p>
-          <SharePill share={share} overSpent={overSpent} />
+          <SharePill remaining={remaining} issued={issued} share={share} overSpent={overSpent} />
         </div>
         <div className="mt-1.5">
           <RemainingProgress
+            remaining={remaining}
+            issued={issued}
             share={share}
             label={`Remaining balance for ${employee.name ?? "employee"}`}
           />
@@ -320,10 +342,17 @@ function EmployeeCard({ employee, pending, onAction }) {
           <p className="text-[10px] font-bold uppercase tracking-[0.12em] text-[var(--ink-muted)]">
             Remaining balance
           </p>
-          <SharePill share={share} overSpent={overSpent} />
+          <SharePill
+            remaining={remaining}
+            issued={issued}
+            share={share}
+            overSpent={overSpent}
+          />
         </div>
         <RemainingProgress
           share={share}
+          remaining={remaining}
+          issued={issued}
           label={`Remaining balance for ${employee.name ?? "employee"}`}
         />
       </div>

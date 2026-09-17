@@ -195,7 +195,7 @@ export function IssuedTransactionActions({
           Closed
         </span>
       )}
-{/* NOTE: the portal must NOT be a direct child of <AnimatePresence> —
+      {/* NOTE: the portal must NOT be a direct child of <AnimatePresence> —
           a portal is not a valid React element (isValidElement(portal) is
           false) so AnimatePresence silently drops it and the dialog never
           renders. Instead, the portal stays mounted and AnimatePresence
@@ -224,8 +224,8 @@ export function IssuedTransactionActions({
                 id={descriptionId}
                 className="mt-1.5 text-sm leading-relaxed text-[var(--ink-muted)]"
               >
-                Are you sure you want to cancel this budget issuance? Its
-                status will be updated to{" "}
+                Are you sure you want to cancel this budget issuance? Its status
+                will be updated to{" "}
                 <span className="font-semibold text-[var(--danger)]">
                   cancelled
                 </span>
@@ -251,7 +251,6 @@ export function IssuedTransactionActions({
               <div className="mt-5 flex items-center justify-end gap-2">
                 <Button
                   variant="outline"
-                  size="sm"
                   onClick={closeDialog}
                   disabled={pending}
                 >
@@ -260,7 +259,6 @@ export function IssuedTransactionActions({
                 <Button
                   ref={initialFocusRef}
                   variant="danger"
-                  size="sm"
                   onClick={confirmCancel}
                   disabled={pending}
                 >

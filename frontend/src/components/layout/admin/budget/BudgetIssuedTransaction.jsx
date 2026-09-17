@@ -211,7 +211,10 @@ const BudgetIssuedTransaction = () => {
   };
 
   return (
-    <Card padding="md">
+    <Card
+      padding="lg"
+      className="relative overflow-hidden rounded-3xl px-2 sm:px-6"
+    >
       <CardHeader>
         <div>
           <div className="flex items-center gap-2.5">

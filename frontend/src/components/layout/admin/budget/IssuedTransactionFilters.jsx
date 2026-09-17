@@ -108,7 +108,7 @@ function FilterTrigger({ filterKey, label, selectedOption }) {
             name={selectedOption.label}
             avatarUrl={selectedOption.avatar_url}
           />
-          <span className="truncate">{selectedOption.label}</span>
+          <span className="truncate text-xs">{selectedOption.label}</span>
         </span>
       );
     }
@@ -116,7 +116,7 @@ function FilterTrigger({ filterKey, label, selectedOption }) {
       return (
         <span className="flex min-w-0 items-center gap-2">
           <MethodIcon method={selectedOption.value} />
-          <span className="truncate">{selectedOption.label}</span>
+          <span className="truncate text-xs">{selectedOption.label}</span>
         </span>
       );
     }
@@ -126,21 +126,21 @@ function FilterTrigger({ filterKey, label, selectedOption }) {
           <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-[var(--accent-soft)] text-[var(--accent-strong)]">
             <HandCoins size={13} aria-hidden />
           </span>
-          <span className="truncate">{selectedOption.label}</span>
+          <span className="truncate text-xs">{selectedOption.label}</span>
         </span>
       );
     }
     return (
       <span className="flex min-w-0 items-center gap-2">
         <StatusDot statusValue={selectedOption.value} />
-        <span className="truncate">{selectedOption.label}</span>
+        <span className="truncate text-xs">{selectedOption.label}</span>
       </span>
     );
   }
   return (
     <span className="flex min-w-0 items-center gap-2 text-[var(--ink-muted)]">
       <PlaceholderIcon size={15} aria-hidden className="shrink-0" />
-      <span className="truncate">{label}</span>
+      <span className="truncate  text-xs">{label}</span>
     </span>
   );
 }
@@ -223,7 +223,6 @@ const IssuedTransactionFilters = ({
             value={filters[key]}
             onChange={(value) => onFilterChange(key, value)}
             placeholder={label}
-            buttonClassName="h-9 rounded-full"
             searchable={Boolean(searchable)}
             renderTrigger={(selectedOption) => (
               <FilterTrigger
