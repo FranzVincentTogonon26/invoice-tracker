@@ -56,7 +56,7 @@ class Employee {
 
   //   Remove an employee account. Budget references issued to the user are
   //   cascaded away by `budget_issued_reference.user_id ON DELETE CASCADE`.
-  static async removeEmployee(id) {
+  static async removeCategory(id) {
     const result = await query(
       `DELETE FROM users
         WHERE user_id = $1 AND role = 'employee'

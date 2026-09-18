@@ -6,24 +6,41 @@ import {
   FileText,
   Users,
   Receipt,
-  Wallet,
   BarChart3,
   Settings,
   LogOut,
   Menu as MenuIcon,
   X,
+  ArrowLeftRight,
+  Logs,
+  HandshakeIcon,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/context/AuthContext";
 import AILogo from "../../ui/AILogo";
 
 const NAV = [
-  { to: "/dashboard", icon: LayoutGrid, label: "Dashboard", primary: true },
-  { to: "/admin/budget", icon: FileText, label: "Budget", primary: true },
+  {
+    to: "/admin/dashboard",
+    icon: LayoutGrid,
+    label: "Dashboard",
+    primary: true,
+  },
+  {
+    to: "/admin/transaction",
+    icon: ArrowLeftRight,
+    label: "Transactions",
+  },
   { to: "/admin/employees", icon: Users, label: "Employee", primary: true },
-  { to: "/expenses", icon: Receipt, label: "Expenses", primary: true },
-  { to: "/payments", icon: Wallet, label: "Payments" },
-  { to: "/reports", icon: BarChart3, label: "Reports" },
+  { to: "/admin/budget", icon: FileText, label: "Budget", primary: true },
+  { to: "/admin/expenses", icon: Receipt, label: "Expenses", primary: true },
+  {
+    to: "/reconciliation",
+    icon: HandshakeIcon,
+    label: "Reconciliation",
+  },
+  { to: "/admin/reports", icon: BarChart3, label: "Reports" },
+  { to: "/admin/reports", icon: Logs, label: "Audit Logs" },
 ];
 
 // `md` is the hand-off point: from here up the hover-expanding rail is used,
@@ -149,7 +166,7 @@ function MobileDock({ onOpenMenu }) {
       aria-label="Primary"
       className="md:hidden pointer-events-none fixed inset-x-0 bottom-0 z-40 flex justify-center px-4 pb-[calc(env(safe-area-inset-bottom)+0.75rem)]"
     >
-      <div className="pointer-events-auto flex w-full max-w-[420px] items-center gap-1 rounded-full border border-[var(--border)] bg-[var(--surface)]/85 p-1.5 shadow-hover backdrop-blur-xl">
+      <div className="pointer-events-auto flex w-full max-w-[430px] items-center gap-1 rounded-full border border-[var(--border)] bg-[var(--surface)]/85 p-1 shadow-hover backdrop-blur-xl">
         {DOCK_ITEMS.map(({ to, icon: Icon, label }) => (
           <NavLink key={to} to={to} title={label} className={DOCK_CELL}>
             {({ isActive }) => (
@@ -165,7 +182,11 @@ function MobileDock({ onOpenMenu }) {
                   <motion.span
                     layoutId="mobile-dock-active"
                     className="absolute inset-0 rounded-full bg-[var(--accent-soft)]"
-                    transition={{ type: "spring", duration: 0.45, bounce: 0.18 }}
+                    transition={{
+                      type: "spring",
+                      duration: 0.45,
+                      bounce: 0.18,
+                    }}
                   />
                 )}
                 <Icon
@@ -173,7 +194,7 @@ function MobileDock({ onOpenMenu }) {
                   strokeWidth={isActive ? 2.4 : 2}
                   className="relative z-10"
                 />
-                <span className="relative z-10 max-w-full truncate text-[10px] font-medium leading-none">
+                <span className="relative z-10 max-w-full truncate text-[9px] font-medium leading-3">
                   {label}
                 </span>
               </span>
@@ -190,7 +211,9 @@ function MobileDock({ onOpenMenu }) {
         >
           <span className={cn(DOCK_INNER, "hover:bg-[var(--surface-2)]")}>
             <MenuIcon size={18} />
-            <span className="max-w-full truncate text-[10px] font-medium leading-none">Menu</span>
+            <span className="max-w-full truncate text-[10px] font-medium leading-none">
+              Menu
+            </span>
           </span>
         </button>
       </div>
@@ -269,7 +292,7 @@ function MobileMenuSheet({ open, onClose, onLogout, user }) {
             transition={{ duration: 0.34, ease: SHEET_EASE }}
             className={cn(
               "relative w-full max-h-[88dvh] overflow-y-auto scrollbar-slim outline-none",
-              "rounded-t-[28px] border border-b-0 border-[var(--border)]",
+              "rounded-t-[15px] border border-b-0 border-[var(--border)]",
               "bg-[var(--surface)] shadow-hover",
               "px-4 pt-3 pb-[calc(env(safe-area-inset-bottom)+1.25rem)]",
             )}

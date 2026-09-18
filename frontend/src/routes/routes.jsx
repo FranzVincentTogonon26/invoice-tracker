@@ -19,6 +19,9 @@ import EmployeeDashboard from "../pages/employee/EmployeeDashboard";
 import EmployeeProfile from "../pages/employee/EmployeeProfile";
 
 import { USER_ROLES } from "../constants";
+import AdminTransaction from "../pages/admin/AdminTransaction";
+import AdminExpenses from "../pages/admin/AdminExpenses";
+import AddExpenses from "../components/layout/admin/expenses/AddExpenses";
 
 export const router = createBrowserRouter([
   {
@@ -43,22 +46,13 @@ export const router = createBrowserRouter([
             path: "/admin",
             element: <AdminShell />,
             children: [
-              {
-                path: "dashboard",
-                element: <AdminDashboard />,
-              },
-              {
-                path: "budget",
-                element: <AdminBudget />,
-              },
-              {
-                path: "employees",
-                element: <AdminEmployees />,
-              },
-              {
-                path: "profile",
-                element: <AdminProfile />,
-              },
+              { path: "dashboard", element: <AdminDashboard /> },
+              { path: "budget", element: <AdminBudget /> },
+              { path: "transaction", element: <AdminTransaction /> },
+              { path: "employees", element: <AdminEmployees /> },
+              { path: "expenses", element: <AdminExpenses /> },
+              { path: "expenses/add", element: <AddExpenses /> },
+              { path: "profile", element: <AdminProfile /> },
             ],
           },
         ],

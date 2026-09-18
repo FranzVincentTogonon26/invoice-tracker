@@ -16,7 +16,9 @@ app.use(
     credentials: true,
   }),
 );
-app.use(express.json({ limit: "1mb" }));
+// 8mb: "Scan receipt" posts the image as a base64 data URL (~1.33× the file
+// size), and the UI caps uploads at 2MB.
+app.use(express.json({ limit: "8mb" }));
 app.use(express.urlencoded({ extended: true }));
 
 app.get("/", (req, res) => {

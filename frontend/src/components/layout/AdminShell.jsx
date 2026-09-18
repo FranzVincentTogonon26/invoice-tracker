@@ -43,7 +43,7 @@ export default function AppShell() {
       {/* `pb-*` clears the fixed mobile dock (Sidebar) plus the device's home
           indicator; from `md` up the rail is back in flow, so only the normal
           padding applies. */}
-      <main className="flex-1 px-1 md:px-8 pt-6 pb-[calc(env(safe-area-inset-bottom)+6rem)] md:pb-6 max-w-[1600px] mx-auto w-full">
+      <main className="flex-1 px-2 md:px-8 pt-6 pb-[calc(env(safe-area-inset-bottom)+6rem)] md:pb-6 max-w-[1600px] mx-auto w-full">
         <Topbar onOpenPalette={openPalette} />
 
         <motion.div

@@ -238,12 +238,6 @@ const ReferencesModal = ({
                           )}
                         </td>
                         <td className="px-4 py-2.5 text-right whitespace-nowrap">
-                          {/* `active` is a COUNT of issued budgets using this
-                              reference (backend budgetReference query). In-use
-                              references (active > 0) are locked — show a
-                              success-themed Check instead of the delete
-                              button; unused ones (active === 0) stay
-                              deletable. */}
                           {Number(reference.active) > 0 ? (
                             <span
                               title={`In use by ${reference.active} issued budget${
