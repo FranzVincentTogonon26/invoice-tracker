@@ -5,41 +5,37 @@ import {
   Hash,
   Loader2,
   Plus,
+  ReceiptText,
   ScanLine,
+  Sparkles,
   Trash2,
-  Upload,
   X,
 } from "lucide-react";
 import { useDropzone } from "react-dropzone";
 import toast from "react-hot-toast";
 import { Button } from "../../../ui/Button";
-import { Input, TextArea } from "../../../ui/Input";
+import { Input } from "../../../ui/Input";
 import { formatDate, formatMoney } from "../../../../lib/utils";
 import { useExpensesMutations } from "../../../../hooks/useExpenses";
 import useSmoothScroll from "../../../../hooks/useSmoothScroll";
+import { Card, CardTitle } from "../../../ui/Card";
+import ReceiptScanButton from "./ScanReceipt";
+import { useReceiptScan } from "./useReceiptScan";
 
-// Error banners auto-dismiss after this long (ms); AnimatePresence plays the
-// smooth fade/slide/height-collapse exit when the message clears.
 const ERROR_VISIBLE_MS = 5000;
-
-// Receipts travel to the API as a base64 data URL (there is no file storage
-// behind the `receipt` table yet), so the raw file is capped here.
 const MAX_RECEIPT_BYTES = 2 * 1024 * 1024;
-
-// Copy per modal kind — the shell, chrome and a11y wiring are shared; only the
-// panel and labels swap. Adding a third transaction = one config entry.
 const MODAL_COPY = {
   category: {
     title: "Expense Categories",
     description:
       "Manage the buckets expense lines are filed under. New categories show up in the form instantly.",
-    maxWidth: "max-w-[600px]",
+    maxWidth: "max-w-[660px]",
   },
   scan_receipt: {
     title: "Scan Receipt",
     description:
-      "Attach the receipt image, describe the purchase and we'll pre-fill an expense line for you.",
-    maxWidth: "max-w-[640px]",
+      "Attach the receipt image — we'll read the vendor, items and totals and pre-fill the expense lines for you.",
+    maxWidth: "max-w-[880px]",
   },
 };
 
@@ -49,34 +45,14 @@ const blankReceipt = () => ({
   description: "",
   qty: "1",
   rate: "",
+  items: [],
+  vendor: "",
+  receiptDate: "",
+  currency: "",
+  total: 0,
+  suggestedCategory: "",
 });
 
-function Field({ label, hint, children }) {
-  return (
-    <label className="block min-w-0">
-      <span className="mb-1.5 block type-eyebrow text-[var(--ink-muted)]">
-        {label}
-      </span>
-      {children}
-      {hint && (
-        <span className="mt-1.5 block text-[11px] leading-snug text-[var(--ink-muted)]">
-          {hint}
-        </span>
-      )}
-    </label>
-  );
-}
-
-/**
- * One reusable dialog for the Expenses page.
- *
- * `transaction` selects the panel:
- *   "category"     → add / list / delete categories
- *   "scan_receipt" → upload a receipt, then create the `receipt` row
- *
- * Data flows out through callbacks so the parent stays the single source of
- * truth: `onAdd(category)`, `onDelete(categoryId)`, `onReceiptCreated(receipt)`.
- */
 const ExpensesModal = ({
   open,
   onClose,
@@ -87,7 +63,6 @@ const ExpensesModal = ({
   onReceiptCreated,
 }) => {
   const { create, removeCategory } = useExpensesMutations();
-  // Smooth eased wheel scrolling for the category table.
   const tableRef = useSmoothScroll();
 
   const [newCategory, setNewCategory] = useState("");
@@ -98,11 +73,16 @@ const ExpensesModal = ({
   const [receipt, setReceipt] = useState(blankReceipt);
 
   const busy = adding || deletingId !== null || saving;
+
+  // Live sum of the editable line items shown in the scan panel.
+  const itemsTotal = (receipt.items ?? []).reduce(
+    (sum, item) =>
+      sum + (Number(item.quantity) || 0) * (Number(item.rate) || 0),
+    0,
+  );
+
   const copy = MODAL_COPY[transaction] ?? MODAL_COPY.category;
 
-  // Auto-dismiss: clear the error after ERROR_VISIBLE_MS so stale messages
-  // don't linger. Restarted every time a new error appears; clearing triggers
-  // the smooth exit animation below via AnimatePresence.
   useEffect(() => {
     if (!err) return undefined;
 
@@ -110,12 +90,60 @@ const ExpensesModal = ({
     return () => clearTimeout(id);
   }, [err]);
 
-  // Reset the panel each time the modal opens or switches transaction.
+  // Scan wiring lives above the open/transaction reset below — that reset
+  // runs during render and clears the hook's error state, so the hook must
+  // be declared first (calling setScanErr before initialization would throw
+  // a ReferenceError the moment the modal opens).
+  // Fill the form + "Scan list items" card from the AI result. Prefer the
+  // itemized lines; fall back to vendor + grand total when Gemini couldn't
+  // split items.
+  const handleParsed = useCallback((parsed) => {
+    const items = parsed.lineItems?.length
+      ? parsed.lineItems.map((li) => ({
+          description: li.description || parsed.vendor || "Item",
+          quantity: Number(li.quantity) || 1,
+          rate: Number(li.rate) || 0,
+        }))
+      : [
+          {
+            description: parsed.vendor || "Expense",
+            quantity: 1,
+            rate: Number(parsed.total) || 0,
+          },
+        ];
+
+    setReceipt((r) => ({
+      ...r,
+      description: items[0].description,
+      qty: String(items[0].quantity),
+      rate: String(items[0].rate),
+      items,
+      vendor: parsed.vendor || "",
+      receiptDate: parsed.receipt_date || "",
+      currency: parsed.currency || "",
+      total: parsed.total || 0,
+      suggestedCategory: parsed.suggested_category || "",
+    }));
+    toast.success("Receipt scanned — check the details below.");
+  }, []);
+
+  const handleScanError = useCallback((message) => {
+    toast.error(message);
+  }, []);
+
+  const {
+    loading: scanning,
+    err: scanErr,
+    setErr: setScanErr,
+    scanFile,
+  } = useReceiptScan({ onParsed: handleParsed, onError: handleScanError });
+
   const [prev, setPrev] = useState({ open, transaction });
   if (prev.open !== open || prev.transaction !== transaction) {
     setPrev({ open, transaction });
     setNewCategory("");
     setErr("");
+    setScanErr("");
     setAdding(false);
     setDeletingId(null);
     setSaving(false);
@@ -123,7 +151,7 @@ const ExpensesModal = ({
   }
 
   const handleClose = () => {
-    if (busy) return;
+    if (busy || scanning) return;
     setErr("");
     onClose?.();
   };
@@ -175,39 +203,55 @@ const ExpensesModal = ({
     }
   };
 
-  /* ── scan_receipt panel actions ──────────────────────────────── */
+  // Single entry point for every upload path (dropzone drop, dropzone
+  // click-pick, manual scan icon): shows the preview immediately, then
+  // auto-scans the same file so the "Scan list items" card fills itself.
+  const handleFilePicked = useCallback(
+    (file) => {
+      setErr("");
+      setScanErr("");
+      if (!file) return;
 
-  // Read the picked image into a data URL so it survives the POST and can be
-  // re-opened from the expense line later.
-  const onDrop = useCallback((accepted) => {
-    setErr("");
-    const file = accepted[0];
-    if (!file) return;
+      if (file.size > MAX_RECEIPT_BYTES) {
+        setErr("Receipt must be 2MB or smaller.");
+        return;
+      }
 
-    if (file.size > MAX_RECEIPT_BYTES) {
-      setErr("Receipt must be 2MB or smaller.");
-      return;
-    }
+      const reader = new FileReader();
+      reader.onload = () =>
+        setReceipt((r) => ({
+          ...r,
+          imageUrl: String(reader.result ?? ""),
+          fileName: file.name,
+        }));
+      reader.onerror = () => setErr("Couldn't read that file.");
+      reader.readAsDataURL(file);
 
-    const reader = new FileReader();
-    reader.onload = () =>
-      setReceipt((r) => ({
-        ...r,
-        imageUrl: String(reader.result ?? ""),
-        fileName: file.name,
-      }));
-    reader.onerror = () => setErr("Couldn't read that file.");
-    reader.readAsDataURL(file);
-  }, []);
+      scanFile(file);
+    },
+    [scanFile, setScanErr],
+  );
+
+  const onDrop = useCallback(
+    (accepted) => {
+      const file = accepted[0];
+      if (file) handleFilePicked(file);
+    },
+    [handleFilePicked],
+  );
 
   const { getRootProps, getInputProps, isDragActive } = useDropzone({
     onDrop,
     multiple: false,
-    accept: { "image/*": [".png", ".jpg", ".jpeg", ".webp"] },
+    // A scan is already running — ignore further drops/picks until it ends.
+    disabled: scanning,
+    // Same set the scan engine validates against (PNG/JPG/WEBP + PDF).
+    accept: {
+      "image/*": [".png", ".jpg", ".jpeg", ".webp"],
+      "application/pdf": [".pdf"],
+    },
   });
 
-  // `qty`/`rate` are the only money inputs — the total is derived, so the row
-  // can never disagree with itself.
   const qty = Number(receipt.qty) || 0;
   const rate = Number(receipt.rate) || 0;
   const amount = Number((qty * rate).toFixed(2));
@@ -252,13 +296,13 @@ const ExpensesModal = ({
     }
   };
 
-  // Close on Escape while open (never while busy) — stopPropagation keeps any
-  // window-level handler behind the modal from also firing.
   useEffect(() => {
     if (!open) return undefined;
 
     const onKeyDown = (e) => {
-      if (e.key === "Escape" && !busy) {
+      // Scanning locks the whole dialog — no Escape close mid-scan.
+      if (e.key === "Escape" && (busy || scanning)) return;
+      if (e.key === "Escape") {
         e.stopPropagation();
         setErr("");
         onClose?.();
@@ -266,7 +310,7 @@ const ExpensesModal = ({
     };
     window.addEventListener("keydown", onKeyDown, true);
     return () => window.removeEventListener("keydown", onKeyDown, true);
-  }, [open, busy, onClose]);
+  }, [open, busy, scanning, onClose]);
 
   return (
     <AnimatePresence>
@@ -275,10 +319,7 @@ const ExpensesModal = ({
           className="fixed inset-0 z-[60] flex items-center justify-center p-4"
           exit={{ opacity: 0 }}
         >
-          <div
-            onClick={handleClose}
-            className="absolute inset-0 bg-[var(--ink)]/30 backdrop-blur-sm flex items-center justify-center px-2"
-          >
+          <div className="absolute inset-0 bg-[var(--ink)]/30 backdrop-blur-sm flex items-center justify-center px-2">
             <motion.div
               onClick={(e) => e.stopPropagation()}
               role="dialog"
@@ -292,12 +333,20 @@ const ExpensesModal = ({
             >
               <div className="flex shrink-0 items-start justify-between mb-5">
                 <div className="min-w-0">
-                  <h3
-                    id="expenses-modal-title"
-                    className="text-lg font-semibold tracking-tight"
-                  >
-                    {copy.title}
-                  </h3>
+                  <div className="flex items-center gap-2.5">
+                    <h3
+                      id="expenses-modal-title"
+                      className="text-lg font-semibold tracking-tight"
+                    >
+                      {copy.title}
+                    </h3>
+                    {transaction === "scan_receipt" && scanning && (
+                      <span className="inline-flex items-center gap-1.5 rounded-full bg-[var(--accent-soft)] px-2.5 py-1 text-[10px] font-bold uppercase tracking-wider text-[var(--accent-strong)]">
+                        <Loader2 size={11} className="animate-spin" />
+                        Scanning…
+                      </span>
+                    )}
+                  </div>
                   <p className="mt-1 text-sm leading-snug text-[var(--ink-muted)]">
                     {copy.description}
                   </p>
@@ -312,8 +361,32 @@ const ExpensesModal = ({
                 </button>
               </div>
 
-              {/* Scrollable body — header and footer stay pinned; only this
-                  area scrolls when the panel grows past the viewport */}
+              {/* Scan-in-progress overlay: covers the whole panel, swallows
+                  every interaction so nothing can be touched mid-scan. */}
+              {transaction === "scan_receipt" && scanning && (
+                <div
+                  aria-live="polite"
+                  aria-busy="true"
+                  className="absolute inset-0 z-20 flex flex-col items-center justify-center gap-4 rounded-3xl bg-[var(--surface)]/80 backdrop-blur-[3px]"
+                >
+                  <div className="relative flex h-20 w-20 items-center justify-center">
+                    <span className="absolute inset-0 animate-ping rounded-full bg-[var(--accent-soft)]" />
+                    <span className="relative flex h-16 w-16 items-center justify-center rounded-full bg-[var(--accent-soft)] text-[var(--accent-strong)]">
+                      <ScanLine size={28} className="animate-pulse" />
+                    </span>
+                  </div>
+                  <div className="text-center">
+                    <p className="text-sm font-semibold text-[var(--ink)]">
+                      Scanning receipt, please wait
+                    </p>
+                    <p className="mt-1 text-[12px] text-[var(--ink-muted)]">
+                      Reading vendor, items and totals — this takes a few
+                      seconds.
+                    </p>
+                  </div>
+                </div>
+              )}
+
               <div className="scrollbar-slim min-h-0 flex-1 overflow-y-auto">
                 {transaction === "category" && (
                   <>
@@ -417,122 +490,254 @@ const ExpensesModal = ({
                     onSubmit={handleConfirmReceipt}
                     className="space-y-4"
                   >
-                    {/* Dropzone — click or drag. Shows the picked image as a
-                        preview so the user can confirm it's the right shot. */}
-                    <div
-                      {...getRootProps()}
-                      className={`flex cursor-pointer items-center gap-3 rounded-2xl border border-dashed px-4 py-4 transition-colors ${
-                        isDragActive
-                          ? "border-[var(--accent)]/60 bg-[var(--accent-soft)]/40"
-                          : "border-[var(--border)] bg-[var(--surface-2)]/40 hover:border-[var(--accent)]/40"
-                      }`}
-                    >
-                      <input {...getInputProps()} />
-
-                      {receipt.imageUrl ? (
-                        <>
+                    {receipt.imageUrl ? (
+                      <div className="flex w-full items-center gap-4 rounded-2xl border border-[var(--border)] bg-[var(--surface-2)]/40 px-4 py-4">
                           <img
                             src={receipt.imageUrl}
                             alt="Receipt preview"
-                            className="h-14 w-14 shrink-0 rounded-xl border border-[var(--border)] object-cover"
+                            className="h-20 w-16 shrink-0 rounded-xl border border-[var(--border)] bg-white object-cover shadow-card"
                           />
                           <div className="min-w-0 flex-1">
-                            <p className="truncate text-xs font-semibold text-[var(--ink)]">
+                            <p className="truncate text-sm font-semibold text-[var(--ink)]">
                               {receipt.fileName || "Receipt attached"}
                             </p>
-                            <p className="text-[11px] text-[var(--ink-muted)]">
-                              Click or drop to replace
+                            <p className="mt-0.5 text-[12px] text-[var(--ink-muted)]">
+                              {scanning
+                                ? "Reading the receipt…"
+                                : "Click or drop to replace"}
                             </p>
+                            {scanning && (
+                              <div className="mt-2.5 h-1.5 w-full max-w-[220px] overflow-hidden rounded-full bg-[var(--surface-2)]">
+                                <div className="h-full w-1/3 animate-[scanbar_1.2s_ease-in-out_infinite] rounded-full bg-[var(--accent)]" />
+                              </div>
+                            )}
                           </div>
-                          <button
-                            type="button"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              setReceipt((r) => ({
-                                ...r,
-                                imageUrl: "",
-                                fileName: "",
-                              }));
-                            }}
-                            aria-label="Remove attached receipt"
-                            className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-[var(--ink-muted)] transition-colors hover:bg-[var(--danger)]/10 hover:text-[var(--danger)]"
-                          >
-                            <Trash2 size={14} />
-                          </button>
-                        </>
+                          {!scanning && (
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setReceipt((r) => ({
+                                  ...r,
+                                  imageUrl: "",
+                                  fileName: "",
+                                }));
+                              }}
+                              aria-label="Remove attached receipt"
+                              className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-[var(--ink-muted)] transition-colors hover:bg-[var(--danger)]/10 hover:text-[var(--danger)]"
+                            >
+                              <Trash2 size={16} />
+                            </button>
+                          )}
+                        </div>
                       ) : (
-                        <>
-                          <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-[var(--accent-soft)] text-[var(--accent-strong)]">
-                            <Upload size={18} />
-                          </span>
-                          <div className="min-w-0">
-                            <p className="text-xs font-semibold text-[var(--ink)]">
-                              Drop the receipt here
+                        <div
+                          {...getRootProps()}
+                          className={`flex cursor-pointer items-center gap-3 rounded-2xl border border-dashed px-4 py-4 transition-colors ${
+                            isDragActive
+                              ? "border-[var(--accent)]/60 bg-[var(--accent-soft)]/40"
+                              : "border-[var(--border)] bg-[var(--surface-2)]/40 hover:border-[var(--accent)]/40"
+                          }`}
+                        >
+                          <input {...getInputProps()} />
+                          <ReceiptScanButton
+                            scanning={scanning}
+                            onFile={handleFilePicked}
+                          />
+                          {scanErr && (
+                            <p
+                              role="alert"
+                              className="min-w-0 flex-1 text-[11px] leading-snug text-[var(--danger)]"
+                            >
+                              {scanErr}
                             </p>
-                            <p className="text-[11px] text-[var(--ink-muted)]">
-                              PNG, JPG or WEBP · up to 2MB
-                            </p>
-                          </div>
-                        </>
+                          )}
+                        </div>
                       )}
+
+                    <div className="grid gap-4 lg:grid-cols-[340px_1fr] items-start">
+                      {/* Left: parsed details / live totals */}
+                      <Card padding="lg">
+                        <CardTitle>Details</CardTitle>
+                        <div className="mt-4 space-y-3">
+                          {[
+                            ["Vendor", receipt.vendor],
+                            ["Date", receipt.receiptDate],
+                            ["Currency", receipt.currency],
+                          ]
+                            .filter(([, v]) => v)
+                            .map(([label, value]) => (
+                              <div
+                                key={label}
+                                className="flex items-baseline justify-between gap-3"
+                              >
+                                <span className="type-eyebrow text-[var(--ink-muted)]">
+                                  {label}
+                                </span>
+                                <span className="truncate text-sm font-semibold tabular text-[var(--ink)]">
+                                  {value}
+                                </span>
+                              </div>
+                            ))}
+
+                          {/* Skeleton while the scan is extracting */}
+                          {scanning && !receipt.vendor && !receipt.receiptDate && (
+                            <div className="space-y-3 pt-1">
+                              {[0, 1, 2].map((i) => (
+                                <div
+                                  key={i}
+                                  className="flex items-center justify-between gap-3"
+                                >
+                                  <div className="h-2.5 w-14 animate-pulse rounded-full bg-[var(--surface-2)]" />
+                                  <div className="h-2.5 w-24 animate-pulse rounded-full bg-[var(--surface-2)]" />
+                                </div>
+                              ))}
+                            </div>
+                          )}
+                        </div>
+
+                        <div className="mt-4 flex items-center justify-between border-t border-[var(--border)] pt-3">
+                          <span className="type-eyebrow text-[var(--ink-muted)]">
+                            Total amount
+                          </span>
+                          <span className="font-display text-lg font-semibold tabular text-[var(--ink)]">
+                            {formatMoney(itemsTotal)}
+                          </span>
+                        </div>
+                      </Card>
+
+                      {/* Right: editable line items */}
+                      <Card padding="lg">
+                        <CardTitle>Scan list items</CardTitle>
+                        <div className="mt-5 hidden sm:grid grid-cols-[1fr_64px_100px_100px_32px] gap-3 px-1 pb-2 text-[11px] uppercase tracking-wider text-[var(--ink-muted)] font-semibold">
+                          <span>Description</span>
+                          <span className="text-center">Qty</span>
+                          <span className="text-center">Rate</span>
+                          <span className="text-right">Amount</span>
+                          <span></span>
+                        </div>
+
+                        <div className="space-y-2">
+                          {scanning && !(receipt.items ?? []).length && (
+                            <div className="space-y-2">
+                              {[0, 1, 2].map((i) => (
+                                <div
+                                  key={i}
+                                  className="grid grid-cols-[1fr_64px_100px] items-center gap-3"
+                                >
+                                  <div className="h-9 animate-pulse rounded-xl bg-[var(--surface-2)]" />
+                                  <div className="h-9 animate-pulse rounded-xl bg-[var(--surface-2)]" />
+                                  <div className="h-9 animate-pulse rounded-xl bg-[var(--surface-2)]" />
+                                </div>
+                              ))}
+                            </div>
+                          )}
+
+                          {(receipt.items ?? []).map((item, i) => (
+                          <div
+                            key={i}
+                            className="grid grid-cols-2 sm:grid-cols-[1fr_80px_110px_110px_32px] gap-3 items-center"
+                          >
+                            <Input
+                              className="col-span-2 sm:col-span-1 rounded-xl"
+                              value={item.description}
+                              placeholder="Description"
+                              onChange={(e) =>
+                                setReceipt((r) => {
+                                  const items = [...r.items];
+                                  items[i] = {
+                                    ...items[i],
+                                    description: e.target.value,
+                                  };
+                                  return { ...r, items };
+                                })
+                              }
+                            />
+                            <Input
+                              className="rounded-xl text-right tabular"
+                              type="number"
+                              min="0"
+                              value={item.quantity}
+                              onChange={(e) =>
+                                setReceipt((r) => {
+                                  const items = [...r.items];
+                                  items[i] = {
+                                    ...items[i],
+                                    quantity: e.target.value,
+                                  };
+                                  return { ...r, items };
+                                })
+                              }
+                            />
+                            <Input
+                              className="rounded-xl text-right tabular"
+                              type="number"
+                              min="0"
+                              value={item.rate}
+                              onChange={(e) =>
+                                setReceipt((r) => {
+                                  const items = [...r.items];
+                                  items[i] = { ...items[i], rate: e.target.value };
+                                  return { ...r, items };
+                                })
+                              }
+                            />
+                            <div className="text-right text-sm font-semibold tabular text-[var(--ink)] pr-1">
+                              {formatMoney(
+                                (Number(item.quantity) || 0) *
+                                  (Number(item.rate) || 0),
+                              )}
+                            </div>
+                            <button
+                              type="button"
+                              onClick={() =>
+                                setReceipt((r) => ({
+                                  ...r,
+                                  items: r.items.filter((_, j) => j !== i),
+                                }))
+                              }
+                              className="h-8 w-8 rounded-full flex items-center justify-center text-[var(--ink-muted)] hover:text-[var(--danger)] hover:bg-[var(--surface-2)] justify-self-end"
+                              title="Remove line"
+                            >
+                              <Trash2 size={14} />
+                            </button>
+                          </div>
+                        ))}
+
+                          {!scanning && (
+                            <button
+                              type="button"
+                              onClick={() =>
+                                setReceipt((r) => ({
+                                  ...r,
+                                  items: [
+                                    ...(r.items ?? []),
+                                    { description: "", quantity: 1, rate: "" },
+                                  ],
+                                }))
+                              }
+                              className="inline-flex items-center gap-1.5 text-[12px] font-semibold text-[var(--accent-strong)] hover:underline"
+                            >
+                              <Plus size={13} /> Add line
+                            </button>
+                          )}
+
+                          {(receipt.items ?? []).length === 0 && !scanning && (
+                            <p className="text-[12px] text-[var(--ink-muted)]">
+                              Attach a receipt and the extracted lines will
+                              appear here for review.
+                            </p>
+                          )}
+                        </div>
+                      </Card>
                     </div>
 
-                    <Field
-                      label="Receipt description"
-                      hint="Becomes the expense line description when you save."
-                    >
-                      <TextArea
-                        value={receipt.description}
-                        onChange={(e) =>
-                          setReceipt((r) => ({
-                            ...r,
-                            description: e.target.value,
-                          }))
-                        }
-                        placeholder="e.g. Office supplies — National Book Store"
-                        disabled={saving}
-                        rows={2}
-                      />
-                    </Field>
-
-                    <div className="grid grid-cols-2 gap-3">
-                      <Field label="Quantity">
-                        <Input
-                          type="number"
-                          min="1"
-                          step="1"
-                          value={receipt.qty}
-                          onChange={(e) =>
-                            setReceipt((r) => ({ ...r, qty: e.target.value }))
-                          }
-                          disabled={saving}
-                          className="tabular text-right"
-                        />
-                      </Field>
-                      <Field label="Unit rate">
-                        <Input
-                          type="number"
-                          min="0"
-                          step="0.01"
-                          value={receipt.rate}
-                          onChange={(e) =>
-                            setReceipt((r) => ({ ...r, rate: e.target.value }))
-                          }
-                          placeholder="0.00"
-                          disabled={saving}
-                          className="tabular text-right"
-                        />
-                      </Field>
-                    </div>
-
-                    <div className="flex items-center justify-between rounded-2xl bg-[var(--surface-2)]/70 px-4 py-3">
-                      <span className="type-eyebrow text-[var(--ink-muted)]">
-                        Total amount
-                      </span>
-                      <span className="font-display text-lg font-semibold tabular text-[var(--ink)]">
-                        {formatMoney(amount)}
-                      </span>
-                    </div>
+                    {receipt.suggestedCategory && (
+                      <div className="flex items-center gap-2 rounded-2xl bg-[var(--accent-soft)]/60 px-4 py-3 text-[12px] font-semibold text-[var(--accent-strong)]">
+                        <Sparkles size={14} />
+                        Suggested category: {receipt.suggestedCategory}
+                      </div>
+                    )}
                   </form>
                 )}
 
@@ -564,7 +769,14 @@ const ExpensesModal = ({
               </div>
 
               <div className="flex shrink-0 items-center justify-end gap-2 mt-5 pt-5 border-t border-[var(--border)]">
-                <Button type="button" variant="outline" onClick={handleClose}>
+                {/* Scanning locks the dialog: Cancel and Confirm are both
+                    disabled until the scan finishes or fails. */}
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={handleClose}
+                  disabled={busy || scanning}
+                >
                   {transaction === "scan_receipt" ? "Cancel" : "Close"}
                 </Button>
                 {transaction === "scan_receipt" && (
@@ -572,14 +784,14 @@ const ExpensesModal = ({
                     type="submit"
                     form="receipt-form"
                     variant="accent"
-                    disabled={saving}
+                    disabled={saving || scanning}
                   >
                     {saving ? (
                       <Loader2 size={14} className="animate-spin" />
                     ) : (
-                      <ScanLine size={14} />
+                      <ReceiptText size={14} />
                     )}
-                    Confirm
+                    Confirm Receipt
                   </Button>
                 )}
               </div>

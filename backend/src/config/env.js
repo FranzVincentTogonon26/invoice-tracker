@@ -16,6 +16,8 @@ export const ENV = {
   JWT_SECRET: process.env.JWT_SECRET,
   DATABASE_URL: process.env.DATABASE_URL,
   RESEND_API_KEY: process.env.RESEND_API_KEY,
+  GIMINI_API_KEY: process.env.GIMINI_API_KEY,
+  GIMINI_MODEL: process.env.GIMINI_MODEL,
   EMAIL_FROM:
     process.env.EMAIL_FROM || "Invoice Tracker <onboarding@resend.dev>",
 };
@@ -26,6 +28,8 @@ const REQUIRED_ENV_KEYS = [
   "DATABASE_URL",
   "CLIENT_URL",
   "RESEND_API_KEY",
+  "GIMINI_API_KEY",
+  "GIMINI_MODEL",
 ];
 
 for (const key of REQUIRED_ENV_KEYS) {

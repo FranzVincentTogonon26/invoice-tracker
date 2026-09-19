@@ -195,3 +195,14 @@ body {
 .scrollbar-inline::-webkit-scrollbar-thumb {
   border-radius: 999px;
 }
+
+/* Scan-in-progress indicator: a thin accent bar sweeping across the progress
+   track shown in the Scan Receipt panel while Gemini reads the file. */
+@keyframes scanbar {
+  0% {
+    transform: translateX(-120%);
+  }
+  100% {
+    transform: translateX(420%);
+  }
+}

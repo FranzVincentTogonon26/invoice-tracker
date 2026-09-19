@@ -3,6 +3,7 @@ import authRoutes from "./auth.route.js";
 import budgetRoutes from "./budget.route.js";
 import employeesRoutes from "./employees.route.js";
 import expensesRoutes from "./expenses.route.js";
+import aiRoutes from "./ai.route.js";
 
 const router = express.Router();
 
@@ -18,5 +19,6 @@ router.use("/auth", authRoutes);
 router.use("/budgets", budgetRoutes);
 router.use("/employees", employeesRoutes);
 router.use("/expenses", expensesRoutes);
+router.use("/ai", aiRoutes);
 
 export default router;

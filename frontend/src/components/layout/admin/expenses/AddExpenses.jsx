@@ -2,18 +2,14 @@ import {
   AlertCircle,
   ArrowLeft,
   Eye,
-  FileText,
-  FolderPlus,
   ImagePlus,
   Info,
   Loader2,
-  Paperclip,
   Plus,
   Save,
   ScanLine,
   Sparkles,
   Trash2,
-  X,
 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { useMemo, useState } from "react";
@@ -23,7 +19,7 @@ import { Button } from "../../../ui/Button";
 import { Badge } from "../../../ui/Badge";
 import { Card, CardDescription, CardTitle } from "../../../ui/Card";
 import { DatePicker } from "../../../ui/DatePicker";
-import { Input } from "../../../ui/Input";
+import { Input, TextArea } from "../../../ui/Input";
 import Listbox from "../../../ui/Listbox";
 import { formatMoney, toISODate } from "../../../../lib/utils";
 import {
@@ -384,20 +380,20 @@ const AddExpenses = () => {
                     onClick={() => removeItem(i)}
                     title="Remove line"
                     aria-label={`Remove expense line ${i + 1}`}
-                    className="h-8 w-8 shrink-0 rounded-full flex items-center justify-center text-[var(--ink-muted)] hover:text-[var(--danger)] hover:bg-[var(--danger)]/10 transition-colors"
+                    className="h-10 w-10 shrink-0 rounded-full flex items-center justify-center text-[var(--ink-muted)] hover:text-[var(--danger)] hover:bg-[var(--danger)]/10 transition-colors"
                   >
-                    <Trash2 size={14} />
+                    <Trash2 size={16} />
                   </button>
                 </div>
 
                 <Field label="Description">
-                  <Input
-                    Icon={FileText}
+                  <TextArea
                     value={it.description}
                     onChange={(e) =>
                       setItem(i, { description: e.target.value })
                     }
                     placeholder="e.g. Pamasahe, Malengke.."
+                    rows={2}
                   />
                 </Field>
 
