@@ -33,7 +33,7 @@ export function TabsTrigger({ value, children, className }) {
       type="button"
       onClick={() => ctx.onValueChange?.(value)}
       className={cn(
-        "relative h-8 shrink-0 whitespace-nowrap rounded-full px-3.5 text-xs font-medium transition-colors",
+        "relative h-9 shrink-0 whitespace-nowrap rounded-full px-3.5 text-sm font-medium transition-colors sm:h-8 sm:text-sm",
         active
           ? "text-[var(--bg)]"
           : "text-[var(--ink-muted)] hover:text-[var(--ink)]",
@@ -47,7 +47,9 @@ export function TabsTrigger({ value, children, className }) {
           transition={{ type: "spring", duration: 0.4, bounce: 0.18 }}
         />
       )}
-      <span className="relative z-10 inline-flex items-center gap-1.5">{children}</span>
+      <span className="relative z-10 inline-flex items-center gap-1.5">
+        {children}
+      </span>
     </button>
   );
 }

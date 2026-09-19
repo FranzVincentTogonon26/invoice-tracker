@@ -54,7 +54,7 @@ const blankReceipt = () => ({
 function Field({ label, hint, children }) {
   return (
     <label className="block min-w-0">
-      <span className="mb-1.5 block text-[11px] font-semibold uppercase tracking-wider text-[var(--ink-muted)]">
+      <span className="mb-1.5 block type-eyebrow text-[var(--ink-muted)]">
         {label}
       </span>
       {children}
@@ -294,11 +294,11 @@ const ExpensesModal = ({
                 <div className="min-w-0">
                   <h3
                     id="expenses-modal-title"
-                    className="font-display text-lg font-semibold tracking-tight"
+                    className="text-lg font-semibold tracking-tight"
                   >
                     {copy.title}
                   </h3>
-                  <p className="mt-1 text-xs leading-snug text-[var(--ink-muted)]">
+                  <p className="mt-1 text-sm leading-snug text-[var(--ink-muted)]">
                     {copy.description}
                   </p>
                 </div>
@@ -343,17 +343,13 @@ const ExpensesModal = ({
                         )}
                       </Button>
                     </form>
-
-                    {/* Category table — scrolls on its own so the header, the
-                        add form and the footer stay pinned when the list is
-                        long */}
                     <div
                       ref={tableRef}
                       className="scrollbar-slim mt-5 max-h-[50vh] min-h-0 overflow-y-auto rounded-2xl border border-[var(--border)]"
                     >
                       <table className="w-full text-sm">
                         <thead>
-                          <tr className="sticky top-0 z-10 bg-[var(--surface-2)] text-[10px] uppercase tracking-wider text-[var(--ink-muted)]">
+                          <tr className="sticky top-0 z-10 bg-[var(--surface-2)] type-eyebrow text-[var(--ink-muted)]">
                             <th className="px-4 py-2.5 text-left font-semibold">
                               Category
                             </th>
@@ -371,14 +367,14 @@ const ExpensesModal = ({
                             >
                               <td
                                 title={category.category_name}
-                                className="max-w-[240px] truncate px-4 py-2.5 text-[13px] text-[var(--ink)]"
+                                className="max-w-[240px] truncate px-4 py-2 text-sm font-semibold text-[var(--ink)]"
                               >
                                 {category.category_name ?? "—"}
                               </td>
-                              <td className="px-4 py-2.5 text-right text-xs text-[var(--ink-muted)] whitespace-nowrap">
+                              <td className="px-4 py-2 text-right text-sm text-[var(--ink-muted)] whitespace-nowrap">
                                 {formatDate(category.created_at)}
                               </td>
-                              <td className="px-4 py-2.5 text-right whitespace-nowrap">
+                              <td className="px-4 py-2 text-right whitespace-nowrap">
                                 <button
                                   type="button"
                                   onClick={() =>
@@ -386,7 +382,7 @@ const ExpensesModal = ({
                                   }
                                   disabled={adding || deletingId !== null}
                                   aria-label={`Delete category ${category.category_name}`}
-                                  className="inline-flex h-7 w-7 items-center justify-center rounded-full text-[var(--ink-muted)] transition-colors hover:bg-[var(--danger)]/10 hover:text-[var(--danger)] disabled:pointer-events-none disabled:opacity-40"
+                                  className="inline-flex h-8 w-8 items-center justify-center rounded-full text-[var(--ink-muted)] transition-colors hover:bg-[var(--danger)]/10 hover:text-[var(--danger)] disabled:pointer-events-none disabled:opacity-40"
                                 >
                                   {deletingId === category.category_id ? (
                                     <Loader2
@@ -394,7 +390,7 @@ const ExpensesModal = ({
                                       className="animate-spin"
                                     />
                                   ) : (
-                                    <Trash2 size={13} />
+                                    <Trash2 size={16} />
                                   )}
                                 </button>
                               </td>
@@ -530,7 +526,7 @@ const ExpensesModal = ({
                     </div>
 
                     <div className="flex items-center justify-between rounded-2xl bg-[var(--surface-2)]/70 px-4 py-3">
-                      <span className="text-[11px] font-semibold uppercase tracking-wider text-[var(--ink-muted)]">
+                      <span className="type-eyebrow text-[var(--ink-muted)]">
                         Total amount
                       </span>
                       <span className="font-display text-lg font-semibold tabular text-[var(--ink)]">
@@ -596,5 +592,3 @@ const ExpensesModal = ({
 };
 
 export default ExpensesModal;
-
-

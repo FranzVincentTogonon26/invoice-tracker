@@ -120,7 +120,13 @@ function RemainingProgress({ remaining, issued, share, label }) {
         aria-valuemax={100}
         aria-valuenow={displayed}
         aria-label={label}
-        aria-valuetext={noIssued ? "No issued budget tracked" : fullySpent ? "Budget fully spent" : `${displayed}% remaining`}
+        aria-valuetext={
+          noIssued
+            ? "No issued budget tracked"
+            : fullySpent
+              ? "Budget fully spent"
+              : `${displayed}% remaining`
+        }
         className="h-1 flex-1 overflow-hidden rounded-full bg-[var(--surface-2)] ring-1 ring-inset ring-[var(--border)]"
       >
         <motion.div
@@ -141,7 +147,12 @@ function RemainingProgress({ remaining, issued, share, label }) {
       </div>
       {isFull && (
         <span className="flex h-4 w-4 shrink-0 items-center justify-center rounded-full bg-[var(--success)]/12">
-          <Check size={10} strokeWidth={3} aria-hidden className="text-[var(--success)]" />
+          <Check
+            size={10}
+            strokeWidth={3}
+            aria-hidden
+            className="text-[var(--success)]"
+          />
         </span>
       )}
     </div>
@@ -168,13 +179,21 @@ function SharePill({ remaining, issued, share, overSpent, className }) {
   return (
     <span
       className={cn(
-        "inline-flex shrink-0 items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-semibold tabular-nums",
+        "inline-flex shrink-0 items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-semibold tabular-nums",
         tone,
         className,
       )}
     >
-      {overSpent ? <AlertCircle size={10} aria-hidden /> : fullySpent ? <Check size={10} aria-hidden /> : null}
-      {fullySpent ? "Fully spent" : share >= 100 ? "100% left" : `${Number(share)}% left`}
+      {overSpent ? (
+        <AlertCircle size={10} aria-hidden />
+      ) : fullySpent ? (
+        <Check size={10} aria-hidden />
+      ) : null}
+      {fullySpent
+        ? "Fully spent"
+        : share >= 100
+          ? "100% left"
+          : `${Number(share)}% left`}
     </span>
   );
 }
@@ -183,14 +202,14 @@ function SharePill({ remaining, issued, share, overSpent, className }) {
 function EmployeeCell({ employee }) {
   return (
     <div className="flex min-w-0 items-center gap-3">
-      <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-[linear-gradient(135deg,var(--accent-soft),var(--surface-2))] font-display text-sm font-bold tracking-tight text-[var(--accent-strong)] ring-1 ring-inset ring-[var(--accent)]/15 transition-transform duration-200 group-hover:rotate-[-6deg] group-hover:scale-[1.06] group-hover:ring-[var(--accent)]/30">
+      <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-[linear-gradient(135deg,var(--accent-soft),var(--surface-2))] font-display text-sm font-bold tracking-tight text-[var(--accent-strong)] ring-1 ring-inset ring-[var(--accent)]/15 transition-transform duration-200 group-hover:rotate-[-6deg] group-hover:scale-[1.06] group-hover:ring-[var(--accent)]/30">
         {employee.name?.trim()?.[0]?.toUpperCase() || "?"}
       </span>
       <div className="min-w-0">
         <p className="truncate font-display text-sm font-semibold leading-snug tracking-tight text-[var(--ink)] transition-colors duration-150 group-hover:text-[var(--accent-strong)]">
           {employee.name}
         </p>
-        <p className="mt-0.5 truncate text-[11px] leading-tight text-[var(--ink-muted)]">
+        <p className="mt-0.5 truncate text-sm leading-tight text-[var(--ink-muted)]">
           {employee.email}
         </p>
       </div>
@@ -228,7 +247,7 @@ function EmployeeRow({ employee, pending, onAction }) {
           {formatMoney(spent)}
         </p>
         {overSpent && (
-          <span className="mt-1 inline-flex items-center gap-1 rounded-full bg-[var(--danger)]/12 px-2 py-0.5 text-[10px] font-semibold leading-none text-[var(--danger)]">
+          <span className="mt-1 inline-flex items-center gap-1 rounded-full bg-[var(--danger)]/12 px-2 py-0.5 text-[11px] font-semibold leading-none text-[var(--danger)]">
             <AlertCircle size={10} aria-hidden />
             Over budget
           </span>
@@ -246,7 +265,12 @@ function EmployeeRow({ employee, pending, onAction }) {
           >
             {formatMoney(remaining)}
           </p>
-          <SharePill remaining={remaining} issued={issued} share={share} overSpent={overSpent} />
+          <SharePill
+            remaining={remaining}
+            issued={issued}
+            share={share}
+            overSpent={overSpent}
+          />
         </div>
         <div className="mt-1.5">
           <RemainingProgress
@@ -269,15 +293,15 @@ function EmployeeRow({ employee, pending, onAction }) {
       <td className="px-4 py-4 align-middle">
         {employee.created_at ? (
           <div>
-            <p className="text-xs font-medium leading-none tabular-nums text-[var(--ink)]">
+            <p className="text-sm font-medium leading-none tabular-nums text-[var(--ink)]">
               {formatDate(employee.created_at)}
             </p>
-            <p className="mt-1 text-[10px] leading-none text-[var(--ink-muted)]">
+            <p className="mt-1 text-[12px] leading-none text-[var(--ink-muted)]">
               {formatTime(employee.created_at)}
             </p>
           </div>
         ) : (
-          <p className="text-xs leading-none text-[var(--ink-muted)]">—</p>
+          <p className="text-sm leading-none text-[var(--ink-muted)]">—</p>
         )}
       </td>
 
@@ -297,9 +321,7 @@ function EmployeeRow({ employee, pending, onAction }) {
 function CardMetric({ label, value, tone }) {
   return (
     <div className="min-w-0">
-      <p className="text-[10px] font-bold uppercase tracking-[0.12em] text-[var(--ink-muted)]">
-        {label}
-      </p>
+      <p className="type-eyebrow text-[var(--ink-muted)]">{label}</p>
       <p
         className={cn(
           "mt-1 truncate text-sm font-semibold tabular-nums",
@@ -339,7 +361,7 @@ function EmployeeCard({ employee, pending, onAction }) {
       {/* Remaining-balance bar — the same animated component as the table row */}
       <div className="mt-3">
         <div className="mb-1.5 flex items-center justify-between gap-2">
-          <p className="text-[10px] font-bold uppercase tracking-[0.12em] text-[var(--ink-muted)]">
+          <p className="type-eyebrow text-[var(--ink-muted)]">
             Remaining balance
           </p>
           <SharePill
@@ -419,7 +441,7 @@ export function EmployeesTable({ rows, pending = false, onAction }) {
                     key={h.label}
                     scope="col"
                     className={cn(
-                      "border-b border-[var(--border)] px-4 py-3.5 text-[10px] font-bold uppercase tracking-[0.14em] text-[var(--ink-muted)] first:pl-5 last:pr-5",
+                      "border-b border-[var(--border)] px-4 py-3.5 type-eyebrow text-[var(--ink-muted)] first:pl-5 last:pr-5",
                       {
                         "text-left": h.align === "left",
                         "text-center": h.align === "center",

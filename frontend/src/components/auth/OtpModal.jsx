@@ -246,7 +246,7 @@ function OtpModalContent({ email, onClose, onVerify, onResend }) {
         </motion.div>
 
         {/* Title */}
-        <h2 className="font-display text-[22px] font-semibold tracking-tight text-[var(--ink)] mt-5">
+        <h2 className="font-display text-xl font-semibold tracking-tight text-[var(--ink)] mt-5">
           Verify your email
         </h2>
 
@@ -287,7 +287,7 @@ function OtpModalContent({ email, onClose, onVerify, onResend }) {
               onChange={(e) => handleChange(i, e.target.value)}
               onKeyDown={(e) => handleKeyDown(i, e)}
               onFocus={(e) => e.target.select()}
-              className={`h-14 w-full flex-1 rounded-2xl border text-center font-display text-xl font-semibold text-[var(--ink)] outline-none transition-all duration-200 focus:bg-[var(--surface)] focus:border-[var(--accent)]/40 focus:ring-4 focus:ring-[var(--accent)]/10 ${
+              className={`h-14 w-full flex-1 rounded-2xl border text-center font-display text-2xl font-semibold text-[var(--ink)] outline-none transition-all duration-200 focus:bg-[var(--surface)] focus:border-[var(--accent)]/40 focus:ring-4 focus:ring-[var(--accent)]/10 sm:text-xl ${
                 digit
                   ? "border-[var(--accent)]/40 bg-[var(--surface)]"
                   : "border-[var(--border)] bg-[var(--surface-2)]"

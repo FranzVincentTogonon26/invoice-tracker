@@ -22,7 +22,6 @@ import useSmoothScroll from "../../../../hooks/useSmoothScroll";
 import { formatMoney } from "../../../../lib/utils";
 import toast from "react-hot-toast";
 
-// Approver is fixed for now (admin-issued budgets are always self-approved)
 const APPROVER = "Franz Vincent";
 
 const initialForm = {
@@ -34,34 +33,26 @@ const initialForm = {
   note: "",
 };
 
-// Soft client-side length caps for the text areas (the backend has no hard
-// limit; these keep entries tidy and power the live character counters).
 const DESCRIPTION_MAX = 200;
 const NOTE_MAX = 150;
-
-// Error banners auto-dismiss after this long (ms); AnimatePresence plays the
-// smooth fade/slide/height-collapse exit when the message clears.
 const ERROR_VISIBLE_MS = 5000;
-
-// Quick-fill amounts for the money input — one tap fills the field, avoiding
-// typos on numeric keyboards. Values match common budget tranches.
 const AMOUNT_PRESETS = [500, 1000, 2500, 5000];
 
 function Field({ label, optional, hint, children, count, max }) {
   return (
     <label className="block">
       <span className="mb-1.5 flex items-baseline justify-between gap-2">
-        <span className="text-[11px] font-semibold uppercase tracking-wider text-[var(--ink-muted)]">
+        <span className="type-eyebrow text-[var(--ink-muted)]">
           {label}
           {optional && (
-            <span className="ml-1.5 normal-case tracking-normal font-normal text-[10px] opacity-70">
+            <span className="ml-1.5 normal-case tracking-normal font-normal text-[12px] opacity-70">
               · optional
             </span>
           )}
         </span>
         {max != null && (
           <span
-            className={`text-[10px] tabular ${
+            className={`text-[12px] tabular ${
               (count ?? 0) >= max
                 ? "text-[var(--warning)]"
                 : "text-[var(--ink-muted)] opacity-70"
@@ -73,7 +64,7 @@ function Field({ label, optional, hint, children, count, max }) {
       </span>
       {children}
       {hint && (
-        <span className="mt-1.5 block text-[11px] font-normal leading-snug text-[var(--ink-muted)]">
+        <span className="mt-1.5 block text-[12px] font-normal leading-snug text-[var(--ink-muted)]">
           {hint}
         </span>
       )}
@@ -81,9 +72,6 @@ function Field({ label, optional, hint, children, count, max }) {
   );
 }
 
-// Compact read-only context strip — fixed metadata (date, approver) shown as
-// one summary card instead of stacked display rows, so users don't click
-// expecting to type (borderless controls, muted subtitle, non-interactive)
 function ContextCard({ icon, title, subtitle, badge, badgeTone = "neutral" }) {
   return (
     <div className="flex items-center gap-3 rounded-2xl border border-[var(--border)] bg-[var(--surface-2)]/60 px-3.5 py-3 shadow-card">
@@ -101,13 +89,6 @@ function ContextCard({ icon, title, subtitle, badge, badgeTone = "neutral" }) {
   );
 }
 
-// Live balance readout for the issuedBudget flow — fetches the selected
-// reference's allocated (budget rows) vs issued (issued_budget rows) amounts
-// and renders the remaining balance. Three visual states:
-//   1. no selection → dashed hint card ("select a source to see balance")
-//   2. loading      → skeleton pulse (no layout shift)
-//   3. loaded       → headline balance + allocated/issued grid breakdown,
-//                     degrading to a warning treatment when fully depleted
 function BalanceCard({ summary, isLoading, referenceId, projection, exceeds }) {
   const EMPTY = { allocated: 0, issued: 0, balance: 0 };
 
@@ -161,9 +142,7 @@ function BalanceCard({ summary, isLoading, referenceId, projection, exceeds }) {
           <WalletIcon size={15} />
         </div>
         <div className="flex-1 min-w-0">
-          <p className="text-[11px] font-semibold uppercase tracking-wider text-[var(--ink-muted)]">
-            Balance
-          </p>
+          <p className="type-eyebrow text-[var(--ink-muted)]">Balance</p>
           <p
             className={`flex items-center gap-1 text-2xl font-semibold tracking-tight tabular ${
               exceeds
@@ -188,25 +167,19 @@ function BalanceCard({ summary, isLoading, referenceId, projection, exceeds }) {
       {/* Breakdown: allocated vs already-issued, side by side on a grid */}
       <div className="mt-3 grid grid-cols-2 gap-2 border-t border-[var(--border)] pt-3">
         <div className="min-w-0">
-          <p className="text-[10px] font-semibold uppercase tracking-wider text-[var(--ink-muted)]">
-            Allocated
-          </p>
+          <p className="type-eyebrow text-[var(--ink-muted)]">Allocated</p>
           <p className="truncate text-sm font-semibold tabular">
             {formatMoney(allocated)}
           </p>
         </div>
         <div className="min-w-0 text-right">
-          <p className="text-[10px] font-semibold uppercase tracking-wider text-[var(--ink-muted)]">
-            Issued
-          </p>
+          <p className="type-eyebrow text-[var(--ink-muted)]">Issued</p>
           <p className="truncate text-sm font-semibold tabular">
             {formatMoney(issued)}
           </p>
         </div>
       </div>
 
-      {/* Live projection: balance minus the amount currently typed. Slides in
-          only once a valid amount is entered; red when it would over-issue. */}
       <AnimatePresence initial={false}>
         {projection != null && (
           <motion.div
@@ -217,7 +190,7 @@ function BalanceCard({ summary, isLoading, referenceId, projection, exceeds }) {
             className="overflow-hidden"
           >
             <div className="mt-2 flex items-center justify-between border-t border-[var(--border)] pt-2">
-              <p className="text-[10px] font-semibold uppercase tracking-wider text-[var(--ink-muted)]">
+              <p className="type-eyebrow text-[var(--ink-muted)]">
                 After this issue
               </p>
               <p
@@ -237,9 +210,6 @@ function BalanceCard({ summary, isLoading, referenceId, projection, exceeds }) {
   );
 }
 
-// Money input with a live formatted peso preview and one-tap quick-fill
-// presets — confirms the parsed amount at a glance and avoids typos on
-// numeric keyboards. Kept here (not in ui/) since it is budget-form specific.
 function AmountInput({ value, onChange, disabled }) {
   const parsed = Number(value);
   const preview =
@@ -262,7 +232,7 @@ function AmountInput({ value, onChange, disabled }) {
       />
       <div className="mt-1.5 flex items-center justify-between gap-2">
         <span
-          className={`font-semibold truncate text-[14px] font-medium tabular leading-snug ${
+          className={`font-medium truncate text-sm tabular leading-snug ${
             preview ? "text-[var(--accent-strong)]" : "text-[var(--ink-muted)]"
           }`}
         >
@@ -275,7 +245,7 @@ function AmountInput({ value, onChange, disabled }) {
               type="button"
               disabled={disabled}
               onClick={() => onChange({ target: { value: String(preset) } })}
-              className="h-6 rounded-full border border-[var(--border)] bg-[var(--surface-2)] px-2 text-[10px] font-semibold tabular text-[var(--ink-muted)] transition-colors hover:border-[var(--accent)]/40 hover:text-[var(--accent-strong)] disabled:opacity-50"
+              className="h-7 rounded-full border border-[var(--border)] bg-[var(--surface-2)] px-2 text-[12px] font-semibold tabular text-[var(--ink-muted)] transition-colors hover:border-[var(--accent)]/40 hover:text-[var(--accent-strong)] disabled:opacity-50"
             >
               ₱{preset.toLocaleString("en-PH")}
             </button>
@@ -286,11 +256,6 @@ function AmountInput({ value, onChange, disabled }) {
   );
 }
 
-// Amount field with a reference lock — the input (and its quick-fill presets)
-// stay disabled until a budget reference is chosen, so an amount can never be
-// entered against a non-existent source. Interactions while locked trigger a
-// toast nudge plus an inline animated hint explaining what's missing.
-// `children` renders extra live warnings (e.g. the over-balance alert).
 function AmountField({ value, onChange, saving, locked, children }) {
   return (
     <Field label="Amount">
@@ -350,8 +315,6 @@ const BudgetModal = ({
   const [references, setReferences] = useState(budgetReferences);
   const [refsOpen, setRefsOpen] = useState(false);
 
-  // Sync local list with the prop during render (same pattern as `prevOpen`
-  // below) — avoids a cascading re-render from setState-in-effect.
   const [prevRefs, setPrevRefs] = useState(budgetReferences);
   if (budgetReferences !== prevRefs) {
     setPrevRefs(budgetReferences);
@@ -413,22 +376,10 @@ const BudgetModal = ({
   }, [open, saving, onClose]);
 
   const isAddBudget = transaction === "addBudget";
-
-  // issuedBudget flow: fetch the selected reference's balance (allocated vs
-  // issued vs remaining) as soon as a reference is chosen. Key nests under
-  // ["budgets"] so the create/remove mutations invalidate it automatically.
   const balanceQuery = useBudgetBalance(form.reference_id, !isAddBudget);
 
-  // Smooth eased wheel scrolling for the modal body (scrub feel)
   const bodyRef = useSmoothScroll();
 
-  // Auto-reveal errors: when an error appears (validation or server failure),
-  // scroll the body until the WHOLE banner is visible. The banner animates
-  // its height in (framer-motion), so a one-shot scrollIntoView measures it
-  // at height 0 and leaves the message clipped below — instead we nudge the
-  // container across several frames until the banner's edges settle fully
-  // inside the visible area. Only the modal container is scrolled (never the
-  // page behind the modal).
   const errRef = useRef(null);
   useEffect(() => {
     if (!err) return undefined;
@@ -440,8 +391,6 @@ const BudgetModal = ({
     let frames = 0;
     let settled = 0;
 
-    // Per-frame scrollTop math must not use CSS smooth-scrolling, or each
-    // nudge restarts an animation and never converges.
     container.style.scrollBehavior = "auto";
 
     const step = () => {
@@ -450,17 +399,14 @@ const BudgetModal = ({
         const cRect = container.getBoundingClientRect();
         const bRect = banner.getBoundingClientRect();
 
-        // Clipped below the visible area → scroll down by the deficit
         if (bRect.bottom + margin > cRect.bottom) {
           container.scrollTop += bRect.bottom + margin - cRect.bottom;
         }
-        // Clipped above the visible area → scroll up by the deficit
+
         if (bRect.top - margin < cRect.top) {
           container.scrollTop -= cRect.top - (bRect.top - margin);
         }
 
-        // Fully visible for 2 consecutive frames → done early. Otherwise the
-        // banner is still growing (mount animation) and needs more nudges.
         const fullyVisible =
           bRect.top - margin >= cRect.top &&
           bRect.bottom + margin <= cRect.bottom;
@@ -468,7 +414,7 @@ const BudgetModal = ({
       }
 
       frames += 1;
-      // Cap at ~1s of frames — covers the banner's mount animation with slack
+
       if (settled < 2 && frames < 60) rafId = requestAnimationFrame(step);
     };
 
@@ -479,9 +425,6 @@ const BudgetModal = ({
     };
   }, [err]);
 
-  // Auto-dismiss: clear the error after ERROR_VISIBLE_MS so stale messages
-  // don't linger. Restarted every time a new error appears; clearing triggers
-  // the smooth exit animation below via AnimatePresence.
   useEffect(() => {
     if (!err) return undefined;
 
@@ -489,11 +432,6 @@ const BudgetModal = ({
     return () => clearTimeout(id);
   }, [err]);
 
-  // Live over-balance feedback for the amount input (issuedBudget flow).
-  // The typed amount is compared against the fetched remaining balance:
-  // exceeding it shows an inline warning under the input, tints the balance
-  // card and turns the "After this issue" projection negative. Submitting
-  // still runs the full validation guard + error banner.
   const amountNum = Number(form.amount);
   const amountEntered =
     String(form.amount ?? "").trim() !== "" &&
@@ -507,12 +445,8 @@ const BudgetModal = ({
     amountNum > remaining;
   const projection = !isAddBudget && amountEntered ? amountNum : null;
 
-  // Amount stays locked until a budget reference is selected — applies to
-  // BOTH flows (addBudget + issuedBudget), since submit validation requires
-  // the source first. Clicking the locked field nudges with a toast + hint.
   const amountLocked = !form.reference_id;
 
-  // Client-side validation mirroring `POST /budgets` zod rules
   const validate = () => {
     if (isAddBudget && !form.reference_id)
       return "Please select a budget reference first.";
@@ -527,8 +461,6 @@ const BudgetModal = ({
     if (Number.isNaN(amount)) return "Amount must be a valid number.";
     if (amount <= 0) return "Amount must be greater than zero.";
 
-    // issuedBudget: block over-issuing past the selected reference's
-    // remaining balance (only enforced once the balance query has data)
     if (!isAddBudget && balanceQuery.isSuccess) {
       const remaining = Number(balanceQuery.data?.balance ?? 0);
       if (amount > remaining)
@@ -615,13 +547,13 @@ const BudgetModal = ({
                 <div className="min-w-0">
                   <h3
                     id="budget-modal-title"
-                    className="font-display text-lg font-semibold tracking-tight"
+                    className="text-lg font-semibold tracking-tight"
                   >
                     {transaction === "addBudget"
                       ? "Add Budget"
                       : "Issued Budget"}
                   </h3>
-                  <p className="mt-1 text-xs leading-snug text-[var(--ink-muted)]">
+                  <p className="mt-1 text-sm leading-snug text-[var(--ink-muted)]">
                     {transaction === "addBudget"
                       ? "Top up a budget reference with new funds."
                       : "Allocate funds from a budget reference to an employee."}
@@ -636,16 +568,12 @@ const BudgetModal = ({
                 </button>
               </div>
 
-              {/* Scrollable body — header and footer stay pinned; only this
-                  area scrolls when the form grows past the viewport */}
               <div
                 ref={bodyRef}
                 className="scrollbar-slim min-h-0 flex-1 overflow-y-auto"
               >
                 {transaction === "addBudget" ? (
                   <div className="space-y-5">
-                    {/* Read-only context strip: date + approver, collapsed into one
-                      summary card instead of two stacked display rows */}
                     <ContextCard
                       icon={
                         <div className="h-9 w-9 shrink-0 rounded-full bg-[var(--accent-soft)] text-[var(--accent-strong)] font-semibold text-sm flex items-center justify-center ring-1 ring-[var(--surface)]">
@@ -712,7 +640,6 @@ const BudgetModal = ({
                   </div>
                 ) : (
                   <div className="space-y-5">
-                    {/* Read-only context strip: today's issuance date */}
                     <ContextCard
                       icon={
                         <div className="h-9 w-9 shrink-0 rounded-full bg-[var(--accent-soft)] text-[var(--accent-strong)] flex items-center justify-center ring-1 ring-[var(--surface)]">
@@ -765,9 +692,6 @@ const BudgetModal = ({
                       saving={saving}
                       locked={amountLocked}
                     >
-                      {/* Live over-balance warning — appears as soon as the
-                        typed amount exceeds the remaining balance, so the
-                        user is told before hitting submit */}
                       <AnimatePresence initial={false}>
                         {exceedsBalance && (
                           <motion.div
@@ -860,9 +784,9 @@ const BudgetModal = ({
                         marginTop: 0,
                         transition: { duration: 0.25, ease: "easeOut" },
                       }}
-                      className="flex items-start gap-2 overflow-hidden text-xs text-[var(--danger)] bg-[var(--danger)]/10 border border-[var(--danger)]/20 rounded-xl px-3.5 py-2.5 leading-snug mt-4"
+                      className="flex items-start gap-2 overflow-hidden text-sm text-[var(--danger)] bg-[var(--danger)]/10 border border-[var(--danger)]/20 rounded-xl px-3.5 py-2.5 leading-snug mt-4"
                     >
-                      <AlertCircle size={14} className="mt-px shrink-0" />
+                      <AlertCircle size={18} className="mt-px shrink-0" />
                       {err}
                     </motion.div>
                   )}
@@ -880,7 +804,6 @@ const BudgetModal = ({
               </div>
             </motion.form>
 
-            {/* Nested modal: reference id table + add-new-reference form */}
             <ReferencesModal
               open={refsOpen}
               references={references}

@@ -13,23 +13,21 @@ const buttonVariants = cva(
           "bg-[var(--accent)] text-white hover:bg-[var(--accent-strong)] active:scale-[0.98]",
         outline:
           "bg-[var(--surface)] border border-[var(--border)] text-[var(--ink)] hover:bg-[var(--surface-2)]",
-        ghost:
-          "bg-transparent text-[var(--ink)] hover:bg-[var(--surface-2)]",
-        soft:
-          "bg-[var(--accent-soft)] text-[var(--accent-strong)] hover:bg-[var(--accent-soft)]/80",
+        ghost: "bg-transparent text-[var(--ink)] hover:bg-[var(--surface-2)]",
+        soft: "bg-[var(--accent-soft)] text-[var(--accent-strong)] hover:bg-[var(--accent-soft)]/80",
         danger:
           "bg-[var(--danger)] text-white hover:bg-[var(--danger)]/85 active:scale-[0.98]",
       },
       size: {
-        sm: "h-8 px-3 text-xs rounded-full",
-        md: "h-10 px-4 text-sm rounded-full",
+        sm: "h-9 px-3 text-sm rounded-full sm:h-8",
+        md: "h-11 px-4 text-sm rounded-full sm:h-10",
         lg: "h-12 px-6 text-sm rounded-full",
-        icon: "h-10 w-10 rounded-full",
-        iconSm: "h-8 w-8 rounded-full",
+        icon: "h-11 w-11 rounded-full sm:h-10 sm:w-10",
+        iconSm: "h-9 w-9 rounded-full sm:h-8 sm:w-8",
       },
     },
     defaultVariants: { variant: "primary", size: "md" },
-  }
+  },
 );
 
 export const Button = forwardRef(
@@ -39,6 +37,6 @@ export const Button = forwardRef(
       className={cn(buttonVariants({ variant, size }), className)}
       {...props}
     />
-  )
+  ),
 );
 Button.displayName = "Button";

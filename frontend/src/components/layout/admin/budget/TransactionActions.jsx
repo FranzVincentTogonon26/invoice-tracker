@@ -6,21 +6,13 @@ import { cn, formatMoney } from "../../../../lib/utils";
 import { USER_ROLES } from "../../../../constants";
 import { Button } from "../../../ui/Button";
 
-// Statuses where cancelling a budget transaction is a valid action — the
-// trigger stays disabled otherwise (and always for non-admin viewers).
 const CANCELLABLE_STATUSES = ["closed", "pending", "added", "approved"];
 
-// Admins get the full action set; employees can only inspect a transaction.
 const canCancelTransaction = (status, role) =>
   role === USER_ROLES.ADMIN && CANCELLABLE_STATUSES.includes(status);
 
-// Shared entrance/exit easing — the same curve BudgetModal uses, so both
-// overlay styles animate consistently.
 const DIALOG_EASE = [0.16, 1, 0.3, 1];
 
-/**
- * Danger-tinted icon badge shared by both dialog variants.
- */
 function DialogIcon({ children }) {
   return (
     <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-[var(--danger)]/12 text-[var(--danger)]">
@@ -29,12 +21,6 @@ function DialogIcon({ children }) {
   );
 }
 
-/**
- * Modal shell shared by both dialog variants: dimmed + blurred backdrop, a
- * centred panel with the app's spring-eased entrance, and destructive
- * `alertdialog` semantics (announced assertively by screen readers, with
- * the body copy wired up as its accessible description).
- */
 function DialogShell({
   titleId,
   descriptionId,
@@ -75,13 +61,6 @@ function DialogShell({
   );
 }
 
-/**
- * Row-level "cancel transaction" trigger. Opens a destructive-confirmation
- * dialog (or an "invalid request" dialog when the amount exceeds the
- * remaining budget); confirming calls `onAction("cancel", transaction)`,
- * which the parent wires to the backend (`budget.status -> 'cancelled'`)
- * plus a short undo window.
- */
 export function TransactionActions({
   transaction,
   role = USER_ROLES.ADMIN,
@@ -98,38 +77,21 @@ export function TransactionActions({
 
   const canCancel = canCancelTransaction(transaction.status, role);
 
-  // A cancel attempt is invalid when the transaction amount exceeds the
-  // remaining budget (cash on hand — the overview total minus issued funds,
-  // passed by the parent as `valueRemaining`) — the trigger then opens an
-  // error dialog instead of the confirmation flow. Guarded on
-  // `valueRemaining != null` so while the overview is loading (or a caller
-  // doesn't pass a value) the check is simply skipped and never fires on
-  // missing data.
   const amount = Number(transaction.amount) || 0;
-  // `valueRemaining` arrives as a RAW number — the display layer formats
-  // it. `Number.isFinite` makes a malformed value skip the check entirely
-  // instead of silently parsing to 0 and blocking every cancel attempt
-  // with a bogus "exceeds the budget" error.
   const remaining = Number(valueRemaining);
   const exceedsTotal =
     valueRemaining != null && Number.isFinite(remaining) && amount > remaining;
 
   const closeDialog = useCallback(() => {
-    // Don't dismiss while the cancel request is in flight — the dialog is
-    // the only signal that something is happening.
     if (pending) return;
     setOpen(false);
     triggerRef.current?.focus();
   }, [pending]);
 
-  // Move focus into the dialog when it opens — the Close button for the
-  // invalid-request dialog, the confirm button otherwise.
   useEffect(() => {
     if (open) initialFocusRef.current?.focus();
   }, [open]);
 
-  // Lock page scroll behind the dialog so background content can't drift
-  // while the modal is up.
   useEffect(() => {
     if (!open) return undefined;
     const previous = document.body.style.overflow;
@@ -139,8 +101,6 @@ export function TransactionActions({
     };
   }, [open]);
 
-  // Close on Escape while open. Capture phase + stopPropagation keeps
-  // page-level Escape handlers from also firing.
   useEffect(() => {
     if (!open) return undefined;
     const onKeyDown = (e) => {
@@ -153,7 +113,6 @@ export function TransactionActions({
     return () => window.removeEventListener("keydown", onKeyDown, true);
   }, [open, closeDialog]);
 
-  // Minimal focus trap — the dialog only contains one or two buttons.
   const handleDialogKeyDown = (e) => {
     if (e.key !== "Tab") return;
     const buttons = Array.from(
@@ -175,14 +134,12 @@ export function TransactionActions({
     if (pending) return;
     setOpen(false);
     onAction?.("cancel", transaction);
-    // Hand focus back to the trigger so keyboard users don't land on <body>.
     triggerRef.current?.focus();
   };
 
   const confirmRestore = () => {
     if (pending) return;
     onAction?.("restore", transaction);
-    // Hand focus back to the trigger so keyboard users don't land on <body>.
     triggerRef.current?.focus();
   };
 
@@ -194,7 +151,7 @@ export function TransactionActions({
           type="button"
           onClick={confirmRestore}
           className={cn(
-            "inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-xs font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--danger)]/30",
+            "inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-sm font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--danger)]/30",
             "text-[var(--ink-muted)] hover:bg-[var(--ink)]/14 hover:text-[var(--ink)]",
             className,
           )}
@@ -211,7 +168,7 @@ export function TransactionActions({
           disabled={!canCancel}
           onClick={() => setOpen(true)}
           className={cn(
-            "inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-xs font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--danger)]/30",
+            "inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-sm font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--danger)]/30",
             "text-[var(--ink-muted)] hover:bg-[var(--danger)]/10 hover:text-[var(--danger)]",
             className,
           )}
@@ -226,11 +183,6 @@ export function TransactionActions({
         </span>
       )}
 
-      {/* NOTE: the portal must NOT be a direct child of <AnimatePresence> —
-          a portal is not a valid React element (isValidElement(portal) is
-          false) so AnimatePresence silently drops it and the dialog never
-          renders. Instead, the portal stays mounted and AnimatePresence
-          tracks the keyed motion.div inside it. */}
       {createPortal(
         <AnimatePresence>
           {open &&
@@ -310,10 +262,10 @@ export function TransactionActions({
                     card) so admins confirm exactly what they're reversing. */}
                 <div className="mt-4 flex items-center gap-3 rounded-2xl border border-[var(--border)] bg-[var(--surface-2)]/60 px-4 py-3">
                   <div className="min-w-0 flex-1">
-                    <p className="truncate text-sm font-semibold text-[var(--ink)]">
+                    <p className="truncate text-[16px] font-semibold text-[var(--ink)]">
                       {transaction.description || "Budget transaction"}
                     </p>
-                    <p className="mt-0.5 text-xs text-[var(--ink-muted)]">
+                    <p className="mt-0.5 text-sm text-[var(--ink-muted)]">
                       Amount to reverse
                     </p>
                   </div>

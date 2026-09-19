@@ -5,7 +5,7 @@ import { TransactionCard, TransactionRow } from "./TransactionRow";
 // because it holds the primary transaction information. The percentages sum to
 // exactly 100% so `table-fixed` never overflows the scroll container — sizing
 // verified against the table's 900px min-width.
-const COLUMN_WIDTHS = ["27%", "11%", "13%", "18%", "13%", "10%", "5%"];
+const COLUMN_WIDTHS = ["27%", "11%", "13%", "18%", "13%", "10%", "6%"];
 
 const HEADERS = [
   { label: "Description" },
@@ -54,7 +54,7 @@ const TransactionTable = ({ rows, role, onAction, valueRemaining }) => (
                   key={h.label}
                   scope="col"
                   className={cn(
-                    "border-b border-[var(--border)] px-4 py-3.5 text-[10px] font-bold uppercase tracking-[0.14em] text-[var(--ink-muted)] first:pl-5 last:pr-5",
+                    "border-b border-[var(--border)] px-4 py-3.5 type-eyebrow text-[var(--ink-muted)] first:pl-5 last:pr-5",
                     {
                       "text-left": h.align === "left",
                       "text-center": h.align === "center",

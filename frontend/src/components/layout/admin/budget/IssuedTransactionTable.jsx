@@ -59,7 +59,7 @@ export function IssuedTransactionTable({ rows, onAction }) {
                     key={h.label}
                     scope="col"
                     className={cn(
-                      "border-b border-[var(--border)] px-4 py-3.5 text-[10px] font-bold uppercase tracking-[0.14em] text-[var(--ink-muted)] first:pl-5 last:pr-5",
+                      "border-b border-[var(--border)] px-4 py-3.5 type-eyebrow text-[var(--ink-muted)] first:pl-5 last:pr-5",
                       {
                         "text-left": h.align === "left",
                         "text-center": h.align === "center",

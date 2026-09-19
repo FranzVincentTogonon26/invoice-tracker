@@ -130,7 +130,7 @@ export function NotificationsPopover() {
                               {st} · {formatMoney(inv.total, inv.currency)}
                             </div>
                           </div>
-                          <div className="text-[10px] text-[var(--ink-muted)] shrink-0 tabular-nums mt-0.5">
+                          <div className="text-[11px] text-[var(--ink-muted)] shrink-0 tabular-nums mt-0.5">
                             {relativeTime(inv.created_at)}
                           </div>
                         </button>
@@ -156,3 +156,4 @@ export function NotificationsPopover() {
     </div>
   );
 }
+

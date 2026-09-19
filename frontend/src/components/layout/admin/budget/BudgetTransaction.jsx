@@ -22,13 +22,7 @@ import {
 
 import TransactionTable from "./TransactionTable";
 
-// Client-side page size — the API returns the full filtered list.
 const PAGE_SIZE = 100;
-
-// How long the "Undo" window stays open after a cancellation (ms). The
-// backend commits the cancel immediately; while this window runs the Undo
-// button can restore the transaction's previous status. Once it closes, the
-// cancelled status becomes permanent.
 const UNDO_WINDOW_MS = 6000;
 
 const METHOD_FILTER_OPTIONS = [
@@ -38,14 +32,10 @@ const METHOD_FILTER_OPTIONS = [
 
 const BudgetTransaction = ({ valueRemaining }) => {
   const { user } = useAuth();
-  // This screen is admin-gated (`requireAdminAccess`); fall back to admin so
-  // the actions menu keeps working if the role is momentarily unavailable.
   const role = user?.role ?? USER_ROLES.ADMIN;
-
   const [status, setStatus] = useState("all");
   const [method, setMethod] = useState("all");
   const [search, setSearch] = useState("");
-  // Debounced copy of `search` so we don't fire a request per keystroke.
   const [debouncedSearch, setDebouncedSearch] = useState("");
   const [page, setPage] = useState(0);
 
@@ -54,9 +44,6 @@ const BudgetTransaction = ({ valueRemaining }) => {
     return () => clearTimeout(timer);
   }, [search]);
 
-  // Filter setters — every filter change also snaps back to the first page.
-  // (Event-handler reset instead of an effect; the page clamp below keeps
-  // out-of-range pages safe either way.)
   const updateStatus = (key) => {
     setStatus(key);
     setPage(0);
@@ -75,18 +62,14 @@ const BudgetTransaction = ({ valueRemaining }) => {
     search: debouncedSearch.trim() || undefined,
   });
 
-  // The hook already resolves `data` to an array.
   const rows = useMemo(() => data ?? [], [data]);
 
-  // Payment-method filtering is client-side (the API only supports `status`
-  // and `search`) and runs before pagination so page counts stay accurate.
   const filteredRows = useMemo(
     () => (method === "all" ? rows : rows.filter((r) => r.method === method)),
     [rows, method],
   );
 
   const pageCount = Math.max(1, Math.ceil(filteredRows.length / PAGE_SIZE));
-  // Clamp so a filter change can never land on an out-of-range page.
   const currentPage = Math.min(page, pageCount - 1);
   const pageRows = useMemo(
     () =>
@@ -97,9 +80,6 @@ const BudgetTransaction = ({ valueRemaining }) => {
     [filteredRows, currentPage],
   );
 
-  // Running total of the filtered list — shown in the summary footer.
-  // Cancelled transactions are excluded: they no longer affect the budget,
-  // so they must not count toward the total.
   const total = useMemo(
     () =>
       filteredRows.reduce(
@@ -114,7 +94,6 @@ const BudgetTransaction = ({ valueRemaining }) => {
     filteredRows.length === 0 ? 0 : currentPage * PAGE_SIZE + 1;
   const rangeEnd = Math.min(filteredRows.length, (currentPage + 1) * PAGE_SIZE);
 
-  // When filters are active the empty state doubles as a "clear filters" affordance.
   const hasActiveFilters =
     status !== "all" || method !== "all" || search.trim().length > 0;
 
@@ -126,11 +105,6 @@ const BudgetTransaction = ({ valueRemaining }) => {
 
   const { cancelTransaction, restoreTransaction } = useBudgetMutations();
 
-  // Row-level mutations route through here. `cancel` hits the backend
-  // (budget.status -> 'cancelled') and opens a short undo window — undoing
-  // restores the transaction's previous status before the change is treated
-  // as permanent. `restore` hits the backend directly and sets the
-  // transaction's status back to 'added' (budget.status -> 'added').
   const handleAction = async (action, transaction) => {
     if (action === "restore") {
       try {
@@ -182,7 +156,9 @@ const BudgetTransaction = ({ valueRemaining }) => {
       <CardHeader>
         <div>
           <CardTitle className="text-lg">Budget Transactions</CardTitle>
-          <CardDescription>Track all budget activity.</CardDescription>
+          <CardDescription className="text-sm">
+            Track all budget activity.
+          </CardDescription>
         </div>
       </CardHeader>
       <div>
@@ -195,7 +171,7 @@ const BudgetTransaction = ({ valueRemaining }) => {
                   key={t.key}
                   onClick={() => updateStatus(t.key)}
                   className={cn(
-                    "h-7 flex-1 rounded-full px-2 text-xs font-semibold transition-colors sm:flex-none sm:px-4",
+                    "h-8 flex-1 rounded-full px-2 text-sm font-semibold transition-colors sm:flex-none sm:px-4",
                     status === t.key
                       ? "bg-[var(--ink)] text-[var(--bg)]"
                       : "text-[var(--ink-muted)] hover:text-[var(--ink)]",
@@ -272,11 +248,11 @@ const BudgetTransaction = ({ valueRemaining }) => {
 
             {/* Footer — "Showing X–Y of N", running total, and pagination */}
             <div className="mt-4 flex flex-col gap-3 border-t border-[var(--border)] pt-4 sm:flex-row sm:items-center">
-              <p className="text-xs text-[var(--ink-muted)]">
+              <p className="text-sm text-[var(--ink-muted)]">
                 Showing {rangeStart}–{rangeEnd} of {filteredRows.length}{" "}
                 {filteredRows.length === 1 ? "transaction" : "transactions"}
               </p>
-              <p className="text-xs text-[var(--ink-muted)] sm:ml-auto sm:mr-6">
+              <p className="text-sm text-[var(--ink-muted)] sm:ml-auto sm:mr-6">
                 Total
                 <span className="ml-2 text-sm font-semibold text-[var(--accent-strong)] tabular">
                   {formatMoney(total)}

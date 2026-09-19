@@ -15,17 +15,17 @@ function Field({ label, optional, hint, children, count, max }) {
   return (
     <label className="block">
       <span className="mb-1.5 flex items-baseline justify-between gap-2">
-        <span className="text-[11px] font-semibold uppercase tracking-wider text-[var(--ink-muted)]">
+        <span className="type-eyebrow text-[var(--ink-muted)]">
           {label}
           {optional && (
-            <span className="ml-1.5 normal-case tracking-normal font-normal text-[10px] opacity-70">
+            <span className="ml-1.5 normal-case tracking-normal font-normal text-[11px] opacity-70">
               · optional
             </span>
           )}
         </span>
         {max != null && (
           <span
-            className={`text-[10px] tabular ${
+            className={`text-[11px] tabular ${
               (count ?? 0) >= max
                 ? "text-[var(--warning)]"
                 : "text-[var(--ink-muted)] opacity-70"
@@ -37,7 +37,7 @@ function Field({ label, optional, hint, children, count, max }) {
       </span>
       {children}
       {hint && (
-        <span className="mt-1.5 block text-[11px] font-normal leading-snug text-[var(--ink-muted)]">
+        <span className="mt-1.5 block text-[12px] font-normal leading-snug text-[var(--ink-muted)]">
           {hint}
         </span>
       )}
@@ -115,11 +115,11 @@ const EmployeesModal = ({ open, onClose, create }) => {
                 <div className="min-w-0">
                   <h3
                     id="employees-modal-title"
-                    className="font-display text-lg font-semibold tracking-tight"
+                    className="text-lg font-semibold tracking-tight"
                   >
                     Add Employee
                   </h3>
-                  <p className="mt-1 text-xs leading-snug text-[var(--ink-muted)]">
+                  <p className="mt-1 text-sm leading-snug text-[var(--ink-muted)]">
                     Create an employee account. They can sign in immediately
                     with the credentials you set.
                   </p>
@@ -187,9 +187,9 @@ const EmployeesModal = ({ open, onClose, create }) => {
                         marginTop: 0,
                         transition: { duration: 0.25, ease: "easeOut" },
                       }}
-                      className="flex items-start gap-2 overflow-hidden text-xs text-[var(--danger)] bg-[var(--danger)]/10 border border-[var(--danger)]/20 rounded-xl px-3.5 py-2.5 leading-snug mt-4"
+                      className="flex items-start gap-2 overflow-hidden text-sm text-[var(--danger)] bg-[var(--danger)]/10 border border-[var(--danger)]/20 rounded-xl px-3.5 py-2.5 leading-snug mt-4"
                     >
-                      <AlertCircle size={14} className="mt-px shrink-0" />
+                      <AlertCircle size={17} className="mt-px shrink-0" />
                       {err}
                     </motion.div>
                   )}

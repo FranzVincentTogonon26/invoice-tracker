@@ -37,16 +37,11 @@ export function StatCard({
   delta,
   chart = "line",
   data = [],
-  // `breakdown` is opt-in: pass an array of { label, value, hint?, tone? } to
-  // render the list section. Passing [] renders an empty state, omitting it
-  // renders no list at all.
   breakdown,
   breakdownCaption = "Per reference",
   loading = false,
   icon: Icon,
   accent = false,
-  // Optional status tint for the icon tile, value and sparkline — mirrors the
-  // app's status colors (active → success, pending → warning, over → danger).
   tone,
 }) {
   const positive = delta == null ? null : delta >= 0;
@@ -63,12 +58,8 @@ export function StatCard({
   const displayValue = value == null || value === "" ? "—" : value;
   const hasData = Array.isArray(data) && data.length > 0;
   const hasBreakdown = Array.isArray(breakdown);
-  // Without a `breakdown` list, `breakdownCaption` (e.g. "Across all
-  // employees") is shown as a one-line footer hint instead of being ignored.
   const hasCaption = !hasBreakdown && Boolean(breakdownCaption);
 
-  // Icon tile treatment — soft tinted squircle; `tone` overrides the default
-  // accent tint so status cards read at a glance.
   const iconTile = accent
     ? "bg-white/15 text-white"
     : tone === "success"
@@ -79,7 +70,6 @@ export function StatCard({
           ? "bg-[var(--danger)]/12 text-[var(--danger)]"
           : "bg-[var(--accent-soft)] text-[var(--accent-strong)]";
 
-  // Value color — status tints carry meaning (green = active, amber = pending).
   const valueColor = accent
     ? "text-white"
     : tone === "success"
@@ -90,8 +80,6 @@ export function StatCard({
           ? "text-[var(--danger)]"
           : "text-[var(--ink)]";
 
-  // Skeleton placeholders keep the 4-column grid from jumping while the
-  // overview query loads.
   if (loading) {
     return (
       <Card
@@ -126,9 +114,6 @@ export function StatCard({
             )}
           />
         )}
-        {/* Only reserve the chart/breakdown slot when the caller actually
-            supplies that content — otherwise the skeleton renders taller
-            than the loaded card and the grid row jumps. */}
         {(hasData || hasBreakdown) && (
           <div
             className={cn(
@@ -150,8 +135,6 @@ export function StatCard({
         !accent && "hover:-translate-y-0.5",
       )}
     >
-      {/* Soft light bloom + hairline ring in the top-right corner of the hero
-          card — echoes the accent gradient using the existing tokens. */}
       {accent && (
         <>
           <div
@@ -180,7 +163,7 @@ export function StatCard({
             )}
             <span
               className={cn(
-                "truncate text-xs font-semibold tracking-tight",
+                "truncate text-sm font-semibold tracking-tight",
                 accent ? "text-white/70" : "text-[var(--ink-muted)]",
               )}
             >
@@ -190,7 +173,7 @@ export function StatCard({
           <div className="flex items-baseline gap-1 min-w-0">
             <span
               className={cn(
-                "font-display tabular text-2xl sm:text-3xl font-semibold tracking-tight truncate",
+                " tabular text-2xl sm:text-3xl font-semibold tracking-tight truncate",
                 valueColor,
               )}
             >
@@ -220,7 +203,7 @@ export function StatCard({
           {hasCaption && (
             <p
               className={cn(
-                "text-[11px] font-medium tracking-tight",
+                "text-sm  tracking-tight",
                 accent ? "text-white/60" : "text-[var(--ink-muted)]",
               )}
             >
@@ -239,7 +222,7 @@ export function StatCard({
               <div className="flex items-center justify-between gap-2 mb-1.5">
                 <span
                   className={cn(
-                    "text-[10px] font-semibold uppercase tracking-wider",
+                    "type-eyebrow",
                     accent ? "text-white/60" : "text-[var(--ink-muted)]",
                   )}
                 >
@@ -247,7 +230,7 @@ export function StatCard({
                 </span>
                 <span
                   className={cn(
-                    "text-[10px] font-semibold tabular rounded-full px-1.5 py-0.5",
+                    "text-[11px] font-semibold tabular rounded-full px-1.5 py-0.5",
                     accent
                       ? "bg-white/10 text-white/70"
                       : "bg-[var(--surface-2)] text-[var(--ink-muted)]",
@@ -260,7 +243,7 @@ export function StatCard({
               {breakdown.length === 0 ? (
                 <p
                   className={cn(
-                    "text-[11px] italic py-1",
+                    "text-sm italic py-1",
                     accent ? "text-white/60" : "text-[var(--ink-muted)]",
                   )}
                 >
@@ -275,7 +258,7 @@ export function StatCard({
                   {breakdown.map((item, i) => (
                     <li
                       key={item.key ?? i}
-                      className="flex items-center justify-between gap-2 text-xs"
+                      className="flex items-center justify-between gap-2 text-sm"
                     >
                       <span className="flex min-w-0 items-center gap-1.5">
                         <span
@@ -303,7 +286,7 @@ export function StatCard({
                         >
                           {item.label ?? "—"}
                           {item.hint != null && (
-                            <span className="text-[10px] opacity-60">
+                            <span className="text-sm opacity-60">
                               {" · "}
                               {item.hint}
                             </span>

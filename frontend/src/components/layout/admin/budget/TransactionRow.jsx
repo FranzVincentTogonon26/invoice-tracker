@@ -4,7 +4,6 @@ import { cn, formatDate, formatMoney, formatTime } from "../../../../lib/utils";
 import { ApproverCell } from "./ApproverCell";
 import { PaymentMethod, methodLabel } from "./PaymentMethod";
 import { TransactionActions } from "./TransactionActions";
-import { BanknoteCheck } from "lucide-react";
 
 /**
  * Desktop table row. `<tr>` cells follow the fixed column proportions set in
@@ -26,17 +25,12 @@ export function TransactionRow({
           aria-hidden
           className="absolute inset-y-3 left-0 w-0.5 rounded-full bg-[var(--accent-strong)] opacity-0 transition-opacity duration-150 group-hover:opacity-100"
         />
-        <p className="text-sm font-semibold leading-snug text-[var(--ink)]">
+        <p className="text-[16px] leading-snug text-[var(--ink)]">
           {t.description}
         </p>
 
         {t.label && (
-          <p className="mt-1 flex items-center gap-1.5 text-xs text-[var(--ink-muted)]">
-            <BanknoteCheck
-              size={15}
-              className="shrink-0 text-[var(--accent-strong)]"
-              strokeWidth={2}
-            />
+          <p className="mt-1 flex items-center gap-1.5 text-sm text-[var(--ink-muted)]">
             <span className="min-w-0 truncate capitalize">{t.label}</span>
           </p>
         )}
@@ -63,11 +57,11 @@ export function TransactionRow({
 
       {/* Date */}
       <td className="px-4 py-3.5 align-middle">
-        <p className="text-xs leading-none tabular-nums text-[var(--ink)]">
+        <p className="text-sm leading-none tabular-nums text-[var(--ink)]">
           {formatDate(t.created_at)}
         </p>
 
-        <p className="mt-1 text-[10px] leading-none tabular-nums text-[var(--ink-muted)]">
+        <p className="mt-1 text-[12px] leading-none tabular-nums text-[var(--ink-muted)]">
           {formatTime(t.created_at)}
         </p>
       </td>

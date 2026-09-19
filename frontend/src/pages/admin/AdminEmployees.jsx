@@ -142,26 +142,14 @@ export default function AdminEmployees() {
         title="Employees"
         description="Manage employee accounts and monitor their budget activity."
         actions={
-          <div className="flex items-center gap-2">
-            <Button
-              variant="accent"
-              onClick={() => setAddOpen(true)}
-              size="sm"
-              className="h-9"
-            >
+          <div className="flex w-full flex-wrap items-center gap-2 sm:w-auto sm:justify-end">
+            <Button variant="accent" onClick={() => setAddOpen(true)}>
               <Plus size={16} /> Add Employee
             </Button>
           </div>
         }
       />
 
-      {/* Overview — modern 4-up KPI band.
-          Single responsive grid (1 → 2 → 4 cols) so every metric scans in
-          one row on desktop instead of a lonely full-width hero with three
-          cards stranded below it. The accent still flags the primary money
-          metric; tones flag status. Stagger comes from variants (one source
-          of truth) rather than hand-tuned delays, and each tile lifts
-          slightly on hover for a tactile feel. Logic / props are untouched. */}
       <motion.div
         variants={{
           hidden: {},
@@ -269,7 +257,7 @@ export default function AdminEmployees() {
         <CardHeader>
           <div>
             <CardTitle className="text-lg">All Employees</CardTitle>
-            <CardDescription>
+            <CardDescription className="text-sm">
               Approve pending sign-ups, activate or deactivate accounts, and
               keep an eye on each employee&apos;s issued budget.
             </CardDescription>
@@ -292,7 +280,7 @@ export default function AdminEmployees() {
                 type="button"
                 onClick={() => updateStatus(t.key)}
                 className={cn(
-                  "h-7 rounded-full px-4 text-xs font-semibold transition-colors",
+                  "h-8 rounded-full px-4 text-sm font-semibold transition-colors",
                   status === t.key
                     ? "bg-[var(--ink)] text-[var(--bg)]"
                     : "text-[var(--ink-muted)] hover:text-[var(--ink)]",
@@ -358,7 +346,7 @@ export default function AdminEmployees() {
 
             {/* Footer — "Showing X–Y of N" and pagination */}
             <div className="mt-4 flex flex-col gap-3 border-t border-[var(--border)] pt-4 sm:flex-row sm:items-center">
-              <p className="text-xs text-[var(--ink-muted)]">
+              <p className="text-sm text-[var(--ink-muted)]">
                 Showing {rangeStart}–{rangeEnd} of {employees.length}{" "}
                 {employees.length === 1 ? "employee" : "employees"}
               </p>

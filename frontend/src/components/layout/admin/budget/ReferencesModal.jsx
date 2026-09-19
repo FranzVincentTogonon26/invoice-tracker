@@ -17,8 +17,6 @@ import { formatDate } from "../../../../lib/utils";
 import { useBudgetMutations } from "../../../../hooks/useBudget";
 import useSmoothScroll from "../../../../hooks/useSmoothScroll";
 
-// Error banners auto-dismiss after this long (ms); AnimatePresence plays the
-// smooth fade/slide/height-collapse exit when the message clears.
 const ERROR_VISIBLE_MS = 5000;
 
 const ReferencesModal = ({
@@ -29,16 +27,12 @@ const ReferencesModal = ({
   onClose,
 }) => {
   const { create, removeReference: remove } = useBudgetMutations();
-  // Smooth eased wheel scrolling for the references table (scrub feel)
   const tableRef = useSmoothScroll();
   const [newRef, setNewRef] = useState("");
   const [err, setErr] = useState("");
   const [adding, setAdding] = useState(false);
   const [deletingId, setDeletingId] = useState(null);
 
-  // Auto-dismiss: clear the error after ERROR_VISIBLE_MS so stale messages
-  // don't linger. Restarted every time a new error appears; clearing triggers
-  // the smooth exit animation below via AnimatePresence.
   useEffect(() => {
     if (!err) return undefined;
 
@@ -91,8 +85,6 @@ const ReferencesModal = ({
     }
   };
 
-  // Deletes the reference row in the DB, drops it from the parent's local
-  // list and clears the dropdown selection if it was selected.
   const handleDelete = async (referenceId) => {
     if (adding || deletingId) return;
     setErr("");
@@ -108,8 +100,6 @@ const ReferencesModal = ({
     }
   };
 
-  // Close on Escape while open (never while adding/deleting). stopPropagation
-  // keeps the parent BudgetModal's window-level Escape handler from also firing.
   useEffect(() => {
     if (!open) return;
 
@@ -155,7 +145,7 @@ const ReferencesModal = ({
                   >
                     Budget Source Reference
                   </h3>
-                  <p className="mt-1 text-xs leading-snug text-[var(--ink-muted)]">
+                  <p className="mt-1 text-sm leading-snug text-[var(--ink-muted)]">
                     Manage the source references budgets are allocated from.
                   </p>
                 </div>
@@ -204,10 +194,7 @@ const ReferencesModal = ({
               >
                 <table className="w-full text-sm">
                   <thead>
-                    <tr className="sticky top-0 z-10 bg-[var(--surface-2)] text-[10px] uppercase tracking-wider text-[var(--ink-muted)]">
-                      <th className="px-4 py-2.5 text-left font-semibold">
-                        Reference Id
-                      </th>
+                    <tr className="sticky top-0 z-10 bg-[var(--surface-2)] type-eyebrow text-[var(--ink-muted)]">
                       <th className="px-4 py-2.5 text-left font-semibold">
                         Source Name
                       </th>
@@ -223,16 +210,10 @@ const ReferencesModal = ({
                         key={reference.reference_id}
                         className="border-t border-[var(--border)] first:border-t-0 hover:bg-[var(--surface-2)]/60 transition-colors"
                       >
-                        <td
-                          title={reference.reference_id}
-                          className="px-4 py-2.5 font-mono text-[13px] text-[var(--ink)] break-all"
-                        >
-                          {`${(reference.reference_id ?? "").slice(0, 8)}-xxxxx`}
-                        </td>
-                        <td className="px-4 py-2.5 text-[13px] text-[var(--ink)] max-w-[160px] truncate">
+                        <td className="px-4 py-2.5 text-sm text-[var(--ink)] max-w-[160px] truncate">
                           {reference.label ?? "—"}
                         </td>
-                        <td className="px-4 py-2.5 text-right text-xs text-[var(--ink-muted)] whitespace-nowrap">
+                        <td className="px-4 py-2.5 text-right text-sm text-[var(--ink-muted)] whitespace-nowrap">
                           {formatDate(
                             reference.created_at ?? reference.date_created,
                           )}
@@ -301,9 +282,9 @@ const ReferencesModal = ({
                       transition: { duration: 0.25, ease: "easeOut" },
                     }}
                     role="alert"
-                    className="flex items-start gap-2 overflow-hidden text-xs text-[var(--danger)] bg-[var(--danger)]/10 border border-[var(--danger)]/20 rounded-xl px-3.5 py-2.5 leading-snug mt-4"
+                    className="flex items-start gap-2 overflow-hidden text-sm text-[var(--danger)] bg-[var(--danger)]/10 border border-[var(--danger)]/20 rounded-xl px-3.5 py-2.5 leading-snug mt-4"
                   >
-                    <AlertCircle size={14} className="mt-px shrink-0" />
+                    <AlertCircle size={18} className="mt-px shrink-0" />
                     {err}
                   </motion.div>
                 )}

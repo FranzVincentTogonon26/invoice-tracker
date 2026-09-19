@@ -38,7 +38,7 @@ export const SelectReference = ({
         <span className="block truncate text-sm font-medium">
           {option.label}
         </span>
-        <span className="flex min-w-0 items-center gap-1.5 text-[10px] text-[var(--ink-muted)]">
+        <span className="flex min-w-0 items-center gap-1.5 text-[12px] text-[var(--ink-muted)]">
           <span className="shrink-0 tabular">
             {formatDate(option.createdAt)}
           </span>
@@ -69,7 +69,7 @@ export const SelectReference = ({
               className="shrink-0 text-[var(--ink-muted)]"
             />
             <span className="truncate">{selectedOption.label}</span>
-            <span className="shrink-0 text-[11px] text-[var(--ink-muted)] tabular">
+            <span className="shrink-0 text-[12px] text-[var(--ink-muted)]">
               {formatDate(selectedOption.createdAt)}
             </span>
           </span>

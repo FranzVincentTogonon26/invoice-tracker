@@ -22,7 +22,9 @@ export const STATUS = {
   sent: { tone: "accent", label: "Sent" },
   paid: { tone: "success", label: "Paid" },
   overdue: { tone: "danger", label: "Overdue" },
-  pending: { tone: "danger", label: "Pending" },
+  // "pending" is an actionable, queued state — it reads amber (warning) the same
+  // way the Employees list does. Red (danger) is reserved for failures/overdue.
+  pending: { tone: "warning", label: "Pending" },
   added: { tone: "accent", label: "Added" },
   cancelled: { tone: "danger", label: "Cancelled" },
   // budget_issued_reference.status values (Budget Issued Transaction tab)

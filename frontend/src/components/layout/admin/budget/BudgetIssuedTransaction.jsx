@@ -12,20 +12,11 @@ import { PAYMENT_METHODS, STATUS } from "../../../../constants";
 import IssuedTransactionFilters from "./IssuedTransactionFilters";
 import IssuedTransactionTable from "./IssuedTransactionTable";
 
-// Client-side page size — the API returns the full filtered list.
 const PAGE_SIZE = 100;
 
-/**
- * Budget Issued Transactions — every budget handed out to an employee.
- * Desktop: semantic `<table>` (see `IssuedTransactionTable`) with a soft mint
- * header and generous row padding; horizontal scrolls when space is tight.
- * Mobile: stacked transaction cards so nothing becomes unreadable.
- */
 const BudgetIssuedTransaction = () => {
   const [search, setSearch] = useState("");
-  // Debounced copy of `search` so we don't fire a request per keystroke.
   const [debouncedSearch, setDebouncedSearch] = useState("");
-  // Dropdown filters — "all" shows every row until a specific value is picked.
   const [employee, setEmployee] = useState("all");
   const [method, setMethod] = useState("all");
   const [fund, setFund] = useState("all");
@@ -42,7 +33,6 @@ const BudgetIssuedTransaction = () => {
     setPage(0);
   };
 
-  // Dropdown filter setters — every filter change also snaps back to page 0.
   const updateEmployee = (value) => {
     setEmployee(value);
     setPage(0);
@@ -87,9 +77,6 @@ const BudgetIssuedTransaction = () => {
   const { cancelIssuedTransaction, restoreIssuedTransaction } =
     useBudgetMutations();
 
-  // Row-level mutations route through here. `cancel` flips the parent
-  // `budget_issued_reference.status` to 'cancel'; `restore` puts it back to
-  // 'open'. Both invalidate the shared ["budgets"] cache via the hook.
   const handleAction = async (action, transaction) => {
     if (action === "restore") {
       try {
@@ -165,8 +152,6 @@ const BudgetIssuedTransaction = () => {
     ];
   }, [rows]);
 
-  // The API only supports `search`; the four dropdown filters run client-side
-  // before pagination so page counts stay accurate.
   const filteredRows = useMemo(
     () =>
       rows.filter(
@@ -222,7 +207,7 @@ const BudgetIssuedTransaction = () => {
               Budget Issued Transactions
             </CardTitle>
           </div>
-          <CardDescription>
+          <CardDescription className="text-sm">
             Track and manage all budget issuances to employees.
           </CardDescription>
         </div>
@@ -272,7 +257,7 @@ const BudgetIssuedTransaction = () => {
 
             {/* Pagination */}
             <div className="mt-4 flex flex-col items-center justify-between gap-3 sm:flex-row">
-              <p className="text-xs tabular-nums text-[var(--ink-muted)]">
+              <p className="text-sm tabular-nums text-[var(--ink-muted)]">
                 Showing {rangeStart}–{rangeEnd} of {filteredRows.length}{" "}
                 {filteredRows.length === 1 ? "transaction" : "transactions"}
               </p>

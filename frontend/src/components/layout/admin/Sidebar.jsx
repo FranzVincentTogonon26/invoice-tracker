@@ -31,7 +31,7 @@ const NAV = [
     icon: ArrowLeftRight,
     label: "Transactions",
   },
-  { to: "/admin/employees", icon: Users, label: "Employee", primary: true },
+  { to: "/admin/employees", icon: Users, label: "Employees", primary: true },
   { to: "/admin/budget", icon: FileText, label: "Budget", primary: true },
   { to: "/admin/expenses", icon: Receipt, label: "Expenses", primary: true },
   {
@@ -152,8 +152,7 @@ const ACCOUNT_ICON =
   "bg-[var(--surface-2)] text-[var(--ink-muted)]";
 
 const SHEET_LABEL =
-  "mt-5 px-1 text-[10px] font-semibold uppercase tracking-wider " +
-  "text-[var(--ink-muted)]";
+  "mt-5 px-1 type-eyebrow " + "text-[var(--ink-muted)]";
 
 /**
  * Floating bottom dock for small screens — the four primary destinations plus
@@ -194,7 +193,7 @@ function MobileDock({ onOpenMenu }) {
                   strokeWidth={isActive ? 2.4 : 2}
                   className="relative z-10"
                 />
-                <span className="relative z-10 max-w-full truncate text-[9px] font-medium leading-3">
+                <span className="relative z-10 max-w-full truncate text-[11px] font-medium leading-none">
                   {label}
                 </span>
               </span>
@@ -211,7 +210,7 @@ function MobileDock({ onOpenMenu }) {
         >
           <span className={cn(DOCK_INNER, "hover:bg-[var(--surface-2)]")}>
             <MenuIcon size={18} />
-            <span className="max-w-full truncate text-[10px] font-medium leading-none">
+            <span className="max-w-full truncate text-[11px] font-medium leading-none">
               Menu
             </span>
           </span>
@@ -466,7 +465,7 @@ export function Sidebar() {
           "group/sidebar hidden md:flex shrink-0 h-[calc(100vh-32px)] sticky top-4 ml-4",
           "flex-col items-center justify-between py-5 rounded-3xl",
           "bg-[var(--surface)] border border-[var(--border)] shadow-card overflow-hidden",
-          "w-[88px] hover:w-[248px]",
+          "w-[82px] hover:w-[248px]",
           "transition-[width] duration-300 ease-[cubic-bezier(0.16,1,0.3,1)]",
         )}
       >

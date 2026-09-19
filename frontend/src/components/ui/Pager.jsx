@@ -65,7 +65,7 @@ export function Pager({ page, pageCount, onChange }) {
         item === "…" ? (
           <span
             key={`ellipsis-${i}`}
-            className="px-1 text-xs text-[var(--ink-muted)]"
+            className="px-1 text-sm text-[var(--ink-muted)]"
           >
             …
           </span>

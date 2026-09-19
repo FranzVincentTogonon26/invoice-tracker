@@ -125,7 +125,6 @@ function Label({ children }) {
     </div>
   );
 }
-
 function Footer({ subtitle }) {
   return (
     <div className="mt-4 pt-3 border-t border-gray-100 flex items-center gap-2">
@@ -161,8 +160,8 @@ function RevenueCard() {
           <Label>Total Revenue</Label>
           <div className="flex items-baseline gap-1 mt-1.5">
             <span
-              className="text-[38px] font-semibold leading-none text-gray-900"
-              style={{ fontFamily: '"Geist","Inter",sans-serif', fontVariantNumeric: "tabular-nums", letterSpacing: "-0.02em" }}
+              className="font-display text-[38px] font-semibold leading-none text-gray-900"
+              style={{ fontVariantNumeric: "tabular-nums", letterSpacing: "-0.02em" }}
             >
               $22,375
             </span>
@@ -199,7 +198,7 @@ function InvoiceCard() {
       </div>
       <div className="space-y-1.5">
         {[["Design sprint", "$3,200"], ["Development · 40h", "$3,800"]].map(([d, a]) => (
-          <div key={d} className="flex items-center justify-between text-[12.5px]">
+          <div key={d} className="flex items-center justify-between text-[12px]">
             <span className="text-gray-500">{d}</span>
             <span className="text-gray-900 font-medium tabular">{a}</span>
           </div>
@@ -305,8 +304,8 @@ function PaidCard() {
         </Pill>
       </div>
       <div
-        className="text-[34px] font-semibold leading-none text-gray-900"
-        style={{ fontFamily: '"Geist","Inter",sans-serif', fontVariantNumeric: "tabular-nums", letterSpacing: "-0.02em" }}
+        className="font-display text-[34px] font-semibold leading-none text-gray-900"
+        style={{ fontVariantNumeric: "tabular-nums", letterSpacing: "-0.02em" }}
       >
         $3,472
       </div>

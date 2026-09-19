@@ -267,7 +267,7 @@ function PaletteBody({ onClose }) {
           {groups.map((g) =>
             g.items.length ? (
               <div key={g.key} className="mb-1">
-                <div className="px-3 pt-2 pb-1 text-[10px] uppercase tracking-wider text-[var(--ink-muted)] font-semibold">
+                <div className="px-3 pt-2 pb-1 type-eyebrow text-[var(--ink-muted)]">
                   {g.title}
                 </div>
                 <div className="flex flex-col gap-0.5">
@@ -304,3 +304,4 @@ function PaletteBody({ onClose }) {
     </motion.div>
   );
 }
+

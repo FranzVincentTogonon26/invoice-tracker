@@ -19,8 +19,8 @@ const cardVariants = cva(
       padding: {
         none: "",
         sm: "p-4",
-        md: "p-5",
-        lg: "p-6",
+        md: "p-4 sm:p-5",
+        lg: "p-5 sm:p-6",
       },
     },
     defaultVariants: { variant: "default", radius: "md", padding: "md" },
@@ -45,7 +45,7 @@ export const CardHeader = ({ className, ...props }) => (
 export const CardTitle = ({ className, ...props }) => (
   <h3
     className={cn(
-      "text-sm font-semibold text-[var(--ink)] tracking-tight",
+      "text-base font-semibold text-[var(--ink)] tracking-tight",
       className
     )}
     {...props}

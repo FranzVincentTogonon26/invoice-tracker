@@ -40,10 +40,10 @@ export default function Login() {
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.55, ease: [0.16, 1, 0.3, 1] }}
       >
-        <h1 className="font-display text-[34px] font-semibold tracking-tight text-[var(--ink)] leading-[1.05]">
+        <h1 className="font-display text-[clamp(26px,7vw,34px)] font-semibold tracking-tight text-[var(--ink)] leading-[1.05]">
           Welcome back
         </h1>
-        <p className="text-[var(--ink-muted)] mt-2 text-[15px]">
+        <p className="text-[var(--ink-muted)] mt-2 text-sm leading-relaxed">
           Sign in to manage your invoices and clients.
         </p>
 

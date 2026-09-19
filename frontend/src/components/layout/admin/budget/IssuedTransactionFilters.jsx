@@ -5,9 +5,6 @@ import { MethodIcon } from "../../../ui/Select";
 import { STATUS } from "../../../../constants";
 import { cn } from "../../../../lib/utils";
 
-// Dropdown filters in the toolbar — order defines layout order, `width` sets
-// the dropdown width (responsive: full-width stacked on mobile, 2-col on sm,
-// fixed inline row on xl) and `searchable` enables the in-dropdown search box.
 const FILTER_DROPDOWNS = [
   {
     key: "employee",
@@ -31,8 +28,6 @@ const FILTER_DROPDOWNS = [
     width: "w-full sm:w-[calc(50%-4px)] xl:w-[168px]",
   },
 ];
-
-// Muted leading icon shown when the filter sits on its "all" placeholder.
 const FILTER_PLACEHOLDER_ICON = {
   employee: Users,
   method: Wallet,
@@ -49,7 +44,7 @@ function initialsOf(name) {
     .join("");
 }
 
-function FilterAvatar({ name, avatarUrl, size = "h-6 w-6 text-[10px]" }) {
+function FilterAvatar({ name, avatarUrl, size = "h-7 w-7 text-[12px]" }) {
   if (avatarUrl) {
     return (
       <img
@@ -108,7 +103,9 @@ function FilterTrigger({ filterKey, label, selectedOption }) {
             name={selectedOption.label}
             avatarUrl={selectedOption.avatar_url}
           />
-          <span className="truncate text-xs">{selectedOption.label}</span>
+          <span className="truncate text-sm text-[var(--ink-muted)] font-semibold">
+            {selectedOption.label}
+          </span>
         </span>
       );
     }
@@ -116,7 +113,9 @@ function FilterTrigger({ filterKey, label, selectedOption }) {
       return (
         <span className="flex min-w-0 items-center gap-2">
           <MethodIcon method={selectedOption.value} />
-          <span className="truncate text-xs">{selectedOption.label}</span>
+          <span className="truncate text-sm text-[var(--ink-muted)] font-semibold">
+            {selectedOption.label}
+          </span>
         </span>
       );
     }
@@ -126,14 +125,18 @@ function FilterTrigger({ filterKey, label, selectedOption }) {
           <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-[var(--accent-soft)] text-[var(--accent-strong)]">
             <HandCoins size={13} aria-hidden />
           </span>
-          <span className="truncate text-xs">{selectedOption.label}</span>
+          <span className="truncate text-sm text-[var(--ink-muted)] font-semibold">
+            {selectedOption.label}
+          </span>
         </span>
       );
     }
     return (
       <span className="flex min-w-0 items-center gap-2">
         <StatusDot statusValue={selectedOption.value} />
-        <span className="truncate text-xs">{selectedOption.label}</span>
+        <span className="truncate text-sm text-[var(--ink-muted)] font-semibold">
+          {selectedOption.label}
+        </span>
       </span>
     );
   }
@@ -197,12 +200,6 @@ function FilterOption({ filterKey, option, selected }) {
   );
 }
 
-/**
- * Toolbar for the Budget Issued Transactions card: four connected dropdown
- * filters (employee · method · source fund · status) plus a search input.
- * Fully controlled — `filters`, `options`, `onFilterChange` and the search
- * value/handler are owned by the parent component.
- */
 const IssuedTransactionFilters = ({
   filters,
   options,

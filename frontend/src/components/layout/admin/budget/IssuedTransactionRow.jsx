@@ -29,16 +29,16 @@ function EmployeeCell({ name, role, avatarUrl }) {
       ) : (
         <span
           aria-hidden
-          className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-[var(--accent-soft)] text-[11px] font-bold text-[var(--accent-strong)]"
+          className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-[var(--accent-soft)] text-sm font-bold text-[var(--accent-strong)]"
         >
           {initialsOf(name) || "?"}
         </span>
       )}
       <div className="min-w-0">
-        <p className="truncate text-sm font-semibold leading-tight text-[var(--ink)]">
+        <p className="truncate text-[16px] font-semibold leading-tight text-[var(--ink)]">
           {name || "Unknown"}
         </p>
-        <p className="mt-0.5 truncate text-xs capitalize text-[var(--ink-muted)]">
+        <p className="mt-0.5 truncate text-sm capitalize text-[var(--ink-muted)]">
           {role || "—"}
         </p>
       </div>
@@ -47,11 +47,11 @@ function EmployeeCell({ name, role, avatarUrl }) {
 }
 
 function NotesCell({ notes }) {
-  if (!notes) return <span className="text-xs text-[var(--ink-muted)]">—</span>;
+  if (!notes) return <span className="text-sm text-[var(--ink-muted)]">—</span>;
   return (
     <p
       title={notes}
-      className="line-clamp-2 whitespace-normal break-words text-[11px] leading-relaxed text-[var(--ink-muted)]"
+      className="line-clamp-2 whitespace-normal break-words text-[13px] leading-relaxed text-[var(--ink-muted)]"
     >
       {notes}
     </p>
@@ -61,10 +61,10 @@ function NotesCell({ notes }) {
 function DateIssuedCell({ date }) {
   return (
     <>
-      <p className="text-xs leading-none tabular-nums text-[var(--ink)]">
+      <p className="text-sm leading-none tabular-nums text-[var(--ink)]">
         {formatDate(date)}
       </p>
-      <p className="mt-1 text-[10px] leading-none tabular-nums text-[var(--ink-muted)]">
+      <p className="mt-1 text-[12px] leading-none tabular-nums text-[var(--ink-muted)]">
         {formatTime(date)}
       </p>
     </>
@@ -96,7 +96,6 @@ export function IssuedTransactionRow({ transaction: t, onAction }) {
   return (
     <tr className="group border-b border-[var(--border)] transition-colors duration-150 last:border-b-0 hover:bg-[var(--accent)]/[0.04]">
       <td className="relative px-4 py-3.5 pl-5 align-middle">
-        {/* Accent flight that fades in on row hover */}
         <span
           aria-hidden
           className="absolute inset-y-3 left-0 w-0.5 rounded-full bg-[var(--accent-strong)] opacity-0 transition-opacity duration-150 group-hover:opacity-100"
@@ -108,7 +107,7 @@ export function IssuedTransactionRow({ transaction: t, onAction }) {
         />
       </td>
       <td className="px-4 py-3.5 align-middle">
-        <p className="text-[13px] leading-snug text-[var(--ink)]">
+        <p className="text-sm leading-snug text-[var(--ink)]">
           {t.description}
         </p>
       </td>

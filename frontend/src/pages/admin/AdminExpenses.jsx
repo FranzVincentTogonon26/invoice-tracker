@@ -17,7 +17,6 @@ const AdminExpenses = () => {
       <PageHeader
         title="Expenses"
         description="Track and manage all your expenses. Keep your budget on track and stay informed with real-time updates."
-        className="flex-col items-start gap-3 sm:flex-row sm:items-end sm:justify-between"
         actions={
           <div className="flex w-full flex-wrap items-center gap-2 sm:w-auto sm:justify-end">
             <DateRangePicker
@@ -25,13 +24,8 @@ const AdminExpenses = () => {
               onChange={setDateRange}
               align="end"
             />
-            <Button
-              variant="accent"
-              size="sm"
-              className="h-9"
-              onClick={() => nav("/admin/expenses/add")}
-            >
-              <Plus size={15} /> Add Expenses
+            <Button variant="accent" onClick={() => nav("/admin/expenses/add")}>
+              <Plus size={15} /> Add Expense
             </Button>
           </div>
         }

@@ -200,8 +200,7 @@ export function DateRangePicker({
         ref={triggerRef}
         type="button"
         variant="soft"
-        size="sm"
-        className={cn("h-9", className)}
+        className={cn("px-5", className)}
         onClick={toggle}
         disabled={disabled}
         aria-haspopup="dialog"
@@ -231,10 +230,10 @@ export function DateRangePicker({
             )}
           >
             <div className="flex items-baseline justify-between gap-3 border-b border-[var(--border)] px-5 py-3">
-              <span className="text-sm font-semibold text-[var(--ink)]">
+              <span className="text-lg font-semibold text-[var(--ink)]">
                 Date range
               </span>
-              <span className="truncate text-[11px] tabular-nums text-[var(--ink-muted)]">
+              <span className="truncate text-[13px] font-semibold text-[var(--ink-muted)]">
                 {formatDateRange(draft, "Pick a start and end date")}
               </span>
             </div>
@@ -255,7 +254,7 @@ export function DateRangePicker({
                       onClick={() => pickPreset(preset)}
                       aria-pressed={active}
                       className={cn(
-                        "h-8 shrink-0 rounded-full px-3 text-xs font-medium transition-colors sm:text-left",
+                        "h-8 shrink-0 rounded-full px-3 text-sm font-medium transition-colors sm:text-left",
                         active
                           ? "bg-[var(--accent-soft)] text-[var(--accent-strong)]"
                           : "text-[var(--ink-muted)] hover:bg-[var(--surface-2)] hover:text-[var(--ink)]",
@@ -292,7 +291,7 @@ export function DateRangePicker({
                     <span
                       key={day}
                       aria-hidden
-                      className="flex h-7 items-center justify-center text-[10px] font-semibold uppercase tracking-wide text-[var(--ink-muted)]"
+                      className="flex h-7 items-center justify-center type-eyebrow text-[var(--ink-muted)]"
                     >
                       {day}
                     </span>
@@ -337,7 +336,7 @@ export function DateRangePicker({
                             aria-pressed={isEdge}
                             aria-current={isToday ? "date" : undefined}
                             className={cn(
-                              "flex h-9 items-center justify-center text-xs font-medium tabular-nums transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)]/40",
+                              "flex h-9 items-center justify-center text-sm font-medium tabular-nums transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)]/40",
                               isEdge
                                 ? "rounded-full bg-[var(--accent)] text-white hover:bg-[var(--accent-strong)]"
                                 : inRange
@@ -358,29 +357,17 @@ export function DateRangePicker({
               </div>
             </div>
 
-            <div className="flex items-center justify-between gap-3 border-t border-[var(--border)] px-5 py-3">
-              <button
-                type="button"
-                onClick={reset}
-                className="inline-flex items-center gap-1.5 text-[11px] font-medium text-[var(--ink-muted)] transition-colors hover:text-[var(--ink)]"
-              >
-                <RotateCcw size={12} aria-hidden /> Reset
-              </button>
+            <div className="flex items-center justify-between gap-3 border-t border-[var(--border)] p-4">
+              <Button type="button" variant="outline" onClick={reset}>
+                <RotateCcw size={14} aria-hidden /> Reset
+              </Button>
               <div className="flex items-center gap-2">
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="sm"
-                  className="h-9"
-                  onClick={() => close()}
-                >
+                <Button type="button" variant="outline" onClick={() => close()}>
                   Cancel
                 </Button>
                 <Button
                   type="button"
                   variant="accent"
-                  size="sm"
-                  className="h-9"
                   onClick={apply}
                   disabled={!draft.start || !draft.end}
                 >

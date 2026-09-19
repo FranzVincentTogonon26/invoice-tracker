@@ -7,6 +7,7 @@ import {
   ImagePlus,
   Info,
   Loader2,
+  Paperclip,
   Plus,
   Save,
   ScanLine,
@@ -56,12 +57,12 @@ const toPayload = (item) => ({
 function Field({ label, children, hint }) {
   return (
     <div className="block min-w-0">
-      <span className="mb-1.5 block text-[11px] font-semibold uppercase tracking-wider text-[var(--ink-muted)]">
+      <span className="mb-1.5 block type-eyebrow text-[var(--ink-muted)]">
         {label}
       </span>
       {children}
       {hint && (
-        <span className="mt-1.5 block text-[11px] leading-snug text-[var(--ink-muted)]">
+        <span className="mt-1.5 block text-[12px] leading-snug text-[var(--ink-muted)]">
           {hint}
         </span>
       )}
@@ -300,10 +301,7 @@ const AddExpenses = () => {
               <h2 className="font-display text-2xl font-semibold tracking-tight text-[var(--ink)]">
                 Add Expenses
               </h2>
-              <Badge tone="accent">
-                <span className="h-1.5 w-1.5 rounded-full bg-current opacity-80" />
-                New draft
-              </Badge>
+              <Badge tone="accent">New draft</Badge>
             </div>
             <p className="mt-1 text-sm text-[var(--ink-muted)]">
               Log expense lines, attach receipts and keep the total in sync.
@@ -313,22 +311,18 @@ const AddExpenses = () => {
         <div className="flex flex-wrap items-center gap-2">
           <Button
             type="button"
-            variant="outline"
-            size="sm"
-            className="h-9"
+            variant="soft"
             onClick={() => {
               setTargetIndex(null);
               setModal("category");
             }}
           >
-            <FolderPlus size={15} />
+            <Plus size={15} />
             Add Category
           </Button>
           <Button
             type="button"
             variant="accent"
-            size="sm"
-            className="h-9"
             onClick={() => {
               setTargetIndex(null);
               setModal("scan_receipt");
@@ -345,10 +339,8 @@ const AddExpenses = () => {
           <Sparkles size={18} />
         </span>
         <div className="min-w-0">
-          <p className="text-[11px] font-semibold uppercase tracking-wider text-[var(--accent-strong)]">
-            Smart tip
-          </p>
-          <p className="truncate text-xs text-[var(--ink-muted)]">
+          <p className="type-eyebrow text-[var(--accent-strong)]">Smart tip</p>
+          <p className="truncate text-sm text-[var(--ink-muted)]">
             Scan a receipt to auto-fill a line — or attach one to a line below.
           </p>
         </div>
@@ -358,8 +350,10 @@ const AddExpenses = () => {
         <Card padding="lg" radius="lg" className="overflow-visible">
           <div className="mb-1 flex flex-wrap items-center justify-between gap-2">
             <div>
-              <CardTitle className="text-[15px]">Transactions items</CardTitle>
-              <CardDescription className="mt-0.5">
+              <CardTitle className="text-base text-lg">
+                Transactions items
+              </CardTitle>
+              <CardDescription className="text-sm">
                 Each row is one receipt line.
               </CardDescription>
             </div>
@@ -400,8 +394,10 @@ const AddExpenses = () => {
                   <Input
                     Icon={FileText}
                     value={it.description}
-                    onChange={(e) => setItem(i, { description: e.target.value })}
-                    placeholder="e.g. Team lunch, Grab to client site…"
+                    onChange={(e) =>
+                      setItem(i, { description: e.target.value })
+                    }
+                    placeholder="e.g. Pamasahe, Malengke.."
                   />
                 </Field>
 
@@ -411,11 +407,7 @@ const AddExpenses = () => {
                       options={categoryOptions}
                       value={it.categoryId}
                       onChange={(next) => setItem(i, { categoryId: next })}
-                      placeholder={
-                        categoryOptions.length
-                          ? "Select category"
-                          : "No categories yet"
-                      }
+                      placeholder="Select category"
                     />
                   </Field>
                   <Field label="Date">
@@ -448,16 +440,16 @@ const AddExpenses = () => {
 
                 <div className="mt-3 flex flex-col gap-2 rounded-xl border border-dashed border-[var(--border)] bg-[var(--surface)]/70 px-3.5 py-3 sm:flex-row sm:items-center sm:justify-between">
                   <div className="flex min-w-0 items-center gap-2.5">
-                    <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-[var(--accent-soft)] text-[var(--accent-strong)]">
+                    <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-[var(--accent-soft)] text-[var(--accent-strong)]">
                       <ImagePlus size={16} />
                     </span>
                     <div className="min-w-0">
-                      <p className="truncate text-xs font-semibold text-[var(--ink)]">
+                      <p className="truncate text-sm font-semibold text-[var(--ink)]">
                         {it.receiptId
                           ? it.receiptName || "Receipt attached"
                           : "No receipt attached"}
                       </p>
-                      <p className="text-[11px] text-[var(--ink-muted)]">
+                      <p className="text-[12px] text-[var(--ink-muted)]">
                         {it.receiptId
                           ? "Stored with this expense line"
                           : "PNG, JPG or WEBP · up to 2MB"}
@@ -465,48 +457,19 @@ const AddExpenses = () => {
                     </div>
                   </div>
                   <div className="flex shrink-0 items-center gap-2">
-                    {it.receiptId ? (
+                    {it.receiptId && (
                       <>
                         <Button
                           variant="soft"
                           size="sm"
                           type="button"
                           onClick={() => openReceipt(it.receiptUrl)}
-                          disabled={!it.receiptUrl}
+                          disabled={it.receiptUrl}
                         >
                           <Eye size={13} />
-                          View
-                        </Button>
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          type="button"
-                          aria-label={`Detach receipt from line ${i + 1}`}
-                          onClick={() =>
-                            setItem(i, {
-                              receiptId: "",
-                              receiptUrl: "",
-                              receiptName: "",
-                            })
-                          }
-                        >
-                          <X size={13} />
-                          Detach
+                          View Receipt
                         </Button>
                       </>
-                    ) : (
-                      <Button
-                        variant="soft"
-                        size="sm"
-                        type="button"
-                        onClick={() => {
-                          setTargetIndex(i);
-                          setModal("scan_receipt");
-                        }}
-                      >
-                        <ScanLine size={13} />
-                        Attach receipt
-                      </Button>
                     )}
                   </div>
                 </div>
@@ -528,17 +491,17 @@ const AddExpenses = () => {
         <div className="space-y-4 lg:sticky lg:top-4">
           <Card padding="lg" radius="lg">
             <div className="flex items-center justify-between gap-2">
-              <CardTitle className="text-[15px]">Summary</CardTitle>
+              <CardTitle className="text-base text-lg">Summary</CardTitle>
               <Badge tone="accent">{items.length} lines</Badge>
             </div>
             <div className="mt-4 rounded-2xl bg-[var(--surface-2)]/70 px-4 py-4 text-center">
-              <p className="text-[11px] font-semibold uppercase tracking-wider text-[var(--ink-muted)]">
+              <p className="type-eyebrow text-[var(--ink-muted)]">
                 Total expenses
               </p>
               <p className="mt-1 font-display text-3xl font-semibold tabular tracking-tight text-[var(--ink)]">
                 {formatMoney(total)}
               </p>
-              <p className="mt-1 text-[11px] text-[var(--ink-muted)]">
+              <p className="mt-1 text-[12px] text-[var(--ink-muted)]">
                 Across {items.length} line{items.length === 1 ? "" : "s"} ·{" "}
                 {filledCount} described
               </p>
@@ -547,10 +510,10 @@ const AddExpenses = () => {
               {items.map((it, i) => (
                 <div
                   key={i}
-                  className="flex items-center justify-between gap-2 text-xs"
+                  className="flex items-center justify-between gap-2 text-sm"
                 >
                   <span className="flex min-w-0 items-center gap-2 text-[var(--ink-muted)]">
-                    <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-[var(--surface-2)] text-[10px] font-bold tabular">
+                    <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-[var(--surface-2)] text-[12px] font-bold tabular">
                       {i + 1}
                     </span>
                     <span className="truncate">
@@ -570,9 +533,9 @@ const AddExpenses = () => {
               ))}
             </div>
             <div className="my-4 h-px bg-[var(--border)]" />
-            <div className="flex items-start gap-2 rounded-xl bg-[var(--accent-soft)]/50 px-3 py-2.5 text-[11px] leading-snug text-[var(--ink-muted)]">
+            <div className="flex items-start gap-2 rounded-xl bg-[var(--accent-soft)]/50 px-3 py-2.5 text-[12px] leading-snug text-[var(--ink-muted)]">
               <Info
-                size={13}
+                size={16}
                 className="mt-px shrink-0 text-[var(--accent-strong)]"
               />
               Totals update live as you type. Attach a receipt per line to speed

@@ -167,7 +167,7 @@ export function IssuedTransactionActions({
           aria-expanded={open}
           onClick={() => setOpen(true)}
           className={cn(
-            "inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-xs font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--danger)]/30",
+            "inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-sm font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--danger)]/30",
             "text-[var(--ink-muted)] hover:bg-[var(--danger)]/10 hover:text-[var(--danger)]",
             className,
           )}
@@ -181,7 +181,7 @@ export function IssuedTransactionActions({
           type="button"
           onClick={confirmRestore}
           className={cn(
-            "inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-xs font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--danger)]/30",
+            "inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-sm font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--danger)]/30",
             "text-[var(--ink-muted)] hover:bg-[var(--ink)]/14 hover:text-[var(--ink)]",
             className,
           )}
@@ -190,7 +190,7 @@ export function IssuedTransactionActions({
           Restore
         </button>
       ) : (
-        <span className="inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-xs font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 text-[var(--ink-muted)] bg-[var(--ink)]/14 text-[var(--ink)]">
+        <span className="inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-sm font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 text-[var(--ink-muted)] bg-[var(--ink)]/14 text-[var(--ink)]">
           <Flag size={13} strokeWidth={2.5} aria-hidden />
           Closed
         </span>
@@ -236,10 +236,10 @@ export function IssuedTransactionActions({
                   they're reversing. */}
               <div className="mt-4 flex items-center gap-3 rounded-2xl border border-[var(--border)] bg-[var(--surface-2)]/60 px-4 py-3">
                 <div className="min-w-0 flex-1">
-                  <p className="truncate text-sm font-semibold text-[var(--ink)]">
+                  <p className="truncate text-[16px] font-semibold text-[var(--ink)]">
                     {transaction.description || "Budget issuance"}
                   </p>
-                  <p className="mt-0.5 text-xs text-[var(--ink-muted)]">
+                  <p className="mt-0.5 text-sm text-[var(--ink-muted)]">
                     Amount to reverse
                   </p>
                 </div>

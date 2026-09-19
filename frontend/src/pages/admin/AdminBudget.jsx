@@ -64,12 +64,8 @@ export default function AdminBudget() {
   const overviewIssuedBudget = overview.overviewIssuedBudget ?? [];
   const totalBudget = overview.totalBudget ?? 0;
   const totalIssued = overview.totalIssued ?? 0;
-  // Cash On Hand = Total Budget − Total Issued (allocated funds not yet
-  // handed out to employees).
   const cashOnHand = totalBudget - totalIssued;
 
-  // Per-reference remaining balance: allocated − issued, matched on
-  // `reference_id`. pg returns DECIMAL as strings — cast with Number().
   const issuedByReference = new Map(
     overviewIssuedBudget.map((row) => [
       row.reference_id,
@@ -84,7 +80,6 @@ export default function AdminBudget() {
       label: row.label ?? "Untitled reference",
       value: formatMoney(remaining),
       hint: formatDate(row.created_at),
-      // Over-issued references (more handed out than allocated) flag red.
       tone: remaining < 0 ? "danger" : undefined,
     };
   });
@@ -93,7 +88,6 @@ export default function AdminBudget() {
   const employees = data?.employees ?? [];
   const budgetReferences = data?.budgetReference ?? [];
 
-  // UI-only derived values for the utilization bar (same totals, width math).
   const totalBudgetNum = Number(totalBudget) || 0;
   const totalIssuedNum = Number(totalIssued) || 0;
   const utilization =
@@ -106,21 +100,17 @@ export default function AdminBudget() {
       <PageHeader
         title="Budget"
         description="Allocate funds, issue to employees, and track every move."
-        className="flex-col items-start gap-3 sm:flex-row sm:items-end sm:justify-between"
         actions={
           <div className="flex w-full flex-wrap items-center gap-2 sm:w-auto sm:justify-end">
             <Button
               variant="soft"
-              size="sm"
-              className="h-9"
+              size="md"
               onClick={() => setModalType("addBudget")}
             >
               <Plus size={15} /> Add Budget
             </Button>
             <Button
               variant="accent"
-              size="sm"
-              className="h-9"
               onClick={() => setModalType("issuedBudget")}
             >
               <HandCoins size={15} /> Issue Budget
@@ -129,8 +119,6 @@ export default function AdminBudget() {
         }
       />
 
-      {/* ── Overview: 3 equal KPIs + utilization bar + slim status strip.
-          Logic above untouched. */}
       <section aria-label="Budget overview" className="space-y-4">
         <motion.div
           variants={container}
@@ -195,17 +183,17 @@ export default function AdminBudget() {
             />
             <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
               <div className="min-w-0">
-                <p className="text-[11px] font-bold uppercase tracking-[0.12em] text-[var(--ink-muted)]">
+                <p className="type-eyebrow text-[var(--ink-muted)]">
                   Allocation utilization
                 </p>
-                <p className="mt-1.5 flex flex-wrap items-baseline gap-x-2 font-display text-lg font-semibold tracking-tight text-[var(--ink)]">
+                <p className="mt-1.5 flex flex-wrap items-baseline gap-x-2 text-lg font-semibold tracking-tight text-[var(--ink)]">
                   {utilization.toFixed(1)}% issued
-                  <span className="text-xs font-medium tabular-nums text-[var(--ink-muted)]">
+                  <span className="text-sm font-medium  text-[var(--ink-muted)]">
                     {formatMoney(totalIssued)} of {formatMoney(totalBudget)}
                   </span>
                 </p>
               </div>
-              <Badge tone="accent" className="w-fit shrink-0 tabular-nums">
+              <Badge tone="accent" className="w-fit shrink-0 ">
                 <CircleCheck size={12} /> Vault {formatMoney(cashOnHand)}
               </Badge>
             </div>
@@ -228,7 +216,7 @@ export default function AdminBudget() {
                 className="h-full rounded-full bg-[linear-gradient(90deg,var(--accent-hero-2),var(--accent-hero))]"
               />
             </div>
-            <div className="mt-2.5 flex items-center justify-between gap-3 text-[11px] text-[var(--ink-muted)]">
+            <div className="mt-2.5 flex items-center justify-between gap-3 text-[12px] text-[var(--ink-muted)]">
               <span className="shrink-0 tabular-nums">0%</span>
               <span className="min-w-0 truncate text-center tabular-nums">
                 {overviewBudget.length}{" "}
@@ -243,7 +231,7 @@ export default function AdminBudget() {
           <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-[var(--success)]/12 text-[var(--success)]">
             <CircleCheck size={16} />
           </span>
-          <p className="min-w-0 flex-1 truncate text-[13px] text-[var(--ink-muted)]">
+          <p className="min-w-0 flex-1 truncate text-sm text-[var(--ink-muted)]">
             <span className="font-semibold text-[var(--ink)]">All clear</span>
             {" — no overdue budgets right now."}
           </p>
@@ -268,7 +256,7 @@ export default function AdminBudget() {
                 </TabsTrigger>
               ))}
             </TabsList>
-            <p className="hidden shrink-0 pl-2 text-xs text-[var(--ink-muted)] lg:block">
+            <p className="hidden shrink-0 pl-2 text-sm text-[var(--ink-muted)] lg:block">
               {tab === "employee_budget" &&
                 "Click an employee to open profile."}
               {tab === "budget_transaction" && "Added + issued activity."}

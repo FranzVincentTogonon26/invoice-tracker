@@ -14,13 +14,13 @@ export function Topbar({ onOpenPalette }) {
     /Mac|iPhone|iPad/i.test(navigator.platform);
 
   return (
-    <header className="flex items-start justify-between gap-6 mb-8">
-      <div>
-        <h1 className="font-display text-[clamp(28px,3vw,38px)] font-semibold leading-tight text-[var(--ink)]">
+    <header className="mb-6 flex items-start justify-between gap-4 md:mb-8 md:gap-6">
+      <div className="min-w-0">
+        <h1 className="font-display text-[clamp(24px,6vw,30px)] font-semibold leading-tight text-[var(--ink)] md:text-[clamp(30px,3vw,38px)]">
           Hello, {firstName}.
         </h1>
-        <p className="text-sm text-[var(--ink-muted)] mt-1">
-          Here's what's happening with your billing today.
+        <p className="mt-1 text-sm leading-relaxed text-[var(--ink-muted)]">
+          Here&apos;s what&apos;s happening with your billing today.
         </p>
       </div>
 

@@ -104,6 +104,37 @@ body {
   font-variant-numeric: tabular-nums;
 }
 
+@layer components {
+  .type-eyebrow {
+    font-size: 12px;
+    line-height: 1.2;
+    font-weight: 600;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    font-variant-numeric: tabular-nums;
+  }
+
+  .type-meta {
+    font-size: 12px;
+    line-height: 1.3;
+    font-variant-numeric: tabular-nums;
+  }
+}
+
+/* Safety net for iOS Safari, which zooms the page when a focused field's text
+   is smaller than 16px. Every control already carries `text-base sm:text-sm`
+   (utilities win over this base rule), so this only catches a stray field that
+   was added without an explicit size. */
+@layer base {
+  @media (max-width: 767px) {
+    input,
+    textarea,
+    select {
+      font-size: 16px;
+    }
+  }
+}
+
 ::-webkit-scrollbar {
   width: 10px;
   height: 10px;

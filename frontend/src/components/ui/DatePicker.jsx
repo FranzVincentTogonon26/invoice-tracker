@@ -1,14 +1,30 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
-import { CalendarDays, ChevronLeft, ChevronRight, RotateCcw } from "lucide-react";
-import { addMonths, cn, formatDate, getMonthGrid, isSameDay, startOfDay, startOfMonth, toISODate } from "@/lib/utils";
+import {
+  CalendarDays,
+  ChevronLeft,
+  ChevronRight,
+  RotateCcw,
+} from "lucide-react";
+import {
+  addMonths,
+  cn,
+  formatDate,
+  getMonthGrid,
+  isSameDay,
+  startOfDay,
+  startOfMonth,
+  toISODate,
+} from "@/lib/utils";
+import { Button } from "./Button";
 
 const DIALOG_EASE = [0.16, 1, 0.3, 1];
 const WEEKDAYS = ["Su", "Mo", "Tu", "We", "Th", "Fr", "Sa"];
 
 function normalizeDay(value) {
   if (value == null || value === "") return null;
-  if (value instanceof Date) return Number.isNaN(value.getTime()) ? null : startOfDay(value);
+  if (value instanceof Date)
+    return Number.isNaN(value.getTime()) ? null : startOfDay(value);
   if (typeof value === "number") {
     const d = new Date(value);
     return Number.isNaN(d.getTime()) ? null : startOfDay(d);
@@ -18,7 +34,11 @@ function normalizeDay(value) {
     if (!trimmed) return null;
     const dateOnly = /^(\d{4})-(\d{2})-(\d{2})$/.exec(trimmed);
     if (dateOnly) {
-      return new Date(Number(dateOnly[1]), Number(dateOnly[2]) - 1, Number(dateOnly[3]));
+      return new Date(
+        Number(dateOnly[1]),
+        Number(dateOnly[2]) - 1,
+        Number(dateOnly[3]),
+      );
     }
     const d = new Date(trimmed);
     return Number.isNaN(d.getTime()) ? null : startOfDay(d);
@@ -38,9 +58,18 @@ function NavButton({ label, onClick, children }) {
     </button>
   );
 }
-export function DatePicker({ value, onChange, placeholder = "Select date", align = "start", className, disabled = false }) {
+export function DatePicker({
+  value,
+  onChange,
+  placeholder = "Select date",
+  align = "start",
+  className,
+  disabled = false,
+}) {
   const [open, setOpen] = useState(false);
-  const [viewMonth, setViewMonth] = useState(() => startOfMonth(normalizeDay(value) ?? new Date()));
+  const [viewMonth, setViewMonth] = useState(() =>
+    startOfMonth(normalizeDay(value) ?? new Date()),
+  );
   const [slide, setSlide] = useState(1);
   const rootRef = useRef(null);
   const triggerRef = useRef(null);
@@ -102,7 +131,7 @@ export function DatePicker({ value, onChange, placeholder = "Select date", align
         aria-expanded={open}
         aria-label={`Date: ${label}`}
         className={cn(
-          "flex h-10 w-full items-center gap-2 rounded-full border border-[var(--border)] bg-[var(--surface)] pl-5 pr-4 text-sm tabular-nums outline-none transition-colors",
+          "flex font-semibold h-10 w-full items-center gap-2 rounded-full border border-[var(--border)] bg-[var(--surface)] pl-5 pr-4 text-sm tabular-nums outline-none transition-colors",
           "hover:border-[var(--accent)]/40 focus:border-[var(--accent)]/50 focus:ring-2 focus:ring-[var(--accent)]/15",
           "disabled:opacity-50",
           open && "border-[var(--accent)]/50 ring-2 ring-[var(--accent)]/15",
@@ -126,22 +155,32 @@ export function DatePicker({ value, onChange, placeholder = "Select date", align
             transition={{ duration: 0.18, ease: DIALOG_EASE }}
             className={cn(
               "absolute top-[calc(100%+8px)] z-40 w-[min(92vw,320px)] overflow-hidden rounded-3xl border border-[var(--border)] bg-[var(--surface)] shadow-hover",
-              align === "end" ? "left-0 right-auto sm:left-auto sm:right-0" : "left-0",
+              align === "end"
+                ? "left-0 right-auto sm:left-auto sm:right-0"
+                : "left-0",
             )}
           >
             <div className="flex items-baseline justify-between gap-3 border-b border-[var(--border)] px-5 py-3">
-              <span className="text-sm font-semibold text-[var(--ink)]">Date</span>
-              <span className="truncate text-[11px] tabular-nums text-[var(--ink-muted)]">
+              <span className="text-lg font-semibold text-[var(--ink)]">
+                Date
+              </span>
+              <span className="truncate text-[13px] font-semibold text-[var(--ink-muted)]">
                 {selected ? formatDate(selected) : "Pick a date"}
               </span>
             </div>
             <div className="p-4 sm:p-5">
               <div className="mb-2 flex items-center justify-between">
-                <NavButton label="Previous month" onClick={() => shiftMonth(-1)}>
+                <NavButton
+                  label="Previous month"
+                  onClick={() => shiftMonth(-1)}
+                >
                   <ChevronLeft size={16} aria-hidden />
                 </NavButton>
                 <span className="text-sm font-semibold text-[var(--ink)]">
-                  {viewMonth.toLocaleDateString("en-US", { month: "long", year: "numeric" })}
+                  {viewMonth.toLocaleDateString("en-US", {
+                    month: "long",
+                    year: "numeric",
+                  })}
                 </span>
                 <NavButton label="Next month" onClick={() => shiftMonth(1)}>
                   <ChevronRight size={16} aria-hidden />
@@ -149,7 +188,11 @@ export function DatePicker({ value, onChange, placeholder = "Select date", align
               </div>
               <div className="grid grid-cols-7">
                 {WEEKDAYS.map((day) => (
-                  <span key={day} aria-hidden className="flex h-7 items-center justify-center text-[10px] font-semibold uppercase tracking-wide text-[var(--ink-muted)]">
+                  <span
+                    key={day}
+                    aria-hidden
+                    className="flex h-7 items-center justify-center type-eyebrow text-[var(--ink-muted)]"
+                  >
                     {day}
                   </span>
                 ))}
@@ -165,7 +208,8 @@ export function DatePicker({ value, onChange, placeholder = "Select date", align
                     className="grid grid-cols-7 gap-y-1"
                   >
                     {cells.map((day, index) => {
-                      if (!day) return <span key={`pad-${index}`} className="h-9" />;
+                      if (!day)
+                        return <span key={`pad-${index}`} className="h-9" />;
                       const isSelected = isSameDay(day, selected);
                       const isToday = isSameDay(day, today);
                       return (
@@ -177,11 +221,13 @@ export function DatePicker({ value, onChange, placeholder = "Select date", align
                           aria-pressed={isSelected}
                           aria-current={isToday ? "date" : undefined}
                           className={cn(
-                            "flex h-9 items-center justify-center rounded-full text-xs font-medium tabular-nums transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)]/40",
+                            "flex h-9 items-center justify-center rounded-full text-sm font-medium tabular-nums transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)]/40",
                             isSelected
                               ? "bg-[var(--accent)] font-semibold text-white hover:bg-[var(--accent-strong)]"
                               : "text-[var(--ink)] hover:bg-[var(--surface-2)]",
-                            !isSelected && isToday && "ring-1 ring-inset ring-[var(--accent)]/40",
+                            !isSelected &&
+                              isToday &&
+                              "ring-1 ring-inset ring-[var(--accent)]/40",
                           )}
                         >
                           {day.getDate()}
@@ -192,17 +238,18 @@ export function DatePicker({ value, onChange, placeholder = "Select date", align
                 </AnimatePresence>
               </div>
             </div>
-            <div className="flex items-center justify-between gap-3 border-t border-[var(--border)] px-5 py-3">
-              <button type="button" onClick={goToday} className="inline-flex items-center gap-1.5 text-[11px] font-medium text-[var(--ink-muted)] transition-colors hover:text-[var(--ink)]">
-                <RotateCcw size={12} aria-hidden /> Today
-              </button>
+            <div className="flex items-center justify-end gap-3 border-t border-[var(--border)] px-5 py-3">
               <div className="flex items-center gap-2">
-                <button type="button" onClick={clear} className="inline-flex h-9 items-center rounded-full px-3 text-xs font-medium text-[var(--ink-muted)] transition-colors hover:bg-[var(--surface-2)] hover:text-[var(--ink)]">
+                <Button type="button" variant="outline" onClick={clear}>
                   Clear
-                </button>
-                <button type="button" onClick={() => pickDay(today)} className="inline-flex h-9 items-center rounded-full bg-[var(--accent)] px-4 text-xs font-semibold text-white transition-colors hover:bg-[var(--accent-strong)]">
+                </Button>
+                <Button
+                  type="button"
+                  variant="soft"
+                  onClick={() => pickDay(today)}
+                >
                   Select today
-                </button>
+                </Button>
               </div>
             </div>
           </motion.div>
@@ -213,5 +260,3 @@ export function DatePicker({ value, onChange, placeholder = "Select date", align
 }
 
 export default DatePicker;
-
-
