@@ -4,6 +4,7 @@ import { AnimatePresence, motion } from "framer-motion";
 import { Ban, Flag, Loader2, RefreshCcw } from "lucide-react";
 import { cn, formatMoney } from "../../../../lib/utils";
 import { Button } from "../../../ui/Button";
+import { LockBodyScroll } from "../../../../hooks/useLockBody";
 
 // Shared entrance/exit easing — the same curve BudgetModal / TransactionActions
 // use, so every overlay style animates consistently.
@@ -40,6 +41,7 @@ function DialogShell({
       exit={{ opacity: 0 }}
       transition={{ duration: 0.2, ease: DIALOG_EASE }}
     >
+      <LockBodyScroll />
       {/* Backdrop click = dismiss (a no-op while the request is in flight). */}
       <div
         className="absolute inset-0 bg-[var(--ink)]/30 backdrop-blur-sm"
@@ -98,16 +100,6 @@ export function IssuedTransactionActions({
   // Move focus into the dialog when it opens — the confirm button.
   useEffect(() => {
     if (open) initialFocusRef.current?.focus();
-  }, [open]);
-
-  // Lock page scroll behind the dialog so background content can't drift.
-  useEffect(() => {
-    if (!open) return undefined;
-    const previous = document.body.style.overflow;
-    document.body.style.overflow = "hidden";
-    return () => {
-      document.body.style.overflow = previous;
-    };
   }, [open]);
 
   // Close on Escape while open. Capture phase + stopPropagation keeps

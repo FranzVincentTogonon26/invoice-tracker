@@ -16,6 +16,7 @@ import toast from "react-hot-toast";
 import { formatDate } from "../../../../lib/utils";
 import { useBudgetMutations } from "../../../../hooks/useBudget";
 import useSmoothScroll from "../../../../hooks/useSmoothScroll";
+import { LockBodyScroll } from "../../../../hooks/useLockBody";
 
 const ERROR_VISIBLE_MS = 5000;
 
@@ -122,6 +123,7 @@ const ReferencesModal = ({
           className="fixed inset-0 z-[60] flex items-center justify-center p-4"
           exit={{ opacity: 0 }}
         >
+          <LockBodyScroll />
           <div
             onClick={handleClose}
             className="absolute inset-0 bg-[var(--ink)]/30 backdrop-blur-sm flex items-center justify-center px-2"
@@ -190,7 +192,7 @@ const ReferencesModal = ({
                   add form and the footer stay pinned when the list is long */}
               <div
                 ref={tableRef}
-                className="scrollbar-slim mt-5 max-h-[50vh] min-h-0 flex-1 overflow-y-auto rounded-2xl border border-[var(--border)]"
+                className="scrollbar-slim mt-5 max-h-[50vh] min-h-0 flex-1 overflow-y-auto overscroll-contain rounded-2xl border border-[var(--border)]"
               >
                 <table className="w-full text-sm">
                   <thead>

@@ -13,6 +13,7 @@ import {
 import { cn, formatMoney } from "@/lib/utils";
 import { useInvoices } from "@/hooks/useInvoices";
 import { useClients } from "@/hooks/useClients";
+import { LockBodyScroll } from "@/hooks/useLockBody";
 
 const NAV_ITEMS = [
   {
@@ -226,6 +227,7 @@ function PaletteBody({ onClose }) {
       exit={{ opacity: 0 }}
       transition={{ duration: 0.15 }}
     >
+      <LockBodyScroll />
       <div
         className="absolute inset-0 bg-[var(--ink)]/30 backdrop-blur-sm"
         onClick={onClose}
@@ -257,7 +259,7 @@ function PaletteBody({ onClose }) {
           </kbd>
         </div>
 
-        <div ref={listRef} className="max-h-[52vh] overflow-y-auto p-2">
+        <div ref={listRef} className="max-h-[52vh] overflow-y-auto overscroll-contain p-2">
           {items.length === 0 && (
             <div className="text-center text-sm text-[var(--ink-muted)] py-10">
               No matches for &ldquo;{query}&rdquo;

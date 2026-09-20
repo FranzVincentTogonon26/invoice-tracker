@@ -6,7 +6,7 @@ import ApiError from "../utils/ApiError.js";
 
 // Fall back to a sane default so a missing GIMINI_MODEL doesn't produce
 // "model is required" errors from the API with no hint as to why.
-const MODEL = ENV.GIMINI_MODEL || "gemini-3.5-flash";
+const MODEL = ENV.GIMINI_MODEL || "gemini-3.5-flash"; // gemini-2.5-flash-lite
 
 let client = null;
 
@@ -125,7 +125,9 @@ const receiptValidator = z.object({
 
 // Gemini can wrap JSON in markdown fences even with response_format set.
 const parseJson = (text) => {
-  const cleaned = String(text).replace(/^```(?:json)?\s*|\s*```$/g, "").trim();
+  const cleaned = String(text)
+    .replace(/^```(?:json)?\s*|\s*```$/g, "")
+    .trim();
   try {
     return JSON.parse(cleaned);
   } catch {

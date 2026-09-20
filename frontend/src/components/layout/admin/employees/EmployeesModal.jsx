@@ -4,6 +4,7 @@ import { useState } from "react";
 import toast from "react-hot-toast";
 import { Button } from "../../../ui/Button";
 import { Input } from "../../../ui/Input";
+import { LockBodyScroll } from "../../../../hooks/useLockBody";
 
 const initialForm = {
   fullname: "",
@@ -100,6 +101,7 @@ const EmployeesModal = ({ open, onClose, create }) => {
           className="fixed inset-0 z-50 flex items-center justify-center p-4"
           exit={{ opacity: 0 }}
         >
+          <LockBodyScroll />
           <div className="absolute inset-0 bg-[var(--ink)]/40 backdrop-blur-sm flex items-center justify-center px-2">
             <motion.form
               onSubmit={onSubmit}
@@ -134,7 +136,7 @@ const EmployeesModal = ({ open, onClose, create }) => {
                 </button>
               </div>
 
-              <div className="scrollbar-slim min-h-0 flex-1 overflow-y-auto">
+              <div className="scrollbar-slim min-h-0 flex-1 overflow-y-auto overscroll-contain">
                 <div className="space-y-5">
                   <Field label="Full name">
                     <Input

@@ -18,6 +18,7 @@ import {
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/context/AuthContext";
 import AILogo from "../../ui/AILogo";
+import { LockBodyScroll } from "@/hooks/useLockBody";
 
 const NAV = [
   {
@@ -232,16 +233,6 @@ function MobileMenuSheet({ open, onClose, onLogout, user }) {
   const displayEmail = user?.email || "";
   const initial = user?.name?.[0]?.toUpperCase() || "R";
 
-  // Lock page scroll behind the sheet (same contract as the row dialogs).
-  useEffect(() => {
-    if (!open) return undefined;
-    const previous = document.body.style.overflow;
-    document.body.style.overflow = "hidden";
-    return () => {
-      document.body.style.overflow = previous;
-    };
-  }, [open]);
-
   // Escape dismisses it. Capture phase + stopPropagation keeps page-level
   // Escape handlers from also firing (matches the dialog pattern).
   useEffect(() => {
@@ -273,6 +264,7 @@ function MobileMenuSheet({ open, onClose, onLogout, user }) {
           exit={{ opacity: 0 }}
           transition={{ duration: 0.18 }}
         >
+          <LockBodyScroll />
           <div
             className="absolute inset-0 bg-[var(--ink)]/40 backdrop-blur-sm"
             onClick={onClose}

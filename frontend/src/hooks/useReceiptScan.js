@@ -3,8 +3,8 @@
 // message to `onError`). Used by the modal's dropzone (auto-scan on upload)
 // and the manual scan icon.
 import { useCallback, useRef, useState } from "react";
-import { aiApi } from "../../../../api/ai";
-import { useAuth } from "../../../../context/AuthContext";
+import { aiApi } from "../api/ai";
+import { useAuth } from "../context/AuthContext";
 
 const MAX_RECEIPT_BYTES = 2 * 1024 * 1024;
 const ACCEPTED_MIME = new Set([
@@ -24,8 +24,7 @@ const normalizeParsedReceipt = (res) => {
     const n = Number(v);
     return Number.isFinite(n) && n >= 0 ? n : fallback;
   };
-  const str = (v) =>
-    typeof v === "string" ? v : v == null ? "" : String(v);
+  const str = (v) => (typeof v === "string" ? v : v == null ? "" : String(v));
 
   const lineItems = (Array.isArray(res?.lineItems) ? res.lineItems : [])
     .map((li) => ({

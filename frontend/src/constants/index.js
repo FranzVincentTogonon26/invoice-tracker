@@ -35,3 +35,48 @@ export const STATUS = {
   active: { tone: "success", label: "Active" },
   inactive: { tone: "neutral", label: "Inactive" },
 };
+
+// Shared constants + factory for the ExpensesModal family. Kept in one place
+// so the panels, the modal and the scan engine all quote the same values.
+
+export const ERROR_VISIBLE_MS = 5000;
+export const MAX_RECEIPT_BYTES = 2 * 1024 * 1024;
+
+export const MODAL_COPY = {
+  category: {
+    title: "Expense Categories",
+    description:
+      "Manage the buckets expense lines are filed under. New categories show up in the form instantly.",
+    maxWidth: "max-w-[660px]",
+  },
+  scan_receipt: {
+    title: "Scan Receipt",
+    description:
+      "Attach the receipt image — we'll read the vendor, items and totals and pre-fill the expense lines for you.",
+    maxWidth: "max-w-[880px]",
+  },
+};
+
+export const blankReceipt = () => ({
+  imageUrl: "",
+  fileName: "",
+  description: "",
+  qty: "1",
+  rate: "",
+  items: [],
+  vendor: "",
+  receiptDate: "",
+  currency: "",
+  total: 0,
+  suggestedCategory: "",
+});
+
+// Exactly the set the scan engine validates against (PNG/JPG/WEBP + PDF) —
+// a broad "image/*" would let GIF/BMP/SVG through the picker only to fail
+// the scan.
+export const RECEIPT_ACCEPT = {
+  "image/png": [".png"],
+  "image/jpeg": [".jpg", ".jpeg"],
+  "image/webp": [".webp"],
+  "application/pdf": [".pdf"],
+};
