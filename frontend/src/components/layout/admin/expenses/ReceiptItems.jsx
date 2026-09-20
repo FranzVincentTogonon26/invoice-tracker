@@ -14,7 +14,7 @@ const ItemRow = ({ item, index, onItemChange, onRemove }) => {
   return (
     <>
       <div
-        className={`hidden ${GRID_COLS} items-center gap-x-3 px-3 py-2 sm:grid lg:gap-x-4 lg:px-4 lg:py-2.5`}
+        className={`hidden ${GRID_COLS} items-center gap-x-3 px-2 py-1.5 sm:grid lg:gap-x-4 lg:px-3 lg:py-2`}
       >
         <div className="min-w-0">
           <Input
@@ -71,7 +71,7 @@ const ItemRow = ({ item, index, onItemChange, onRemove }) => {
         </button>
       </div>
 
-      <div className="flex items-center gap-3 px-3 py-3 sm:hidden">
+      <div className="flex items-center gap-2.5 px-2 py-2 sm:hidden">
         <div className="min-w-0 flex-1">
           <Input
             className="h-8 w-full min-w-0 rounded-lg border-0 bg-transparent px-0 text-[13px] font-medium shadow-none focus:ring-0"
@@ -152,9 +152,9 @@ const ReceiptItems = ({
       )}
     </div>
 
-    <div className="mt-3 overflow-hidden rounded-xl border border-[var(--border)] bg-[var(--surface)] sm:mt-4">
+    <div className="mt-2 overflow-hidden rounded-xl border border-[var(--border)] bg-[var(--surface)] sm:mt-2.5">
       <div
-        className={`hidden ${GRID_COLS} items-center gap-x-3 border-b border-[var(--border)] bg-[var(--surface-2)]/50 px-3 py-2 text-[10px] font-semibold uppercase tracking-[0.1em] text-[var(--ink-muted)] sm:grid lg:gap-x-4 lg:px-4 lg:py-2.5`}
+        className={`hidden ${GRID_COLS} items-center gap-x-3 border-b border-[var(--border)] bg-[var(--surface-2)]/50 px-2 py-1.5 text-[10px] font-semibold uppercase tracking-[0.1em] text-[var(--ink-muted)] sm:grid lg:gap-x-4 lg:px-3 lg:py-2`}
       >
         <span>Description</span>
         <span className="text-center">Qty</span>
@@ -168,7 +168,7 @@ const ReceiptItems = ({
           {[0, 1, 2].map((i) => (
             <div
               key={i}
-              className="border-b border-[var(--border)] px-3 py-3 last:border-b-0 sm:px-3 sm:py-2.5 lg:px-4"
+              className="border-b border-[var(--border)] px-2 py-2 last:border-b-0 sm:px-2 sm:py-2 lg:px-3"
             >
               <div
                 className={`hidden ${GRID_COLS_SM} items-center gap-x-3 sm:grid lg:gap-x-4`}
@@ -211,11 +211,11 @@ const ReceiptItems = ({
       )}
 
       {!scanning && items.length === 0 && (
-        <div className="px-4 py-7 text-center sm:py-6">
+        <div className="px-3 py-4 text-center sm:py-4">
           <p className="text-[13px] font-medium text-[var(--ink)]">
             No line items yet
           </p>
-          <p className="mx-auto mt-1 max-w-sm text-[12px] leading-relaxed text-[var(--ink-muted)]">
+          <p className="mx-auto mt-0.5 max-w-sm text-[12px] leading-relaxed text-[var(--ink-muted)]">
             Add a line manually or re-scan the receipt.
           </p>
         </div>
@@ -225,7 +225,7 @@ const ReceiptItems = ({
         <button
           type="button"
           onClick={onAddItem}
-          className="flex min-h-[42px] w-full items-center justify-center gap-1.5 border-t border-dashed border-[var(--border)] px-3 py-2.5 text-[13px] font-medium text-[var(--accent-strong)] transition-colors hover:bg-[var(--accent-soft)]/40 active:bg-[var(--accent-soft)]/50"
+          className="flex min-h-[36px] w-full items-center justify-center gap-1.5 border-t border-dashed border-[var(--border)] px-3 py-2 text-[13px] font-medium text-[var(--accent-strong)] transition-colors hover:bg-[var(--accent-soft)]/40 active:bg-[var(--accent-soft)]/50"
         >
           <Plus size={14} />
           Add line item
@@ -233,7 +233,7 @@ const ReceiptItems = ({
       )}
     </div>
 
-    <div className="mt-3 flex items-center justify-between gap-4 border-t border-[var(--border)] pt-3 sm:mt-4 sm:pt-4">
+    <div className="mt-2 flex items-center justify-between gap-4 border-t border-[var(--border)] pt-2 sm:mt-2.5 sm:pt-2.5">
       <span className="text-[10px] font-semibold uppercase tracking-[0.1em] text-[var(--ink-muted)]">
         Total amount
       </span>

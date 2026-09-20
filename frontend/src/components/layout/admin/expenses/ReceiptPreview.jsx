@@ -9,17 +9,17 @@ const ReceiptPreview = ({
   onRemoveRequest,
   onRemove,
 }) => (
-  <div className="flex w-full items-center gap-3.5 rounded-2xl border border-[var(--border)] bg-[var(--surface-2)]/40 px-3.5 py-3.5 sm:gap-4 sm:px-4 sm:py-4 lg:rounded-3xl lg:gap-5 lg:px-5 lg:py-5">
+  <div className="flex w-full items-center gap-2.5 rounded-2xl border border-[var(--border)] bg-[var(--surface-2)]/40 px-3 py-2.5 sm:gap-3 sm:px-3 sm:py-3 lg:rounded-3xl lg:gap-3 lg:px-4 lg:py-3">
     <img
       src={receipt.imageUrl}
       alt="Receipt preview"
-      className="h-16 w-12 shrink-0 rounded-xl border border-[var(--border)] bg-white object-cover shadow-card sm:h-20 sm:w-16 lg:h-24 lg:w-[76px] lg:rounded-2xl"
+      className="h-14 w-11 shrink-0 rounded-xl border border-[var(--border)] bg-white object-cover shadow-card sm:h-16 sm:w-14 lg:h-20 lg:w-16 lg:rounded-2xl"
     />
     <div className="min-w-0 flex-1">
       <p className="truncate text-base font-semibold tracking-tight text-[var(--ink)] sm:text-[15px] lg:text-base">
         {receipt.fileName || "Receipt attached"}
       </p>
-      <p className="mt-1 text-[12px] leading-relaxed text-[var(--ink-muted)]">
+      <p className="mt-0.5 text-[12px] leading-relaxed text-[var(--ink-muted)]">
         {scanning ? (
           "Reading the receipt…"
         ) : (
@@ -30,7 +30,7 @@ const ReceiptPreview = ({
         )}
       </p>
       {scanning && (
-        <div className="mt-3 h-1.5 w-full max-w-full overflow-hidden rounded-full bg-[var(--surface-2)] sm:max-w-[220px]">
+        <div className="mt-2 h-1.5 w-full max-w-full overflow-hidden rounded-full bg-[var(--surface-2)] sm:max-w-[220px]">
           <div className="h-full w-1/3 animate-[scanbar_1.2s_ease-in-out_infinite] rounded-full bg-[var(--accent)]" />
         </div>
       )}

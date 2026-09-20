@@ -7,7 +7,7 @@ const ReceiptScanButton = ({ scanning = false, onFile }) => {
   return (
     <>
       <span
-        className="flex h-14 w-14 shrink-0 items-center justify-center rounded-xl bg-[var(--accent-soft)] text-[var(--accent-strong)] disabled:opacity-50 sm:h-12 sm:w-12"
+        className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-[var(--accent-soft)] text-[var(--accent-strong)] disabled:opacity-50 sm:h-10 sm:w-10"
         onClick={() => {
           if (!scanning) inputRef.current?.click();
         }}

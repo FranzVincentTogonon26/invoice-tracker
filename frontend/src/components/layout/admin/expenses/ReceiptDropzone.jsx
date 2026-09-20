@@ -20,7 +20,7 @@ const ReceiptDropzone = ({ scanning, onFile }) => {
   return (
     <div
       {...getRootProps()}
-      className={`flex min-h-[84px] cursor-pointer items-center gap-4 rounded-2xl border border-dashed px-4 py-5 transition-colors active:border-[var(--accent)]/60 sm:min-h-0 sm:gap-3 sm:py-4 lg:rounded-3xl lg:gap-5 lg:px-6 lg:py-6 ${
+      className={`flex min-h-[64px] cursor-pointer items-center gap-3 rounded-2xl border border-dashed px-3 py-3 transition-colors active:border-[var(--accent)]/60 sm:min-h-0 sm:gap-3 sm:py-3 lg:rounded-3xl lg:gap-3 lg:px-4 lg:py-4 ${
         isDragActive
           ? "border-[var(--accent)]/60 bg-[var(--accent-soft)]/40"
           : "border-[var(--border)] bg-[var(--surface-2)]/40 hover:border-[var(--accent)]/40"

@@ -9,15 +9,15 @@ import ReceiptItems from "./ReceiptItems";
 // Mobile copy is tap-first (no drag-and-drop exists there); desktop keeps
 // the original "drop" wording.
 const EmptyScanPlaceholder = () => (
-  <div className="flex items-start gap-4 rounded-2xl border border-dashed border-[var(--border)] bg-[var(--surface-2)]/40 px-4 py-5 sm:px-5 lg:gap-5 lg:px-6 lg:py-7">
-    <span className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-[var(--surface)] text-[var(--ink-muted)] shadow-card lg:h-14 lg:w-14">
-      <ScanLine size={22} />
+  <div className="flex items-start gap-3 rounded-2xl border border-dashed border-[var(--border)] bg-[var(--surface-2)]/40 px-3 py-3 sm:px-4 sm:py-4 lg:gap-3 lg:px-4 lg:py-4">
+    <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-[var(--surface)] text-[var(--ink-muted)] shadow-card lg:h-11 lg:w-11">
+      <ScanLine size={20} />
     </span>
-    <div className="min-w-0 lg:pt-0.5">
+    <div className="min-w-0 lg:pt-0">
       <p className="text-[15px] font-semibold tracking-tight text-[var(--ink)] sm:text-sm lg:text-[15px]">
         No scan yet
       </p>
-      <p className="mt-1.5 max-w-[46ch] text-[13px] leading-relaxed text-[var(--ink-muted)] sm:mt-1 sm:text-[12px] lg:mt-2 lg:text-[13px]">
+      <p className="mt-0.5 max-w-[46ch] text-[13px] leading-relaxed text-[var(--ink-muted)] sm:text-[12px] lg:mt-1 lg:text-[13px]">
         <span className="sm:hidden">
           Tap the upload area above to pick a receipt — the extracted lines will
           appear here for review.
@@ -42,7 +42,7 @@ const EmptyScanPlaceholder = () => (
 const Divider = () => (
   <div
     aria-hidden="true"
-    className="my-6 border-t border-[var(--border)] sm:my-7 lg:my-8"
+    className="my-3 border-t border-[var(--border)] sm:my-4 lg:my-4"
   />
 );
 
@@ -78,23 +78,23 @@ const ReceiptPanel = ({
     <form
       id="receipt-form"
       onSubmit={onSubmit}
-      className="space-y-3 sm:space-y-4 lg:space-y-5"
+      className="space-y-2 sm:space-y-3 lg:space-y-3"
     >
       {/* A failed scan reverts the panel to the dropzone so the receipt can be
           re-scanned — the error shows in the shared alert box. */}
       {!hasScannedContent ? (
-        <div className="space-y-3 sm:space-y-4">
+        <div className="space-y-2 sm:space-y-3">
           {attachment}
-          <Card padding="lg" className="p-4 sm:p-6 lg:p-7">
+          <Card padding="lg" className="p-3 sm:p-4 lg:p-4">
             <EmptyScanPlaceholder />
           </Card>
         </div>
       ) : (
-        <Card padding="lg" className="p-4 sm:p-6 lg:rounded-3xl lg:p-8 xl:p-10">
+        <Card padding="lg" className="p-3 sm:p-4 lg:rounded-3xl lg:p-5 xl:p-5">
           {/* ── Top: receipt file ── */}
           {attachment}
 
-          <div className="mt-6 sm:mt-7 lg:mt-8">
+          <div className="mt-3 sm:mt-4 lg:mt-4">
             {/* ── Below: vendor details ── */}
             <ReceiptDetails receipt={receipt} scanning={scanning} />
 
