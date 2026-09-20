@@ -213,7 +213,7 @@ export default function AdminBudget() {
                   ease: [0.16, 1, 0.3, 1],
                   delay: 0.2,
                 }}
-                className="h-full rounded-full bg-[linear-gradient(90deg,var(--accent-hero-2),var(--accent-hero))]"
+                className="utilization-fill h-full rounded-full"
               />
             </div>
             <div className="mt-2.5 flex items-center justify-between gap-3 text-[12px] text-[var(--ink-muted)]">

@@ -13,4 +13,12 @@ export const aiApi = {
       })
       .then((r) => r.data.data);
   },
+
+  // POST /ai/expense-suggest → { data: { description, category } } — text-only
+  // second pass over a confirmed scan: analyzes the receipt's whole scan list
+  // into ONE expense description and picks the best-fit category from the ones
+  // the admin already has (empty string when nothing fits).
+  suggestExpenses: (payload) =>
+    apiClient.post("/ai/expense-suggest", payload).then((r) => r.data.data),
 };
+

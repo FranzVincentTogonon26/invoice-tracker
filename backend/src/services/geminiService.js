@@ -6,7 +6,7 @@ import ApiError from "../utils/ApiError.js";
 
 // Fall back to a sane default so a missing GIMINI_MODEL doesn't produce
 // "model is required" errors from the API with no hint as to why.
-const MODEL = ENV.GIMINI_MODEL || "gemini-3.5-flash"; // gemini-2.5-flash-lite
+const MODEL = ENV.GIMINI_MODEL || "gemini-2.5-flash-lite"; // gemini-2.5-flash-lite, gemini-3.5-flash
 
 let client = null;
 
@@ -160,4 +160,73 @@ export const generateReceipt = async ({ buffer, mimeType }) => {
   });
 
   return receiptValidator.parse(parseJson(text));
+};
+
+/* ── Expense line suggestions (confirmed scan) ───────────────────── */
+
+// Contract for the second pass over a confirmed scan: the whole receipt is
+// logged as ONE grouped expense line, so Gemini answers with a single
+// suggestion for that line instead of one entry per scanned item.
+const suggestionResponseSchema = {
+  type: Type.OBJECT,
+  required: ["description", "category"],
+  properties: {
+    description: {
+      type: Type.STRING,
+      description:
+        "Short, human-friendly expense description summarizing the whole receipt",
+    },
+    category: {
+      type: Type.STRING,
+      description:
+        "Category name copied exactly from the provided list, or an empty string when nothing fits",
+    },
+  },
+};
+
+// Same forgiving guard as the receipt pass: a missing/odd field degrades to a
+// default instead of failing the whole request.
+const suggestionValidator = z.object({
+  description: z.coerce.string().catch(""),
+  category: z.coerce.string().catch(""),
+});
+
+export const generateExpenseSuggestions = async ({
+  vendor,
+  date,
+  items,
+  categories,
+}) => {
+  const lines = items
+    .map((item, index) =>
+      [
+        `#${index + 1}`,
+        `description: ${item.description || "(blank)"}`,
+        `qty: ${item.quantity ?? 1}`,
+        `rate: ${item.rate ?? 0}`,
+        `amount: ${item.amount ?? 0}`,
+      ].join(" | "),
+    )
+    .join("\n");
+
+  const prompt = [
+    "You are an accounts-payable assistant for a Philippine small business.",
+    "The admin logs this whole scanned receipt as ONE expense line, so analyze the receipt below and answer with a single suggestion:",
+    '1. description — ONE short, human-friendly expense description in Title Case, at most 6 words, summarizing what was bought (e.g. "Groceries and office supplies"). Prefer the wording an admin would type themselves over POS shorthand; fall back to the vendor name when the lines are unreadable.',
+    "2. category — exactly one name copied from the category list, or an empty string when none of them fit the purchase.",
+    "Rules: never answer per line, never add extra entries, and never invent a category that isn't in the list.",
+    "",
+    `Vendor: ${vendor || "(not readable)"}`,
+    `Receipt date: ${date || "(not readable)"}`,
+    `Category list: ${categories.length ? categories.join(", ") : "(none available)"}`,
+    "Scanned lines:",
+    lines,
+  ].join("\n");
+
+  const text = await generate({
+    input: [{ type: "text", text: prompt }],
+    schema: suggestionResponseSchema,
+  });
+
+  return suggestionValidator.parse(parseJson(text));
 };

@@ -65,6 +65,33 @@
   --shadow-hover: 0 8px 24px rgba(0, 0, 0, 0.4);
 }
 
+/* Utilization progress fill — light mode keeps the accent gradient,
+   dark mode switches to solid white so the bar stays visible to the eye
+   (the dark --accent-hero values are too close to the dark track). */
+.utilization-fill {
+  background: linear-gradient(90deg, var(--accent-hero-2), var(--accent-hero));
+}
+[data-theme="dark"] .utilization-fill {
+  background: #ffffff;
+  box-shadow: 0 0 8px 1px rgba(255, 255, 255, 0.45);
+}
+
+/* Remaining-balance progress fill (Employees table/cards).
+   Light mode: accent gradient normally, solid success + glow at 100%.
+   Dark mode: solid white + white glow normally (high contrast on the dark
+   track), success green + glow kept at 100% since it already reads well. */
+.remaining-fill {
+  background: linear-gradient(90deg, var(--accent-hero-2), var(--accent-hero));
+}
+.remaining-fill.is-full {
+  background: var(--success);
+  box-shadow: 0 0 6px 1px var(--success);
+}
+[data-theme="dark"] .remaining-fill:not(.is-full) {
+  background: #ffffff;
+  box-shadow: 0 0 6px 1px rgba(255, 255, 255, 0.45);
+}
+
 html,
 body,
 #root {

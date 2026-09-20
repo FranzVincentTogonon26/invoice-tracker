@@ -4,6 +4,7 @@ import ReceiptPreview from "./ReceiptPreview";
 import ReceiptDropzone from "./ReceiptDropzone";
 import ReceiptDetails from "./ReceiptDetails";
 import ReceiptItems from "./ReceiptItems";
+import ModelSource from "./ModelSource";
 
 // Placeholder shown before any scan/upload has produced content.
 // Mobile copy is tap-first (no drag-and-drop exists there); desktop keeps
@@ -84,6 +85,7 @@ const ReceiptPanel = ({
           re-scanned — the error shows in the shared alert box. */}
       {!hasScannedContent ? (
         <div className="space-y-2 sm:space-y-3">
+          <ModelSource />
           {attachment}
           <Card padding="lg" className="p-3 sm:p-4 lg:p-4">
             <EmptyScanPlaceholder />

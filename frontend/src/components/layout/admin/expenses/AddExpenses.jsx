@@ -26,7 +26,14 @@ import {
   useExpenses,
   useExpensesMutations,
 } from "../../../../hooks/useExpenses";
+import { useExpenseSuggestion } from "../../../../hooks/useExpenseSuggestion";
+import {
+  clearPendingReceipts,
+  readPendingReceipt,
+  removePendingReceipt,
+} from "../../../../lib/receiptDraft";
 import ExpensesModal from "./ExpensesModal";
+import ReceiptDraftModal from "./ReceiptDraftModal";
 
 // One editable line. Kept camelCase for the form and mapped to the API's
 // snake_case shape by `toPayload` — see `blankItem`/`toPayload` pairing.
@@ -38,16 +45,91 @@ const blankItem = () => ({
   receiptId: "",
   receiptUrl: "",
   receiptName: "",
+  // Set when the line was mapped from a confirmed scan: the whole receipt lands
+  // as ONE grouped line whose `receiptId` points at a temporary localStorage
+  // draft (not at a `receipt` row yet), and whose scanned date/amount stay
+  // locked so the receipt's numbers can't drift.
+  receiptLocal: false,
+  dateLocked: false,
+  amountLocked: false,
+  aiSuggested: false,
 });
+
+// A line the admin hasn't touched yet — the scan mapping replaces those instead
+// of leaving an empty row above the mapped ones.
+const isUntouchedItem = (item) =>
+  !item.description.trim() &&
+  !item.categoryId &&
+  !item.receiptId &&
+  !(Number(item.totalAmount) > 0);
 
 // Form line → POST /expenses item. Empty strings are dropped so the backend
 // sees `undefined` instead of "" (zod would reject "" as a UUID/date).
-const toPayload = (item) => ({
+// `receiptId` arrives already resolved: a temporary draft id is swapped for the
+// real `receipt` row id in `handleSave`.
+const toPayload = (item, receiptId) => ({
   description: item.description.trim(),
   category_id: item.categoryId || undefined,
   expense_date: item.date || undefined,
   total_amount: Number(item.totalAmount) || 0,
-  receipt_id: item.receiptId || undefined,
+  receipt_id: receiptId || undefined,
+});
+
+// Loose name match for an AI-suggested category: "Meals & Snacks" has to find
+// the stored "Meals and Snacks". Nothing close enough → "" (no category), so
+// the admin picks one instead of the line landing in the wrong bucket.
+const normalizeCategoryName = (value) =>
+  String(value ?? "")
+    .toLowerCase()
+    .replace(/&/g, " and ")
+    .replace(/[^a-z0-9]+/g, " ")
+    .trim();
+
+const matchCategoryId = (categories, suggestion) => {
+  const needle = normalizeCategoryName(suggestion);
+  if (!needle) return "";
+
+  const exact = categories.find(
+    (category) => normalizeCategoryName(category.category_name) === needle,
+  );
+  if (exact) return exact.category_id;
+
+  const partial = categories.find((category) => {
+    const name = normalizeCategoryName(category.category_name);
+    return name && (name.includes(needle) || needle.includes(name));
+  });
+
+  return partial?.category_id ?? "";
+};
+
+// Confirmed scan → ONE editable line for the whole receipt ("one transaction
+// as a group"). The vendor seeds the description (the AI pass below suggests a
+// better wording for it), the scan's own category suggestion is pre-matched,
+// and the receipt's date/grand total are copied over and locked — those numbers
+// belong to the receipt. The date lock is dropped when the scan read no date.
+const draftToLine = (draft, categories = []) => ({
+  ...blankItem(),
+  description: draft.vendor || "Scanned receipt",
+  categoryId: matchCategoryId(categories, draft.suggestedCategory),
+  date: draft.date || toISODate(),
+  totalAmount: Number(draft.total) > 0 ? String(draft.total) : "",
+  receiptId: draft.receiptId,
+  receiptUrl: draft.imageUrl || "",
+  receiptName: draft.vendor || "Receipt",
+  receiptLocal: true,
+  dateLocked: Boolean(draft.date),
+  amountLocked: Number(draft.total) > 0,
+});
+
+// Applies the grouped AI suggestion to the receipt's line: the description is
+// only taken when Gemini produced one, and the category must match a stored
+// name — no match falls back to the scan's own suggestion, else stays empty.
+const applySuggestion = (item, suggestion, categories) => ({
+  ...item,
+  description: suggestion.description || item.description,
+  categoryId:
+    matchCategoryId(categories, suggestion.category) || item.categoryId,
+  aiSuggested: Boolean(suggestion.description) || item.aiSuggested,
 });
 
 function Field({ label, children, hint }) {
@@ -66,41 +148,15 @@ function Field({ label, children, hint }) {
   );
 }
 
-/**
- * Draws a data-URL receipt into a fresh tab. Chrome refuses top-level
- * navigation to `data:` URLs, so the payload is converted to a Blob URL first
- * (and revoked once the tab has had time to load it).
- */
-function openReceipt(url) {
-  if (!url) return;
-
-  try {
-    const [meta, base64] = url.split(",");
-    if (!base64) throw new Error("not a data url");
-
-    const mime = /:(.*?);/.exec(meta)?.[1] || "image/png";
-    const bytes = atob(base64);
-    const buffer = new Uint8Array(bytes.length);
-    for (let i = 0; i < bytes.length; i += 1) {
-      buffer[i] = bytes.charCodeAt(i);
-    }
-
-    const blobUrl = URL.createObjectURL(new Blob([buffer], { type: mime }));
-    window.open(blobUrl, "_blank", "noopener");
-    setTimeout(() => URL.revokeObjectURL(blobUrl), 60_000);
-  } catch {
-    window.open(url, "_blank", "noopener");
-  }
-}
 const AddExpenses = () => {
   const nav = useNavigate();
 
   const [form, setForm] = useState({ items: [blankItem()] });
   // null | "category" | "scan_receipt" — drives the reused ExpensesModal.
   const [modal, setModal] = useState(null);
-  // Line the scan attaches to; null means "append a new pre-filled line".
-  const [targetIndex, setTargetIndex] = useState(null);
   const [formError, setFormError] = useState("");
+  // Temporary receipt draft opened from a line's "View Receipt" button.
+  const [viewReceipt, setViewReceipt] = useState(null);
 
   // Categories power the "Select Category" Listbox straight from
   // GET /expenses, which returns them alongside the ledger.
@@ -130,6 +186,14 @@ const AddExpenses = () => {
 
   const items = form.items;
   const saving = create.isPending;
+
+  // Second AI pass over a confirmed scan (POST /ai/expense-suggest): the whole
+  // scan list is analyzed into ONE readable description plus the best-fit
+  // category for the grouped line. A failure here is non-blocking — the mapped
+  // line is already usable as it is.
+  const { loading: suggesting, suggest } = useExpenseSuggestion({
+    onError: (message) => toast.error(message),
+  });
 
   /* ── line editing ────────────────────────────────────────────── */
 
@@ -190,52 +254,72 @@ const AddExpenses = () => {
       ),
     }));
 
-  // A scanned receipt either lands on the targeted line or becomes a new line.
-  const handleReceiptCreated = (receipt) => {
-    if (!receipt?.id) return;
+  /* ── confirmed scan → one grouped expense line ───────────────── */
 
-    const attach = {
-      receiptId: receipt.id,
-      receiptUrl: receipt.image_url ?? "",
-      receiptName: receipt.description ?? "Receipt",
-    };
+  // A confirmed scan arrives here as a temporary draft (already parked in
+  // localStorage by the modal). The whole receipt becomes ONE line — its scan
+  // list is not exploded into separate rows — with the receipt's own date and
+  // grand total copied over and locked; description and category are then
+  // polished by the AI pass below.
+  const handleReceiptConfirmed = async (draft) => {
+    if (!draft?.receiptId) return;
+
+    const line = draftToLine(draft, categories);
 
     setForm((f) => {
-      if (targetIndex === null) {
-        return {
-          ...f,
-          items: [
-            ...f.items,
-            {
-              ...blankItem(),
-              description: receipt.description ?? "",
-              totalAmount: Number(receipt.amount) || "",
-              ...attach,
-            },
-          ],
-        };
-      }
-
-      return {
-        ...f,
-        items: f.items.map((item, i) =>
-          i === targetIndex
-            ? {
-                ...item,
-                ...attach,
-                // Only fill what's still blank — never clobber typed values.
-                description: item.description.trim()
-                  ? item.description
-                  : (receipt.description ?? ""),
-                totalAmount:
-                  Number(item.totalAmount) > 0
-                    ? item.totalAmount
-                    : Number(receipt.amount) || "",
-              }
-            : item,
-        ),
-      };
+      // Untouched placeholder rows make way for the mapped line.
+      const kept = f.items.filter((item) => !isUntouchedItem(item));
+      return { ...f, items: [...kept, line] };
     });
+
+    // ONE suggestion for the receipt as a whole (description + category). Only
+    // the line still carrying this draft's id is touched, so an older scan is
+    // never rewritten.
+    const suggestion = await suggest({
+      vendor: draft.vendor,
+      date: draft.date,
+      items: draft.items,
+      categories: categoryOptions.map((option) => option.label),
+    });
+
+    if (!suggestion) return;
+
+    setForm((f) => ({
+      ...f,
+      items: f.items.map((item) =>
+        item.receiptId === draft.receiptId
+          ? applySuggestion(item, suggestion, categories)
+          : item,
+      ),
+    }));
+  };
+
+  // "View Receipt": the scanned recap (vendor, date, scan list, total). The
+  // temporary draft is read back from localStorage so the details survive a
+  // refresh; when it's gone the line's own copy is shown instead.
+  const handleViewReceipt = (item) => {
+    const draft = item.receiptId ? readPendingReceipt(item.receiptId) : null;
+
+    setViewReceipt(
+      draft ?? {
+        receiptId: item.receiptId,
+        vendor: item.receiptName || "",
+        date: item.date || "",
+        currency: "",
+        items: [
+          {
+            description: item.description,
+            quantity: 1,
+            rate: Number(item.totalAmount) || 0,
+            amount: Number(item.totalAmount) || 0,
+          },
+        ],
+        itemsTotal: Number(item.totalAmount) || 0,
+        total: Number(item.totalAmount) || 0,
+        imageUrl: item.receiptUrl || "",
+        fileName: "",
+      },
+    );
   };
 
   /* ── save ────────────────────────────────────────────────────── */
@@ -267,10 +351,45 @@ const AddExpenses = () => {
     }
 
     try {
+      // Lines still pointing at a temporary draft need a real `receipt` row
+      // first: `expenses.receipt_id` is a foreign key, and every line of one
+      // scan shares that single record (image + receipt grand total).
+      const persistedReceipts = new Map();
+      for (const item of items) {
+        if (!item.receiptLocal || !item.receiptId) continue;
+        if (persistedReceipts.has(item.receiptId)) continue;
+
+        const draft = readPendingReceipt(item.receiptId);
+        const total = Number(draft?.total) || Number(item.totalAmount) || 0;
+        if (!draft || !(total > 0)) continue;
+
+        const vendor = String(draft.vendor ?? "").trim();
+        const created = await create.mutateAsync({
+          type: "receipt",
+          description: vendor.length >= 2 ? vendor : "Scanned receipt",
+          qty: 1,
+          rate: total,
+          amount: total,
+          image_url: draft.imageUrl || undefined,
+        });
+
+        persistedReceipts.set(item.receiptId, created?.id ?? null);
+      }
+
       await create.mutateAsync({
         type: "expense",
-        items: items.map(toPayload),
+        items: items.map((item) =>
+          toPayload(
+            item,
+            item.receiptLocal
+              ? persistedReceipts.get(item.receiptId)
+              : item.receiptId,
+          ),
+        ),
       });
+
+      // Those drafts live in the database now — the temporary copies can go.
+      persistedReceipts.forEach((_, draftId) => removePendingReceipt(draftId));
 
       toast.success(
         `Saved ${items.length} expense line${items.length === 1 ? "" : "s"}.`,
@@ -308,10 +427,7 @@ const AddExpenses = () => {
           <Button
             type="button"
             variant="soft"
-            onClick={() => {
-              setTargetIndex(null);
-              setModal("category");
-            }}
+            onClick={() => setModal("category")}
           >
             <Plus size={15} />
             Add Category
@@ -319,10 +435,7 @@ const AddExpenses = () => {
           <Button
             type="button"
             variant="accent"
-            onClick={() => {
-              setTargetIndex(null);
-              setModal("scan_receipt");
-            }}
+            onClick={() => setModal("scan_receipt")}
           >
             <ScanLine size={15} />
             Scan receipt
@@ -337,7 +450,8 @@ const AddExpenses = () => {
         <div className="min-w-0">
           <p className="type-eyebrow text-[var(--accent-strong)]">Smart tip</p>
           <p className="truncate text-sm text-[var(--ink-muted)]">
-            Scan a receipt to auto-fill a line — or attach one to a line below.
+            Scan a receipt to fill one grouped line — description, category,
+            date and total.
           </p>
         </div>
       </div>
@@ -350,12 +464,20 @@ const AddExpenses = () => {
                 Transactions items
               </CardTitle>
               <CardDescription className="text-sm">
-                Each row is one receipt line.
+                One confirmed receipt lands here as one grouped row.
               </CardDescription>
             </div>
-            <Badge tone="neutral" className="tabular">
-              {items.length} {items.length === 1 ? "row" : "rows"}
-            </Badge>
+            <div className="flex flex-wrap items-center justify-end gap-2">
+              {suggesting && (
+                <Badge tone="accent">
+                  <Loader2 size={11} className="animate-spin" />
+                  Suggesting…
+                </Badge>
+              )}
+              <Badge tone="neutral" className="tabular">
+                {items.length} {items.length === 1 ? "row" : "rows"}
+              </Badge>
+            </div>
           </div>
 
           <div className="space-y-3 pt-4">
@@ -374,6 +496,15 @@ const AddExpenses = () => {
                     <p className="truncate text-sm font-semibold text-[var(--ink)]">
                       {it.description.trim() || `Expense item ${i + 1}`}
                     </p>
+                    {it.receiptLocal && (
+                      <Badge
+                        tone="accent"
+                        className="hidden shrink-0 sm:inline-flex"
+                      >
+                        <Sparkles size={11} />
+                        {it.aiSuggested ? "AI suggested" : "From receipt"}
+                      </Badge>
+                    )}
                   </div>
                   <button
                     type="button"
@@ -386,7 +517,14 @@ const AddExpenses = () => {
                   </button>
                 </div>
 
-                <Field label="Description">
+                <Field
+                  label="Description"
+                  hint={
+                    it.receiptLocal
+                      ? "Suggested from the scanned receipt — edit it if it doesn't match."
+                      : undefined
+                  }
+                >
                   <TextArea
                     value={it.description}
                     onChange={(e) =>
@@ -398,7 +536,16 @@ const AddExpenses = () => {
                 </Field>
 
                 <div className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-[1fr_170px_160px]">
-                  <Field label="Category">
+                  <Field
+                    label="Category"
+                    hint={
+                      it.receiptLocal
+                        ? it.categoryId
+                          ? "Matched from your category list."
+                          : "No category matched — pick one."
+                        : undefined
+                    }
+                  >
                     <Listbox
                       options={categoryOptions}
                       value={it.categoryId}
@@ -406,15 +553,30 @@ const AddExpenses = () => {
                       placeholder="Select category"
                     />
                   </Field>
-                  <Field label="Date">
+                  <Field
+                    label="Date"
+                    hint={
+                      it.dateLocked
+                        ? "From the scanned receipt — locked."
+                        : undefined
+                    }
+                  >
                     <DatePicker
                       value={it.date}
                       onChange={(next) => setItem(i, { date: next })}
                       placeholder="Select date"
                       className="tabular"
+                      disabled={it.dateLocked}
                     />
                   </Field>
-                  <Field label="Amount">
+                  <Field
+                    label="Amount"
+                    hint={
+                      it.amountLocked
+                        ? "The receipt's grand total — locked."
+                        : undefined
+                    }
+                  >
                     <div className="relative">
                       <span className="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 text-sm font-semibold text-[var(--ink-muted)]">
                         ₱
@@ -429,6 +591,12 @@ const AddExpenses = () => {
                         }
                         placeholder="0.00"
                         className="pl-8 text-right font-semibold tabular"
+                        disabled={it.amountLocked}
+                        title={
+                          it.amountLocked
+                            ? "Amount is locked to the scanned receipt's grand total"
+                            : undefined
+                        }
                       />
                     </div>
                   </Field>
@@ -437,35 +605,40 @@ const AddExpenses = () => {
                 <div className="mt-3 flex flex-col gap-2 rounded-xl border border-dashed border-[var(--border)] bg-[var(--surface)]/70 px-3.5 py-3 sm:flex-row sm:items-center sm:justify-between">
                   <div className="flex min-w-0 items-center gap-2.5">
                     <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-[var(--accent-soft)] text-[var(--accent-strong)]">
-                      <ImagePlus size={16} />
+                      {it.receiptLocal ? (
+                        <Sparkles size={16} />
+                      ) : (
+                        <ImagePlus size={16} />
+                      )}
                     </span>
                     <div className="min-w-0">
                       <p className="truncate text-sm font-semibold text-[var(--ink)]">
                         {it.receiptId
-                          ? it.receiptName || "Receipt attached"
+                          ? it.receiptLocal
+                            ? "Receipt attached"
+                            : it.receiptName || "Receipt attached"
                           : "No receipt attached"}
                       </p>
                       <p className="text-[12px] text-[var(--ink-muted)]">
                         {it.receiptId
-                          ? "Stored with this expense line"
+                          ? it.receiptLocal
+                            ? `${it.receiptName || "Scanned receipt"} · #${String(it.receiptId).slice(0, 8).toUpperCase()}`
+                            : "Stored with this expense line"
                           : "PNG, JPG or WEBP · up to 2MB"}
                       </p>
                     </div>
                   </div>
                   <div className="flex shrink-0 items-center gap-2">
                     {it.receiptId && (
-                      <>
-                        <Button
-                          variant="soft"
-                          size="sm"
-                          type="button"
-                          onClick={() => openReceipt(it.receiptUrl)}
-                          disabled={it.receiptUrl}
-                        >
-                          <Eye size={13} />
-                          View Receipt
-                        </Button>
-                      </>
+                      <Button
+                        variant="soft"
+                        size="sm"
+                        type="button"
+                        onClick={() => handleViewReceipt(it)}
+                      >
+                        <Eye size={13} />
+                        View Receipt
+                      </Button>
                     )}
                   </div>
                 </div>
@@ -534,8 +707,8 @@ const AddExpenses = () => {
                 size={16}
                 className="mt-px shrink-0 text-[var(--accent-strong)]"
               />
-              Totals update live as you type. Attach a receipt per line to speed
-              up approval.
+              Totals update live as you type. A confirmed receipt stays attached
+              to its grouped line for approval.
             </div>
 
             {formError && (
@@ -567,7 +740,12 @@ const AddExpenses = () => {
                 variant="outline"
                 className="w-full"
                 type="button"
-                onClick={() => nav(-1)}
+                onClick={() => {
+                  // The lines (and the temporary receipts behind them) are
+                  // being thrown away — don't leave the drafts behind.
+                  clearPendingReceipts();
+                  nav(-1);
+                }}
                 disabled={saving}
               >
                 Discard
@@ -583,11 +761,14 @@ const AddExpenses = () => {
         categories={categories}
         onAdd={handleCategoryAdded}
         onDelete={handleCategoryDeleted}
-        onReceiptCreated={handleReceiptCreated}
-        onClose={() => {
-          setModal(null);
-          setTargetIndex(null);
-        }}
+        onReceiptConfirmed={handleReceiptConfirmed}
+        onClose={() => setModal(null)}
+      />
+
+      <ReceiptDraftModal
+        open={Boolean(viewReceipt)}
+        receipt={viewReceipt}
+        onClose={() => setViewReceipt(null)}
       />
     </div>
   );

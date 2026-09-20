@@ -52,7 +52,7 @@ export const MODAL_COPY = {
   scan_receipt: {
     title: "Scan Receipt",
     description:
-      "Attach the receipt image — we'll read the vendor, items and totals and pre-fill the expense lines for you.",
+      "Attach the receipt image — we'll read the vendor, items and totals and pre-fill one grouped expense line for you.",
     maxWidth: "max-w-[880px]",
   },
 };

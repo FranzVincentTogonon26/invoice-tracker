@@ -14,4 +14,8 @@ router.post(
   aiController.extractReceipt,
 );
 
+// JSON-only (no upload): the confirmed scan is analyzed once more so the
+// grouped receipt line gets a readable description and the best-fit category.
+router.post("/expense-suggest", authMiddleware, aiController.suggestExpenses);
+
 export default router;

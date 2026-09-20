@@ -8,6 +8,10 @@ import useSmoothScroll from "../../../../hooks/useSmoothScroll";
 import { LockBodyScroll } from "../../../../hooks/useLockBody";
 import { useReceiptScan } from "../../../../hooks/useReceiptScan";
 import {
+  buildReceiptDraft,
+  savePendingReceipt,
+} from "../../../../lib/receiptDraft";
+import {
   ERROR_VISIBLE_MS,
   MAX_RECEIPT_BYTES,
   MODAL_COPY,
@@ -27,6 +31,7 @@ const ExpensesModal = ({
   onAdd,
   onDelete,
   onReceiptCreated,
+  onReceiptConfirmed,
 }) => {
   const { create, removeCategory } = useExpensesMutations();
   const tableRef = useSmoothScroll();
@@ -274,6 +279,47 @@ const ExpensesModal = ({
     e.preventDefault();
     setErr("");
 
+    // ── Temporary (localStorage) flow ──────────────────────────────
+    // AddExpenses opts in through `onReceiptConfirmed`. Confirming parks the
+    // scan in the browser as a draft — random receipt id, vendor, date, scan
+    // list items (description/qty/rate/amount) and total — which the form then
+    // maps into ONE grouped expense line. The real `receipt` row is created on
+    // save, so nothing is left half-persisted and `expenses.receipt_id` never
+    // points at a row that doesn't exist yet.
+    if (onReceiptConfirmed) {
+      const items = (receipt.items ?? []).filter(
+        (item) =>
+          String(item.description ?? "").trim() &&
+          Number(item.quantity) > 0 &&
+          Number(item.rate) > 0,
+      );
+
+      if (!items.length) {
+        setErr(
+          "Every scanned line needs a description, quantity and rate before confirming.",
+        );
+        return;
+      }
+
+      const { draft, persisted, imageDropped } = savePendingReceipt(
+        buildReceiptDraft({ ...receipt, items }),
+      );
+
+      onReceiptConfirmed(draft);
+      setReceipt(blankReceipt());
+      onClose?.();
+
+      toast.success(
+        !persisted
+          ? "Receipt confirmed — grouped line added for this session only."
+          : imageDropped
+            ? "Receipt confirmed — grouped line added (image too large to keep)."
+            : "Receipt confirmed — grouped line added.",
+      );
+      return;
+    }
+
+    // ── Server flow (no parent handler wired) ──────────────────────
     const description = receipt.description.trim();
     if (description.length < 2) {
       setErr("Receipt description is required.");

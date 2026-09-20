@@ -138,10 +138,8 @@ function RemainingProgress({ remaining, issued, share, label }) {
             delay: 0.2,
           }}
           className={cn(
-            "h-full rounded-full",
-            isFull
-              ? "bg-[linear-gradient(90deg,var(--success),var(--success))] shadow-[0_0_6px_1px_var(--success)]"
-              : "bg-[linear-gradient(90deg,var(--accent-hero-2),var(--accent-hero))]",
+            "remaining-fill h-full rounded-full",
+            isFull && "is-full",
           )}
         />
       </div>
