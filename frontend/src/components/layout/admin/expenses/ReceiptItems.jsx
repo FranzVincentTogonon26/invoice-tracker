@@ -89,7 +89,6 @@ const ItemRow = ({ item, index, onItemChange, onRemove }) => {
             <Input
               className="h-5 w-10 rounded border-0 bg-transparent p-0 text-[11px] tabular shadow-none focus:ring-0"
               type="number"
-              min="0"
               inputMode="decimal"
               autoComplete="off"
               placeholder="0"
@@ -103,7 +102,6 @@ const ItemRow = ({ item, index, onItemChange, onRemove }) => {
             <Input
               className="h-5 w-16 rounded border-0 bg-transparent p-0 text-[11px] tabular shadow-none focus:ring-0"
               type="number"
-              min="0"
               inputMode="decimal"
               autoComplete="off"
               placeholder="0.00"

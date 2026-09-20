@@ -31,20 +31,20 @@ const ConfirmClearDialog = ({ open, onKeep, onConfirm }) => (
               <Trash2 size={17} />
             </span>
             <div className="min-w-0">
-              <h4 className="text-sm font-semibold text-[var(--ink)]">
+              <h4 className="text-lg font-semibold text-[var(--ink)]">
                 Remove scanned receipt?
               </h4>
-              <p className="mt-1 text-[12px] leading-relaxed text-[var(--ink-muted)]">
-                This clears the attached image, receipt details, scan list
-                items and total. You can scan again afterwards.
+              <p className="mt-1 text-sm leading-relaxed text-[var(--ink-muted)]">
+                This clears the attached image, receipt details, scan list items
+                and total. You can scan again afterwards.
               </p>
             </div>
           </div>
           <div className="mt-5 flex items-center justify-end gap-2">
-            <Button type="button" variant="outline" size="sm" onClick={onKeep}>
+            <Button type="button" variant="outline" onClick={onKeep}>
               Keep
             </Button>
-            <Button type="button" variant="danger" size="sm" onClick={onConfirm}>
+            <Button type="button" variant="danger" onClick={onConfirm}>
               <Trash2 size={13} /> Confirm remove
             </Button>
           </div>
