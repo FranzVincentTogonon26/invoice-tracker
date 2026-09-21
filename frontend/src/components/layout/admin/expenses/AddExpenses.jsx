@@ -12,8 +12,8 @@ import {
   Trash2,
 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
-import { useMemo, useState } from "react";
-import { motion } from "framer-motion";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { AnimatePresence, motion } from "framer-motion";
 import toast from "react-hot-toast";
 import { Button } from "../../../ui/Button";
 import { Badge } from "../../../ui/Badge";
@@ -22,6 +22,7 @@ import { DatePicker } from "../../../ui/DatePicker";
 import { Input, TextArea } from "../../../ui/Input";
 import Listbox from "../../../ui/Listbox";
 import { formatMoney, toISODate } from "../../../../lib/utils";
+import { ERROR_VISIBLE_MS } from "../../../../constants";
 import {
   useExpenses,
   useExpensesMutations,
@@ -32,11 +33,11 @@ import {
   readPendingReceipt,
   removePendingReceipt,
 } from "../../../../lib/receiptDraft";
+import ConfirmRemoveItemDialog from "./ConfirmRemoveItemDialog";
 import ExpensesModal from "./ExpensesModal";
 import ReceiptDraftModal from "./ReceiptDraftModal";
+import SelectSourceFund from "./SelectSourceFund";
 
-// One editable line. Kept camelCase for the form and mapped to the API's
-// snake_case shape by `toPayload` — see `blankItem`/`toPayload` pairing.
 const blankItem = () => ({
   description: "",
   categoryId: "",
@@ -45,28 +46,28 @@ const blankItem = () => ({
   receiptId: "",
   receiptUrl: "",
   receiptName: "",
-  // Set when the line was mapped from a confirmed scan: the whole receipt lands
-  // as ONE grouped line whose `receiptId` points at a temporary localStorage
-  // draft (not at a `receipt` row yet), and whose scanned date/amount stay
-  // locked so the receipt's numbers can't drift.
   receiptLocal: false,
   dateLocked: false,
   amountLocked: false,
   aiSuggested: false,
 });
 
-// A line the admin hasn't touched yet — the scan mapping replaces those instead
-// of leaving an empty row above the mapped ones.
 const isUntouchedItem = (item) =>
   !item.description.trim() &&
   !item.categoryId &&
   !item.receiptId &&
   !(Number(item.totalAmount) > 0);
 
-// Form line → POST /expenses item. Empty strings are dropped so the backend
-// sees `undefined` instead of "" (zod would reject "" as a UUID/date).
-// `receiptId` arrives already resolved: a temporary draft id is swapped for the
-// real `receipt` row id in `handleSave`.
+const missingFieldsFor = (item) => {
+  const missing = [];
+  if (!item.description.trim()) missing.push("description");
+  if (!(Number(item.totalAmount) > 0)) missing.push("amount");
+  return missing;
+};
+
+const firstIncompleteIndex = (items) =>
+  items.findIndex((item) => missingFieldsFor(item).length > 0);
+
 const toPayload = (item, receiptId) => ({
   description: item.description.trim(),
   category_id: item.categoryId || undefined,
@@ -75,9 +76,6 @@ const toPayload = (item, receiptId) => ({
   receipt_id: receiptId || undefined,
 });
 
-// Loose name match for an AI-suggested category: "Meals & Snacks" has to find
-// the stored "Meals and Snacks". Nothing close enough → "" (no category), so
-// the admin picks one instead of the line landing in the wrong bucket.
 const normalizeCategoryName = (value) =>
   String(value ?? "")
     .toLowerCase()
@@ -88,25 +86,17 @@ const normalizeCategoryName = (value) =>
 const matchCategoryId = (categories, suggestion) => {
   const needle = normalizeCategoryName(suggestion);
   if (!needle) return "";
-
   const exact = categories.find(
     (category) => normalizeCategoryName(category.category_name) === needle,
   );
   if (exact) return exact.category_id;
-
   const partial = categories.find((category) => {
     const name = normalizeCategoryName(category.category_name);
     return name && (name.includes(needle) || needle.includes(name));
   });
-
   return partial?.category_id ?? "";
 };
 
-// Confirmed scan → ONE editable line for the whole receipt ("one transaction
-// as a group"). The vendor seeds the description (the AI pass below suggests a
-// better wording for it), the scan's own category suggestion is pre-matched,
-// and the receipt's date/grand total are copied over and locked — those numbers
-// belong to the receipt. The date lock is dropped when the scan read no date.
 const draftToLine = (draft, categories = []) => ({
   ...blankItem(),
   description: draft.vendor || "Scanned receipt",
@@ -121,9 +111,6 @@ const draftToLine = (draft, categories = []) => ({
   amountLocked: Number(draft.total) > 0,
 });
 
-// Applies the grouped AI suggestion to the receipt's line: the description is
-// only taken when Gemini produced one, and the category must match a stored
-// name — no match falls back to the scan's own suggestion, else stays empty.
 const applySuggestion = (item, suggestion, categories) => ({
   ...item,
   description: suggestion.description || item.description,
@@ -150,17 +137,27 @@ function Field({ label, children, hint }) {
 
 const AddExpenses = () => {
   const nav = useNavigate();
-
   const [form, setForm] = useState({ items: [blankItem()] });
-  // null | "category" | "scan_receipt" — drives the reused ExpensesModal.
+  // Budget reference the draft is funded from. The Summary card owns the
+  // picker; with a single open source it is selected automatically (below).
+  const [referenceId, setReferenceId] = useState("");
   const [modal, setModal] = useState(null);
   const [formError, setFormError] = useState("");
-  // Temporary receipt draft opened from a line's "View Receipt" button.
+  const [addItemError, setAddItemError] = useState("");
+  const [removeIndex, setRemoveIndex] = useState(null);
   const [viewReceipt, setViewReceipt] = useState(null);
-
-  // Categories power the "Select Category" Listbox straight from
-  // GET /expenses, which returns them alongside the ledger.
-  const { categories } = useExpenses();
+  // Row awaiting a remove confirmation, plus its trash button so focus can
+  // return there when the dialog is cancelled. `addLineRef` is the fallback
+  // target once a row is actually removed and its own button is gone, and
+  // `pendingRemoveRef` is the consume-once guard for the confirm action.
+  const pendingRemoveRef = useRef(null);
+  const removeTriggerRef = useRef(null);
+  const addLineRef = useRef(null);
+  const {
+    categories,
+    references,
+    isLoading: referencesLoading,
+  } = useExpenses();
   const { create } = useExpensesMutations();
 
   const categoryOptions = useMemo(
@@ -172,7 +169,6 @@ const AddExpenses = () => {
     [categories],
   );
 
-  // id → name lookup for the summary readout (the Listbox deals in ids).
   const categoryNames = useMemo(
     () =>
       new Map(
@@ -186,35 +182,111 @@ const AddExpenses = () => {
 
   const items = form.items;
   const saving = create.isPending;
-
-  // Second AI pass over a confirmed scan (POST /ai/expense-suggest): the whole
-  // scan list is analyzed into ONE readable description plus the best-fit
-  // category for the grouped line. A failure here is non-blocking — the mapped
-  // line is already usable as it is.
   const { loading: suggesting, suggest } = useExpenseSuggestion({
     onError: (message) => toast.error(message),
   });
 
-  /* ── line editing ────────────────────────────────────────────── */
+  // The add-line guard message is transient: fade it out on its own after the
+  // shared 5s window so a stale warning never lingers under the button.
+  useEffect(() => {
+    if (!addItemError) return undefined;
 
-  const setItem = (index, patch) =>
+    const id = setTimeout(() => setAddItemError(""), ERROR_VISIBLE_MS);
+    return () => clearTimeout(id);
+  }, [addItemError]);
+
+  // The save-time error strip follows the same contract: it slides in beside
+  // the Summary buttons and auto-fades after the shared 5s window so a stale
+  // failure never sits next to "Save expenses".
+  useEffect(() => {
+    if (!formError) return undefined;
+
+    const id = setTimeout(() => setFormError(""), ERROR_VISIBLE_MS);
+    return () => clearTimeout(id);
+  }, [formError]);
+
+  const setItem = (index, patch) => {
+    setAddItemError("");
     setForm((f) => ({
       ...f,
       items: f.items.map((item, i) =>
         i === index ? { ...item, ...patch } : item,
       ),
     }));
+  };
 
-  const addItem = () =>
+  const addItem = () => {
+    const invalidIndex = firstIncompleteIndex(items);
+    if (invalidIndex >= 0) {
+      const missing = missingFieldsFor(items[invalidIndex]).join(" and ");
+      setAddItemError(
+        `Unable to add a line item — fill up the ${missing} on line ${
+          invalidIndex + 1
+        } first to proceed.`,
+      );
+      return;
+    }
+    setAddItemError("");
     setForm((f) => ({ ...f, items: [...f.items, blankItem()] }));
+  };
 
-  const removeItem = (index) =>
+  const removeItem = (index) => {
+    const removed = items[index];
+    if (removed?.receiptId) removePendingReceipt(removed.receiptId);
+
     setForm((f) => {
       const next = f.items.filter((_, i) => i !== index);
       return { ...f, items: next.length ? next : [blankItem()] };
     });
+  };
 
-  /* ── totals (live, as you type) ─────────────────────────────── */
+  // The trash button only asks before dropping a line that has something on it:
+  // dropping a filled line also drops the receipt draft parked for it, and a
+  // stray tap used to cost the whole line. A line whose description is still
+  // blank has nothing to confirm, so it goes straight away — `removeItem` runs
+  // from here or from `confirmRemoveItem`.
+  //
+  // The pending index also lives in a ref: AnimatePresence keeps the dialog
+  // mounted (with its frozen props) for the exit animation, so a double-click
+  // would otherwise re-run the handler with the stale index and eat the line
+  // that shifted into that slot.
+  const requestRemoveItem = (index, trigger) => {
+    const line = items[index];
+
+    // Blank description = nothing typed, nothing worth a confirmation.
+    if (!line?.description?.trim()) {
+      removeItem(index);
+      // The row (and its trash button) is gone — park focus on a stable control.
+      addLineRef.current?.focus();
+      return;
+    }
+
+    removeTriggerRef.current = trigger ?? null;
+    pendingRemoveRef.current = index;
+    setRemoveIndex(index);
+  };
+
+  const cancelRemoveItem = useCallback(() => {
+    pendingRemoveRef.current = null;
+    setRemoveIndex(null);
+    removeTriggerRef.current?.focus?.();
+    removeTriggerRef.current = null;
+  }, []);
+
+  const confirmRemoveItem = () => {
+    const index = pendingRemoveRef.current;
+    if (index == null) return;
+    pendingRemoveRef.current = null;
+    removeItem(index);
+    setRemoveIndex(null);
+    removeTriggerRef.current = null;
+    // The row (and its trash button) is gone — park focus on a stable control.
+    addLineRef.current?.focus();
+  };
+
+  // Line the dialog is asking about (null while it's closed).
+  const removingLine =
+    removeIndex == null ? null : (items[removeIndex] ?? null);
 
   const { total, filledCount } = useMemo(() => {
     const sum = items.reduce(
@@ -225,13 +297,19 @@ const AddExpenses = () => {
     return { total: sum, filledCount: filled };
   }, [items]);
 
-  /* ── modal callbacks ─────────────────────────────────────────── */
+  // The Summary card funds the lines from one budget reference. With a single
+  // open source there is nothing to pick, so it is used automatically — the
+  // same fallback `SelectSourceFund` renders, mirrored here so the value this
+  // form holds always matches the card (including after a source is removed).
+  const selectedReferenceId = useMemo(() => {
+    if (references.length === 1) return references[0].reference_id;
+    return references.some((ref) => ref.reference_id === referenceId)
+      ? referenceId
+      : "";
+  }, [references, referenceId]);
 
-  // A category created from the modal is auto-selected on the first line that
-  // has none yet (or the last line), so the round-trip feels instant.
   const handleCategoryAdded = (category) => {
     if (!category?.category_id) return;
-
     setForm((f) => {
       const empty = f.items.findIndex((item) => !item.categoryId);
       const at = empty >= 0 ? empty : f.items.length - 1;
@@ -244,8 +322,6 @@ const AddExpenses = () => {
     });
   };
 
-  // The category list is refetched by the mutation; just drop the now-dangling
-  // selection from any line that referenced it.
   const handleCategoryDeleted = (categoryId) =>
     setForm((f) => ({
       ...f,
@@ -254,36 +330,20 @@ const AddExpenses = () => {
       ),
     }));
 
-  /* ── confirmed scan → one grouped expense line ───────────────── */
-
-  // A confirmed scan arrives here as a temporary draft (already parked in
-  // localStorage by the modal). The whole receipt becomes ONE line — its scan
-  // list is not exploded into separate rows — with the receipt's own date and
-  // grand total copied over and locked; description and category are then
-  // polished by the AI pass below.
   const handleReceiptConfirmed = async (draft) => {
     if (!draft?.receiptId) return;
-
     const line = draftToLine(draft, categories);
-
     setForm((f) => {
-      // Untouched placeholder rows make way for the mapped line.
       const kept = f.items.filter((item) => !isUntouchedItem(item));
       return { ...f, items: [...kept, line] };
     });
-
-    // ONE suggestion for the receipt as a whole (description + category). Only
-    // the line still carrying this draft's id is touched, so an older scan is
-    // never rewritten.
     const suggestion = await suggest({
       vendor: draft.vendor,
       date: draft.date,
       items: draft.items,
       categories: categoryOptions.map((option) => option.label),
     });
-
     if (!suggestion) return;
-
     setForm((f) => ({
       ...f,
       items: f.items.map((item) =>
@@ -294,12 +354,8 @@ const AddExpenses = () => {
     }));
   };
 
-  // "View Receipt": the scanned recap (vendor, date, scan list, total). The
-  // temporary draft is read back from localStorage so the details survive a
-  // refresh; when it's gone the line's own copy is shown instead.
   const handleViewReceipt = (item) => {
     const draft = item.receiptId ? readPendingReceipt(item.receiptId) : null;
-
     setViewReceipt(
       draft ?? {
         receiptId: item.receiptId,
@@ -322,47 +378,35 @@ const AddExpenses = () => {
     );
   };
 
-  /* ── save ────────────────────────────────────────────────────── */
-
   const handleSave = async (e) => {
     e?.preventDefault();
     setFormError("");
-
+    setAddItemError("");
     const touched = items.filter(
       (item) =>
         item.description.trim() ||
         Number(item.totalAmount) > 0 ||
         item.receiptId,
     );
-
     if (touched.length === 0) {
       setFormError("Add at least one expense line before saving.");
       return;
     }
-
-    const invalidIndex = items.findIndex(
-      (item) => !item.description.trim() || !(Number(item.totalAmount) > 0),
-    );
+    const invalidIndex = firstIncompleteIndex(items);
     if (invalidIndex >= 0) {
       setFormError(
         `Line ${invalidIndex + 1} needs a description and an amount greater than zero.`,
       );
       return;
     }
-
     try {
-      // Lines still pointing at a temporary draft need a real `receipt` row
-      // first: `expenses.receipt_id` is a foreign key, and every line of one
-      // scan shares that single record (image + receipt grand total).
       const persistedReceipts = new Map();
       for (const item of items) {
         if (!item.receiptLocal || !item.receiptId) continue;
         if (persistedReceipts.has(item.receiptId)) continue;
-
         const draft = readPendingReceipt(item.receiptId);
         const total = Number(draft?.total) || Number(item.totalAmount) || 0;
         if (!draft || !(total > 0)) continue;
-
         const vendor = String(draft.vendor ?? "").trim();
         const created = await create.mutateAsync({
           type: "receipt",
@@ -372,12 +416,13 @@ const AddExpenses = () => {
           amount: total,
           image_url: draft.imageUrl || undefined,
         });
-
         persistedReceipts.set(item.receiptId, created?.id ?? null);
       }
-
       await create.mutateAsync({
         type: "expense",
+        // Funding source — empty string normalizes to NULL on the server, so
+        // nothing is saved when no reference is available/picked.
+        reference_id: selectedReferenceId || undefined,
         items: items.map((item) =>
           toPayload(
             item,
@@ -387,10 +432,7 @@ const AddExpenses = () => {
           ),
         ),
       });
-
-      // Those drafts live in the database now — the temporary copies can go.
       persistedReceipts.forEach((_, draftId) => removePendingReceipt(draftId));
-
       toast.success(
         `Saved ${items.length} expense line${items.length === 1 ? "" : "s"}.`,
       );
@@ -399,6 +441,7 @@ const AddExpenses = () => {
       setFormError(error?.message || "Couldn't save expenses.");
     }
   };
+
   return (
     <div className="mx-auto w-full max-w-6xl space-y-5 pb-6">
       <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
@@ -423,7 +466,7 @@ const AddExpenses = () => {
             </p>
           </div>
         </div>
-        <div className="flex flex-wrap items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2 justify-end">
           <Button
             type="button"
             variant="soft"
@@ -471,7 +514,7 @@ const AddExpenses = () => {
               {suggesting && (
                 <Badge tone="accent">
                   <Loader2 size={11} className="animate-spin" />
-                  Suggesting…
+                  Suggesting description..
                 </Badge>
               )}
               <Badge tone="neutral" className="tabular">
@@ -508,7 +551,7 @@ const AddExpenses = () => {
                   </div>
                   <button
                     type="button"
-                    onClick={() => removeItem(i)}
+                    onClick={(e) => requestRemoveItem(i, e.currentTarget)}
                     title="Remove line"
                     aria-label={`Remove expense line ${i + 1}`}
                     className="h-10 w-10 shrink-0 rounded-full flex items-center justify-center text-[var(--ink-muted)] hover:text-[var(--danger)] hover:bg-[var(--danger)]/10 transition-colors"
@@ -553,6 +596,7 @@ const AddExpenses = () => {
                       placeholder="Select category"
                     />
                   </Field>
+
                   <Field
                     label="Date"
                     hint={
@@ -569,6 +613,7 @@ const AddExpenses = () => {
                       disabled={it.dateLocked}
                     />
                   </Field>
+
                   <Field
                     label="Amount"
                     hint={
@@ -628,13 +673,15 @@ const AddExpenses = () => {
                       </p>
                     </div>
                   </div>
-                  <div className="flex shrink-0 items-center gap-2">
+
+                  <div className="flex w-full items-center gap-2 sm:w-auto sm:shrink-0">
                     {it.receiptId && (
                       <Button
                         variant="soft"
                         size="sm"
                         type="button"
                         onClick={() => handleViewReceipt(it)}
+                        className="w-full sm:w-auto"
                       >
                         <Eye size={13} />
                         View Receipt
@@ -647,6 +694,7 @@ const AddExpenses = () => {
           </div>
 
           <button
+            ref={addLineRef}
             type="button"
             onClick={addItem}
             className="mt-3 flex w-full items-center justify-center gap-2 rounded-2xl border border-dashed border-[var(--border)] px-4 py-3.5 text-sm font-semibold text-[var(--accent-strong)] hover:border-[var(--accent)]/50 hover:bg-[var(--accent-soft)]/40 transition-colors"
@@ -656,15 +704,46 @@ const AddExpenses = () => {
             </span>
             Add line item
           </button>
+
+          <AnimatePresence initial={false}>
+            {addItemError && (
+              <motion.div
+                role="alert"
+                initial={{ opacity: 0, y: -4, height: 0, marginTop: 0 }}
+                animate={{ opacity: 1, y: 0, height: "auto", marginTop: 12 }}
+                exit={{
+                  opacity: 0,
+                  y: -4,
+                  height: 0,
+                  marginTop: 0,
+                  transition: { duration: 0.25, ease: "easeOut" },
+                }}
+                className="mt-3 flex items-start gap-2 overflow-hidden rounded-xl border border-[var(--danger)]/20 bg-[var(--danger)]/10 px-3.5 py-2.5 text-sm leading-snug text-[var(--danger)]"
+              >
+                <AlertCircle size={17} className="mt-px shrink-0" />
+                {addItemError}
+              </motion.div>
+            )}
+          </AnimatePresence>
         </Card>
+
         <div className="space-y-4 lg:sticky lg:top-4">
           <Card padding="lg" radius="lg">
-            <div className="flex items-center justify-between gap-2">
-              <CardTitle className="text-base text-lg">Summary</CardTitle>
-              <Badge tone="accent">{items.length} lines</Badge>
+            <div className="flex items-start justify-between gap-3">
+              <div className="min-w-0">
+                <CardTitle className="text-lg">Summary</CardTitle>
+                <CardDescription>
+                  Funding, totals and the lines about to be saved.
+                </CardDescription>
+              </div>
+              <Badge tone="accent" className="shrink-0 tabular">
+                {items.length} line{items.length === 1 ? "" : "s"}
+              </Badge>
             </div>
-            <div className="mt-4 rounded-2xl bg-[var(--surface-2)]/70 px-4 py-4 text-center">
-              <p className="type-eyebrow text-[var(--ink-muted)]">
+
+            {/* Headline number for the draft */}
+            <div className="mt-4 rounded-2xl border border-[var(--accent)]/20 bg-[var(--accent-soft)]/40 px-4 py-4 text-center">
+              <p className="type-eyebrow text-[var(--accent-strong)]">
                 Total expenses
               </p>
               <p className="mt-1 font-display text-3xl font-semibold tabular tracking-tight text-[var(--ink)]">
@@ -675,11 +754,25 @@ const AddExpenses = () => {
                 {filledCount} described
               </p>
             </div>
-            <div className="mt-4 space-y-2">
+
+            {/* Source of funds — its balance, what these lines leave behind and
+                whether the source still covers them. */}
+            <div className="mt-4">
+              <SelectSourceFund
+                references={references}
+                value={selectedReferenceId}
+                onChange={setReferenceId}
+                total={total}
+                disabled={saving}
+                loading={referencesLoading}
+              />
+            </div>
+
+            <div className="mt-4 space-y-1">
               {items.map((it, i) => (
                 <div
                   key={i}
-                  className="flex items-center justify-between gap-2 text-sm"
+                  className="-mx-2 flex items-center justify-between gap-2 rounded-xl px-2 py-1.5 text-sm transition-colors hover:bg-[var(--surface-2)]/70"
                 >
                   <span className="flex min-w-0 items-center gap-2 text-[var(--ink-muted)]">
                     <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-[var(--surface-2)] text-[12px] font-bold tabular">
@@ -701,7 +794,9 @@ const AddExpenses = () => {
                 </div>
               ))}
             </div>
+
             <div className="my-4 h-px bg-[var(--border)]" />
+
             <div className="flex items-start gap-2 rounded-xl bg-[var(--accent-soft)]/50 px-3 py-2.5 text-[12px] leading-snug text-[var(--ink-muted)]">
               <Info
                 size={16}
@@ -711,15 +806,26 @@ const AddExpenses = () => {
               to its grouped line for approval.
             </div>
 
-            {formError && (
-              <div
-                role="alert"
-                className="mt-4 flex items-start gap-2 rounded-xl border border-[var(--danger)]/20 bg-[var(--danger)]/10 px-3.5 py-2.5 text-xs leading-snug text-[var(--danger)]"
-              >
-                <AlertCircle size={14} className="mt-px shrink-0" />
-                {formError}
-              </div>
-            )}
+            <AnimatePresence initial={false}>
+              {formError && (
+                <motion.div
+                  role="alert"
+                  initial={{ opacity: 0, y: -4, height: 0, marginTop: 0 }}
+                  animate={{ opacity: 1, y: 0, height: "auto", marginTop: 16 }}
+                  exit={{
+                    opacity: 0,
+                    y: -4,
+                    height: 0,
+                    marginTop: 0,
+                    transition: { duration: 0.25, ease: "easeOut" },
+                  }}
+                  className="mt-4 flex items-start gap-2 overflow-hidden rounded-xl border border-[var(--danger)]/20 bg-[var(--danger)]/10 px-3.5 py-2.5 text-xs leading-snug text-[var(--danger)]"
+                >
+                  <AlertCircle size={14} className="mt-px shrink-0" />
+                  {formError}
+                </motion.div>
+              )}
+            </AnimatePresence>
 
             <div className="mt-4 space-y-2">
               <Button
@@ -736,13 +842,12 @@ const AddExpenses = () => {
                 )}
                 Save expenses
               </Button>
+
               <Button
                 variant="outline"
                 className="w-full"
                 type="button"
                 onClick={() => {
-                  // The lines (and the temporary receipts behind them) are
-                  // being thrown away — don't leave the drafts behind.
                   clearPendingReceipts();
                   nav(-1);
                 }}
@@ -769,6 +874,19 @@ const AddExpenses = () => {
         open={Boolean(viewReceipt)}
         receipt={viewReceipt}
         onClose={() => setViewReceipt(null)}
+      />
+
+      <ConfirmRemoveItemDialog
+        open={removeIndex !== null}
+        line={removingLine}
+        lineNumber={(removeIndex ?? 0) + 1}
+        categoryName={
+          removingLine?.categoryId
+            ? (categoryNames.get(removingLine.categoryId) ?? "")
+            : ""
+        }
+        onCancel={cancelRemoveItem}
+        onConfirm={confirmRemoveItem}
       />
     </div>
   );

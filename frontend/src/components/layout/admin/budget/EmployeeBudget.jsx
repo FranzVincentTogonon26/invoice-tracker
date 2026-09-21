@@ -87,10 +87,10 @@ const EmployeeBudget = ({ employeeIssuedBudget = [], isLoading, onOpen }) => {
           <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-[var(--accent-soft)] text-[var(--accent-strong)]">
             <Wallet size={20} />
           </div>
-          <p className="mt-4 text-sm font-semibold text-[var(--ink)]">
+          <p className="mt-4 text-lg font-semibold text-[var(--ink)]">
             No budgets issued yet
           </p>
-          <p className="mt-1.5 max-w-xs text-xs leading-relaxed text-[var(--ink-muted)]">
+          <p className="mt-1.5 max-w-sm text-xs leading-relaxed text-[var(--ink-muted)]">
             Use the{" "}
             <span className="font-medium text-[var(--accent-strong)]">
               Budget Issued

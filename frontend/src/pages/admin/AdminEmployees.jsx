@@ -142,7 +142,7 @@ export default function AdminEmployees() {
         title="Employees"
         description="Manage employee accounts and monitor their budget activity."
         actions={
-          <div className="flex w-full flex-wrap items-center gap-2 sm:w-auto  sm:justify-end">
+          <div className="flex w-full flex-wrap items-center gap-2 sm:w-auto  justify-end">
             <Button variant="accent" onClick={() => setAddOpen(true)}>
               <Plus size={16} /> Add Employee
             </Button>

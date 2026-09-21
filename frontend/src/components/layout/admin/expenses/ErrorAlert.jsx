@@ -16,7 +16,7 @@ const ErrorAlert = ({ message }) => (
           transition: { duration: 0.25, ease: "easeOut" },
         }}
         role="alert"
-        className="flex items-start gap-2 overflow-hidden text-xs text-[var(--danger)] bg-[var(--danger)]/10 border border-[var(--danger)]/20 rounded-xl px-3.5 py-2.5 leading-snug mt-4"
+        className="flex items-start gap-2 overflow-hidden text-sm text-[var(--danger)] bg-[var(--danger)]/10 border border-[var(--danger)]/20 rounded-xl px-3.5 py-2.5 leading-snug mt-4"
       >
         <AlertCircle size={14} className="mt-px shrink-0" />
         {message}

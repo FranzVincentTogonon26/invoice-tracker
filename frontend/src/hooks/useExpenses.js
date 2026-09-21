@@ -10,13 +10,17 @@ export function useExpenses(params) {
     queryFn: () => expensesApi.list(params),
   });
 
-  // The API returns `{ expenses, categories, overview }` with an empty-
-  // reference default for every field, so consumers never crash while loading
-  // or after a failure — `data` stays the raw payload.
+  // The API returns `{ expenses, categories, overview, gemini_model }` with an
+  // empty-reference default for every field, so consumers never crash while
+  // loading or after a failure — `data` stays the raw payload.
   return {
     ...query,
     expenses: query.data?.expenses ?? [],
     categories: query.data?.categories ?? [],
+    references: query.data?.references ?? [],
+    // Rows from the `geminimodel` table — `ModelSource` maps them into the
+    // "Source" Listbox of the Scan Receipt panel.
+    geminiModel: query.data?.gemini_model ?? [],
     overview: query.data?.overview ?? {
       totalExpenses: 0,
       thisMonth: 0,

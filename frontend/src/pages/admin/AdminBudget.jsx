@@ -101,7 +101,7 @@ export default function AdminBudget() {
         title="Budget"
         description="Allocate funds, issue to employees, and track every move."
         actions={
-          <div className="flex w-full flex-wrap items-center gap-2 sm:w-auto sm:justify-end">
+          <div className="flex w-full flex-wrap items-center gap-2 sm:w-auto justify-end">
             <Button
               variant="soft"
               size="md"

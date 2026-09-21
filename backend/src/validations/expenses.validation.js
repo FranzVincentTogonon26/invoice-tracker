@@ -62,6 +62,14 @@ export const createExpensesSchema = z
         z.uuid({ message: "Invalid issued reference id" }).optional(),
       ),
 
+    // The budget reference the lines are funded from (SelectSourceFund). Empty
+    // string = nothing picked → undefined → stored as NULL.
+    reference_id: z
+      .preprocess(
+        (v) => (typeof v === "string" && v.trim() === "" ? undefined : v),
+        z.uuid({ message: "Invalid budget reference id" }).optional(),
+      ),
+
     // ── type: "category" ─────────────────────────────────────────
     category_name: z
       .string({ error: "Category name is required" })

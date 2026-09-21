@@ -18,7 +18,7 @@ const AdminExpenses = () => {
         title="Expenses"
         description="Track and manage all your expenses. Keep your budget on track and stay informed with real-time updates."
         actions={
-          <div className="flex w-full flex-wrap items-center gap-2 sm:w-auto sm:justify-end">
+          <div className="flex w-full flex-wrap items-center gap-2 sm:w-auto justify-end">
             <DateRangePicker
               value={dateRange}
               onChange={setDateRange}

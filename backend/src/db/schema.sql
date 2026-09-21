@@ -36,6 +36,16 @@ CREATE TABLE IF NOT EXISTS otp (
     created_at  TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
+-- ============================================================
+-- GEMINI MODEL
+-- ============================================================
+
+CREATE TABLE IF NOT EXISTS geminiModel (
+    id          UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    model       VARCHAR(255) NOT NULL,
+    created_at  TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
 
 -- ============================================================
 -- BUDGET REFERENCES
@@ -156,11 +166,14 @@ CREATE TABLE IF NOT EXISTS category (
 
 CREATE TABLE IF NOT EXISTS receipt (
     id              UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    receipt_id      VARCHAR(255) NOT NULL,
+    vendor          TEXT,
     image_url       TEXT,
     description     TEXT NOT NULL,
     qty             INTEGER NOT NULL DEFAULT 1,
     rate            DECIMAL(12,2) NOT NULL,
     amount          DECIMAL(12,2) NOT NULL,
+    receipt_date    TIMESTAMPTZ,
     created_at      TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
@@ -171,9 +184,8 @@ CREATE TABLE IF NOT EXISTS receipt (
 
 CREATE TABLE IF NOT EXISTS expenses (
     id              UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    -- Nullable on purpose: an admin can log an expense without a budget
-    -- issuance behind it (ON DELETE CASCADE still cleans issued ones up).
     issued_ref_id   UUID REFERENCES budget_issued_reference(id) ON DELETE CASCADE,
+    reference_id    UUID REFERENCES budget_reference(reference_id) ON DELETE SET NULL,
     user_id         UUID NOT NULL REFERENCES users(user_id) ON DELETE CASCADE,
     description     TEXT NOT NULL,
     category_id     UUID REFERENCES category(category_id) ON DELETE SET NULL,

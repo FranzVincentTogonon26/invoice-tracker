@@ -1,34 +1,28 @@
 import { GoogleGenAI, Type } from "@google/genai";
 import { z } from "zod";
-
 import { ENV } from "../config/env.js";
 import ApiError from "../utils/ApiError.js";
 
-// Fall back to a sane default so a missing GIMINI_MODEL doesn't produce
-// "model is required" errors from the API with no hint as to why.
-const MODEL = ENV.GIMINI_MODEL || "gemini-2.5-flash-lite"; // gemini-2.5-flash-lite, gemini-3.5-flash
-
+const DEFAULT_MODEL = "gemini-3.1-flash-lite";
+const MODEL = ENV.GIMINI_MODEL || DEFAULT_MODEL;
+const MODEL_RE = /^[a-zA-Z0-9][a-zA-Z0-9._-]{0,99}$/;
+const resolveModel = (requested) => {
+  const candidate = typeof requested === "string" ? requested.trim() : "";
+  return MODEL_RE.test(candidate) ? candidate : MODEL;
+};
 let client = null;
-
 const getClient = () => {
   const key = ENV.GIMINI_API_KEY;
   if (!key)
     throw new ApiError(503, "Gemini API key is not configured on the server.");
-
-  if (!client) {
-    client = new GoogleGenAI({ apiKey: key });
-  }
+  if (!client) client = new GoogleGenAI({ apiKey: key });
   return client;
 };
 
-// Thin wrapper around the SDK's `interactions` API. The v2 SDK expects
-// snake_case params (`input`, `response_format`) whose content blocks are
-// `{ type: "text" | "image" | "document", ... }` — NOT the old
-// `{ role, parts }` shape — and it exposes the reply as `output_text`.
-const generate = async ({ input, schema }) => {
+const generate = async ({ input, schema, model }) => {
   try {
     const result = await getClient().interactions.create({
-      model: MODEL,
+      model: resolveModel(model),
       input,
       response_format: {
         type: "text",
@@ -36,7 +30,6 @@ const generate = async ({ input, schema }) => {
         schema,
       },
     });
-
     const output_text =
       result?.output_text ??
       (typeof result?.text === "function"
@@ -44,41 +37,30 @@ const generate = async ({ input, schema }) => {
         : typeof result?.text === "string"
           ? result.text
           : undefined);
-
-    if (!output_text) {
+    if (!output_text)
       throw new ApiError(502, "Gemini returned an empty response.");
-    }
     return output_text;
   } catch (err) {
     console.error("Gemini request failed:", err?.message ?? err);
-
     if (err.isApiError) throw err;
-
     const status = err.status || err.statusCode;
     switch (status) {
       case 400:
         throw new ApiError(502, "Invalid Gemini request.");
-
       case 401:
         throw new ApiError(503, "Invalid Gemini API key.");
-
       case 403:
         throw new ApiError(503, "Gemini API access denied.");
-
       case 429:
         throw new ApiError(429, "Gemini quota exceeded.");
     }
-
     throw new ApiError(
       502,
-      "The AI service is temporarily unavailable. Please try again.",
+      "The AI service is temporarily unavailable. Please select another Source.",
     );
   }
 };
 
-// Structured extraction contract sent to Gemini (OpenAPI-style schema, same
-// shape `Type.*` builds). Everything but the line items is optional so a
-// messy receipt still yields its items instead of failing wholesale.
 const receiptResponseSchema = {
   type: Type.OBJECT,
   required: ["lineItems"],
@@ -104,9 +86,6 @@ const receiptResponseSchema = {
   },
 };
 
-// Server-side guard on whatever Gemini returns: coerces numbers, tolerates
-// missing/extra fields, and never throws on a partially-good response
-// (`.catch()` fills defaults) so one odd field can't fail the whole scan.
 const receiptLineItemSchema = z.object({
   description: z.coerce.string().catch(""),
   quantity: z.coerce.number().positive().catch(1),
@@ -123,7 +102,6 @@ const receiptValidator = z.object({
   suggested_category: z.coerce.string().catch(""),
 });
 
-// Gemini can wrap JSON in markdown fences even with response_format set.
 const parseJson = (text) => {
   const cleaned = String(text)
     .replace(/^```(?:json)?\s*|\s*```$/g, "")
@@ -135,7 +113,7 @@ const parseJson = (text) => {
   }
 };
 
-export const generateReceipt = async ({ buffer, mimeType }) => {
+export const generateReceipt = async ({ buffer, mimeType, model }) => {
   const prompt = [
     "You are an accounts-payable assistant. Extract structured data from this receipt image/PDF.",
     "Return the vendor, receipt date (YYYY-MM-DD), currency, each line item (description, quantity, unit rate), subtotal, and grand total.",
@@ -143,8 +121,6 @@ export const generateReceipt = async ({ buffer, mimeType }) => {
     "Suggest a sensible expense category in suggested_category.",
   ].join("\n");
 
-  // Media block type follows the file: PDFs travel as "document" content,
-  // everything else (PNG/JPG/WEBP/HEIC) as "image".
   const media =
     mimeType === "application/pdf"
       ? {
@@ -157,16 +133,12 @@ export const generateReceipt = async ({ buffer, mimeType }) => {
   const text = await generate({
     input: [{ type: "text", text: prompt }, media],
     schema: receiptResponseSchema,
+    model,
   });
 
   return receiptValidator.parse(parseJson(text));
 };
 
-/* ── Expense line suggestions (confirmed scan) ───────────────────── */
-
-// Contract for the second pass over a confirmed scan: the whole receipt is
-// logged as ONE grouped expense line, so Gemini answers with a single
-// suggestion for that line instead of one entry per scanned item.
 const suggestionResponseSchema = {
   type: Type.OBJECT,
   required: ["description", "category"],
@@ -184,8 +156,6 @@ const suggestionResponseSchema = {
   },
 };
 
-// Same forgiving guard as the receipt pass: a missing/odd field degrades to a
-// default instead of failing the whole request.
 const suggestionValidator = z.object({
   description: z.coerce.string().catch(""),
   category: z.coerce.string().catch(""),
@@ -196,6 +166,7 @@ export const generateExpenseSuggestions = async ({
   date,
   items,
   categories,
+  model,
 }) => {
   const lines = items
     .map((item, index) =>
@@ -226,6 +197,7 @@ export const generateExpenseSuggestions = async ({
   const text = await generate({
     input: [{ type: "text", text: prompt }],
     schema: suggestionResponseSchema,
+    model,
   });
 
   return suggestionValidator.parse(parseJson(text));

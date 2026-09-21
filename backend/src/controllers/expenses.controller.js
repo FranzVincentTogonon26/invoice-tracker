@@ -10,10 +10,17 @@ const UUID_RE =
 // GET /expenses — categories + ledger + headline stats.
 export const expenses = async (req, res, next) => {
   try {
-    const { categories, expenses: rows, overview } =
-      await Expenses.expensesOverview(req.query);
+    const {
+      categories,
+      expenses: rows,
+      overview,
+      gemini_model,
+      references,
+    } = await Expenses.expensesOverview(req.query);
 
-    return res.status(200).json({ expenses: rows, categories, overview });
+    return res
+      .status(200)
+      .json({ expenses: rows, categories, overview, gemini_model, references });
   } catch (err) {
     next(err);
   }
@@ -72,6 +79,8 @@ export const create = async (req, res, next) => {
       // Expenses are filed under the admin who logged them.
       user_id: req.user.id,
       issued_ref_id: payload.issued_ref_id ?? null,
+      // The budget reference picked in SelectSourceFund (nullable).
+      reference_id: payload.reference_id ?? null,
     });
 
     return res.status(201).json({

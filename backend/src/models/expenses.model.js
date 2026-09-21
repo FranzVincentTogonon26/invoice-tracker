@@ -17,6 +17,18 @@ class Expenses {
     return result.rows;
   }
 
+  // All selectable Gemini models, alphabetically — powers the "Source" Listbox
+  // in the Scan Receipt panel (`ModelSource`).
+  static async geminiModel() {
+    const result = await query(
+      `SELECT id, model
+         FROM geminimodel
+        ORDER BY model ASC`,
+      [],
+    );
+    return result.rows;
+  }
+
   // Case-insensitive lookup so "Travel" and "travel" don't both get created.
   static async findCategoryByName(category_name) {
     const result = await query(
@@ -68,21 +80,28 @@ class Expenses {
   // Inserts every line in one transaction so a bad row can't leave a partial
   // batch behind. `expense_date` is the date the user picked on the line
   // (defaults to today at the DB level when omitted).
-  static async createExpenses({ items, user_id, issued_ref_id = null }) {
+  static async createExpenses({
+    items,
+    user_id,
+    issued_ref_id = null,
+    reference_id = null,
+  }) {
     return withTransaction(async (client) => {
       const rows = [];
 
       for (const item of items) {
         const result = await client.query(
           `INSERT INTO expenses
-             (user_id, issued_ref_id, description, category_id, total_amount,
-              expense_date, notes, receipt_id, payment_method)
+             (user_id, issued_ref_id, reference_id, description, category_id,
+              total_amount, expense_date, notes, receipt_id, payment_method)
            VALUES
-             ($1, $2, $3, $4, $5, COALESCE($6::date, CURRENT_DATE), $7, $8, $9)
+             ($1, $2, $3, $4, $5, $6,
+              COALESCE($7::date, CURRENT_DATE), $8, $9, $10)
            RETURNING *`,
           [
             user_id,
             issued_ref_id,
+            reference_id,
             item.description,
             item.category_id ?? null,
             item.total_amount,
@@ -109,6 +128,44 @@ class Expenses {
     return result.rows[0] ?? null;
   }
 
+  static async budgetReference() {
+    const result = await query(
+      `SELECT
+          b.reference_id,
+          b.label,
+          b.created_at,
+          ( SELECT COUNT(id) FROM budget bi
+             WHERE bi.reference_id = b.reference_id ) AS active,
+          COALESCE((
+            SELECT SUM(bu.amount)
+              FROM budget bu
+             WHERE bu.reference_id = b.reference_id
+               AND bu.status != 'cancelled'
+          ), 0)::float8 AS allocated,
+          COALESCE((
+            SELECT SUM(i.amount)
+              FROM issued_budget i
+              JOIN budget_issued_reference bir ON i.issued_ref_id = bir.id
+             WHERE bir.status = 'open'
+               AND bir.reference_id = b.reference_id
+          ), 0)::float8 AS issued
+         FROM budget_reference b
+        WHERE b.status = 'open'
+        ORDER BY b.created_at DESC`,
+      [],
+    );
+
+    // pg hands DECIMALs back as strings and SUM() over zero rows as NULL — coerce
+    // both so the client always receives numbers. `balance` is what the source
+    // can still spend (allocated − issued) — the same figure
+    // `Budget.referenceBalance()` reports, so both screens agree.
+    return result.rows.map((row) => {
+      const allocated = Number(row.allocated) || 0;
+      const issued = Number(row.issued) || 0;
+      return { ...row, allocated, issued, balance: allocated - issued };
+    });
+  }
+
   /**
    * Overview payload for GET /expenses — categories (for the Listbox), the
    * expense ledger (optionally windowed by `from` / `to` dates) and the
@@ -116,6 +173,8 @@ class Expenses {
    */
   static async expensesOverview({ from, to } = {}) {
     const categories = await this.categoryList();
+    const gemini_model = await this.geminiModel();
+    const references = await this.budgetReference();
 
     const where = [];
     const params = [];
@@ -172,6 +231,8 @@ class Expenses {
 
     return {
       categories,
+      references,
+      gemini_model,
       expenses: expenses.rows,
       overview: {
         totalExpenses: Number(s.total_expenses) || 0,

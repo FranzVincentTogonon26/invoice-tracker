@@ -17,3 +17,15 @@ ALTER TABLE expenses
 -- 3. The expenses page filters/orders by that date.
 CREATE INDEX IF NOT EXISTS idx_expenses_expense_date
     ON expenses(expense_date);
+
+
+-- 4. The Add Expenses form picks a budget reference (SelectSourceFund) to fund
+--    the draft, but the table had nowhere to keep it — only `issued_ref_id`
+--    (a budget *issuance* to an employee, optional) existed. Store the chosen
+--    reference so the ledger can report balance per source like Budget does.
+ALTER TABLE expenses
+    ADD COLUMN IF NOT EXISTS reference_id UUID
+        REFERENCES budget_reference(reference_id) ON DELETE SET NULL;
+
+CREATE INDEX IF NOT EXISTS idx_expenses_reference_id
+    ON expenses(reference_id);

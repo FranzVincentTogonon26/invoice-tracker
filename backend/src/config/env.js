@@ -29,7 +29,6 @@ const REQUIRED_ENV_KEYS = [
   "CLIENT_URL",
   "RESEND_API_KEY",
   "GIMINI_API_KEY",
-  "GIMINI_MODEL",
 ];
 
 for (const key of REQUIRED_ENV_KEYS) {
