@@ -15,9 +15,9 @@ const ReceiptDetails = ({ receipt, scanning }) => {
   return (
     <div>
       <div className="flex items-baseline justify-between gap-3">
-        <CardTitle className="tracking-tight lg:text-[17px]">Details</CardTitle>
+        <CardTitle className="tracking-tight lg:text-base">Details</CardTitle>
         {rows.length > 0 && (
-          <span className="hidden shrink-0 text-[11px] font-semibold uppercase tracking-wider text-[var(--ink-muted)] lg:inline">
+          <span className="hidden shrink-0 text-xs font-semibold uppercase tracking-widest text-[var(--ink-muted)] lg:inline">
             {rows.length} of 3 read
           </span>
         )}
@@ -31,7 +31,7 @@ const ReceiptDetails = ({ receipt, scanning }) => {
               </span>
               <span className="type-eyebrow">{label}</span>
             </span>
-            <span className="min-w-0 max-w-[60%] flex-1 break-words text-right text-[15px] font-semibold leading-snug text-[var(--ink)] sm:text-sm lg:text-[13.5px] lg:leading-relaxed">
+            <span className="min-w-0 max-w-[60%] flex-1 break-words text-right text-sm font-semibold leading-snug text-[var(--ink)]">
               {value}
             </span>
           </div>
@@ -39,7 +39,7 @@ const ReceiptDetails = ({ receipt, scanning }) => {
 
       {/* Fallback while scanned details are still empty */}
       {!scanning && !receipt.vendor && !receipt.receiptDate && !receipt.currency && (
-        <p className="mt-1 rounded-xl bg-[var(--surface-2)]/60 px-3 py-2 text-[13px] leading-relaxed text-[var(--ink-muted)] lg:px-3 lg:py-2.5">
+        <p className="mt-1 rounded-xl bg-[var(--surface-2)]/60 px-3 py-2 text-sm leading-relaxed text-[var(--ink-muted)] lg:px-3 lg:py-2.5">
           Couldn’t read vendor details — items are listed below.
         </p>
       )}

@@ -1,4 +1,4 @@
-﻿import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import { Loader2, X } from "lucide-react";
 import toast from "react-hot-toast";
@@ -56,7 +56,7 @@ const ExpensesModal = ({
     Number(receipt.total) > 0 ||
     (receipt.items ?? []).length > 0;
 
-  // Confirm Receipt requires an actual upload — line items alone (e.g.
+  // Confirm Receipt requires an actual upload � line items alone (e.g.
   // manually added after a failed scan) must not enable it.
   const hasReceiptImage = Boolean(receipt.imageUrl);
 
@@ -76,7 +76,7 @@ const ExpensesModal = ({
     return () => clearTimeout(id);
   }, [err]);
 
-  // Scan wiring lives above the open/transaction reset below — that reset
+  // Scan wiring lives above the open/transaction reset below � that reset
   // runs during render and clears the hook's error state, so the hook must
   // be declared first (calling setScanErr before initialization would throw
   // a ReferenceError the moment the modal opens).
@@ -110,7 +110,7 @@ const ExpensesModal = ({
       total: parsed.total || 0,
       suggestedCategory: parsed.suggested_category || "",
     }));
-    toast.success("Receipt scanned — check the details below.");
+    toast.success("Receipt scanned � check the details below.");
   }, []);
 
   // Surface scan errors in the shared alert box like every other error.
@@ -126,9 +126,9 @@ const ExpensesModal = ({
   } = useReceiptScan({ onParsed: handleParsed, onError: handleScanError });
 
   // Full Details / items / total sections only appear once a receipt is
-  // attached (or a scan is running) AND the scan didn't fail — an error
+  // attached (or a scan is running) AND the scan didn't fail � an error
   // reverts the card to the "No scan yet" placeholder instead of showing a
-  // hollow Details/items/total form. Declared after `scanning` — TDZ otherwise.
+  // hollow Details/items/total form. Declared after `scanning` � TDZ otherwise.
   const hasScannedContent = scanning || (hasReceiptData && !scanErr);
   // A failed scan reverts the attachment card to the dropzone.
   const scanFailed = Boolean(scanErr);
@@ -152,7 +152,7 @@ const ExpensesModal = ({
     onClose?.();
   };
 
-  /* â”€â”€ category panel actions â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
+  /* ── category panel actions ──────────────────────────────────── */
 
   const handleAddCategory = async (e) => {
     e.preventDefault();
@@ -172,7 +172,7 @@ const ExpensesModal = ({
       });
       await onAdd?.(created);
 
-      // Stay open — adding several categories in a row is the common case.
+      // Stay open � adding several categories in a row is the common case.
       setNewCategory("");
       toast.success(
         `Category "${created.category_name ?? category_name}" added!`,
@@ -299,15 +299,15 @@ const ExpensesModal = ({
 
       toast.success(
         !persisted
-          ? "Receipt confirmed — grouped line added for this session only."
+          ? "Receipt confirmed � grouped line added for this session only."
           : imageDropped
-            ? "Receipt confirmed — grouped line added (image too large to keep)."
-            : "Receipt confirmed — grouped line added.",
+            ? "Receipt confirmed � grouped line added (image too large to keep)."
+            : "Receipt confirmed � grouped line added.",
       );
       return;
     }
 
-    // ── Server flow (no parent handler wired) ──────────────────────
+    // -- Server flow (no parent handler wired) ----------------------
     const description = receipt.description.trim();
     if (description.length < 2) {
       setErr("Receipt description is required.");
@@ -351,7 +351,7 @@ const ExpensesModal = ({
     if (!open) return undefined;
 
     const onKeyDown = (e) => {
-      // Scanning locks the whole dialog — no Escape close mid-scan.
+      // Scanning locks the whole dialog � no Escape close mid-scan.
       if (e.key === "Escape" && (busy || scanning)) return;
       if (e.key === "Escape") {
         e.stopPropagation();
@@ -389,18 +389,18 @@ const ExpensesModal = ({
                   <div className="flex flex-wrap items-center gap-x-2.5 gap-y-1.5">
                     <h3
                       id="expenses-modal-title"
-                      className="text-[17px] font-semibold tracking-tight sm:text-lg"
+                      className="font-display text-lg font-semibold tracking-tight"
                     >
                       {copy.title}
                     </h3>
                     {isScanMode && scanning && (
-                      <span className="inline-flex items-center gap-1.5 rounded-full bg-[var(--accent-soft)] px-2.5 py-1 text-[10px] font-bold uppercase tracking-wider text-[var(--accent-strong)]">
+                      <span className="inline-flex items-center gap-1.5 rounded-full bg-[var(--accent-soft)] px-2.5 py-1 text-xs font-semibold uppercase tracking-widest text-[var(--accent-strong)]">
                         <Loader2 size={11} className="animate-spin" />
-                        Scanning…
+                        Scanning�
                       </span>
                     )}
                   </div>
-                  <p className="mt-1 text-[13px] leading-snug text-[var(--ink-muted)] sm:text-sm">
+                  <p className="mt-1 text-sm leading-snug text-[var(--ink-muted)]">
                     {copy.description}
                   </p>
                 </div>
@@ -461,7 +461,7 @@ const ExpensesModal = ({
                 {isScanMode && !hasReceiptImage && !scanning && (
                   <p
                     id="receipt-confirm-hint"
-                    className="order-first w-full text-center text-[12px] leading-snug text-[var(--ink-muted)] sm:hidden"
+                    className="order-first w-full text-center text-xs leading-snug text-[var(--ink-muted)] sm:hidden"
                   >
                     Upload a receipt above to enable{" "}
                     <span className="font-semibold text-[var(--ink)]">
@@ -475,7 +475,7 @@ const ExpensesModal = ({
                   variant="outline"
                   onClick={handleClose}
                   disabled={busy || scanning}
-                  className="order-2 h-12 w-full text-[15px] sm:order-none sm:h-10 sm:w-auto sm:text-sm"
+                  className="order-2 h-12 w-full text-sm sm:order-none sm:h-10 sm:w-auto"
                 >
                   {isScanMode ? "Cancel" : "Close"}
                 </Button>
@@ -500,7 +500,7 @@ const ExpensesModal = ({
                       !hasReceiptImage ||
                       (receipt.items ?? []).length === 0
                     }
-                    className="order-1 h-12 w-full text-[15px] sm:order-none sm:h-10 sm:w-auto sm:text-sm"
+                    className="order-1 h-12 w-full text-sm sm:order-none sm:h-10 sm:w-auto"
                   >
                     {saving && <Loader2 size={14} className="animate-spin" />}
                     Confirm Receipt

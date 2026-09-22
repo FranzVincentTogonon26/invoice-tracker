@@ -16,7 +16,7 @@ export function PaymentMethod({ method, className }) {
       <span className="flex h-4 w-4 shrink-0 items-center justify-center text-[var(--ink-muted)]">
         <MethodIcon method={method} className="text-[var(--ink-muted)]" />
       </span>
-      <span className="truncate text-[12px] transition-colors text-[var(--ink-muted)]">
+      <span className="truncate text-xs transition-colors text-[var(--ink-muted)]">
         {methodLabel(method)}
       </span>
     </div>

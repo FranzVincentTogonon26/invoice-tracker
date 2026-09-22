@@ -77,7 +77,7 @@ export function NotificationsPopover() {
                 Recent activity
               </div>
               {overdue > 0 && (
-                <span className="text-[11px] font-semibold text-[var(--danger)] tabular-nums">
+                <span className="text-xs font-semibold text-[var(--danger)] tabular-nums">
                   {overdue} overdue
                 </span>
               )}
@@ -126,11 +126,11 @@ export function NotificationsPopover() {
                               {inv.invoice_number} ·{" "}
                               {inv.client_name || "No client"}
                             </div>
-                            <div className="text-[11px] text-[var(--ink-muted)] mt-0.5 truncate capitalize">
+                            <div className="text-xs text-[var(--ink-muted)] mt-0.5 truncate capitalize">
                               {st} · {formatMoney(inv.total, inv.currency)}
                             </div>
                           </div>
-                          <div className="text-[11px] text-[var(--ink-muted)] shrink-0 tabular-nums mt-0.5">
+                          <div className="text-xs text-[var(--ink-muted)] shrink-0 tabular-nums mt-0.5">
                             {relativeTime(inv.created_at)}
                           </div>
                         </button>

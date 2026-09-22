@@ -62,7 +62,7 @@ const ROW_BASE =
   "transition-[width,background-color,color,box-shadow] duration-300 ease-[cubic-bezier(0.16,1,0.3,1)]";
 
 const LABEL_BASE =
-  "text-sm font-medium whitespace-nowrap pr-4 " +
+  "text-sm font-semibold tracking-tight whitespace-nowrap pr-4 " +
   "opacity-0 -translate-x-1 " +
   "transition-[opacity,transform] duration-200 ease-out " +
   "group-hover/sidebar:opacity-100 group-hover/sidebar:translate-x-0 group-hover/sidebar:delay-100";
@@ -144,7 +144,7 @@ const SHEET_TILE =
   "flex items-center gap-2.5 rounded-2xl border px-3 py-3 transition-colors";
 
 const ACCOUNT_ROW =
-  "flex h-12 w-full items-center gap-3 rounded-2xl px-3 text-sm font-medium " +
+  "flex h-12 w-full items-center gap-3 rounded-2xl px-3 text-sm font-semibold tracking-tight " +
   "transition-colors focus-visible:outline-none " +
   "focus-visible:ring-2 focus-visible:ring-[var(--accent)]/30";
 
@@ -194,7 +194,7 @@ function MobileDock({ onOpenMenu }) {
                   strokeWidth={isActive ? 2.4 : 2}
                   className="relative z-10"
                 />
-                <span className="relative z-10 max-w-full truncate text-[11px] font-medium leading-none">
+                <span className="relative z-10 max-w-full truncate text-xs font-medium leading-none">
                   {label}
                 </span>
               </span>
@@ -211,7 +211,7 @@ function MobileDock({ onOpenMenu }) {
         >
           <span className={cn(DOCK_INNER, "hover:bg-[var(--surface-2)]")}>
             <MenuIcon size={18} />
-            <span className="max-w-full truncate text-[11px] font-medium leading-none">
+            <span className="max-w-full truncate text-xs font-medium leading-none">
               Menu
             </span>
           </span>
@@ -296,7 +296,7 @@ function MobileMenuSheet({ open, onClose, onLogout, user }) {
                 <div className="font-display text-base font-semibold text-[var(--ink)]">
                   Budget Tracker
                 </div>
-                <div className="text-[11px] text-[var(--ink-muted)]">
+                <div className="text-xs text-[var(--ink-muted)]">
                   Jump to any part of your workspace
                 </div>
               </div>
@@ -320,7 +320,7 @@ function MobileMenuSheet({ open, onClose, onLogout, user }) {
                   {displayName}
                 </div>
                 {displayEmail && (
-                  <div className="truncate text-[11px] text-[var(--ink-muted)]">
+                  <div className="truncate text-xs text-[var(--ink-muted)]">
                     {displayEmail}
                   </div>
                 )}
@@ -355,7 +355,7 @@ function MobileMenuSheet({ open, onClose, onLogout, user }) {
                       >
                         <Icon size={16} />
                       </span>
-                      <span className="truncate text-sm font-medium">
+                      <span className="truncate text-sm font-semibold tracking-tight">
                         {label}
                       </span>
                     </span>
@@ -515,7 +515,7 @@ export function Sidebar() {
                 {displayName}
               </div>
               {displayEmail && (
-                <div className="text-[11px] text-[var(--ink-muted)] truncate">
+                <div className="text-xs text-[var(--ink-muted)] truncate">
                   {displayEmail}
                 </div>
               )}

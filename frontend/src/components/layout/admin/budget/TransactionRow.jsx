@@ -25,7 +25,7 @@ export function TransactionRow({
           aria-hidden
           className="absolute inset-y-3 left-0 w-0.5 rounded-full bg-[var(--accent-strong)] opacity-0 transition-opacity duration-150 group-hover:opacity-100"
         />
-        <p className="text-[16px] leading-snug text-[var(--ink)]">
+        <p className="text-base font-semibold leading-snug text-[var(--ink)]">
           {t.description}
         </p>
 
@@ -61,7 +61,7 @@ export function TransactionRow({
           {formatDate(t.created_at)}
         </p>
 
-        <p className="mt-1 text-[12px] leading-none tabular-nums text-[var(--ink-muted)]">
+        <p className="mt-1 text-xs leading-none tabular-nums text-[var(--ink-muted)]">
           {formatTime(t.created_at)}
         </p>
       </td>
@@ -122,7 +122,7 @@ export function TransactionCard({
       </div>
 
       <div className="mt-3 flex items-center justify-between gap-3">
-        <span className="text-base font-bold text-[var(--ink)] tabular">
+        <span className="text-base font-semibold text-[var(--ink)] tabular-nums">
           {formatMoney(t.amount)}
         </span>
         <StatusBadge status={t.status} />
@@ -136,7 +136,7 @@ export function TransactionCard({
         <span className="min-w-0 truncate">
           {t.approved_by?.trim() || "Unassigned"}
         </span>
-        <span className={cn("ml-auto shrink-0 tabular")}>
+        <span className={cn("ml-auto shrink-0 tabular-nums")}>
           {formatDate(t.created_at)} · {formatTime(t.created_at)}
         </span>
       </div>

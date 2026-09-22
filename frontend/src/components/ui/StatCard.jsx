@@ -163,7 +163,7 @@ export function StatCard({
             )}
             <span
               className={cn(
-                "truncate text-sm font-semibold tracking-tight",
+                "font-display truncate text-sm font-semibold tracking-tight",
                 accent ? "text-white/70" : "text-[var(--ink-muted)]",
               )}
             >
@@ -173,7 +173,7 @@ export function StatCard({
           <div className="flex items-baseline gap-1 min-w-0">
             <span
               className={cn(
-                " tabular text-2xl sm:text-3xl font-semibold tracking-tight truncate",
+                "font-display tabular-nums text-2xl sm:text-3xl font-semibold tracking-tight truncate",
                 valueColor,
               )}
             >
@@ -203,7 +203,7 @@ export function StatCard({
           {hasCaption && (
             <p
               className={cn(
-                "text-sm  tracking-tight",
+                "text-sm leading-relaxed",
                 accent ? "text-white/60" : "text-[var(--ink-muted)]",
               )}
             >
@@ -230,7 +230,7 @@ export function StatCard({
                 </span>
                 <span
                   className={cn(
-                    "text-[11px] font-semibold tabular rounded-full px-1.5 py-0.5",
+                    "text-xs font-semibold tabular-nums rounded-full px-1.5 py-0.5",
                     accent
                       ? "bg-white/10 text-white/70"
                       : "bg-[var(--surface-2)] text-[var(--ink-muted)]",
@@ -295,7 +295,7 @@ export function StatCard({
                       </span>
                       <span
                         className={cn(
-                          "shrink-0 font-semibold tabular",
+                          "shrink-0 font-semibold tabular-nums",
                           item.tone === "danger"
                             ? "text-[var(--danger)]"
                             : item.tone === "success"

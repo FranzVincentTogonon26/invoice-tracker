@@ -38,12 +38,12 @@ export const SelectReference = ({
         <span className="block truncate text-sm font-medium">
           {option.label}
         </span>
-        <span className="flex min-w-0 items-center gap-1.5 text-[12px] text-[var(--ink-muted)]">
-          <span className="shrink-0 tabular">
+        <span className="flex min-w-0 items-center gap-1.5 text-xs text-[var(--ink-muted)]">
+          <span className="shrink-0 tabular-nums">
             {formatDate(option.createdAt)}
           </span>
           <span className="h-0.5 w-0.5 shrink-0 rounded-full bg-current opacity-60" />
-          <span className="truncate font-mono">{`${(option.referenceId ?? "").slice(0, 8)}-xxxxx`}</span>
+          <span className="truncate font-mono text-xs tracking-tight">{`${(option.referenceId ?? "").slice(0, 8)}-xxxxx`}</span>
         </span>
       </span>
       {isSelected && (
@@ -69,7 +69,7 @@ export const SelectReference = ({
               className="shrink-0 text-[var(--ink-muted)]"
             />
             <span className="truncate">{selectedOption.label}</span>
-            <span className="shrink-0 text-[12px] text-[var(--ink-muted)]">
+            <span className="shrink-0 text-xs text-[var(--ink-muted)]">
               {formatDate(selectedOption.createdAt)}
             </span>
           </span>

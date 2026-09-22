@@ -120,7 +120,7 @@ function PreviewCard({ children, width = 300 }) {
 
 function Label({ children }) {
   return (
-    <div className="text-[10px] uppercase tracking-wider text-gray-400 font-semibold">
+    <div className="text-xs uppercase tracking-widest text-gray-400 font-semibold">
       {children}
     </div>
   );
@@ -129,7 +129,7 @@ function Footer({ subtitle }) {
   return (
     <div className="mt-4 pt-3 border-t border-gray-100 flex items-center gap-2">
       <span className="h-4 w-4 rounded-md" style={{ background: `linear-gradient(135deg,${TEAL},${TEAL_DARK})` }} />
-      <span className="text-[11px] font-medium text-gray-700">{subtitle || "Invoicer"}</span>
+      <span className="text-xs font-medium text-gray-700">{subtitle || "Invoicer"}</span>
     </div>
   );
 }
@@ -143,7 +143,7 @@ function Pill({ children, tone = "teal" }) {
       : { background: "#FDE7EA", color: "#BE123C" };
   return (
     <div
-      className="inline-flex items-center gap-1 px-2 py-1 rounded-full text-[10px] font-semibold"
+      className="inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-semibold"
       style={styles}
     >
       {children}
@@ -160,9 +160,7 @@ function RevenueCard() {
           <Label>Total Revenue</Label>
           <div className="flex items-baseline gap-1 mt-1.5">
             <span
-              className="font-display text-[38px] font-semibold leading-none text-gray-900"
-              style={{ fontVariantNumeric: "tabular-nums", letterSpacing: "-0.02em" }}
-            >
+              className="font-display text-4xl font-semibold leading-none tracking-tight tabular-nums text-gray-900">
               $22,375
             </span>
           </div>
@@ -192,21 +190,21 @@ function InvoiceCard() {
       <div className="flex items-start justify-between mb-3">
         <div>
           <Label>Invoice</Label>
-          <div className="text-[15px] font-semibold text-gray-900 mt-1 tabular">INV-0012</div>
+          <div className="text-base font-semibold text-gray-900 mt-1 tabular-nums">INV-0012</div>
         </div>
         <Pill>Sent</Pill>
       </div>
       <div className="space-y-1.5">
         {[["Design sprint", "$3,200"], ["Development · 40h", "$3,800"]].map(([d, a]) => (
-          <div key={d} className="flex items-center justify-between text-[12px]">
+          <div key={d} className="flex items-center justify-between text-xs">
             <span className="text-gray-500">{d}</span>
-            <span className="text-gray-900 font-medium tabular">{a}</span>
+            <span className="text-gray-900 font-semibold tracking-tight tabular-nums">{a}</span>
           </div>
         ))}
       </div>
       <div className="flex items-center justify-between mt-3 pt-2 border-t border-gray-100">
-        <span className="text-[11px] uppercase tracking-wide text-gray-400 font-semibold">Total</span>
-        <span className="text-[16px] font-semibold tabular" style={{ color: TEAL_DARK }}>$7,595</span>
+        <span className="text-xs uppercase tracking-widest text-gray-400 font-semibold">Total</span>
+        <span className="text-base font-semibold tabular-nums" style={{ color: TEAL_DARK }}>$7,595</span>
       </div>
       <Footer subtitle="Nova Retail Group" />
     </PreviewCard>
@@ -232,10 +230,10 @@ function OverdueCard() {
         {rows.map((r) => (
           <div key={r.c} className="flex items-center gap-3">
             <div className="flex-1 min-w-0">
-              <div className="text-[13px] font-medium text-gray-900 truncate">{r.c}</div>
-              <div className="text-[10px] text-gray-400">{r.d} overdue</div>
+              <div className="text-sm font-medium text-gray-900 truncate">{r.c}</div>
+              <div className="text-xs text-gray-400">{r.d} overdue</div>
             </div>
-            <span className="text-[13px] font-semibold text-gray-900 tabular">{r.a}</span>
+            <span className="text-sm font-semibold text-gray-900 tabular-nums">{r.a}</span>
           </div>
         ))}
       </div>
@@ -255,13 +253,13 @@ function ReceiptCard() {
         </Pill>
       </div>
       <div className="rounded-2xl p-3" style={{ background: TEAL_SOFT }}>
-        <div className="text-[9px] uppercase tracking-wide font-semibold mb-1" style={{ color: TEAL_DARK }}>
+        <div className="text-xs uppercase tracking-widest font-semibold mb-1" style={{ color: TEAL_DARK }}>
           Extracted
         </div>
-        <div className="text-[13px] font-medium text-gray-900">Adobe Inc.</div>
-        <div className="flex items-center justify-between text-[12px] text-gray-600 mt-1">
+        <div className="text-sm font-medium text-gray-900">Adobe Inc.</div>
+        <div className="flex items-center justify-between text-xs text-gray-600 mt-1">
           <span>Creative Cloud · ×1</span>
-          <span className="tabular font-semibold text-gray-900">$54.99</span>
+          <span className="tabular-nums font-semibold text-gray-900">$54.99</span>
         </div>
       </div>
       <Footer subtitle="Image → invoice" />
@@ -282,9 +280,9 @@ function ReminderCard() {
       <div className="rounded-2xl bg-gray-50 border border-gray-100 p-3">
         <div className="flex items-center gap-2 mb-1.5">
           <BellRing size={12} style={{ color: TEAL_DARK }} />
-          <span className="text-[12px] font-semibold text-gray-900">Friendly nudge</span>
+          <span className="text-xs font-semibold text-gray-900">Friendly nudge</span>
         </div>
-        <p className="text-[12px] text-gray-500 leading-snug">
+        <p className="text-xs text-gray-500 leading-snug">
           "Hi Nova — just a gentle reminder that invoice INV-0006 for $2,400 was due last week…"
         </p>
       </div>
@@ -304,9 +302,7 @@ function PaidCard() {
         </Pill>
       </div>
       <div
-        className="font-display text-[34px] font-semibold leading-none text-gray-900"
-        style={{ fontVariantNumeric: "tabular-nums", letterSpacing: "-0.02em" }}
-      >
+        className="font-display text-4xl font-semibold leading-none tracking-tight tabular-nums text-gray-900">
         $3,472
       </div>
       <div className="flex items-center gap-1 mt-3">

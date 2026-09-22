@@ -113,17 +113,17 @@ const ReceiptDraftModal = ({ open, receipt, onClose }) => {
                   <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
                     <h3
                       id="receipt-draft-title"
-                      className="text-[17px] font-semibold tracking-tight text-[var(--ink)] sm:text-lg"
+                      className="font-display text-lg font-semibold tracking-tight text-[var(--ink)]"
                     >
                       Receipt details
                     </h3>
                     {shortId && (
-                      <Badge tone="neutral" className="tabular">
+                      <Badge tone="neutral" className="tabular-nums">
                         #{shortId}
                       </Badge>
                     )}
                   </div>
-                  <p className="mt-0.5 text-[13px] leading-snug text-[var(--ink-muted)]">
+                  <p className="mt-0.5 text-sm leading-snug text-[var(--ink-muted)]">
                     Scanned receipt attached to this expense line.
                   </p>
                 </div>
@@ -166,13 +166,13 @@ const ReceiptDraftModal = ({ open, receipt, onClose }) => {
                   <h4 className="text-sm font-semibold text-[var(--ink)]">
                     Scan list items
                   </h4>
-                  <span className="text-[11px] font-semibold uppercase tracking-wider text-[var(--ink-muted)]">
+                  <span className="text-xs font-semibold uppercase tracking-widest text-[var(--ink-muted)]">
                     {items.length} {items.length === 1 ? "line" : "lines"}
                   </span>
                 </div>
 
                 <div className="mt-2 overflow-hidden rounded-2xl border border-[var(--border)]">
-                  <div className="hidden grid-cols-[minmax(0,1fr)_56px_92px_104px] items-center gap-x-3 border-b border-[var(--border)] bg-[var(--surface-2)]/60 px-3 py-2 text-[11px] font-semibold uppercase tracking-wider text-[var(--ink-muted)] sm:grid">
+                  <div className="hidden grid-cols-[minmax(0,1fr)_56px_92px_104px] items-center gap-x-3 border-b border-[var(--border)] bg-[var(--surface-2)]/60 px-3 py-2 text-xs font-semibold uppercase tracking-widest text-[var(--ink-muted)] sm:grid">
                     <span>Description</span>
                     <span className="text-center">Qty</span>
                     <span className="text-right">Rate</span>
@@ -180,7 +180,7 @@ const ReceiptDraftModal = ({ open, receipt, onClose }) => {
                   </div>
 
                   {items.length === 0 ? (
-                    <p className="px-3 py-4 text-center text-[13px] text-[var(--ink-muted)]">
+                    <p className="px-3 py-4 text-center text-sm text-[var(--ink-muted)]">
                       This receipt has no line items.
                     </p>
                   ) : (
@@ -189,19 +189,19 @@ const ReceiptDraftModal = ({ open, receipt, onClose }) => {
                         key={`${item.description}-${i}`}
                         className="border-b border-[var(--border)] px-3 py-2.5 last:border-b-0 sm:grid sm:grid-cols-[minmax(0,1fr)_56px_92px_104px] sm:items-center sm:gap-x-3 sm:py-2"
                       >
-                        <p className="min-w-0 truncate text-[13px] font-medium text-[var(--ink)]">
+                        <p className="min-w-0 truncate text-sm font-medium text-[var(--ink)]">
                           {item.description || `Item ${i + 1}`}
                         </p>
-                        <div className="mt-1 flex items-center justify-between gap-3 text-[12px] text-[var(--ink-muted)] sm:mt-0 sm:contents">
-                          <span className="tabular sm:text-center">
+                        <div className="mt-1 flex items-center justify-between gap-3 text-xs text-[var(--ink-muted)] sm:mt-0 sm:contents">
+                          <span className="tabular-nums sm:text-center">
                             <span className="sm:hidden">Qty </span>
                             {Number(item.quantity) || 0}
                           </span>
-                          <span className="tabular sm:text-right">
+                          <span className="tabular-nums sm:text-right">
                             <span className="sm:hidden">Rate </span>
                             {formatMoney(item.rate)}
                           </span>
-                          <span className="font-semibold tabular text-[var(--ink)] sm:text-right">
+                          <span className="font-semibold tabular-nums text-[var(--ink)] sm:text-right">
                             {formatMoney(item.amount)}
                           </span>
                         </div>
@@ -214,10 +214,10 @@ const ReceiptDraftModal = ({ open, receipt, onClose }) => {
               {/* ── Total ── */}
               <div className="mt-3 rounded-2xl bg-[var(--surface-2)]/70 px-4 py-3">
                 <div className="flex items-center justify-between gap-4">
-                  <span className="text-[11px] font-semibold uppercase tracking-[0.1em] text-[var(--ink-muted)]">
+                  <span className="text-xs font-semibold uppercase tracking-widest text-[var(--ink-muted)]">
                     Total amount
                   </span>
-                  <span className="font-display text-lg font-semibold tabular text-[var(--ink)]">
+                  <span className="font-display text-lg font-semibold tabular-nums tracking-tight text-[var(--ink)]">
                     {formatMoney(total)}
                   </span>
                 </div>
@@ -236,7 +236,7 @@ const ReceiptDraftModal = ({ open, receipt, onClose }) => {
                       <p className="truncate text-sm font-semibold text-[var(--ink)]">
                         {receipt?.fileName || "Receipt image"}
                       </p>
-                      <p className="text-[12px] text-[var(--ink-muted)]">
+                      <p className="text-xs text-[var(--ink-muted)]">
                         Stored temporarily in this browser
                       </p>
                     </div>
@@ -259,7 +259,7 @@ const ReceiptDraftModal = ({ open, receipt, onClose }) => {
                       <p className="text-sm font-semibold text-[var(--ink)]">
                         No image stored
                       </p>
-                      <p className="text-[12px] text-[var(--ink-muted)]">
+                      <p className="text-xs text-[var(--ink-muted)]">
                         The scanned lines were kept — the image didn&apos;t fit
                         in local storage.
                       </p>

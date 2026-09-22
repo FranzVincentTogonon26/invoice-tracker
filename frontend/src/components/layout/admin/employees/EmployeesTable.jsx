@@ -177,7 +177,7 @@ function SharePill({ remaining, issued, share, overSpent, className }) {
   return (
     <span
       className={cn(
-        "inline-flex shrink-0 items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-semibold tabular-nums",
+        "inline-flex shrink-0 items-center gap-1 rounded-full px-2 py-0.5 text-xs font-semibold tabular-nums",
         tone,
         className,
       )}
@@ -200,7 +200,7 @@ function SharePill({ remaining, issued, share, overSpent, className }) {
 function EmployeeCell({ employee }) {
   return (
     <div className="flex min-w-0 items-center gap-3">
-      <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-[linear-gradient(135deg,var(--accent-soft),var(--surface-2))] font-display text-sm font-bold tracking-tight text-[var(--accent-strong)] ring-1 ring-inset ring-[var(--accent)]/15 transition-transform duration-200 group-hover:rotate-[-6deg] group-hover:scale-[1.06] group-hover:ring-[var(--accent)]/30">
+      <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-[linear-gradient(135deg,var(--accent-soft),var(--surface-2))] font-display text-sm font-semibold tracking-tight text-[var(--accent-strong)] ring-1 ring-inset ring-[var(--accent)]/15 transition-transform duration-200 group-hover:rotate-[-6deg] group-hover:scale-[1.06] group-hover:ring-[var(--accent)]/30">
         {employee.name?.trim()?.[0]?.toUpperCase() || "?"}
       </span>
       <div className="min-w-0">
@@ -245,7 +245,7 @@ function EmployeeRow({ employee, pending, onAction }) {
           {formatMoney(spent)}
         </p>
         {overSpent && (
-          <span className="mt-1 inline-flex items-center gap-1 rounded-full bg-[var(--danger)]/12 px-2 py-0.5 text-[11px] font-semibold leading-none text-[var(--danger)]">
+          <span className="mt-1 inline-flex items-center gap-1 rounded-full bg-[var(--danger)]/12 px-2 py-0.5 text-xs font-semibold leading-none text-[var(--danger)]">
             <AlertCircle size={10} aria-hidden />
             Over budget
           </span>
@@ -294,7 +294,7 @@ function EmployeeRow({ employee, pending, onAction }) {
             <p className="text-sm font-medium leading-none tabular-nums text-[var(--ink)]">
               {formatDate(employee.created_at)}
             </p>
-            <p className="mt-1 text-[12px] leading-none text-[var(--ink-muted)]">
+            <p className="mt-1 text-xs leading-none text-[var(--ink-muted)]">
               {formatTime(employee.created_at)}
             </p>
           </div>

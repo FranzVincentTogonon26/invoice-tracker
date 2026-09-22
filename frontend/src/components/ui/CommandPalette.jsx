@@ -254,7 +254,7 @@ function PaletteBody({ onClose }) {
             placeholder="Search invoices, clients, or jump to a page..."
             className="flex-1 bg-transparent outline-none text-sm text-[var(--ink)] placeholder:text-[var(--ink-muted)]"
           />
-          <kbd className="hidden sm:inline-flex items-center gap-1 text-[10px] px-2 h-6 rounded-md bg-[var(--surface-2)] text-[var(--ink-muted)] border border-[var(--border)] font-medium">
+          <kbd className="hidden sm:inline-flex items-center gap-1 text-xs px-2 h-6 rounded-md bg-[var(--surface-2)] text-[var(--ink-muted)] border border-[var(--border)] font-medium">
             Esc
           </kbd>
         </div>
@@ -280,7 +280,7 @@ function PaletteBody({ onClose }) {
           )}
         </div>
 
-        <div className="flex items-center justify-between px-5 h-10 border-t border-[var(--border)] bg-[var(--surface-2)]/60 text-[11px] text-[var(--ink-muted)]">
+        <div className="flex items-center justify-between px-5 h-10 border-t border-[var(--border)] bg-[var(--surface-2)]/60 text-xs text-[var(--ink-muted)]">
           <div className="flex items-center gap-3">
             <span className="flex items-center gap-1">
               <kbd className="px-1.5 h-5 rounded bg-[var(--surface)] border border-[var(--border)] inline-flex items-center">

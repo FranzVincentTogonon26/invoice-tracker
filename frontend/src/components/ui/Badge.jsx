@@ -3,7 +3,7 @@ import { cn } from "@/lib/utils";
 import { STATUS } from "../../constants";
 
 const badgeVariants = cva(
-  "inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[12px] font-semibold tracking-tight tabular",
+  "inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold tracking-tight tabular-nums",
   {
     variants: {
       tone: {

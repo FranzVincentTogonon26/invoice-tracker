@@ -19,14 +19,14 @@ function Field({ label, optional, hint, children, count, max }) {
         <span className="type-eyebrow text-[var(--ink-muted)]">
           {label}
           {optional && (
-            <span className="ml-1.5 normal-case tracking-normal font-normal text-[11px] opacity-70">
+            <span className="ml-1.5 normal-case tracking-normal text-xs opacity-70">
               · optional
             </span>
           )}
         </span>
         {max != null && (
           <span
-            className={`text-[11px] tabular ${
+            className={`text-xs tabular-nums ${
               (count ?? 0) >= max
                 ? "text-[var(--warning)]"
                 : "text-[var(--ink-muted)] opacity-70"
@@ -38,7 +38,7 @@ function Field({ label, optional, hint, children, count, max }) {
       </span>
       {children}
       {hint && (
-        <span className="mt-1.5 block text-[12px] font-normal leading-snug text-[var(--ink-muted)]">
+        <span className="mt-1.5 block text-xs leading-snug text-[var(--ink-muted)]">
           {hint}
         </span>
       )}
@@ -117,7 +117,7 @@ const EmployeesModal = ({ open, onClose, create }) => {
                 <div className="min-w-0">
                   <h3
                     id="employees-modal-title"
-                    className="text-lg font-semibold tracking-tight"
+                    className="font-display text-lg font-semibold tracking-tight"
                   >
                     Add Employee
                   </h3>

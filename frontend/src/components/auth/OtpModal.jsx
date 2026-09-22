@@ -289,7 +289,7 @@ function OtpModalContent({ email, onClose, onVerify, onResend }) {
               onChange={(e) => handleChange(i, e.target.value)}
               onKeyDown={(e) => handleKeyDown(i, e)}
               onFocus={(e) => e.target.select()}
-              className={`h-14 w-full flex-1 rounded-2xl border text-center font-display text-2xl font-semibold text-[var(--ink)] outline-none transition-all duration-200 focus:bg-[var(--surface)] focus:border-[var(--accent)]/40 focus:ring-4 focus:ring-[var(--accent)]/10 sm:text-xl ${
+              className={`h-14 w-full flex-1 rounded-2xl border text-center font-display text-2xl font-semibold tabular-nums tracking-tight text-[var(--ink)] outline-none transition-all duration-200 focus:bg-[var(--surface)] focus:border-[var(--accent)]/40 focus:ring-4 focus:ring-[var(--accent)]/10 ${
                 digit
                   ? "border-[var(--accent)]/40 bg-[var(--surface)]"
                   : "border-[var(--border)] bg-[var(--surface-2)]"
@@ -350,7 +350,7 @@ function OtpModalContent({ email, onClose, onVerify, onResend }) {
         </div>
 
         {/* Expiration */}
-        <p className="text-[11px] text-[var(--ink-muted)]/80 text-center mt-5 leading-relaxed">
+        <p className="text-xs text-[var(--ink-muted)]/80 text-center mt-5 leading-relaxed">
           For your security, this code expires in 10 minutes.
         </p>
       </motion.div>

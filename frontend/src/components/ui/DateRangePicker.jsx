@@ -230,10 +230,10 @@ export function DateRangePicker({
             )}
           >
             <div className="flex items-baseline justify-between gap-3 border-b border-[var(--border)] px-5 py-3">
-              <span className="text-lg font-semibold text-[var(--ink)]">
+              <span className="font-display text-lg font-semibold tracking-tight text-[var(--ink)]">
                 Date range
               </span>
-              <span className="truncate text-[13px] font-semibold text-[var(--ink-muted)]">
+              <span className="truncate text-sm font-semibold text-[var(--ink-muted)]">
                 {formatDateRange(draft, "Pick a start and end date")}
               </span>
             </div>

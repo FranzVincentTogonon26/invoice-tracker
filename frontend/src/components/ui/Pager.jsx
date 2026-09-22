@@ -33,7 +33,7 @@ const PagerButton = ({
     disabled={disabled}
     onClick={onClick}
     className={cn(
-      "flex h-8 min-w-8 items-center justify-center rounded-full border px-2 text-xs font-semibold transition-colors",
+      "flex h-8 min-w-8 items-center justify-center rounded-full border px-2 text-xs font-semibold tabular-nums tracking-tight transition-colors",
       active
         ? "border-transparent bg-[var(--accent-strong)] text-white shadow-card"
         : "border-[var(--border)] text-[var(--ink-muted)] hover:bg-[var(--surface-2)] hover:text-[var(--ink)]",

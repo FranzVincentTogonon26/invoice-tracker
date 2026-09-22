@@ -11,7 +11,7 @@ export function ApproverCell({ name, approvedAt, className }) {
 
   return (
     <div className={cn("flex min-w-0 items-center gap-3", className)}>
-      <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-[var(--accent-soft)] text-sm font-bold text-[var(--accent-strong)] ring-2 ring-[var(--accent)]/10">
+      <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-[var(--accent-soft)] text-sm font-semibold text-[var(--accent-strong)] ring-2 ring-[var(--accent)]/10">
         {hasApprover ? (
           name.trim()[0].toUpperCase()
         ) : (
@@ -22,7 +22,7 @@ export function ApproverCell({ name, approvedAt, className }) {
         <p className="truncate text-sm font-medium leading-tight text-[var(--ink)]">
           {hasApprover ? name : "Unassigned"}
         </p>
-        <p className="mt-0.5 truncate text-[12px] leading-tight text-[var(--ink-muted)]">
+        <p className="mt-0.5 truncate text-xs leading-tight text-[var(--ink-muted)]">
           {approvedAt
             ? `Approved · ${relativeTime(approvedAt)}`
             : "Awaiting approval"}

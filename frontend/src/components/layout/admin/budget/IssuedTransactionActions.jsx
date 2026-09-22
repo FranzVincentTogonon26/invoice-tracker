@@ -228,14 +228,14 @@ export function IssuedTransactionActions({
                   they're reversing. */}
               <div className="mt-4 flex items-center gap-3 rounded-2xl border border-[var(--border)] bg-[var(--surface-2)]/60 px-4 py-3">
                 <div className="min-w-0 flex-1">
-                  <p className="truncate text-[16px] font-semibold text-[var(--ink)]">
+                  <p className="truncate text-base font-semibold text-[var(--ink)]">
                     {transaction.description || "Budget issuance"}
                   </p>
                   <p className="mt-0.5 text-sm text-[var(--ink-muted)]">
                     Amount to reverse
                   </p>
                 </div>
-                <span className="shrink-0 text-sm font-bold text-[var(--ink)] tabular">
+                <span className="shrink-0 text-sm font-semibold text-[var(--ink)] tabular-nums">
                   {formatMoney(amount)}
                 </span>
               </div>

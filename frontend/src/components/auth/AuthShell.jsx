@@ -100,7 +100,7 @@ function BrandPanel({ headline, subhead }) {
         >
           <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-white/8 border border-white/10 backdrop-blur-md">
             <Sparkles size={12} className="text-white/80" />
-            <span className="text-[11px] tracking-wide text-white/80 uppercase font-semibold">
+            <span className="type-eyebrow text-xs tracking-widest text-white/80 uppercase font-semibold">
               AI Invoice Manager
             </span>
           </div>
@@ -140,7 +140,7 @@ export function AuthField({
   return (
     <div>
       <div className="flex items-center justify-between mb-1.5">
-        <label className="text-sm font-medium text-[var(--ink)]">{label}</label>
+        <label className="text-sm font-semibold tracking-tight text-[var(--ink)]">{label}</label>
         {extra}
       </div>
       <div className="relative">
@@ -154,7 +154,7 @@ export function AuthField({
           minLength={minLength}
           className={`peer w-full h-12 ${
             Icon ? "pl-11 pr-4" : "px-4"
-          } rounded-2xl border border-[var(--border)] bg-[var(--surface)] text-base text-[var(--ink)] placeholder:text-[var(--ink-muted)]/60 outline-none transition-all duration-200 focus:border-[var(--accent)]/40 focus:ring-4 focus:ring-[var(--accent)]/10`}
+          } rounded-2xl border border-[var(--border)] bg-[var(--surface)] text-base tracking-tight text-[var(--ink)] placeholder:text-[var(--ink-muted)]/60 outline-none transition-all duration-200 focus:border-[var(--accent)]/40 focus:ring-4 focus:ring-[var(--accent)]/10`}
         />
         {Icon && (
           <div className="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 text-[var(--ink-muted)]/55 peer-focus:text-[var(--accent-strong)] peer-[:not(:placeholder-shown)]:text-[var(--accent-strong)] transition-colors">
@@ -171,7 +171,7 @@ export function AuthPrimaryButton({ children, disabled, ...props }) {
     <motion.button
       whileTap={{ scale: 0.985 }}
       disabled={disabled}
-      className="relative w-full h-12 rounded-2xl text-white font-semibold text-base flex items-center justify-center gap-2 overflow-hidden shadow-[0_8px_24px_-8px_rgba(13,148,136,0.55)] transition-all duration-200 hover:shadow-[0_12px_28px_-8px_rgba(13,148,136,0.7)] disabled:opacity-60 disabled:cursor-not-allowed"
+      className="relative w-full h-12 rounded-2xl text-white font-semibold tracking-tight text-base flex items-center justify-center gap-2 overflow-hidden shadow-[0_8px_24px_-8px_rgba(13,148,136,0.55)] transition-all duration-200 hover:shadow-[0_12px_28px_-8px_rgba(13,148,136,0.7)] disabled:opacity-60 disabled:cursor-not-allowed"
       style={{
         background:
           "linear-gradient(135deg, #14b8a6 0%, #0d9488 50%, #0f766e 100%)",

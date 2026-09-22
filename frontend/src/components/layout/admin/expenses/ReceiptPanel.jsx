@@ -12,10 +12,10 @@ const EmptyScanPlaceholder = () => (
       <ScanLine size={20} />
     </span>
     <div className="min-w-0 lg:pt-0">
-      <p className="text-[15px] font-semibold tracking-tight text-[var(--ink)] sm:text-sm lg:text-[15px]">
+      <p className="text-base font-semibold tracking-tight text-[var(--ink)]">
         No scan yet
       </p>
-      <p className="mt-0.5 max-w-[46ch] text-[13px] leading-relaxed text-[var(--ink-muted)] sm:text-[12px] lg:mt-1 lg:text-[13px]">
+      <p className="mt-0.5 max-w-[46ch] text-sm leading-relaxed text-[var(--ink-muted)] lg:mt-1">
         <span className="sm:hidden">
           Tap the upload area above to pick a receipt — the extracted lines will
           appear here for review.

@@ -29,13 +29,13 @@ function EmployeeCell({ name, role, avatarUrl }) {
       ) : (
         <span
           aria-hidden
-          className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-[var(--accent-soft)] text-sm font-bold text-[var(--accent-strong)]"
+          className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-[var(--accent-soft)] text-sm font-semibold text-[var(--accent-strong)]"
         >
           {initialsOf(name) || "?"}
         </span>
       )}
       <div className="min-w-0">
-        <p className="truncate text-[16px] font-semibold leading-tight text-[var(--ink)]">
+        <p className="truncate text-base font-semibold leading-tight text-[var(--ink)]">
           {name || "Unknown"}
         </p>
         <p className="mt-0.5 truncate text-sm capitalize text-[var(--ink-muted)]">
@@ -51,7 +51,7 @@ function NotesCell({ notes }) {
   return (
     <p
       title={notes}
-      className="line-clamp-2 whitespace-normal break-words text-[13px] leading-relaxed text-[var(--ink-muted)]"
+      className="line-clamp-2 whitespace-normal break-words text-sm leading-relaxed text-[var(--ink-muted)]"
     >
       {notes}
     </p>
@@ -64,7 +64,7 @@ function DateIssuedCell({ date }) {
       <p className="text-sm leading-none tabular-nums text-[var(--ink)]">
         {formatDate(date)}
       </p>
-      <p className="mt-1 text-[12px] leading-none tabular-nums text-[var(--ink-muted)]">
+      <p className="mt-1 text-xs leading-none tabular-nums text-[var(--ink-muted)]">
         {formatTime(date)}
       </p>
     </>
@@ -173,7 +173,7 @@ export function IssuedTransactionCard({ transaction: t, onAction }) {
             </p>
           )}
         </div>
-        <span className="shrink-0 text-base font-bold tabular-nums text-[var(--ink)]">
+        <span className="shrink-0 text-base font-semibold tabular-nums text-[var(--ink)]">
           {formatMoney(t.amount)}
         </span>
       </div>

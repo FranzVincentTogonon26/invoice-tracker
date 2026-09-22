@@ -46,14 +46,14 @@ function Field({ label, optional, hint, children, count, max }) {
         <span className="type-eyebrow text-[var(--ink-muted)]">
           {label}
           {optional && (
-            <span className="ml-1.5 normal-case tracking-normal font-normal text-[12px] opacity-70">
+            <span className="ml-1.5 normal-case tracking-normal text-xs opacity-70">
               · optional
             </span>
           )}
         </span>
         {max != null && (
           <span
-            className={`text-[12px] tabular ${
+            className={`text-xs tabular-nums ${
               (count ?? 0) >= max
                 ? "text-[var(--warning)]"
                 : "text-[var(--ink-muted)] opacity-70"
@@ -65,7 +65,7 @@ function Field({ label, optional, hint, children, count, max }) {
       </span>
       {children}
       {hint && (
-        <span className="mt-1.5 block text-[12px] font-normal leading-snug text-[var(--ink-muted)]">
+        <span className="mt-1.5 block text-xs leading-snug text-[var(--ink-muted)]">
           {hint}
         </span>
       )}
@@ -145,7 +145,7 @@ function BalanceCard({ summary, isLoading, referenceId, projection, exceeds }) {
         <div className="flex-1 min-w-0">
           <p className="type-eyebrow text-[var(--ink-muted)]">Balance</p>
           <p
-            className={`flex items-center gap-1 text-2xl font-semibold tracking-tight tabular ${
+            className={`font-display flex items-center gap-1 text-2xl font-semibold tracking-tight tabular-nums ${
               exceeds
                 ? "text-[var(--danger)]"
                 : depleted
@@ -170,19 +170,19 @@ function BalanceCard({ summary, isLoading, referenceId, projection, exceeds }) {
       <div className="mt-3 grid grid-cols-3 gap-2 border-t border-[var(--border)] pt-3">
         <div className="min-w-0">
           <p className="type-eyebrow text-[var(--ink-muted)]">Allocated</p>
-          <p className="truncate text-sm font-semibold tabular">
+          <p className="truncate text-sm font-semibold tabular-nums">
             {formatMoney(allocated)}
           </p>
         </div>
         <div className="min-w-0 text-center">
           <p className="type-eyebrow text-[var(--ink-muted)]">Issued</p>
-          <p className="truncate text-sm font-semibold tabular">
+          <p className="truncate text-sm font-semibold tabular-nums">
             {formatMoney(issued)}
           </p>
         </div>
         <div className="min-w-0 text-right">
           <p className="type-eyebrow text-[var(--ink-muted)]">Expenses</p>
-          <p className="truncate text-sm font-semibold tabular">
+          <p className="truncate text-sm font-semibold tabular-nums">
             {formatMoney(expenses)}
           </p>
         </div>
@@ -202,7 +202,7 @@ function BalanceCard({ summary, isLoading, referenceId, projection, exceeds }) {
                 After this issue
               </p>
               <p
-                className={`truncate text-sm font-semibold tabular ${
+                className={`truncate text-sm font-semibold tabular-nums ${
                   projection > balance
                     ? "text-[var(--danger)]"
                     : "text-[var(--accent-strong)]"
@@ -240,7 +240,7 @@ function AmountInput({ value, onChange, disabled }) {
       />
       <div className="mt-1.5 flex items-center justify-between gap-2">
         <span
-          className={`font-medium truncate text-sm tabular leading-snug ${
+          className={`font-medium truncate text-sm tabular-nums leading-snug ${
             preview ? "text-[var(--accent-strong)]" : "text-[var(--ink-muted)]"
           }`}
         >
@@ -253,7 +253,7 @@ function AmountInput({ value, onChange, disabled }) {
               type="button"
               disabled={disabled}
               onClick={() => onChange({ target: { value: String(preset) } })}
-              className="h-7 rounded-full border border-[var(--border)] bg-[var(--surface-2)] px-2 text-[12px] font-semibold tabular text-[var(--ink-muted)] transition-colors hover:border-[var(--accent)]/40 hover:text-[var(--accent-strong)] disabled:opacity-50"
+              className="h-7 rounded-full border border-[var(--border)] bg-[var(--surface-2)] px-2 text-xs font-semibold tabular-nums text-[var(--ink-muted)] transition-colors hover:border-[var(--accent)]/40 hover:text-[var(--accent-strong)] disabled:opacity-50"
             >
               ₱{preset.toLocaleString("en-PH")}
             </button>
@@ -556,7 +556,7 @@ const BudgetModal = ({
                 <div className="min-w-0">
                   <h3
                     id="budget-modal-title"
-                    className="text-lg font-semibold tracking-tight"
+                    className="font-display text-lg font-semibold tracking-tight"
                   >
                     {transaction === "addBudget"
                       ? "Add Budget"
@@ -714,15 +714,15 @@ const BudgetModal = ({
                             <AlertCircle size={14} className="mt-px shrink-0" />
                             <span>
                               Input{" "}
-                              <span className="font-semibold tabular">
+                              <span className="font-semibold tabular-nums">
                                 {formatMoney(amountNum)}
                               </span>{" "}
                               is greater than the remaining balance of{" "}
-                              <span className="font-semibold tabular">
+                              <span className="font-semibold tabular-nums">
                                 {formatMoney(remaining)}
                               </span>
                               . Enter an amount up to{" "}
-                              <span className="font-semibold tabular">
+                              <span className="font-semibold tabular-nums">
                                 {formatMoney(remaining)}
                               </span>
                               .

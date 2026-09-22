@@ -60,7 +60,7 @@ function Field({ label, hint, children }) {
       </span>
       {children}
       {hint && (
-        <span className="mt-1.5 block text-[12px] leading-snug text-[var(--ink-muted)]">
+        <span className="mt-1.5 block text-xs leading-snug text-[var(--ink-muted)]">
           {hint}
         </span>
       )}
@@ -214,7 +214,7 @@ const SelectSourceFund = ({
               <p className="type-eyebrow text-[var(--ink-muted)]">Balance</p>
               <p
                 className={cn(
-                  "flex items-center gap-1 text-lg font-semibold tracking-tight tabular",
+                  "font-display flex items-center gap-1 text-lg font-semibold tracking-tight tabular-nums",
                   funding.amount,
                 )}
               >
@@ -228,28 +228,28 @@ const SelectSourceFund = ({
                 })}
               </p>
             </div>
-            <Badge tone={funding.badgeTone} className="shrink-0 text-[10px]">
+            <Badge tone={funding.badgeTone} className="shrink-0 text-xs">
               {funding.label}
             </Badge>
           </div>
 
           {/* Which source the numbers belong to — a lone source is auto-picked. */}
           <div className="mt-3 flex items-center justify-between gap-2 border-t border-[var(--border)] pt-3">
-            <span className="flex min-w-0 items-center gap-1.5 text-[12px] text-[var(--ink-muted)]">
+            <span className="flex min-w-0 items-center gap-1.5 text-xs text-[var(--ink-muted)]">
               <HandCoins size={13} aria-hidden className="shrink-0" />
               <span className="truncate">
                 {selected.label || "Untitled source"}
               </span>
               {!canChoose && (
                 <span
-                  className="shrink-0 rounded-full bg-[var(--surface)] px-1.5 py-0.5 text-[11px] font-semibold text-[var(--ink-muted)]"
+                  className="shrink-0 rounded-full bg-[var(--surface)] px-1.5 py-0.5 text-xs font-semibold text-[var(--ink-muted)]"
                   title="Selected automatically — it is the only open budget source"
                 >
                   auto
                 </span>
               )}
             </span>
-            <span className="shrink-0 text-[12px] tabular text-[var(--ink-muted)]">
+            <span className="shrink-0 text-xs tabular-nums text-[var(--ink-muted)]">
               {formatDate(selected.created_at)}
             </span>
           </div>
@@ -257,20 +257,20 @@ const SelectSourceFund = ({
           {/* Live math: what this draft costs vs. what the source has left. */}
           <div className="mt-3 grid grid-cols-2 gap-2">
             <div className="min-w-0">
-              <p className="type-eyebrow text-[10px] text-[var(--ink-muted)]">
-                These expenses
+              <p className="type-eyebrow text-xs text-[var(--ink-muted)]">
+                expenses
               </p>
-              <p className="truncate text-sm font-semibold tabular text-[var(--ink)]">
+              <p className="truncate text-sm font-semibold tabular-nums text-[var(--ink)]">
                 {formatMoney(expenses)}
               </p>
             </div>
             <div className="min-w-0 text-right">
-              <p className="type-eyebrow text-[var(--ink-muted)] text-[10px]">
+              <p className="type-eyebrow text-[var(--ink-muted)] text-xs">
                 {insufficient ? "Short by" : "Remaining"}
               </p>
               <p
                 className={cn(
-                  "truncate text-sm font-semibold tabular",
+                  "truncate text-sm font-semibold tabular-nums",
                   funding.remaining,
                 )}
               >
@@ -296,21 +296,21 @@ const SelectSourceFund = ({
             />
           </div>
 
-          <p className="mt-2 text-[11px] leading-snug text-[var(--ink-muted)]">
+          <p className="mt-2 text-xs leading-snug text-[var(--ink-muted)]">
             Allocated {formatMoney(selected.allocated)} · Issued{" "}
             {formatMoney(selected.issued)}
           </p>
 
           {insufficient && (
             <div className="mt-3 rounded-2xl border border-[var(--danger)]/30 bg-[var(--danger)]/10 px-3 py-3">
-              <p className="flex items-start gap-1.5 text-[12px] font-semibold leading-snug text-[var(--danger)]">
+              <p className="flex items-start gap-1.5 text-xs font-semibold leading-snug text-[var(--danger)]">
                 <AlertCircle size={13} aria-hidden className="mt-px shrink-0" />
                 <span>
                   Cannot proceed with your request — insufficient funds. These
                   expenses are{" "}
-                  <span className="tabular">{formatMoney(expenses)}</span> but
-                  this source is{" "}
-                  <span className="tabular">
+                  <span className="tabular-nums">{formatMoney(expenses)}</span>{" "}
+                  but this source is{" "}
+                  <span className="tabular-nums">
                     {formatMoney(Math.abs(remaining))}
                   </span>{" "}
                   short.
@@ -334,7 +334,7 @@ const SelectSourceFund = ({
                         title={`Fund these expenses from ${
                           source.label || "this source"
                         }`}
-                        className="flex max-w-full items-center gap-1.5 rounded-full border border-[var(--border)] bg-[var(--surface)] px-2.5 py-1 text-[12px] font-semibold text-[var(--ink)] transition-colors hover:border-[var(--accent)]/50 hover:bg-[var(--accent-soft)]/40 disabled:cursor-not-allowed disabled:opacity-50"
+                        className="flex max-w-full items-center gap-1.5 rounded-full border border-[var(--border)] bg-[var(--surface)] px-2.5 py-1 text-xs font-semibold text-[var(--ink)] transition-colors hover:border-[var(--accent)]/50 hover:bg-[var(--accent-soft)]/40 disabled:cursor-not-allowed disabled:opacity-50"
                       >
                         <WalletIcon
                           size={12}
@@ -344,7 +344,7 @@ const SelectSourceFund = ({
                         <span className="truncate">
                           {source.label || "Untitled source"}
                         </span>
-                        <span className="shrink-0 tabular text-[var(--ink-muted)]">
+                        <span className="shrink-0 tabular-nums text-[var(--ink-muted)]">
                           {formatMoney(source.balance)}
                         </span>
                       </button>
@@ -352,7 +352,7 @@ const SelectSourceFund = ({
                   </div>
                 </div>
               ) : (
-                <ul className="mt-2 list-disc space-y-1 border-t border-[var(--danger)]/20 pt-2.5 pl-4 text-[11px] leading-snug text-[var(--danger)]">
+                <ul className="mt-2 list-disc space-y-1 border-t border-[var(--danger)]/20 pt-2.5 pl-4 text-xs leading-snug text-[var(--danger)]">
                   <li>Lower an amount on any line so the total fits.</li>
                   <li>
                     {canChoose

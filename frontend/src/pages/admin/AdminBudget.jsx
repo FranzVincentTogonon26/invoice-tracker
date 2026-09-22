@@ -229,7 +229,7 @@ export default function AdminBudget() {
                   <span className="text-sm font-semibold text-[var(--ink)]">
                     used
                   </span>
-                  <span className="w-full text-sm font-normal text-[var(--ink-muted)] sm:w-auto">
+                  <span className="w-full text-sm text-[var(--ink-muted)] sm:w-auto">
                     {formatMoney(Number(totalIssued) + Number(totalExpenses))}{" "}
                     of {formatMoney(totalBudget)} allocated
                   </span>
@@ -372,7 +372,7 @@ export default function AdminBudget() {
             <span className="block font-display text-sm font-semibold tabular-nums text-[var(--ink)]">
               {formatMoney(cashOnHand)}
             </span>
-            <span className="block text-[11px] font-medium text-[var(--ink-muted)]">
+            <span className="block text-xs text-[var(--ink-muted)]">
               remaining
             </span>
           </span>

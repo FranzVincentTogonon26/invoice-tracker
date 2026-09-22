@@ -126,21 +126,21 @@ const ConfirmRemoveItemDialog = ({
             {/* Line summary so the exact row being dropped is confirmed. */}
             <div className="mt-4 flex items-center gap-3 rounded-2xl border border-[var(--border)] bg-[var(--surface-2)]/60 px-4 py-3">
               <div className="min-w-0 flex-1">
-                <p className="truncate text-[15px] font-semibold text-[var(--ink)]">
+                <p className="truncate text-base font-semibold text-[var(--ink)]">
                   {line?.description?.trim() || `Expense item ${lineNumber}`}
                 </p>
-                <p className="mt-0.5 truncate text-[12px] text-[var(--ink-muted)]">
+                <p className="mt-0.5 truncate text-xs text-[var(--ink-muted)]">
                   {categoryName ? `${categoryName} · ` : ""}
                   {formatDate(line?.date)}
                 </p>
               </div>
-              <span className="shrink-0 text-sm font-bold tabular text-[var(--ink)]">
+              <span className="shrink-0 text-sm font-semibold tabular-nums text-[var(--ink)]">
                 {formatMoney(line?.totalAmount)}
               </span>
             </div>
 
             {scannedDraft && (
-              <div className="mt-3 flex items-start gap-2 rounded-2xl bg-[var(--danger)]/10 px-3.5 py-2.5 text-[12px] leading-snug text-[var(--danger)]">
+              <div className="mt-3 flex items-start gap-2 rounded-2xl bg-[var(--danger)]/10 px-3.5 py-2.5 text-xs leading-snug text-[var(--danger)]">
                 <Sparkles size={14} className="mt-px shrink-0" aria-hidden />
                 <span>
                   The scanned receipt parked for this line is discarded too —
@@ -150,7 +150,7 @@ const ConfirmRemoveItemDialog = ({
             )}
 
             {storedReceipt && (
-              <p className="mt-3 flex items-start gap-2 rounded-2xl bg-[var(--surface-2)]/60 px-3.5 py-2.5 text-[12px] leading-snug text-[var(--ink-muted)]">
+              <p className="mt-3 flex items-start gap-2 rounded-2xl bg-[var(--surface-2)]/60 px-3.5 py-2.5 text-xs leading-snug text-[var(--ink-muted)]">
                 <ImagePlus
                   size={14}
                   className="mt-px shrink-0 text-[var(--accent-strong)]"

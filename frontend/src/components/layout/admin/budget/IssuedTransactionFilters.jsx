@@ -44,7 +44,7 @@ function initialsOf(name) {
     .join("");
 }
 
-function FilterAvatar({ name, avatarUrl, size = "h-7 w-7 text-[12px]" }) {
+function FilterAvatar({ name, avatarUrl, size = "h-7 w-7 text-xs" }) {
   if (avatarUrl) {
     return (
       <img
@@ -62,7 +62,7 @@ function FilterAvatar({ name, avatarUrl, size = "h-7 w-7 text-[12px]" }) {
     <span
       aria-hidden
       className={cn(
-        "flex shrink-0 items-center justify-center rounded-full bg-[var(--accent-soft)] font-bold text-[var(--accent-strong)]",
+        "flex shrink-0 items-center justify-center rounded-full bg-[var(--accent-soft)] font-semibold text-[var(--accent-strong)]",
         size,
       )}
     >
@@ -156,7 +156,7 @@ function FilterOption({ filterKey, option, selected }) {
         <span className="min-w-0 flex-1">
           <span className="block truncate">{option.label}</span>
           {option.employee_role && (
-            <span className="block truncate text-[11px] capitalize text-[var(--ink-muted)]">
+            <span className="block truncate text-xs capitalize text-[var(--ink-muted)]">
               {option.employee_role}
             </span>
           )}

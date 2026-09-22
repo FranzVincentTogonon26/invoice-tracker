@@ -153,7 +153,7 @@ function Field({ label, children, hint }) {
       </span>
       {children}
       {hint && (
-        <span className="mt-1.5 block text-[12px] leading-snug text-[var(--ink-muted)]">
+        <span className="mt-1.5 block text-xs leading-snug text-[var(--ink-muted)]">
           {hint}
         </span>
       )}
@@ -583,7 +583,7 @@ const AddExpenses = () => {
                   Suggesting description..
                 </Badge>
               )}
-              <Badge tone="neutral" className="tabular">
+              <Badge tone="neutral" className="tabular-nums">
                 {items.length} {items.length === 1 ? "row" : "rows"}
               </Badge>
             </div>
@@ -599,7 +599,7 @@ const AddExpenses = () => {
               >
                 <div className="mb-3 flex items-center justify-between gap-2">
                   <div className="flex min-w-0 items-center gap-2.5">
-                    <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-[var(--ink)] font-display text-[11px] font-bold tabular text-[var(--bg)]">
+                    <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-[var(--ink)] font-display text-xs font-semibold tabular-nums text-[var(--bg)]">
                       {String(i + 1).padStart(2, "0")}
                     </span>
                     <p className="truncate text-sm font-semibold text-[var(--ink)]">
@@ -675,7 +675,7 @@ const AddExpenses = () => {
                       value={it.date}
                       onChange={(next) => setItem(i, { date: next })}
                       placeholder="Select date"
-                      className="tabular"
+                      className="tabular-nums"
                       disabled={it.dateLocked}
                     />
                   </Field>
@@ -701,7 +701,7 @@ const AddExpenses = () => {
                           setItem(i, { totalAmount: e.target.value })
                         }
                         placeholder="0.00"
-                        className="pl-8 text-right font-semibold tabular"
+                        className="pl-8 text-right font-semibold tabular-nums"
                         disabled={it.amountLocked}
                         title={
                           it.amountLocked
@@ -730,7 +730,7 @@ const AddExpenses = () => {
                             : it.receiptName || "Receipt attached"
                           : "No receipt attached"}
                       </p>
-                      <p className="text-[12px] text-[var(--ink-muted)]">
+                      <p className="text-xs text-[var(--ink-muted)]">
                         {it.receiptId
                           ? it.receiptLocal
                             ? `${it.receiptName || "Scanned receipt"} · #${String(it.receiptId).slice(0, 8).toUpperCase()}`
@@ -802,7 +802,7 @@ const AddExpenses = () => {
                   Funding, totals and the lines about to be saved.
                 </CardDescription>
               </div>
-              <Badge tone="accent" className="shrink-0 tabular">
+              <Badge tone="accent" className="shrink-0 tabular-nums">
                 {items.length} line{items.length === 1 ? "" : "s"}
               </Badge>
             </div>
@@ -811,10 +811,10 @@ const AddExpenses = () => {
               <p className="type-eyebrow text-[var(--accent-strong)]">
                 Total expenses
               </p>
-              <p className="mt-1 font-display text-3xl font-semibold tabular tracking-tight text-[var(--ink)]">
+              <p className="mt-1 font-display text-3xl font-semibold tabular-nums tracking-tight text-[var(--ink)]">
                 {formatMoney(total)}
               </p>
-              <p className="mt-1 text-[12px] text-[var(--ink-muted)]">
+              <p className="mt-1 text-xs text-[var(--ink-muted)]">
                 Across {items.length} line{items.length === 1 ? "" : "s"} ·{" "}
                 {filledCount} described
               </p>
@@ -850,7 +850,7 @@ const AddExpenses = () => {
                     <span className="flex min-w-0 items-center gap-2 text-[var(--ink-muted)]">
                       <span
                         className={cn(
-                          "flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-[var(--surface-2)] text-[12px] font-bold tabular",
+                          "flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-[var(--surface-2)] text-xs font-semibold tabular-nums",
                           missingAmount &&
                             "bg-[var(--danger)]/12 text-[var(--danger)]",
                         )}
@@ -872,12 +872,12 @@ const AddExpenses = () => {
                         className="shrink-0 text-right leading-tight"
                         title="Add an amount greater than zero to proceed"
                       >
-                        <span className="block font-semibold tabular text-[var(--danger)]">
+                        <span className="block font-semibold tabular-nums text-[var(--danger)]">
                           {formatMoney(it.totalAmount)}
                         </span>
                       </span>
                     ) : (
-                      <span className="shrink-0 font-semibold tabular text-[var(--ink)]">
+                      <span className="shrink-0 font-semibold tabular-nums text-[var(--ink)]">
                         {formatMoney(it.totalAmount)}
                       </span>
                     )}
@@ -888,7 +888,7 @@ const AddExpenses = () => {
 
             <div className="my-4 h-px bg-[var(--border)]" />
 
-            <div className="flex items-start gap-2 rounded-xl bg-[var(--accent-soft)]/50 px-3 py-2.5 text-[12px] leading-snug text-[var(--ink-muted)]">
+            <div className="flex items-start gap-2 rounded-xl bg-[var(--accent-soft)]/50 px-3 py-2.5 text-xs leading-snug text-[var(--ink-muted)]">
               <Info
                 size={16}
                 className="mt-px shrink-0 text-[var(--accent-strong)]"

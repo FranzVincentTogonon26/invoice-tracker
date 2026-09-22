@@ -45,7 +45,7 @@ export const CardHeader = ({ className, ...props }) => (
 export const CardTitle = ({ className, ...props }) => (
   <h3
     className={cn(
-      "text-base font-semibold text-[var(--ink)] tracking-tight",
+      "font-display text-base font-semibold text-[var(--ink)] tracking-tight leading-snug",
       className
     )}
     {...props}
@@ -53,7 +53,7 @@ export const CardTitle = ({ className, ...props }) => (
 );
 
 export const CardDescription = ({ className, ...props }) => (
-  <p className={cn("text-xs text-[var(--ink-muted)]", className)} {...props} />
+  <p className={cn("text-xs leading-relaxed text-[var(--ink-muted)]", className)} {...props} />
 );
 
 export const CardContent = ({ className, ...props }) => (

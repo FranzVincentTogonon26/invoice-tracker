@@ -254,7 +254,7 @@ const BudgetTransaction = ({ valueRemaining }) => {
               </p>
               <p className="text-sm text-[var(--ink-muted)] sm:ml-auto sm:mr-6">
                 Total
-                <span className="ml-2 text-sm font-semibold text-[var(--accent-strong)] tabular">
+                <span className="ml-2 text-sm font-semibold text-[var(--accent-strong)] tabular-nums">
                   {formatMoney(total)}
                 </span>
               </p>

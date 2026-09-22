@@ -32,12 +32,12 @@ const ReceiptScanButton = ({ scanning = false, onFile }) => {
         />
       </span>
       <div className="min-w-0">
-        <p className="text-[15px] font-semibold leading-snug text-[var(--ink)] sm:text-sm">
+        <p className="text-base font-semibold leading-snug text-[var(--ink)]">
           {/* Mobile has no drag-and-drop — lead with tap-first wording. */}
           <span className="sm:hidden">Tap to upload receipt</span>
           <span className="hidden sm:inline">Drop the receipt here</span>
         </p>
-        <p className="mt-0.5 text-[12px] leading-snug text-[var(--ink-muted)]">
+        <p className="mt-0.5 text-xs leading-snug text-[var(--ink-muted)]">
           {scanning ? (
             "Reading the receipt…"
           ) : (

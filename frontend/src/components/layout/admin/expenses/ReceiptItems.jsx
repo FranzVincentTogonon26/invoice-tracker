@@ -18,7 +18,7 @@ const ItemRow = ({ item, index, onItemChange, onRemove }) => {
       >
         <div className="min-w-0">
           <Input
-            className="h-9 w-full min-w-0 rounded-lg px-2.5 text-[13px]"
+            className="h-9 w-full min-w-0 rounded-lg px-2.5 text-sm"
             value={item.description}
             placeholder="Item description"
             inputMode="text"
@@ -31,7 +31,7 @@ const ItemRow = ({ item, index, onItemChange, onRemove }) => {
         </div>
         <div className="min-w-0">
           <Input
-            className="h-9 w-full rounded-lg px-2 text-center tabular text-[13px]"
+            className="h-9 w-full rounded-lg px-2 text-center tabular-nums text-sm"
             type="number"
             inputMode="decimal"
             autoComplete="off"
@@ -43,7 +43,7 @@ const ItemRow = ({ item, index, onItemChange, onRemove }) => {
         </div>
         <div className="min-w-0">
           <Input
-            className="h-9 w-full rounded-lg px-2.5 text-right tabular text-[13px]"
+            className="h-9 w-full rounded-lg px-2.5 text-right tabular-nums text-sm"
             type="number"
             inputMode="decimal"
             autoComplete="off"
@@ -54,7 +54,7 @@ const ItemRow = ({ item, index, onItemChange, onRemove }) => {
           />
         </div>
         <div className="min-w-0 text-right">
-          <span className="text-[13px] font-semibold tabular text-[var(--ink)]">
+          <span className="text-sm font-semibold tabular-nums text-[var(--ink)]">
             {formatMoney(amount)}
           </span>
         </div>
@@ -72,7 +72,7 @@ const ItemRow = ({ item, index, onItemChange, onRemove }) => {
       <div className="flex items-center gap-2.5 px-2 py-2 sm:hidden">
         <div className="min-w-0 flex-1">
           <Input
-            className="h-8 w-full min-w-0 rounded-lg border-0 bg-transparent px-0 text-[13px] font-medium shadow-none focus:ring-0"
+            className="h-8 w-full min-w-0 rounded-lg border-0 bg-transparent px-0 text-sm font-medium shadow-none focus:ring-0"
             value={item.description}
             placeholder="Item description"
             inputMode="text"
@@ -82,10 +82,10 @@ const ItemRow = ({ item, index, onItemChange, onRemove }) => {
               onItemChange(index, { description: e.target.value })
             }
           />
-          <div className="mt-0.5 flex items-center gap-1.5 text-[11px] text-[var(--ink-muted)]">
+          <div className="mt-0.5 flex items-center gap-1.5 text-xs text-[var(--ink-muted)]">
             <span>Qty</span>
             <Input
-              className="h-5 w-10 rounded border-0 bg-transparent p-0 text-[11px] tabular shadow-none focus:ring-0"
+              className="h-5 w-10 rounded border-0 bg-transparent p-0 text-xs tabular-nums shadow-none focus:ring-0"
               type="number"
               inputMode="decimal"
               autoComplete="off"
@@ -98,7 +98,7 @@ const ItemRow = ({ item, index, onItemChange, onRemove }) => {
             />
             <span className="text-[var(--border)]">×</span>
             <Input
-              className="h-5 w-16 rounded border-0 bg-transparent p-0 text-[11px] tabular shadow-none focus:ring-0"
+              className="h-5 w-16 rounded border-0 bg-transparent p-0 text-xs tabular-nums shadow-none focus:ring-0"
               type="number"
               inputMode="decimal"
               autoComplete="off"
@@ -110,7 +110,7 @@ const ItemRow = ({ item, index, onItemChange, onRemove }) => {
           </div>
         </div>
         <div className="shrink-0 text-right">
-          <span className="text-[13px] font-semibold tabular text-[var(--ink)]">
+          <span className="text-sm font-semibold tabular-nums text-[var(--ink)]">
             {formatMoney(amount)}
           </span>
         </div>
@@ -138,11 +138,11 @@ const ReceiptItems = ({
 }) => (
   <div>
     <div className="flex items-center justify-between gap-3">
-      <CardTitle className="tracking-tight lg:text-[17px]">
+      <CardTitle className="tracking-tight lg:text-base">
         Scan list items
       </CardTitle>
       {items.length > 0 && !scanning && (
-        <span className="text-[11px] font-medium tabular text-[var(--ink-muted)]">
+        <span className="text-xs font-medium tabular-nums text-[var(--ink-muted)]">
           {items.length} {items.length === 1 ? "line" : "lines"}
         </span>
       )}
@@ -150,7 +150,7 @@ const ReceiptItems = ({
 
     <div className="mt-2 overflow-hidden rounded-xl border border-[var(--border)] bg-[var(--surface)] sm:mt-2.5">
       <div
-        className={`hidden ${GRID_COLS} items-center gap-x-3 border-b border-[var(--border)] bg-[var(--surface-2)]/50 px-2 py-1.5 text-[10px] font-semibold uppercase tracking-[0.1em] text-[var(--ink-muted)] sm:grid lg:gap-x-4 lg:px-3 lg:py-2`}
+        className={`hidden ${GRID_COLS} items-center gap-x-3 border-b border-[var(--border)] bg-[var(--surface-2)]/50 px-2 py-1.5 text-xs font-semibold uppercase tracking-widest text-[var(--ink-muted)] sm:grid lg:gap-x-4 lg:px-3 lg:py-2`}
       >
         <span>Description</span>
         <span className="text-center">Qty</span>
@@ -208,10 +208,10 @@ const ReceiptItems = ({
 
       {!scanning && items.length === 0 && (
         <div className="px-3 py-4 text-center sm:py-4">
-          <p className="text-[13px] font-medium text-[var(--ink)]">
+          <p className="text-sm font-medium text-[var(--ink)]">
             No line items yet
           </p>
-          <p className="mx-auto mt-0.5 max-w-sm text-[12px] leading-relaxed text-[var(--ink-muted)]">
+          <p className="mx-auto mt-0.5 max-w-sm text-xs leading-relaxed text-[var(--ink-muted)]">
             Add a line manually or re-scan the receipt.
           </p>
         </div>
@@ -221,7 +221,7 @@ const ReceiptItems = ({
         <button
           type="button"
           onClick={onAddItem}
-          className="flex min-h-[36px] w-full items-center justify-center gap-1.5 border-t border-dashed border-[var(--border)] px-3 py-2 text-[13px] font-medium text-[var(--accent-strong)] transition-colors hover:bg-[var(--accent-soft)]/40 active:bg-[var(--accent-soft)]/50"
+          className="flex min-h-[36px] w-full items-center justify-center gap-1.5 border-t border-dashed border-[var(--border)] px-3 py-2 text-sm font-medium text-[var(--accent-strong)] transition-colors hover:bg-[var(--accent-soft)]/40 active:bg-[var(--accent-soft)]/50"
         >
           <Plus size={14} />
           Add line item
@@ -230,10 +230,10 @@ const ReceiptItems = ({
     </div>
 
     <div className="mt-2 flex items-center justify-between gap-4 border-t border-[var(--border)] pt-2 sm:mt-2.5 sm:pt-2.5">
-      <span className="text-[10px] font-semibold uppercase tracking-[0.1em] text-[var(--ink-muted)]">
+      <span className="text-xs font-semibold uppercase tracking-widest text-[var(--ink-muted)]">
         Total amount
       </span>
-      <span className="font-display text-[17px] font-semibold tabular text-[var(--ink)] sm:text-lg">
+      <span className="font-display text-lg font-semibold tabular-nums tracking-tight text-[var(--ink)]">
         {formatMoney(itemsTotal)}
       </span>
     </div>

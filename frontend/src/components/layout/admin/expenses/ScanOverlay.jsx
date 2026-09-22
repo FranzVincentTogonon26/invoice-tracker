@@ -15,10 +15,10 @@ const ScanOverlay = () => (
       </span>
     </div>
     <div className="text-center">
-      <p className="text-[15px] font-semibold text-[var(--ink)] sm:text-sm">
+      <p className="text-base font-semibold text-[var(--ink)]">
         Scanning receipt, please wait
       </p>
-      <p className="mt-1 text-[13px] text-[var(--ink-muted)] sm:text-[12px]">
+      <p className="mt-1 text-sm text-[var(--ink-muted)]">
         Reading vendor, items and totals — this takes a few seconds.
       </p>
     </div>
