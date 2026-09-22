@@ -1,7 +1,7 @@
 import { HandCoins } from "lucide-react";
 import { Badge, StatusBadge } from "../../../ui/Badge";
 import { MethodIcon } from "../../../ui/Select";
-import { formatDate, formatMoney, formatTime } from "../../../../lib/utils";
+import { cn, formatDate, formatMoney, formatTime } from "../../../../lib/utils";
 import { PaymentMethod, methodLabel } from "./PaymentMethod";
 import { IssuedTransactionActions } from "./IssuedTransactionActions";
 
@@ -17,28 +17,48 @@ function initialsOf(name) {
     .join("");
 }
 
-function EmployeeCell({ name, role, avatarUrl }) {
+export function EmployeeCell({ name, role, avatarUrl, size = "md" }) {
+  // "sm" fits narrow ledger columns (Expenses table); "md" is the original
+  // Budget Issued Transaction sizing.
+  const compact = size === "sm";
   return (
     <div className="flex items-center gap-3">
       {avatarUrl ? (
         <img
           src={avatarUrl}
           alt=""
-          className="h-9 w-9 shrink-0 rounded-full object-cover ring-1 ring-[var(--border)]"
+          className={cn(
+            "shrink-0 rounded-full object-cover ring-1 ring-[var(--border)]",
+            compact ? "h-8 w-8" : "h-9 w-9",
+          )}
         />
       ) : (
         <span
           aria-hidden
-          className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-[var(--accent-soft)] text-sm font-semibold text-[var(--accent-strong)]"
+          className={cn(
+            "flex shrink-0 items-center justify-center rounded-full bg-[var(--accent-soft)] font-semibold text-[var(--accent-strong)]",
+            compact ? "h-8 w-8 text-xs" : "h-10 w-10 text-sm",
+          )}
         >
           {initialsOf(name) || "?"}
         </span>
       )}
       <div className="min-w-0">
-        <p className="truncate text-base font-semibold leading-tight text-[var(--ink)]">
+        <p
+          className={cn(
+            "truncate font-semibold leading-tight text-[var(--ink)]",
+            compact ? "text-sm" : "text-base",
+          )}
+        >
           {name || "Unknown"}
         </p>
-        <p className="mt-0.5 truncate text-sm capitalize text-[var(--ink-muted)]">
+        <p
+          className={cn(
+            "mt-0.5 truncate capitalize text-[var(--ink-muted)]",
+            compact ? "text-xs" : "text-sm",
+          )}
+        >
+          {/* users.role is CHECK-constrained to 'admin' | 'employee' */}
           {role || "—"}
         </p>
       </div>

@@ -27,13 +27,13 @@ const NAV = [
     label: "Dashboard",
     primary: true,
   },
+  { to: "/admin/budget", icon: FileText, label: "Budget", primary: true },
   {
     to: "/admin/transaction",
     icon: ArrowLeftRight,
     label: "Transactions",
   },
   { to: "/admin/employees", icon: Users, label: "Employees", primary: true },
-  { to: "/admin/budget", icon: FileText, label: "Budget", primary: true },
   { to: "/admin/expenses", icon: Receipt, label: "Expenses", primary: true },
   {
     to: "/reconciliation",
@@ -152,8 +152,7 @@ const ACCOUNT_ICON =
   "flex h-9 w-9 shrink-0 items-center justify-center rounded-xl " +
   "bg-[var(--surface-2)] text-[var(--ink-muted)]";
 
-const SHEET_LABEL =
-  "mt-5 px-1 type-eyebrow " + "text-[var(--ink-muted)]";
+const SHEET_LABEL = "mt-5 px-1 type-eyebrow " + "text-[var(--ink-muted)]";
 
 /**
  * Floating bottom dock for small screens — the four primary destinations plus

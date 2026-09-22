@@ -319,7 +319,9 @@ class Expenses {
           e.receipt_id,
           e.issued_ref_id,
           e.user_id,
-          u.name AS created_by
+          u.name AS created_by,
+          u.role AS created_by_role,
+          u.avatar_url AS created_by_avatar
        FROM expenses e
        LEFT JOIN category c ON c.category_id = e.category_id
        LEFT JOIN users u ON u.user_id = e.user_id
@@ -340,7 +342,72 @@ class Expenses {
       [],
     );
 
+    const overviewIssuedBudget = await query(
+      `SELECT
+          br.reference_id,
+          br.label,
+          br.created_at,
+          COALESCE(SUM(i.amount), 0) AS amount
+       FROM budget_issued_reference bir
+       JOIN issued_budget i ON i.issued_ref_id = bir.id
+       JOIN budget_reference br ON br.reference_id = bir.reference_id
+       WHERE bir.status = 'open'
+       GROUP BY br.reference_id, br.label, br.created_at
+       ORDER BY br.created_at DESC`,
+      [],
+    );
+
+    const overviewBudget = await query(
+      `SELECT
+          br.reference_id,
+          br.label,
+          br.created_at,
+          COALESCE(SUM(b.amount), 0) AS amount
+       FROM budget_reference br
+       LEFT JOIN budget b ON b.reference_id = br.reference_id
+       WHERE b.status != 'cancelled'
+       GROUP BY br.reference_id, br.label, br.created_at
+       ORDER BY br.created_at DESC`,
+      [],
+    );
+
+    const overviewExpenses = await query(
+      `SELECT
+          br.reference_id,
+          br.label,
+          br.created_at,
+          COALESCE(SUM(e.total_amount), 0) AS amount
+       FROM expenses e
+       JOIN budget_reference br ON br.reference_id = e.reference_id
+       GROUP BY br.reference_id, br.label, br.created_at
+       ORDER BY br.created_at DESC`,
+      [],
+    );
+
+    // Scalar count — the previous query mixed COUNT with GROUP BY/ORDER BY,
+    // which returned a raw pg result object instead of a single number.
+    const totalTransaction = await query(
+      `SELECT COUNT(e.id)::int AS total
+         FROM expenses e
+         JOIN budget_reference br ON br.reference_id = e.reference_id`,
+      [],
+    );
+
     const s = stats.rows[0] ?? {};
+
+    // pg returns DECIMAL as strings — cast before summing.
+    const totalBudget = overviewBudget.rows.reduce(
+      (sum, row) => sum + Number(row.amount || 0),
+      0,
+    );
+    const totalIssued = overviewIssuedBudget.rows.reduce(
+      (sum, row) => sum + Number(row.amount || 0),
+      0,
+    );
+    const totalExpenses = overviewExpenses.rows.reduce(
+      (sum, row) => sum + Number(row.amount || 0),
+      0,
+    );
 
     return {
       categories,
@@ -348,10 +415,14 @@ class Expenses {
       gemini_model,
       expenses: expenses.rows,
       overview: {
-        totalExpenses: Number(s.total_expenses) || 0,
-        thisMonth: Number(s.this_month) || 0,
-        totalTransactions: Number(s.total_transactions) || 0,
+        overviewBudget: overviewBudget.rows,
+        overviewIssuedBudget: overviewIssuedBudget.rows,
+        overviewExpenses: overviewExpenses.rows,
+        totalBudget,
+        totalIssued,
+        totalExpenses,
         totalCategories: categories.length,
+        totalTransaction: totalTransaction.rows[0]?.total ?? 0,
       },
     };
   }
