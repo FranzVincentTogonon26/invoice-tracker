@@ -1,24 +1,35 @@
 import { query, withTransaction } from "../config/db.js";
 
+// receipt.qty is INTEGER in the schema, but scanned lines (Gemini / manual
+// entry) can carry fractional quantities like 3.62 — round them so the insert
+// doesn't fail with `invalid input syntax for type integer` (pg 22P02).
+const toIntQty = (value, fallback = 1) => {
+  const n = Number(value);
+  if (!Number.isFinite(n)) return fallback;
+  return Math.max(0, Math.round(n));
+};
+
 class Expenses {
-  // Columns safe to return in API responses.
   static CATEGORY_COLUMNS = "category_id, category_name, created_at";
 
-  /* ── Category ────────────────────────────────────────────────── */
-
-  // All categories, alphabetically — powers the "Select Category" Listbox.
   static async categoryList() {
+    // `expense_count` reports how many expense rows reference each category so
+    // the UI can lock its delete action (deleting a category would null out
+    // expenses.category_id through ON DELETE SET NULL).
     const result = await query(
-      `SELECT ${this.CATEGORY_COLUMNS}
-         FROM category
-        ORDER BY category_name ASC`,
+      `SELECT c.category_id,
+              c.category_name,
+              c.created_at,
+              COUNT(e.id)::int AS expense_count
+         FROM category c
+         LEFT JOIN expenses e ON e.category_id = c.category_id
+        GROUP BY c.category_id, c.category_name, c.created_at
+        ORDER BY c.category_name ASC`,
       [],
     );
     return result.rows;
   }
 
-  // All selectable Gemini models, alphabetically — powers the "Source" Listbox
-  // in the Scan Receipt panel (`ModelSource`).
   static async geminiModel() {
     const result = await query(
       `SELECT id, model
@@ -29,7 +40,6 @@ class Expenses {
     return result.rows;
   }
 
-  // Case-insensitive lookup so "Travel" and "travel" don't both get created.
   static async findCategoryByName(category_name) {
     const result = await query(
       `SELECT ${this.CATEGORY_COLUMNS}
@@ -51,8 +61,6 @@ class Expenses {
     return result.rows[0];
   }
 
-  // Deletes a category. `expenses.category_id` is ON DELETE SET NULL, so
-  // already-filed expense lines survive as uncategorized.
   static async removeCategory(id) {
     const result = await query(
       `DELETE FROM category
@@ -63,54 +71,155 @@ class Expenses {
     return result.rows[0] ?? null;
   }
 
-  /* ── Receipt (scan_receipt) ──────────────────────────────────── */
+  static async createReceipt({
+    receipt_id = null,
+    vendor = null,
+    description = null,
+    qty = 1,
+    rate = 0,
+    amount = 0,
+    items = [],
+  }) {
+    const lines =
+      Array.isArray(items) && items.length > 0
+        ? items
+        : [{ description, qty, rate, amount }];
 
-  static async createReceipt({ image_url, description, qty, rate, amount }) {
-    const result = await query(
-      `INSERT INTO receipt (image_url, description, qty, rate, amount)
-       VALUES ($1, $2, $3, $4, $5)
-       RETURNING *`,
-      [image_url ?? null, description, qty, rate, amount],
-    );
-    return result.rows[0];
+    const rows = [];
+    for (const line of lines) {
+      const result = await query(
+        `INSERT INTO receipt
+           (receipt_id, vendor, description, qty, rate, amount)
+         VALUES (COALESCE($1::text, gen_random_uuid()::text), $2, $3, $4, $5, $6)
+         RETURNING *`,
+        [
+          receipt_id,
+          vendor || null,
+          line.description ?? null,
+          toIntQty(line.qty),
+          line.rate ?? 0,
+          line.amount ?? 0,
+        ],
+      );
+      rows.push(result.rows[0]);
+    }
+    return rows;
   }
 
-  /* ── Expenses ────────────────────────────────────────────────── */
+  static async upsertReceipt(client, draft) {
+    await client.query(`DELETE FROM receipt WHERE receipt_id = $1`, [
+      draft.receipt_id,
+    ]);
 
-  // Inserts every line in one transaction so a bad row can't leave a partial
-  // batch behind. `expense_date` is the date the user picked on the line
-  // (defaults to today at the DB level when omitted).
+    return this.insertReceiptRows(client, draft);
+  }
+
+  static async insertReceiptRows(client, draft) {
+    const lines =
+      Array.isArray(draft.items) && draft.items.length > 0
+        ? draft.items
+        : [
+            {
+              description: draft.description,
+              qty: draft.qty,
+              rate: draft.rate,
+              amount: draft.amount,
+            },
+          ];
+
+    const rows = [];
+    for (const line of lines) {
+      const result = await client.query(
+        `INSERT INTO receipt
+           (receipt_id, vendor, description, qty, rate, amount)
+         VALUES ($1, $2, $3, $4, $5, $6)
+         RETURNING *`,
+        [
+          draft.receipt_id,
+          draft.vendor || null,
+          line.description ?? null,
+          toIntQty(line.qty),
+          line.rate ?? 0,
+          line.amount ?? 0,
+        ],
+      );
+      rows.push(result.rows[0]);
+    }
+    return rows;
+  }
+
   static async createExpenses({
     items,
     user_id,
     issued_ref_id = null,
     reference_id = null,
+    receipts = [],
+    image_url = null,
+    receipt_date = null,
   }) {
     return withTransaction(async (client) => {
+      const receiptRowIds = new Map();
+
+      for (const draft of receipts) {
+        if (!draft?.receipt_id) continue;
+        const rows = await this.upsertReceipt(client, draft);
+        receiptRowIds.set(draft.receipt_id, rows[0]?.id ?? null);
+      }
+
+      const unresolved = [
+        ...new Set(
+          items
+            .map((item) => item.receipt_id)
+            .filter((id) => id && !receiptRowIds.has(id)),
+        ),
+      ];
+
+      if (unresolved.length > 0) {
+        const found = await client.query(
+          `SELECT DISTINCT ON (receipt_id) receipt_id, id
+             FROM receipt
+            WHERE receipt_id = ANY($1::text[])
+            ORDER BY receipt_id, created_at ASC`,
+          [unresolved],
+        );
+        for (const row of found.rows) {
+          receiptRowIds.set(row.receipt_id, row.id);
+        }
+      }
+
       const rows = [];
 
       for (const item of items) {
+        const storedReceiptId = item.receipt_id
+          ? (receiptRowIds.get(item.receipt_id) ?? null)
+          : null;
+
         const result = await client.query(
           `INSERT INTO expenses
              (user_id, issued_ref_id, reference_id, description, category_id,
-              total_amount, expense_date, notes, receipt_id, payment_method)
+              total_amount, expense_date, notes, receipt_id, payment_method,
+              image_url, receipt_date)
            VALUES
-             ($1, $2, $3, $4, $5, $6,
-              COALESCE($7::date, CURRENT_DATE), $8, $9, $10)
+             ($1, $2, COALESCE($3::uuid, $11::uuid), $4, $5, $6,
+              COALESCE($7::date, CURRENT_DATE), $8, $9, $10, $12, $13)
            RETURNING *`,
           [
             user_id,
             issued_ref_id,
-            reference_id,
+            reference_id ?? null,
             item.description,
             item.category_id ?? null,
-            item.total_amount,
+            item.total_amount ?? 0,
             item.expense_date ?? null,
             item.notes ?? null,
-            item.receipt_id ?? null,
+            storedReceiptId,
             item.payment_method ?? "cash",
+            item.reference_id ?? null,
+            item.image_url ?? image_url ?? null,
+            item.receipt_date ?? receipt_date ?? null,
           ],
         );
+
         rows.push(result.rows[0]);
       }
 
@@ -148,34 +257,40 @@ class Expenses {
               JOIN budget_issued_reference bir ON i.issued_ref_id = bir.id
              WHERE bir.status = 'open'
                AND bir.reference_id = b.reference_id
-          ), 0)::float8 AS issued
+          ), 0)::float8 AS issued,
+          COALESCE((
+            SELECT SUM(e.total_amount)
+              FROM expenses e
+             WHERE e.reference_id = b.reference_id
+               AND e.status != 'cancel'
+          ), 0)::float8 AS expenses
          FROM budget_reference b
         WHERE b.status = 'open'
         ORDER BY b.created_at DESC`,
       [],
     );
 
-    // pg hands DECIMALs back as strings and SUM() over zero rows as NULL — coerce
-    // both so the client always receives numbers. `balance` is what the source
-    // can still spend (allocated − issued) — the same figure
-    // `Budget.referenceBalance()` reports, so both screens agree.
     return result.rows.map((row) => {
       const allocated = Number(row.allocated) || 0;
       const issued = Number(row.issued) || 0;
-      return { ...row, allocated, issued, balance: allocated - issued };
+      const expenses = Number(row.expenses) || 0;
+      // Spendable balance mirrors the AdminBudget overview:
+      // allocated − issued − expenses (expenses drawn against this source
+      // reduce what the Add Expenses form can still fund).
+      return {
+        ...row,
+        allocated,
+        issued,
+        expenses,
+        balance: allocated - issued - expenses,
+      };
     });
   }
 
-  /**
-   * Overview payload for GET /expenses — categories (for the Listbox), the
-   * expense ledger (optionally windowed by `from` / `to` dates) and the
-   * headline stats the Expenses page cards read.
-   */
   static async expensesOverview({ from, to } = {}) {
     const categories = await this.categoryList();
     const gemini_model = await this.geminiModel();
     const references = await this.budgetReference();
-
     const where = [];
     const params = [];
 
@@ -183,14 +298,12 @@ class Expenses {
       params.push(from);
       where.push(`e.expense_date >= $${params.length}::date`);
     }
+
     if (to) {
       params.push(to);
       where.push(`e.expense_date <= $${params.length}::date`);
     }
 
-    // `expense_date::text` keeps the wire format as "YYYY-MM-DD" — node-pg
-    // would otherwise hand back a Date at local midnight, which JSON-serializes
-    // to a UTC-shifted instant and can land on the previous day.
     const expenses = await query(
       `SELECT
           e.id,

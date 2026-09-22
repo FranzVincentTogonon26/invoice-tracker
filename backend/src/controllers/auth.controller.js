@@ -62,16 +62,16 @@ export const issuedOtp = async (req, res, next) => {
     const { email, name } = validate(resendOtpSchema, req.body);
     const { code, otpHash, expiresAt } = await generateOtp();
 
-    await sendOtpEmail({
-      to: email,
-      name,
-      otp: code,
-    });
-
     await Otp.upsert({
       email,
       otpHash,
       expiresAt,
+    });
+
+    await sendOtpEmail({
+      to: email,
+      name,
+      otp: code,
     });
 
     return res.json({
@@ -187,8 +187,8 @@ export const resendOtp = async (req, res, next) => {
 
       // Send first, then persist — if sending fails, the previous (still
       // valid) code is not lost, and the user can retry the resend.
-      await sendOtpEmail({ to: email, name, otp: code });
       await Otp.upsert({ email, otpHash, expiresAt });
+      await sendOtpEmail({ to: email, name, otp: code });
 
       return res.json({
         message: `Successfully issued 6-digit verification code. Please check your email: ${email}`,

@@ -91,7 +91,7 @@ function ContextCard({ icon, title, subtitle, badge, badgeTone = "neutral" }) {
 }
 
 function BalanceCard({ summary, isLoading, referenceId, projection, exceeds }) {
-  const EMPTY = { allocated: 0, issued: 0, balance: 0 };
+  const EMPTY = { allocated: 0, issued: 0, expenses: 0, balance: 0 };
 
   if (!referenceId) {
     return (
@@ -125,7 +125,7 @@ function BalanceCard({ summary, isLoading, referenceId, projection, exceeds }) {
     );
   }
 
-  const { allocated, issued, balance } = summary ?? EMPTY;
+  const { allocated, issued, expenses, balance } = summary ?? EMPTY;
   const depleted = balance <= 0;
 
   return (
@@ -165,18 +165,25 @@ function BalanceCard({ summary, isLoading, referenceId, projection, exceeds }) {
         </Badge>
       </div>
 
-      {/* Breakdown: allocated vs already-issued, side by side on a grid */}
-      <div className="mt-3 grid grid-cols-2 gap-2 border-t border-[var(--border)] pt-3">
+      {/* Breakdown: allocated vs already-issued vs already-spent — the three
+          legs behind `balance = allocated − issued − expenses` */}
+      <div className="mt-3 grid grid-cols-3 gap-2 border-t border-[var(--border)] pt-3">
         <div className="min-w-0">
           <p className="type-eyebrow text-[var(--ink-muted)]">Allocated</p>
           <p className="truncate text-sm font-semibold tabular">
             {formatMoney(allocated)}
           </p>
         </div>
-        <div className="min-w-0 text-right">
+        <div className="min-w-0 text-center">
           <p className="type-eyebrow text-[var(--ink-muted)]">Issued</p>
           <p className="truncate text-sm font-semibold tabular">
             {formatMoney(issued)}
+          </p>
+        </div>
+        <div className="min-w-0 text-right">
+          <p className="type-eyebrow text-[var(--ink-muted)]">Expenses</p>
+          <p className="truncate text-sm font-semibold tabular">
+            {formatMoney(expenses)}
           </p>
         </div>
       </div>

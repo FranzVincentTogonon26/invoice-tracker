@@ -9,30 +9,11 @@ import {
 import { Badge } from "../../../ui/Badge";
 import SelectReference from "../../../ui/SelectReference";
 import { cn, formatDate, formatMoney } from "../../../../lib/utils";
-
-/* Money columns arrive from pg as DECIMAL strings and SUM() over zero rows as
-   NULL — coerce once so every comparison below is numeric. */
-const toNumber = (value) => {
-  const parsed = Number(value);
-  return Number.isFinite(parsed) ? parsed : 0;
-};
-
-/* Mirrors `Budget.referenceBalance()` on the server: a source can still spend
-   `allocated − issued`. Recomputing it here keeps the card correct even when
-   only the raw columns arrive. */
-const withBalance = (reference) => {
-  const allocated = toNumber(reference.allocated);
-  const issued = toNumber(reference.issued);
-  return {
-    ...reference,
-    allocated,
-    issued,
-    balance:
-      reference.balance == null
-        ? allocated - issued
-        : toNumber(reference.balance),
-  };
-};
+import {
+  FUNDING_STATUS,
+  fundingAlternatives,
+  fundingState,
+} from "../../../../lib/funding";
 
 /* The three funding states the balance card can be in:
    `insufficient` = the draft costs more than the source has left,
@@ -120,27 +101,37 @@ const SelectSourceFund = ({
   disabled = false,
   loading = false,
 }) => {
-  const sources = useMemo(() => references.map(withBalance), [references]);
-
-  // Fall back to the only open source so a workspace with one source never has
-  // to click through a picker that has nothing to pick.
-  const selected =
-    sources.find((source) => source.reference_id === value) ??
-    (sources.length === 1 ? sources[0] : null);
+  // The picker's fallback, the live balance and the funding status all come
+  // from one shared calculation — the Add Expenses save validates against the
+  // very same numbers, so the card can never disagree with the save.
+  const {
+    sources,
+    source: selected,
+    expenses,
+    balance,
+    remaining,
+    used,
+    status,
+  } = useMemo(
+    () => fundingState(references, value, total),
+    [references, value, total],
+  );
 
   const canChoose = sources.length > 1;
-  const expenses = toNumber(total);
-  const balance = selected?.balance ?? 0;
-  const remaining = balance - expenses;
-
-  const insufficient = Boolean(selected) && remaining < 0;
-  const depleted = Boolean(selected) && !insufficient && remaining <= 0;
+  const insufficient = status === FUNDING_STATUS.insufficient;
+  const depleted = status === FUNDING_STATUS.depleted;
   const funding =
     FUNDING[insufficient ? "insufficient" : depleted ? "depleted" : "funded"];
 
-  // Share of the balance this draft consumes — an unfunded source reads 100%.
-  const used =
-    balance > 0 ? Math.min(100, Math.max(0, (expenses / balance) * 100)) : 100;
+  // Sources that could still absorb this draft — offered as one-tap switches
+  // when the picked one can't cover it (only useful with more than one source).
+  const alternatives = useMemo(
+    () =>
+      insufficient
+        ? fundingAlternatives(sources, selected?.reference_id, expenses)
+        : [],
+    [insufficient, sources, selected, expenses],
+  );
 
   const usedLabel = !selected
     ? "No budget source selected"
@@ -223,18 +214,21 @@ const SelectSourceFund = ({
               <p className="type-eyebrow text-[var(--ink-muted)]">Balance</p>
               <p
                 className={cn(
-                  "flex items-center gap-1 text-2xl font-semibold tracking-tight tabular",
+                  "flex items-center gap-1 text-lg font-semibold tracking-tight tabular",
                   funding.amount,
                 )}
               >
-                <PhilippinePesoIcon size={20} className="shrink-0 opacity-70" />
+                <PhilippinePesoIcon
+                  size={20}
+                  className="shrink-0 opacity-70 "
+                />
                 {Number(balance).toLocaleString("en-PH", {
                   minimumFractionDigits: 2,
                   maximumFractionDigits: 2,
                 })}
               </p>
             </div>
-            <Badge tone={funding.badgeTone} className="shrink-0">
+            <Badge tone={funding.badgeTone} className="shrink-0 text-[10px]">
               {funding.label}
             </Badge>
           </div>
@@ -263,7 +257,7 @@ const SelectSourceFund = ({
           {/* Live math: what this draft costs vs. what the source has left. */}
           <div className="mt-3 grid grid-cols-2 gap-2">
             <div className="min-w-0">
-              <p className="type-eyebrow text-[var(--ink-muted)]">
+              <p className="type-eyebrow text-[10px] text-[var(--ink-muted)]">
                 These expenses
               </p>
               <p className="truncate text-sm font-semibold tabular text-[var(--ink)]">
@@ -271,7 +265,7 @@ const SelectSourceFund = ({
               </p>
             </div>
             <div className="min-w-0 text-right">
-              <p className="type-eyebrow text-[var(--ink-muted)]">
+              <p className="type-eyebrow text-[var(--ink-muted)] text-[10px]">
                 {insufficient ? "Short by" : "Remaining"}
               </p>
               <p
@@ -308,11 +302,66 @@ const SelectSourceFund = ({
           </p>
 
           {insufficient && (
-            <p className="mt-2 flex items-start gap-1.5 text-[11px] leading-snug text-[var(--danger)]">
-              <AlertCircle size={12} aria-hidden className="mt-px shrink-0" />
-              Over the balance by {formatMoney(Math.abs(remaining))} — pick
-              another source or lower the amounts.
-            </p>
+            <div className="mt-3 rounded-2xl border border-[var(--danger)]/30 bg-[var(--danger)]/10 px-3 py-3">
+              <p className="flex items-start gap-1.5 text-[12px] font-semibold leading-snug text-[var(--danger)]">
+                <AlertCircle size={13} aria-hidden className="mt-px shrink-0" />
+                <span>
+                  Cannot proceed with your request — insufficient funds. These
+                  expenses are{" "}
+                  <span className="tabular">{formatMoney(expenses)}</span> but
+                  this source is{" "}
+                  <span className="tabular">
+                    {formatMoney(Math.abs(remaining))}
+                  </span>{" "}
+                  short.
+                </span>
+              </p>
+
+              {/* Recommendations: a source that still covers the draft is one
+                  tap away; otherwise point at the two ways to make it fit. */}
+              {alternatives.length > 0 ? (
+                <div className="mt-2.5 border-t border-[var(--danger)]/20 pt-2.5">
+                  <p className="type-eyebrow text-[var(--danger)]">
+                    Sources that still cover this
+                  </p>
+                  <div className="mt-1.5 flex flex-wrap gap-1.5">
+                    {alternatives.map((source) => (
+                      <button
+                        key={source.reference_id}
+                        type="button"
+                        onClick={() => onChange?.(source.reference_id)}
+                        disabled={disabled}
+                        title={`Fund these expenses from ${
+                          source.label || "this source"
+                        }`}
+                        className="flex max-w-full items-center gap-1.5 rounded-full border border-[var(--border)] bg-[var(--surface)] px-2.5 py-1 text-[12px] font-semibold text-[var(--ink)] transition-colors hover:border-[var(--accent)]/50 hover:bg-[var(--accent-soft)]/40 disabled:cursor-not-allowed disabled:opacity-50"
+                      >
+                        <WalletIcon
+                          size={12}
+                          aria-hidden
+                          className="shrink-0 text-[var(--accent-strong)]"
+                        />
+                        <span className="truncate">
+                          {source.label || "Untitled source"}
+                        </span>
+                        <span className="shrink-0 tabular text-[var(--ink-muted)]">
+                          {formatMoney(source.balance)}
+                        </span>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              ) : (
+                <ul className="mt-2 list-disc space-y-1 border-t border-[var(--danger)]/20 pt-2.5 pl-4 text-[11px] leading-snug text-[var(--danger)]">
+                  <li>Lower an amount on any line so the total fits.</li>
+                  <li>
+                    {canChoose
+                      ? "Top up this budget reference, or pick another source above."
+                      : "Top up this budget reference so it can cover the draft."}
+                  </li>
+                </ul>
+              )}
+            </div>
           )}
         </div>
       )}

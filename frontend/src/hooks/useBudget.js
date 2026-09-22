@@ -94,6 +94,6 @@ export function useBudgetBalance(referenceId, enabled = true) {
   return {
     ...query,
     // Empty references legitimately return zeros — never resolve to undefined
-    data: query.data ?? { allocated: 0, issued: 0, balance: 0 },
+    data: query.data ?? { allocated: 0, issued: 0, expenses: 0, balance: 0 },
   };
 }

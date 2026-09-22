@@ -6,9 +6,6 @@ import ReceiptDetails from "./ReceiptDetails";
 import ReceiptItems from "./ReceiptItems";
 import ModelSource from "./ModelSource";
 
-// Placeholder shown before any scan/upload has produced content.
-// Mobile copy is tap-first (no drag-and-drop exists there); desktop keeps
-// the original "drop" wording.
 const EmptyScanPlaceholder = () => (
   <div className="flex items-start gap-3 rounded-2xl border border-dashed border-[var(--border)] bg-[var(--surface-2)]/40 px-3 py-3 sm:px-4 sm:py-4 lg:gap-3 lg:px-4 lg:py-4">
     <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-[var(--surface)] text-[var(--ink-muted)] shadow-card lg:h-11 lg:w-11">
@@ -32,14 +29,6 @@ const EmptyScanPlaceholder = () => (
   </div>
 );
 
-// The "Scan Receipt" form body: preview/dropzone + the scan-result card
-// (details, editable lines, total). Full Details/items/total sections only
-// appear once a receipt is attached (or a scan is running) AND the scan
-// didn't fail — an error reverts the card to the "No scan yet" placeholder.
-// Single-card vertical rhythm on every breakpoint: attachment on top,
-// Details below it, then the editable lines, with the live total pinned to
-// the card bottom. Desktop just gets more padding + section air so the wide
-// card stays readable instead of squeezed.
 const Divider = () => (
   <div
     aria-hidden="true"
@@ -79,7 +68,7 @@ const ReceiptPanel = ({
     <form
       id="receipt-form"
       onSubmit={onSubmit}
-      className="space-y-2 sm:space-y-3 lg:space-y-3"
+      className="space-y-2 sm:space-y-3 lg:space-y-3 z-100"
     >
       {/* A failed scan reverts the panel to the dropzone so the receipt can be
           re-scanned — the error shows in the shared alert box. */}

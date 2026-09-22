@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import {
   AlertCircle,
-  Check,
+  BadgeCheck,
   Hash,
   Loader2,
   Plus,
@@ -226,9 +226,9 @@ const ReferencesModal = ({
                               title={`In use by ${reference.active} issued budget${
                                 Number(reference.active) === 1 ? "" : "s"
                               } — cannot be deleted`}
-                              className="inline-flex h-5 w-5 items-center justify-center rounded-full bg-[var(--success)]/12 text-[var(--success)] cursor-default select-none"
+                              className="inline-flex h-8 w-8 cursor-default items-center justify-center rounded-full text-[var(--success)]"
                             >
-                              <Check size={10} strokeWidth={2.5} />
+                              <BadgeCheck size={16} strokeWidth={2.5} />
                             </span>
                           ) : (
                             <button
@@ -245,7 +245,7 @@ const ReferencesModal = ({
                               {deletingId === reference.reference_id ? (
                                 <Loader2 size={13} className="animate-spin" />
                               ) : (
-                                <Trash2 size={13} />
+                                <Trash2 size={16} />
                               )}
                             </button>
                           )}

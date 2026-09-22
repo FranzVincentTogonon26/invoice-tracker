@@ -33,6 +33,19 @@ class Budget {
       [],
     );
 
+    const overviewExpenses = await query(
+      `SELECT
+          br.reference_id,
+          br.label,
+          br.created_at,
+          COALESCE(SUM(e.total_amount), 0) AS amount
+       FROM expenses e
+       JOIN budget_reference br ON br.reference_id = e.reference_id
+       GROUP BY br.reference_id, br.label, br.created_at
+       ORDER BY br.created_at DESC`,
+      [],
+    );
+
     // pg returns DECIMAL as strings — cast before summing.
     const totalBudget = overviewBudget.rows.reduce(
       (sum, row) => sum + Number(row.amount || 0),
@@ -42,14 +55,20 @@ class Budget {
       (sum, row) => sum + Number(row.amount || 0),
       0,
     );
+    const totalExpenses = overviewExpenses.rows.reduce(
+      (sum, row) => sum + Number(row.amount || 0),
+      0,
+    );
 
     // Return `.rows` (not the raw pg result) so the API payload is a plain
     // array — the frontend consumes these directly.
     return {
       overviewBudget: overviewBudget.rows,
       overviewIssuedBudget: overviewIssuedBudget.rows,
+      overviewExpenses: overviewExpenses.rows,
       totalBudget,
       totalIssued,
+      totalExpenses,
     };
   }
 
@@ -164,7 +183,10 @@ class Budget {
   // - `allocated`: SUM(budget.amount) — total funds added to this reference
   // - `issued`:    SUM(issued_budget.amount) — funds already handed out via
   //                budget_issued_reference rows tied to this reference
-  // - `balance`:   allocated - issued (what can still be issued)
+  // - `expenses`:  SUM(expenses.total_amount) — funds already spent against
+  //                this reference by saved expenses
+  // - `balance`:   allocated - issued - expenses (what can still be issued),
+  //                the same formula the AdminBudget overview uses.
   // Scalar subqueries with COALESCE keep empty references at 0 instead of NULL
   // (SUM returns NULL over zero rows).
   static async referenceBalance(referenceId) {
@@ -180,14 +202,20 @@ class Budget {
             FROM issued_budget i
             JOIN budget_issued_reference bir ON i.issued_ref_id = bir.id
             WHERE bir.status = 'open' AND bir.reference_id = $1
-          ), 0) AS issued`,
+          ), 0) AS issued,
+          COALESCE((
+            SELECT SUM(e.total_amount)
+            FROM expenses e
+            WHERE e.reference_id = $1 AND e.status != 'cancel'
+          ), 0) AS expenses`,
       [referenceId],
     );
 
-    const row = result.rows[0] ?? { allocated: 0, issued: 0 };
+    const row = result.rows[0] ?? { allocated: 0, issued: 0, expenses: 0 };
     const allocated = Number(row.allocated);
     const issued = Number(row.issued);
-    return { allocated, issued, balance: allocated - issued };
+    const expenses = Number(row.expenses);
+    return { allocated, issued, expenses, balance: allocated - issued - expenses };
   }
 
   // Soft-delete a Budget Reference (status 'open' -> 'cut_off'). A hard

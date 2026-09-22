@@ -21,7 +21,8 @@ import { Card, CardDescription, CardTitle } from "../../../ui/Card";
 import { DatePicker } from "../../../ui/DatePicker";
 import { Input, TextArea } from "../../../ui/Input";
 import Listbox from "../../../ui/Listbox";
-import { formatMoney, toISODate } from "../../../../lib/utils";
+import { cn, formatMoney, toISODate } from "../../../../lib/utils";
+import { FUNDING_STATUS, fundingState } from "../../../../lib/funding";
 import { ERROR_VISIBLE_MS } from "../../../../constants";
 import {
   useExpenses,
@@ -68,12 +69,37 @@ const missingFieldsFor = (item) => {
 const firstIncompleteIndex = (items) =>
   items.findIndex((item) => missingFieldsFor(item).length > 0);
 
-const toPayload = (item, receiptId) => ({
+/* Draft lines the save can't accept yet: an amount of 0 (nothing typed) reads
+   as ₱0.00 in the summary, which is exactly what the save error and the red row
+   flag point at. */
+const zeroAmountIndexesFor = (items) =>
+  items
+    .map((item, index) => (!(Number(item.totalAmount) > 0) ? index : -1))
+    .filter((index) => index >= 0);
+
+/* "Line 2 (Pamasahe)" — how the save errors point at one draft line. */
+const lineLabel = (item, index) =>
+  `Line ${index + 1}${
+    item.description.trim() ? ` (${item.description.trim()})` : ""
+  }`;
+
+const ISO_DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
+
+const isoDateOnly = (value) => {
+  const iso = String(value ?? "")
+    .trim()
+    .slice(0, 10);
+  return ISO_DATE_RE.test(iso) ? iso : undefined;
+};
+
+const toPayload = (item, { receiptId, imageUrl, receiptDate } = {}) => ({
   description: item.description.trim(),
   category_id: item.categoryId || undefined,
-  expense_date: item.date || undefined,
+  expense_date: isoDateOnly(item.date),
   total_amount: Number(item.totalAmount) || 0,
   receipt_id: receiptId || undefined,
+  image_url: imageUrl || undefined,
+  receipt_date: isoDateOnly(receiptDate),
 });
 
 const normalizeCategoryName = (value) =>
@@ -138,18 +164,17 @@ function Field({ label, children, hint }) {
 const AddExpenses = () => {
   const nav = useNavigate();
   const [form, setForm] = useState({ items: [blankItem()] });
-  // Budget reference the draft is funded from. The Summary card owns the
-  // picker; with a single open source it is selected automatically (below).
   const [referenceId, setReferenceId] = useState("");
   const [modal, setModal] = useState(null);
   const [formError, setFormError] = useState("");
   const [addItemError, setAddItemError] = useState("");
+  // Zero-amount flags + the "Line N still reads ₱0.00 …" footer only render
+  // after the Save button is clicked — a fresh blank row isn't an error until
+  // a save is attempted. The flagged list stays derived from the live draft,
+  // so corrected lines revert on the next keystroke.
+  const [showZeroAmountErrors, setShowZeroAmountErrors] = useState(false);
   const [removeIndex, setRemoveIndex] = useState(null);
   const [viewReceipt, setViewReceipt] = useState(null);
-  // Row awaiting a remove confirmation, plus its trash button so focus can
-  // return there when the dialog is cancelled. `addLineRef` is the fallback
-  // target once a row is actually removed and its own button is gone, and
-  // `pendingRemoveRef` is the consume-once guard for the confirm action.
   const pendingRemoveRef = useRef(null);
   const removeTriggerRef = useRef(null);
   const addLineRef = useRef(null);
@@ -186,21 +211,14 @@ const AddExpenses = () => {
     onError: (message) => toast.error(message),
   });
 
-  // The add-line guard message is transient: fade it out on its own after the
-  // shared 5s window so a stale warning never lingers under the button.
   useEffect(() => {
     if (!addItemError) return undefined;
-
     const id = setTimeout(() => setAddItemError(""), ERROR_VISIBLE_MS);
     return () => clearTimeout(id);
   }, [addItemError]);
 
-  // The save-time error strip follows the same contract: it slides in beside
-  // the Summary buttons and auto-fades after the shared 5s window so a stale
-  // failure never sits next to "Save expenses".
   useEffect(() => {
     if (!formError) return undefined;
-
     const id = setTimeout(() => setFormError(""), ERROR_VISIBLE_MS);
     return () => clearTimeout(id);
   }, [formError]);
@@ -233,34 +251,19 @@ const AddExpenses = () => {
   const removeItem = (index) => {
     const removed = items[index];
     if (removed?.receiptId) removePendingReceipt(removed.receiptId);
-
     setForm((f) => {
       const next = f.items.filter((_, i) => i !== index);
       return { ...f, items: next.length ? next : [blankItem()] };
     });
   };
 
-  // The trash button only asks before dropping a line that has something on it:
-  // dropping a filled line also drops the receipt draft parked for it, and a
-  // stray tap used to cost the whole line. A line whose description is still
-  // blank has nothing to confirm, so it goes straight away — `removeItem` runs
-  // from here or from `confirmRemoveItem`.
-  //
-  // The pending index also lives in a ref: AnimatePresence keeps the dialog
-  // mounted (with its frozen props) for the exit animation, so a double-click
-  // would otherwise re-run the handler with the stale index and eat the line
-  // that shifted into that slot.
   const requestRemoveItem = (index, trigger) => {
     const line = items[index];
-
-    // Blank description = nothing typed, nothing worth a confirmation.
     if (!line?.description?.trim()) {
       removeItem(index);
-      // The row (and its trash button) is gone — park focus on a stable control.
       addLineRef.current?.focus();
       return;
     }
-
     removeTriggerRef.current = trigger ?? null;
     pendingRemoveRef.current = index;
     setRemoveIndex(index);
@@ -280,11 +283,9 @@ const AddExpenses = () => {
     removeItem(index);
     setRemoveIndex(null);
     removeTriggerRef.current = null;
-    // The row (and its trash button) is gone — park focus on a stable control.
     addLineRef.current?.focus();
   };
 
-  // Line the dialog is asking about (null while it's closed).
   const removingLine =
     removeIndex == null ? null : (items[removeIndex] ?? null);
 
@@ -297,16 +298,38 @@ const AddExpenses = () => {
     return { total: sum, filledCount: filled };
   }, [items]);
 
-  // The Summary card funds the lines from one budget reference. With a single
-  // open source there is nothing to pick, so it is used automatically — the
-  // same fallback `SelectSourceFund` renders, mirrored here so the value this
-  // form holds always matches the card (including after a source is removed).
   const selectedReferenceId = useMemo(() => {
     if (references.length === 1) return references[0].reference_id;
     return references.some((ref) => ref.reference_id === referenceId)
       ? referenceId
       : "";
   }, [references, referenceId]);
+
+  // Lines still missing an amount — refused by the save ("Cannot proceed …
+  // ₱0.00 = 0.00 … add an amount to proceed"). `flaggedLines` below is the
+  // same list, gated on a save attempt so it stays empty until the Save
+  // button is actually clicked.
+  const zeroAmountIndexes = useMemo(() => zeroAmountIndexesFor(items), [items]);
+  const flaggedLines = showZeroAmountErrors ? zeroAmountIndexes : [];
+
+  // The source funding this draft and how it stands — the very same shared
+  // calculation the SelectSourceFund card renders, so the save's insufficient
+  // funds check can never disagree with the balance on screen.
+  const funding = useMemo(
+    () => fundingState(references, selectedReferenceId, total),
+    [references, selectedReferenceId, total],
+  );
+  // The same state that turns the SelectSourceFund badge "Insufficient": the
+  // picked source can't cover the draft, so saving is blocked outright. While
+  // it holds, the Save button is disabled and this guard keeps a stale click
+  // (or a race with refreshed references) from sending the request anyway.
+  // `depleted` still saves — it uses the source up exactly.
+  const insufficientFunds = funding.status === FUNDING_STATUS.insufficient;
+  // With more than one open source the admin must pick which one funds these
+  // lines: saving with nothing selected would file the expenses against no
+  // budget at all (the server stores a NULL reference_id). A lone source is
+  // auto-mirrored above and zero sources save unfunded, so neither needs a pick.
+  const sourceUnselected = funding.sources.length > 1 && !funding.source;
 
   const handleCategoryAdded = (category) => {
     if (!category?.category_id) return;
@@ -382,6 +405,9 @@ const AddExpenses = () => {
     e?.preventDefault();
     setFormError("");
     setAddItemError("");
+    // From here on the summary may flag the offending ₱0.00 rows — the Save
+    // button was clicked, so calling them out is no longer premature.
+    setShowZeroAmountErrors(true);
     const touched = items.filter(
       (item) =>
         item.description.trim() ||
@@ -392,6 +418,21 @@ const AddExpenses = () => {
       setFormError("Add at least one expense line before saving.");
       return;
     }
+    // A line whose amount still reads ₱0.00 = 0.00 can't be saved — name the
+    // ones at fault so nobody has to hunt for the empty amount field.
+    if (zeroAmountIndexes.length > 0) {
+      setFormError(
+        `Cannot proceed with your request — ${zeroAmountIndexes
+          .map(
+            (index) =>
+              `${lineLabel(items[index], index)} is ${formatMoney(
+                items[index].totalAmount,
+              )} = 0.00`,
+          )
+          .join(", ")}. Add an amount to proceed.`,
+      );
+      return;
+    }
     const invalidIndex = firstIncompleteIndex(items);
     if (invalidIndex >= 0) {
       setFormError(
@@ -399,42 +440,67 @@ const AddExpenses = () => {
       );
       return;
     }
+    // Several open sources demand a funder — nothing picked would save the
+    // lines with no budget reference at all.
+    if (sourceUnselected) {
+      setFormError(
+        "Select a budget source to fund these expenses before saving.",
+      );
+      return;
+    }
+    // Funding is checked against the drafted total before anything is sent: an
+    // insufficient source is a hard stop here, not a surprise after the round
+    // trip. `depleted` still goes through — it uses the source up exactly.
+    if (insufficientFunds) {
+      setFormError(
+        `Cannot proceed with your request — insufficient funds in ${
+          funding.source?.label || "the selected budget source"
+        }. These expenses total ${formatMoney(total)}, but only ${formatMoney(
+          funding.balance,
+        )} is left (short by ${formatMoney(
+          funding.shortfall,
+        )}). Lower an amount or pick another budget source.`,
+      );
+      return;
+    }
     try {
-      const persistedReceipts = new Map();
-      for (const item of items) {
+      const receipts = [];
+      const drafts = new Map();
+      for (const item of touched) {
         if (!item.receiptLocal || !item.receiptId) continue;
-        if (persistedReceipts.has(item.receiptId)) continue;
+        if (drafts.has(item.receiptId)) continue;
         const draft = readPendingReceipt(item.receiptId);
-        const total = Number(draft?.total) || Number(item.totalAmount) || 0;
-        if (!draft || !(total > 0)) continue;
-        const vendor = String(draft.vendor ?? "").trim();
-        const created = await create.mutateAsync({
-          type: "receipt",
-          description: vendor.length >= 2 ? vendor : "Scanned receipt",
-          qty: 1,
-          rate: total,
-          amount: total,
-          image_url: draft.imageUrl || undefined,
+        if (!draft) continue;
+        drafts.set(item.receiptId, draft);
+        receipts.push({
+          receipt_id: draft.receiptId,
+          vendor: draft.vendor || item.receiptName || "",
+          items: (draft.items ?? []).map((line) => ({
+            description: line.description ?? "",
+            qty: Number(line.qty ?? line.quantity ?? 0) || 0,
+            rate: Number(line.rate ?? 0) || 0,
+            amount: Number(line.amount ?? 0) || 0,
+          })),
         });
-        persistedReceipts.set(item.receiptId, created?.id ?? null);
       }
       await create.mutateAsync({
         type: "expense",
-        // Funding source — empty string normalizes to NULL on the server, so
-        // nothing is saved when no reference is available/picked.
         reference_id: selectedReferenceId || undefined,
-        items: items.map((item) =>
-          toPayload(
-            item,
-            item.receiptLocal
-              ? persistedReceipts.get(item.receiptId)
-              : item.receiptId,
-          ),
-        ),
+        receipts,
+        items: touched.map((item) => {
+          const draft = drafts.get(item.receiptId);
+          return toPayload(item, {
+            receiptId: item.receiptLocal && !draft ? undefined : item.receiptId,
+            imageUrl: draft?.imageUrl || item.receiptUrl || undefined,
+            receiptDate: draft?.date || (item.dateLocked ? item.date : ""),
+          });
+        }),
       });
-      persistedReceipts.forEach((_, draftId) => removePendingReceipt(draftId));
+      // Saved cleanly — drop every parked draft so the next Add Expenses form
+      // starts fresh (leftover drafts would point at receipts that now exist).
+      clearPendingReceipts();
       toast.success(
-        `Saved ${items.length} expense line${items.length === 1 ? "" : "s"}.`,
+        `Saved ${touched.length} expense line${touched.length === 1 ? "" : "s"}.`,
       );
       nav("/admin/expenses");
     } catch (error) {
@@ -741,7 +807,6 @@ const AddExpenses = () => {
               </Badge>
             </div>
 
-            {/* Headline number for the draft */}
             <div className="mt-4 rounded-2xl border border-[var(--accent)]/20 bg-[var(--accent-soft)]/40 px-4 py-4 text-center">
               <p className="type-eyebrow text-[var(--accent-strong)]">
                 Total expenses
@@ -755,8 +820,6 @@ const AddExpenses = () => {
               </p>
             </div>
 
-            {/* Source of funds — its balance, what these lines leave behind and
-                whether the source still covers them. */}
             <div className="mt-4">
               <SelectSourceFund
                 references={references}
@@ -769,30 +832,58 @@ const AddExpenses = () => {
             </div>
 
             <div className="mt-4 space-y-1">
-              {items.map((it, i) => (
-                <div
-                  key={i}
-                  className="-mx-2 flex items-center justify-between gap-2 rounded-xl px-2 py-1.5 text-sm transition-colors hover:bg-[var(--surface-2)]/70"
-                >
-                  <span className="flex min-w-0 items-center gap-2 text-[var(--ink-muted)]">
-                    <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-[var(--surface-2)] text-[12px] font-bold tabular">
-                      {i + 1}
+              {items.map((it, i) => {
+                // An amount still at 0 (nothing typed) reads ₱0.00 = 0.00 — the
+                // exact thing the save refuses. The flag only appears after
+                // the Save button is clicked, so a fresh blank line is never
+                // scolded on sight.
+                const missingAmount = flaggedLines.includes(i);
+                return (
+                  <div
+                    key={i}
+                    className={cn(
+                      "-mx-2 flex items-center justify-between gap-2 rounded-xl px-2 py-1.5 text-sm transition-colors hover:bg-[var(--surface-2)]/70",
+                      missingAmount &&
+                        "bg-[var(--danger)]/10 ring-1 ring-inset ring-[var(--danger)]/20",
+                    )}
+                  >
+                    <span className="flex min-w-0 items-center gap-2 text-[var(--ink-muted)]">
+                      <span
+                        className={cn(
+                          "flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-[var(--surface-2)] text-[12px] font-bold tabular",
+                          missingAmount &&
+                            "bg-[var(--danger)]/12 text-[var(--danger)]",
+                        )}
+                      >
+                        {i + 1}
+                      </span>
+                      <span className="truncate">
+                        {it.description.trim() || `Item ${i + 1}`}
+                        {it.categoryId ? (
+                          <span className="opacity-60">
+                            {" "}
+                            · {categoryNames.get(it.categoryId) ?? "Category"}
+                          </span>
+                        ) : null}
+                      </span>
                     </span>
-                    <span className="truncate">
-                      {it.description.trim() || `Item ${i + 1}`}
-                      {it.categoryId ? (
-                        <span className="opacity-60">
-                          {" "}
-                          · {categoryNames.get(it.categoryId) ?? "Category"}
+                    {missingAmount ? (
+                      <span
+                        className="shrink-0 text-right leading-tight"
+                        title="Add an amount greater than zero to proceed"
+                      >
+                        <span className="block font-semibold tabular text-[var(--danger)]">
+                          {formatMoney(it.totalAmount)}
                         </span>
-                      ) : null}
-                    </span>
-                  </span>
-                  <span className="shrink-0 font-semibold tabular text-[var(--ink)]">
-                    {formatMoney(it.totalAmount)}
-                  </span>
-                </div>
-              ))}
+                      </span>
+                    ) : (
+                      <span className="shrink-0 font-semibold tabular text-[var(--ink)]">
+                        {formatMoney(it.totalAmount)}
+                      </span>
+                    )}
+                  </div>
+                );
+              })}
             </div>
 
             <div className="my-4 h-px bg-[var(--border)]" />
@@ -833,7 +924,14 @@ const AddExpenses = () => {
                 className="w-full"
                 type="button"
                 onClick={handleSave}
-                disabled={saving}
+                disabled={saving || insufficientFunds || sourceUnselected}
+                title={
+                  sourceUnselected
+                    ? "Select a budget source to fund these expenses"
+                    : insufficientFunds
+                      ? "Cannot proceed — the selected budget source is insufficient"
+                      : undefined
+                }
               >
                 {saving ? (
                   <Loader2 size={14} className="animate-spin" />

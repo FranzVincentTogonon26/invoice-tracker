@@ -199,11 +199,6 @@ const ExpensesModal = ({
     }
   };
 
-  /* â”€â”€ receipt panel actions â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
-
-  // Single entry point for every upload path (dropzone drop, dropzone
-  // click-pick, manual scan icon): shows the preview immediately, then
-  // auto-scans the same file so the "Scan list items" card fills itself.
   const handleFilePicked = useCallback(
     (file) => {
       setErr("");
@@ -279,13 +274,6 @@ const ExpensesModal = ({
     e.preventDefault();
     setErr("");
 
-    // ── Temporary (localStorage) flow ──────────────────────────────
-    // AddExpenses opts in through `onReceiptConfirmed`. Confirming parks the
-    // scan in the browser as a draft — random receipt id, vendor, date, scan
-    // list items (description/qty/rate/amount) and total — which the form then
-    // maps into ONE grouped expense line. The real `receipt` row is created on
-    // save, so nothing is left half-persisted and `expenses.receipt_id` never
-    // points at a row that doesn't exist yet.
     if (onReceiptConfirmed) {
       const items = (receipt.items ?? []).filter(
         (item) =>

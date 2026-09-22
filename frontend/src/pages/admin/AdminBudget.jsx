@@ -1,7 +1,6 @@
 import { motion } from "framer-motion";
 import {
   ArrowLeftRight,
-  BadgeCheck,
   CircleCheck,
   HandCoins,
   PhilippinePesoIcon,
@@ -62,9 +61,14 @@ export default function AdminBudget() {
   const overview = data?.budgetOverview ?? {};
   const overviewBudget = overview.overviewBudget ?? [];
   const overviewIssuedBudget = overview.overviewIssuedBudget ?? [];
+  const overviewExpenses = overview.overviewExpenses ?? [];
   const totalBudget = overview.totalBudget ?? 0;
   const totalIssued = overview.totalIssued ?? 0;
-  const cashOnHand = totalBudget - totalIssued;
+  const totalExpenses = overview.totalExpenses ?? 0;
+
+  // Balance = total budget − (total issued + total expenses)
+  const cashOnHand =
+    Number(totalBudget) - (Number(totalIssued) + Number(totalExpenses));
 
   const issuedByReference = new Map(
     overviewIssuedBudget.map((row) => [
@@ -72,9 +76,15 @@ export default function AdminBudget() {
       Number(row.amount || 0),
     ]),
   );
+  const expensesByReference = new Map(
+    overviewExpenses.map((row) => [row.reference_id, Number(row.amount || 0)]),
+  );
+  // Per-reference remaining = allocated − issued − expenses (same formula as
+  // the headline balance, just scoped to each budget source).
   const cashOnHandBreakdown = overviewBudget.map((row, i) => {
     const issued = issuedByReference.get(row.reference_id) ?? 0;
-    const remaining = Number(row.amount || 0) - issued;
+    const spent = expensesByReference.get(row.reference_id) ?? 0;
+    const remaining = Number(row.amount || 0) - issued - spent;
     return {
       key: i,
       label: row.label ?? "Untitled reference",
@@ -90,9 +100,13 @@ export default function AdminBudget() {
 
   const totalBudgetNum = Number(totalBudget) || 0;
   const totalIssuedNum = Number(totalIssued) || 0;
+  const totalExpensesNum = Number(totalExpenses) || 0;
   const utilization =
     totalBudgetNum > 0
-      ? Math.min(100, (totalIssuedNum / totalBudgetNum) * 100)
+      ? Math.min(
+          100,
+          ((totalIssuedNum + totalExpensesNum) / totalBudgetNum) * 100,
+        )
       : 0;
 
   return (
@@ -124,7 +138,7 @@ export default function AdminBudget() {
           variants={container}
           initial="hidden"
           animate="show"
-          className="grid grid-cols-1 items-stretch gap-4 sm:gap-5 lg:grid-cols-3"
+          className="grid grid-cols-1 items-stretch gap-3 sm:grid-cols-2 sm:gap-4 xl:grid-cols-4"
         >
           <motion.div variants={item} className="h-full min-w-0 [&>div]:h-full">
             <StatCard
@@ -145,7 +159,7 @@ export default function AdminBudget() {
 
           <motion.div variants={item} className="h-full min-w-0 [&>div]:h-full">
             <StatCard
-              label="My Vault"
+              label="My Balance"
               value={formatMoney(cashOnHand)}
               icon={PhilippinePesoIcon}
               loading={isLoading}
@@ -157,9 +171,25 @@ export default function AdminBudget() {
 
           <motion.div variants={item} className="h-full min-w-0 [&>div]:h-full">
             <StatCard
+              label="My Expenses"
+              value={formatMoney(totalExpenses)}
+              icon={ReceiptText}
+              loading={isLoading}
+              breakdownCaption="Expenses"
+              breakdown={overviewExpenses.map((row, i) => ({
+                key: i,
+                label: row.label ?? "Untitled reference",
+                value: formatMoney(row.amount),
+                hint: formatDate(row.created_at),
+              }))}
+            />
+          </motion.div>
+
+          <motion.div variants={item} className="h-full min-w-0 [&>div]:h-full">
+            <StatCard
               label="Total Issued"
               value={formatMoney(totalIssued)}
-              icon={BadgeCheck}
+              icon={HandCoins}
               loading={isLoading}
               breakdownCaption="Issued"
               breakdown={overviewIssuedBudget.map((row, i) => ({
@@ -184,17 +214,32 @@ export default function AdminBudget() {
             <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
               <div className="min-w-0">
                 <p className="type-eyebrow text-[var(--ink-muted)]">
-                  Allocation utilization
+                  Budget utilization
                 </p>
-                <p className="mt-1.5 flex flex-wrap items-baseline gap-x-2 text-lg font-semibold tracking-tight text-[var(--ink)]">
-                  {utilization.toFixed(1)}% issued
-                  <span className="text-sm font-medium  text-[var(--ink-muted)]">
-                    {formatMoney(totalIssued)} of {formatMoney(totalBudget)}
+                <p className="mt-1.5 flex flex-wrap items-baseline gap-x-2">
+                  <span
+                    className={`font-display text-2xl font-semibold tracking-tight tabular-nums ${
+                      Number(cashOnHand) < 0
+                        ? "text-[var(--danger)]"
+                        : "text-[var(--ink)]"
+                    }`}
+                  >
+                    {utilization.toFixed(1)}%
+                  </span>
+                  <span className="text-sm font-semibold text-[var(--ink)]">
+                    used
+                  </span>
+                  <span className="w-full text-sm font-normal text-[var(--ink-muted)] sm:w-auto">
+                    {formatMoney(Number(totalIssued) + Number(totalExpenses))}{" "}
+                    of {formatMoney(totalBudget)} allocated
                   </span>
                 </p>
               </div>
-              <Badge tone="accent" className="w-fit shrink-0 ">
-                <CircleCheck size={12} /> Vault {formatMoney(cashOnHand)}
+              <Badge
+                tone={Number(cashOnHand) < 0 ? "danger" : "accent"}
+                className="w-fit shrink-0"
+              >
+                <CircleCheck size={12} /> Balance {formatMoney(cashOnHand)}
               </Badge>
             </div>
             <div
@@ -202,41 +247,134 @@ export default function AdminBudget() {
               aria-valuemin={0}
               aria-valuemax={100}
               aria-valuenow={Number(utilization.toFixed(1))}
-              aria-label="Share of budget already issued"
-              className="mt-4 h-2 overflow-hidden rounded-full bg-[var(--surface-2)]"
+              aria-label="Share of budget already used"
+              className="mt-4 flex h-2.5 overflow-hidden rounded-full bg-[var(--surface-2)]"
             >
               <motion.div
                 initial={{ width: 0 }}
-                animate={{ width: `${utilization}%` }}
+                animate={{
+                  width: `${
+                    Number(totalBudget) > 0
+                      ? Math.min(
+                          100,
+                          (Number(totalIssued) / Number(totalBudget)) * 100,
+                        )
+                      : 0
+                  }%`,
+                }}
                 transition={{
                   duration: 0.7,
                   ease: [0.16, 1, 0.3, 1],
                   delay: 0.2,
                 }}
-                className="utilization-fill h-full rounded-full"
+                className="utilization-fill h-full shrink-0 rounded-l-full"
+              />
+              <motion.div
+                initial={{ width: 0 }}
+                animate={{
+                  width: `${Math.max(
+                    0,
+                    utilization -
+                      (Number(totalBudget) > 0
+                        ? Math.min(
+                            100,
+                            (Number(totalIssued) / Number(totalBudget)) * 100,
+                          )
+                        : 0),
+                  )}%`,
+                }}
+                transition={{
+                  duration: 0.7,
+                  ease: [0.16, 1, 0.3, 1],
+                  delay: 0.3,
+                }}
+                className="h-full shrink-0 rounded-r-full bg-[var(--warning)]/70"
               />
             </div>
-            <div className="mt-2.5 flex items-center justify-between gap-3 text-[12px] text-[var(--ink-muted)]">
-              <span className="shrink-0 tabular-nums">0%</span>
-              <span className="min-w-0 truncate text-center tabular-nums">
+            <div className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-1.5 text-xs text-[var(--ink-muted)]">
+              <span className="inline-flex items-center gap-1.5">
+                <span
+                  aria-hidden
+                  className="h-2 w-2 rounded-full bg-[var(--accent)]"
+                />
+                Issued ·{" "}
+                <span className="font-semibold tabular-nums text-[var(--ink)]">
+                  {formatMoney(totalIssued)}
+                </span>
+              </span>
+              <span className="inline-flex items-center gap-1.5">
+                <span
+                  aria-hidden
+                  className="h-2 w-2 rounded-full bg-[var(--warning)]/70"
+                />
+                My Expenses ·{" "}
+                <span className="font-semibold tabular-nums text-[var(--ink)]">
+                  {formatMoney(totalExpenses)}
+                </span>
+              </span>
+              <span className="ml-auto tabular-nums">
                 {overviewBudget.length}{" "}
                 {overviewBudget.length === 1 ? "reference" : "references"} ·{" "}
-                {overviewIssuedBudget.length} issued
+                {overviewIssuedBudget.length} issued · {overviewExpenses.length}{" "}
+                {overviewExpenses.length === 1 ? "expense" : "expenses"}
               </span>
-              <span className="shrink-0 tabular-nums">100%</span>
             </div>
           </Card>
         </motion.div>
-        <div className="flex items-center gap-3 rounded-2xl border border-[var(--success)]/20 bg-[var(--success)]/[0.06] px-4 py-3">
-          <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-[var(--success)]/12 text-[var(--success)]">
+        <div
+          role="status"
+          className={
+            Number(cashOnHand) < 0
+              ? "flex items-center gap-3 rounded-2xl border border-[var(--danger)]/25 bg-[var(--danger)]/[0.07] px-4 py-3"
+              : utilization >= 90
+                ? "flex items-center gap-3 rounded-2xl border border-[var(--warning)]/25 bg-[var(--warning)]/[0.08] px-4 py-3"
+                : "flex items-center gap-3 rounded-2xl border border-[var(--success)]/20 bg-[var(--success)]/[0.06] px-4 py-3"
+          }
+        >
+          <span
+            className={
+              Number(cashOnHand) < 0
+                ? "flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-[var(--danger)]/12 text-[var(--danger)]"
+                : utilization >= 90
+                  ? "flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-[var(--warning)]/14 text-[var(--warning)]"
+                  : "flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-[var(--success)]/12 text-[var(--success)]"
+            }
+          >
             <CircleCheck size={16} />
           </span>
-          <p className="min-w-0 flex-1 truncate text-sm text-[var(--ink-muted)]">
-            <span className="font-semibold text-[var(--ink)]">All clear</span>
-            {" — no overdue budgets right now."}
+          <p className="min-w-0 flex-1 text-sm leading-relaxed text-[var(--ink-muted)]">
+            {Number(cashOnHand) < 0 ? (
+              <>
+                <span className="font-semibold text-[var(--ink)]">
+                  Over budget
+                </span>
+                {` — spending exceeds allocation by ${formatMoney(
+                  Math.abs(Number(cashOnHand)),
+                )}.`}
+              </>
+            ) : utilization >= 90 ? (
+              <>
+                <span className="font-semibold text-[var(--ink)]">
+                  Running tight
+                </span>
+                {` — ${utilization.toFixed(1)}% of the budget is already used.`}
+              </>
+            ) : (
+              <>
+                <span className="font-semibold text-[var(--ink)]">
+                  All clear
+                </span>
+                {" — no overdue budgets right now."}
+              </>
+            )}
           </p>
-          <span className="shrink-0 font-display text-sm font-semibold tabular-nums text-[var(--ink)]">
-            {formatMoney(0)}
+          <span className="shrink-0 text-right">
+            <span className="block font-display text-sm font-semibold tabular-nums text-[var(--ink)]">
+              {formatMoney(cashOnHand)}
+            </span>
+            <span className="block text-[11px] font-medium text-[var(--ink-muted)]">
+              remaining
+            </span>
           </span>
         </div>
       </section>

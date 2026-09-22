@@ -6,6 +6,16 @@ export const errorHandler = (err, req, res, next) => {
     err = ApiError.badRequest("Malformed JSON payload.", "INVALID_JSON");
   }
 
+  // PostgreSQL data-format / constraint errors mean the client sent a value
+  // the database cannot store (e.g. "3.62" for an INTEGER column) — that is a
+  // 400, not a 500.
+  if (["22P02", "23514", "22003", "22001"].includes(err.code)) {
+    err = ApiError.badRequest(
+      "One or more values have an invalid format.",
+      "INVALID_VALUE",
+    );
+  }
+
   // Convert PostgreSQL unique constraint error to an ApiError
   if (err.code === "23505") {
     err = ApiError.conflict(

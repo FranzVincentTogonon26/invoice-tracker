@@ -16,9 +16,11 @@ app.use(
     credentials: true,
   }),
 );
-// 8mb: "Scan receipt" posts the image as a base64 data URL (~1.33× the file
-// size), and the UI caps uploads at 2MB.
-app.use(express.json({ limit: "8mb" }));
+// 32mb: "Scan receipt" posts the image as a base64 data URL (~1.33× the file
+// size), and the UI caps uploads at 2MB. Saving the Add Expenses form posts
+// every scanned draft with its image in one payload, so leave a little more
+// headroom than a single image needs.
+app.use(express.json({ limit: "32mb" }));
 app.use(express.urlencoded({ extended: true }));
 
 app.get("/", (req, res) => {

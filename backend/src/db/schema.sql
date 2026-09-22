@@ -166,16 +166,15 @@ CREATE TABLE IF NOT EXISTS category (
 
 CREATE TABLE IF NOT EXISTS receipt (
     id              UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    receipt_id      VARCHAR(255) NOT NULL,
+    receipt_id      VARCHAR(255) NOT NULL DEFAULT gen_random_uuid()::text,
     vendor          TEXT,
-    image_url       TEXT,
-    description     TEXT NOT NULL,
-    qty             INTEGER NOT NULL DEFAULT 1,
-    rate            DECIMAL(12,2) NOT NULL,
-    amount          DECIMAL(12,2) NOT NULL,
-    receipt_date    TIMESTAMPTZ,
+    description     TEXT,
+    qty             INTEGER DEFAULT 1,
+    rate            DECIMAL(12,2) DEFAULT 0,
+    amount          DECIMAL(12,2) DEFAULT 0,
     created_at      TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
+
 
 
 -- ============================================================
@@ -192,6 +191,8 @@ CREATE TABLE IF NOT EXISTS expenses (
     total_amount    DECIMAL(12,2) NOT NULL,
     expense_date    DATE NOT NULL DEFAULT CURRENT_DATE,
     receipt_id      UUID REFERENCES receipt(id) ON DELETE SET NULL,
+    image_url       TEXT,
+    receipt_date    TIMESTAMPTZ,
     notes           TEXT,
     payment_method  VARCHAR(30) NOT NULL DEFAULT 'cash' CHECK (payment_method IN ('cash','bank_transfer','e_wallet','cheque')),
     status          VARCHAR(20) NOT NULL DEFAULT 'paid' CHECK (status IN ('paid','draft','cancel')),
@@ -208,6 +209,7 @@ CREATE TABLE IF NOT EXISTS expenses (
 
 CREATE TABLE IF NOT EXISTS audit_logs (
     id              UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    user_id         UUID NOT NULL REFERENCES users(user_id) ON DELETE CASCADE,
     log_description TEXT NOT NULL,
     created_at      TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
@@ -348,6 +350,9 @@ CREATE INDEX IF NOT EXISTS idx_category_name
 
 CREATE INDEX IF NOT EXISTS idx_receipt_created_at
     ON receipt(created_at);
+
+CREATE INDEX IF NOT EXISTS idx_receipt_receipt_id
+    ON receipt(receipt_id);
 
 
 -- ------------------------------------------------------------
