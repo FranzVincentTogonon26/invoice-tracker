@@ -566,10 +566,7 @@ const AddExpenses = () => {
       </div>
 
       <div className="grid grid-cols-1 items-start gap-5 lg:grid-cols-[minmax(0,1fr)_320px]">
-        <Card
-          padding="lg"
-          className="relative overflow-hidden rounded-3xl px-2 sm:px-6"
-        >
+        <Card padding="lg" className="relative rounded-3xl px-2 sm:px-6">
           <div className="mb-1 flex flex-wrap items-center justify-between gap-2">
             <div>
               <CardTitle className="text-base text-lg">
@@ -797,10 +794,7 @@ const AddExpenses = () => {
         </Card>
 
         <div className="space-y-4 lg:sticky lg:top-4">
-          <Card
-            padding="lg"
-            className="relative overflow-hidden rounded-3xl px-2 sm:px-6"
-          >
+          <Card padding="lg" className="relative rounded-3xl px-2 sm:px-6">
             <div className="flex items-start justify-between gap-3">
               <div className="min-w-0">
                 <CardTitle className="text-lg">Summary</CardTitle>
