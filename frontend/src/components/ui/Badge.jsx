@@ -25,7 +25,11 @@ export function Badge({ className, tone, ...props }) {
 }
 
 export function StatusBadge({ status, className }) {
-  const s = STATUS[status] || STATUS.draft;
+  // Fallback must resolve to a real entry: `STATUS.draft` was never a key
+  // (draft lives in EXPENSE_STATUS), so an unknown status made `s` undefined
+  // and threw on `s.tone`, taking the whole table down. Mirrors the sibling
+  // ExpenseStatusBadge: a neutral pill that still prints the raw status.
+  const s = STATUS[status] ?? { tone: "neutral", label: status ?? "-" };
   return (
     <Badge tone={s.tone} className={className}>
       <span className="h-2 w-2 rounded-full bg-current opacity-80" />
@@ -34,4 +38,3 @@ export function StatusBadge({ status, className }) {
   );
 }
 
-export { badgeVariants };

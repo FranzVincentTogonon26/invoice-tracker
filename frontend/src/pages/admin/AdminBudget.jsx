@@ -1,7 +1,9 @@
 import { motion } from "framer-motion";
 import {
   ArrowLeftRight,
+  CircleAlert,
   CircleCheck,
+  CircleX,
   HandCoins,
   PhilippinePesoIcon,
   Plus,
@@ -69,6 +71,16 @@ export default function AdminBudget() {
   // Balance = total budget − (total issued + total expenses)
   const cashOnHand =
     Number(totalBudget) - (Number(totalIssued) + Number(totalExpenses));
+  const cashOnHandNum = Number(cashOnHand) || 0;
+  const totalBudgetAmt = Number(totalBudget) || 0;
+
+  // Cent-rounded: money renders to 2dp, so anything that formats as ₱0.00
+  // counts as depleted (avoids 0.004 slipping past a strict `=== 0` check).
+  // Depleted only reads as a warning once there is an allocation to deplete —
+  // an empty ledger (no budget yet) keeps the neutral card.
+  const isOverdrawn = cashOnHandNum < -0.004;
+  const isDepleted =
+    !isOverdrawn && Math.abs(cashOnHandNum) < 0.005 && totalBudgetAmt > 0;
 
   const issuedByReference = new Map(
     overviewIssuedBudget.map((row) => [
@@ -163,7 +175,24 @@ export default function AdminBudget() {
               value={formatMoney(cashOnHand)}
               icon={PhilippinePesoIcon}
               loading={isLoading}
-              tone={Number(cashOnHand) < 0 ? "danger" : undefined}
+              tone={
+                isOverdrawn ? "danger" : isDepleted ? "warning" : undefined
+              }
+              status={
+                isOverdrawn
+                  ? {
+                      tone: "danger",
+                      label: "Overdrawn — over budget",
+                      icon: CircleX,
+                    }
+                  : isDepleted
+                    ? {
+                        tone: "warning",
+                        label: "Depleted — no funds left",
+                        icon: CircleAlert,
+                      }
+                    : undefined
+              }
               breakdownCaption="Remaining"
               breakdown={cashOnHandBreakdown}
             />
@@ -236,10 +265,19 @@ export default function AdminBudget() {
                 </p>
               </div>
               <Badge
-                tone={Number(cashOnHand) < 0 ? "danger" : "accent"}
+                tone={isOverdrawn ? "danger" : isDepleted ? "warning" : "accent"}
                 className="w-fit shrink-0"
               >
-                <CircleCheck size={12} /> Balance {formatMoney(cashOnHand)}
+                {isOverdrawn ? (
+                  <CircleX size={12} />
+                ) : isDepleted ? (
+                  <CircleAlert size={12} />
+                ) : (
+                  <CircleCheck size={12} />
+                )}{" "}
+                Balance {formatMoney(cashOnHand)}
+                {isDepleted && !isOverdrawn ? " — depleted" : ""}
+                {isOverdrawn ? " — overdrawn" : ""}
               </Badge>
             </div>
             <div
@@ -321,62 +359,6 @@ export default function AdminBudget() {
             </div>
           </Card>
         </motion.div>
-        <div
-          role="status"
-          className={
-            Number(cashOnHand) < 0
-              ? "flex items-center gap-3 rounded-2xl border border-[var(--danger)]/25 bg-[var(--danger)]/[0.07] px-4 py-3"
-              : utilization >= 90
-                ? "flex items-center gap-3 rounded-2xl border border-[var(--warning)]/25 bg-[var(--warning)]/[0.08] px-4 py-3"
-                : "flex items-center gap-3 rounded-2xl border border-[var(--success)]/20 bg-[var(--success)]/[0.06] px-4 py-3"
-          }
-        >
-          <span
-            className={
-              Number(cashOnHand) < 0
-                ? "flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-[var(--danger)]/12 text-[var(--danger)]"
-                : utilization >= 90
-                  ? "flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-[var(--warning)]/14 text-[var(--warning)]"
-                  : "flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-[var(--success)]/12 text-[var(--success)]"
-            }
-          >
-            <CircleCheck size={16} />
-          </span>
-          <p className="min-w-0 flex-1 text-sm leading-relaxed text-[var(--ink-muted)]">
-            {Number(cashOnHand) < 0 ? (
-              <>
-                <span className="font-semibold text-[var(--ink)]">
-                  Over budget
-                </span>
-                {` — spending exceeds allocation by ${formatMoney(
-                  Math.abs(Number(cashOnHand)),
-                )}.`}
-              </>
-            ) : utilization >= 90 ? (
-              <>
-                <span className="font-semibold text-[var(--ink)]">
-                  Running tight
-                </span>
-                {` — ${utilization.toFixed(1)}% of the budget is already used.`}
-              </>
-            ) : (
-              <>
-                <span className="font-semibold text-[var(--ink)]">
-                  All clear
-                </span>
-                {" — no overdue budgets right now."}
-              </>
-            )}
-          </p>
-          <span className="shrink-0 text-right">
-            <span className="block font-display text-sm font-semibold tabular-nums text-[var(--ink)]">
-              {formatMoney(cashOnHand)}
-            </span>
-            <span className="block text-xs text-[var(--ink-muted)]">
-              remaining
-            </span>
-          </span>
-        </div>
       </section>
 
       <Tabs value={tab} onValueChange={setTab} className="space-y-4">

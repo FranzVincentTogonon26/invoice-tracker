@@ -13,46 +13,15 @@ import { MethodIcon } from "../../../ui/Select";
 import { cn, formatDate, formatMoney, formatTime } from "../../../../lib/utils";
 import { PAYMENT_METHODS } from "../../../../constants";
 
-/*
- * Unified ledger table for the Expenses page. Each row is either an expense
- * (kind: "expense") or a budget issuance (kind: "issued") - AdminExpenses maps
- * both sources into one shape:
- *   { kind, id, date, timeDate, description, category, amount, employee,
- *     employeeRole, employeeAvatar, method, status }
- *
- * Columns: Date | Description | Employee | Type | Amount | Category | Method |
- * Status | Actions (the burger-dots menu).
- */
+const COLUMN_WIDTHS = ["11%", "23%", "18%", "15%", "13%", "15%", "5%"];
 
-// Column proportions — Employee and Description get the most room because
-// they carry the primary row context (avatar + name, then the title). Status
-// and Category were widened a point each at Employee/Category's expense so the
-// status badge and category pill stop truncating. Percentages sum to 100% so
-// `table-fixed` never overflows the scroll container (verified against the
-// 1120px min-width below).
-const COLUMN_WIDTHS = [
-  "10%", // Date
-  "18%", // Description
-  "17%", // Employee
-  "12%", // Type
-  "10%", // Amount
-  "11%", // Category
-  "8%", // Method
-  "10%", // Status
-  "4%", // Actions
-];
-
-// One icon per column, rendered in the sticky header as a visual anchor.
-// `srOnly` columns (Actions) intentionally carry no icon.
 const HEADERS = [
   { label: "Date" },
   { label: "Description" },
   { label: "Employee" },
   { label: "Type" },
+  { label: "Status" },
   { label: "Amount", align: "right" },
-  { label: "Category" },
-  { label: "Method" },
-  { label: "Status", align: "center" },
   { label: "Actions", srOnly: true, align: "right" },
 ];
 
@@ -68,7 +37,10 @@ const TYPE_META = {
 };
 
 export function ExpenseStatusBadge({ status, className }) {
-  const s = EXPENSE_STATUS[status] ?? { tone: "neutral", label: status ?? "-" };
+  const s = EXPENSE_STATUS[status] ?? {
+    tone: "neutral",
+    label: status ?? "-",
+  };
   return (
     <Badge tone={s.tone} className={className}>
       <span className="h-1.5 w-1.5 rounded-full bg-current opacity-80" />
@@ -91,27 +63,20 @@ function TypeBadge({ kind, className }) {
   const meta = TYPE_META[kind] ?? TYPE_META.expense;
   const Icon = meta.Icon;
   return (
-    <Badge tone={meta.tone} className={className}>
-      <Icon size={12} strokeWidth={2.25} aria-hidden />
-      {meta.label}
+    <Badge tone={meta.tone} className={cn("min-w-0", className)}>
+      <Icon size={12} strokeWidth={2.25} aria-hidden className="shrink-0" />
+      <span className="truncate">{meta.label}</span>
     </Badge>
   );
 }
-
-/* -------------------------------------------------------------------------- */
-/* Row actions: a burger-dots trigger with a portal dropdown menu             */
-/* -------------------------------------------------------------------------- */
 
 function RowActions({ row, pending, onDelete, onIssuedAction }) {
   const [open, setOpen] = useState(false);
   const [position, setPosition] = useState(null);
   const btnRef = useRef(null);
   const menuRef = useRef(null);
-
-  // Hooks must run unconditionally - compute the early-exit after them.
   const isFinalized = row.kind === "issued" && row.status === "close";
 
-  // Close on outside click / Escape / scroll / resize while open.
   useEffect(() => {
     if (!open) return undefined;
 
@@ -119,6 +84,7 @@ function RowActions({ row, pending, onDelete, onIssuedAction }) {
       setOpen(false);
       btnRef.current?.focus();
     };
+
     const handlePointerDown = (e) => {
       if (
         !btnRef.current?.contains(e.target) &&
@@ -126,16 +92,22 @@ function RowActions({ row, pending, onDelete, onIssuedAction }) {
       )
         close();
     };
+
     const handleKeyDown = (e) => {
       if (e.key === "Escape") {
         e.stopPropagation();
         close();
       }
     };
+
     window.addEventListener("pointerdown", handlePointerDown);
     window.addEventListener("keydown", handleKeyDown);
-    window.addEventListener("scroll", close, { capture: true, passive: true });
+    window.addEventListener("scroll", close, {
+      capture: true,
+      passive: true,
+    });
     window.addEventListener("resize", close);
+
     return () => {
       window.removeEventListener("pointerdown", handlePointerDown);
       window.removeEventListener("keydown", handleKeyDown);
@@ -237,7 +209,6 @@ function RowActions({ row, pending, onDelete, onIssuedAction }) {
   );
 }
 
-// Avatar with an initials fallback (users.avatar_url is usually NULL).
 function initialsOf(name) {
   return (name || "?")
     .split(" ")
@@ -248,8 +219,6 @@ function initialsOf(name) {
 }
 
 function EmployeeCell({ name, role, avatarUrl, size = "md" }) {
-  // "sm" fits narrow ledger columns (Expenses table); "md" is the original
-  // Budget Issued Transaction sizing.
   const compact = size === "sm";
   return (
     <div className="flex items-center gap-3">
@@ -277,7 +246,7 @@ function EmployeeCell({ name, role, avatarUrl, size = "md" }) {
         <p
           className={cn(
             "truncate font-semibold leading-tight text-[var(--ink)]",
-            compact ? "text-sm" : "text-base",
+            compact ? "text-[13px]" : "text-base",
           )}
         >
           {name || "Unknown"}
@@ -288,17 +257,12 @@ function EmployeeCell({ name, role, avatarUrl, size = "md" }) {
             compact ? "text-xs" : "text-sm",
           )}
         >
-          {/* users.role is CHECK-constrained to 'admin' | 'employee' */}
           {role || "—"}
         </p>
       </div>
     </div>
   );
 }
-
-/* -------------------------------------------------------------------------- */
-/* Ledger row + mobile card                                                   */
-/* -------------------------------------------------------------------------- */
 
 function LedgerRow({
   row,
@@ -309,7 +273,7 @@ function LedgerRow({
 }) {
   return (
     <tr className="group border-b border-[var(--border)] transition-colors duration-150 last:border-b-0 hover:bg-[var(--accent)]/[0.04]">
-      <td className="relative px-4 py-3.5 pl-5 align-middle">
+      <td className="relative px-4 py-4 pl-5 align-middle">
         <span
           aria-hidden
           className="absolute inset-y-3 left-0 w-0.5 rounded-full bg-[var(--accent-strong)] opacity-0 transition-opacity duration-150 group-hover:opacity-100"
@@ -317,20 +281,27 @@ function LedgerRow({
         <p className="text-sm leading-none tabular-nums text-[var(--ink)]">
           {formatDate(row.date)}
         </p>
-        <p className="mt-1 text-xs leading-none tabular-nums text-[var(--ink-muted)]">
+        <p className="mt-1.5 text-xs leading-none tabular-nums text-[var(--ink-muted)]">
           {formatTime(row.timeDate)}
         </p>
       </td>
 
-      <td className="px-4 py-3.5 align-middle">
+      <td className="px-4 py-4 align-middle">
         <p
           title={row.description}
           className="truncate text-sm font-semibold leading-snug text-[var(--ink)]"
         >
           {row.description || "Untitled"}
         </p>
+        <p
+          title={row.category || undefined}
+          className="mt-1 truncate text-xs leading-snug text-[var(--ink-muted)]"
+        >
+          {row.category || "—"}
+        </p>
       </td>
-      <td className="px-4 py-3.5 align-middle">
+
+      <td className="px-4 py-4 align-middle">
         <EmployeeCell
           name={row.employee}
           role={row.employeeRole}
@@ -338,41 +309,33 @@ function LedgerRow({
           size="sm"
         />
       </td>
-      <td className="px-4 py-3.5 align-middle">
+
+      <td className="px-4 py-4 align-middle">
         <TypeBadge kind={row.kind} className="max-w-full" />
       </td>
-      <td className="px-4 py-3.5 text-right align-middle">
-        <span className="text-sm font-semibold tabular-nums text-[var(--ink)]">
-          {formatMoney(row.amount)}
-        </span>
-      </td>
-      <td className="px-4 py-3.5 align-middle">
-        <Badge tone="neutral" className="max-w-full">
-          <span
-            title={row.category}
-            className="block truncate text-sm text-[var(--ink-muted)] text-[12px]"
-          >
-            {row.category || "-"}
-          </span>
-        </Badge>
-      </td>
 
-      <td className="px-4 py-3.5 align-middle">
-        <Badge tone="neutral" className="max-w-full">
-          <span className="flex min-w-0 items-center gap-1.5 text-xs text-[var(--ink-muted)]">
-            <MethodIcon method={row.method} />
-            <span className="truncate">{methodLabel(row.method)}</span>
-          </span>
-        </Badge>
-      </td>
-      <td className="px-4 py-3.5 text-center align-middle">
+      <td className="px-4 py-4 align-middle">
         {row.kind === "issued" ? (
           <StatusBadge status={row.status} />
         ) : (
           <ExpenseStatusBadge status={row.status} />
         )}
       </td>
-      <td className="px-4 py-3.5 pr-5 text-right align-middle">
+
+      <td className="px-4 py-4 text-right align-middle">
+        <p className="text-sm font-semibold tabular-nums text-[var(--ink)]">
+          {formatMoney(row.amount)}
+        </p>
+        <p
+          title={methodLabel(row.method)}
+          className="mt-1.5 flex items-center justify-end gap-1.5 text-xs text-[var(--ink-muted)]"
+        >
+          <MethodIcon method={row.method} className="h-3.5 w-3.5" />
+          <span className="truncate">{methodLabel(row.method)}</span>
+        </p>
+      </td>
+
+      <td className="px-4 py-4 pr-5 text-right align-middle">
         <div className="flex justify-end">
           <RowActions
             row={row}
@@ -399,49 +362,51 @@ function LedgerCard({
         aria-hidden
         className="pointer-events-none absolute inset-x-6 top-0 h-px bg-[linear-gradient(90deg,transparent,var(--accent)/60,transparent)]"
       />
-      <div className="flex items-center justify-between gap-3">
+
+      <div className="flex items-start justify-between gap-3">
         <TypeBadge kind={row.kind} className="max-w-full" />
+        <span className="shrink-0 text-base font-semibold tabular-nums text-[var(--ink)]">
+          {formatMoney(row.amount)}
+        </span>
+      </div>
+
+      <p
+        title={row.description}
+        className="mt-3 truncate text-sm font-semibold leading-snug text-[var(--ink)]"
+      >
+        {row.description || "Untitled"}
+      </p>
+
+      <p className="mt-0.5 truncate text-xs leading-snug text-[var(--ink-muted)]">
+        {[row.category, row.employee].filter(Boolean).join(" · ") || "—"}
+      </p>
+
+      <div className="mt-3 flex flex-wrap items-center gap-x-3 gap-y-2 border-t border-[var(--border)] pt-3">
         {row.kind === "issued" ? (
           <StatusBadge status={row.status} />
         ) : (
           <ExpenseStatusBadge status={row.status} />
         )}
-      </div>
-      <div className="mt-3 flex items-start justify-between gap-3">
-        <div className="min-w-0">
-          <p className="truncate text-sm font-semibold leading-snug text-[var(--ink)]">
-            {row.description || "Untitled"}
-          </p>
-          <p className="mt-0.5 truncate text-xs text-[var(--ink-muted)]">
-            {[row.category, row.employee].filter(Boolean).join(" - ")}
-          </p>
-        </div>
-        <span className="shrink-0 text-base font-semibold tabular-nums text-[var(--ink)]">
-          {formatMoney(row.amount)}
-        </span>
-      </div>
-      <div className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-1.5 border-t border-[var(--border)] pt-3 text-xs text-[var(--ink-muted)]">
-        <span className="flex min-w-0 items-center gap-1.5">
-          <MethodIcon method={row.method} />
+
+        <span className="flex min-w-0 items-center gap-1.5 text-xs text-[var(--ink-muted)]">
+          <MethodIcon method={row.method} className="h-3.5 w-3.5" />
           <span className="truncate">{methodLabel(row.method)}</span>
         </span>
-        <span className="shrink-0 tabular-nums">{formatDate(row.date)}</span>
-        <span className="ml-auto shrink-0">
-          <RowActions
-            row={row}
-            pending={removePending || issuedPending}
-            onDelete={onDelete}
-            onIssuedAction={onIssuedAction}
-          />
+
+        <span className="ml-auto shrink-0 text-xs tabular-nums text-[var(--ink-muted)]">
+          {formatDate(row.date)}
         </span>
+
+        <RowActions
+          row={row}
+          pending={removePending || issuedPending}
+          onDelete={onDelete}
+          onIssuedAction={onIssuedAction}
+        />
       </div>
     </div>
   );
 }
-
-/* -------------------------------------------------------------------------- */
-/* Table                                                                      */
-/* -------------------------------------------------------------------------- */
 
 const ExpensesTable = ({
   rows,
@@ -456,28 +421,26 @@ const ExpensesTable = ({
       tabIndex={0}
       aria-label="Expenses and budget issuances"
     >
-      <div className="relative min-w-[1120px] overflow-hidden rounded-3xl border border-[var(--border)] bg-[var(--surface)] shadow-card">
+      <div className="relative min-w-[1020px] overflow-hidden rounded-3xl border border-[var(--border)] bg-[var(--surface)] shadow-card">
         <div
           aria-hidden
           className="pointer-events-none absolute inset-x-6 top-0 z-10 h-px bg-[linear-gradient(90deg,transparent,var(--accent)/65,transparent)]"
         />
+
         <table className="w-full table-fixed border-collapse text-left">
           <caption className="sr-only">
             Unified ledger of expenses and budget issuances with date,
-            description, employee, type, amount, category, payment method, and
-            status
+            description and category, employee, type, status, and amount with
+            payment method
           </caption>
+
           <colgroup>
             {COLUMN_WIDTHS.map((width, i) => (
               <col key={i} style={{ width }} />
             ))}
           </colgroup>
+
           <thead className="sticky top-0 z-[1]">
-            {/* Soft mint header: slightly heavier backdrop so rows scrolling
-                underneath stay legible, an accent-tinted rule to echo the
-                hairline gradient on the card's top edge, and a small icon per
-                column as a scan anchor. Alignment matches each body cell
-                (Amount right, Status center, Actions screen-reader only). */}
             <tr className="bg-[var(--surface-2)]/90 backdrop-blur">
               {HEADERS.map((h) => (
                 <th
@@ -492,28 +455,14 @@ const ExpensesTable = ({
                     },
                   )}
                 >
-                  <span
-                    className={cn(
-                      "flex items-center gap-1.5",
-                      h.srOnly ? "sr-only" : "whitespace-nowrap",
-                      { "justify-center": h.align === "center" },
-                      { "justify-end": h.align === "right" },
-                    )}
-                  >
-                    {h.Icon && (
-                      <h.Icon
-                        size={13}
-                        strokeWidth={2.25}
-                        aria-hidden
-                        className="shrink-0 text-[var(--accent-strong)] opacity-70"
-                      />
-                    )}
+                  <span className={h.srOnly ? "sr-only" : "whitespace-nowrap"}>
                     {h.label}
                   </span>
                 </th>
               ))}
             </tr>
           </thead>
+
           <tbody>
             {rows.map((row) => (
               <LedgerRow
@@ -529,6 +478,7 @@ const ExpensesTable = ({
         </table>
       </div>
     </div>
+
     <div className="flex flex-col gap-3 md:hidden">
       {rows.map((row) => (
         <LedgerCard

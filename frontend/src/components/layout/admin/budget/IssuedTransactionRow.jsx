@@ -91,20 +91,6 @@ function DateIssuedCell({ date }) {
   );
 }
 
-function SourceOfFundsCell({ label }) {
-  if (!label) return <span className="text-xs text-[var(--ink-muted)]">—</span>;
-  return (
-    <Badge tone="accent" className="max-w-full">
-      <span className="flex h-4 w-4 shrink-0 items-center justify-center rounded-full bg-[var(--accent-strong)]/12 text-[var(--accent-strong)]">
-        <HandCoins size={11} strokeWidth={2.25} aria-hidden />
-      </span>
-      <span className="min-w-0 truncate" title={label}>
-        {label}
-      </span>
-    </Badge>
-  );
-}
-
 /* ── Row + card ──────────────────────────────────────────────────────────── */
 
 /**
@@ -132,7 +118,9 @@ export function IssuedTransactionRow({ transaction: t, onAction }) {
         </p>
       </td>
       <td className="px-4 py-3.5 align-middle">
-        <SourceOfFundsCell label={t.source_of_funds} />
+        <span className="text-sm leading-snug text-[var(--ink)]">
+          {t.source_of_funds}
+        </span>
       </td>
       <td className="px-4 py-3.5 text-right align-middle">
         <span className="text-sm font-semibold tabular-nums text-[var(--ink)]">

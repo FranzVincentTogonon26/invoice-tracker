@@ -1,7 +1,33 @@
 import { ResponsiveContainer, LineChart, Line, BarChart, Bar } from "recharts";
+import { AlertCircle, Minus, TrendingDown, TrendingUp } from "lucide-react";
 import { Card } from "./Card";
 import { Badge } from "./Badge";
 import { cn } from "../../lib/utils";
+
+/** Dot color for a breakdown row. `warning` is supported so amber states
+   (draft, closed) can mirror the badges used in the ledger tables. */
+const breakdownDotTone = (tone, accent) =>
+  tone === "danger"
+    ? "bg-[var(--danger)]"
+    : tone === "warning"
+      ? "bg-[var(--warning)]"
+      : tone === "success"
+        ? "bg-[var(--success)]"
+        : accent
+          ? "bg-white/40"
+          : "bg-[var(--accent)]/60";
+
+/** Value color for a breakdown row — same tone vocabulary as the dot. */
+const breakdownValueTone = (tone, accent) =>
+  tone === "danger"
+    ? "text-[var(--danger)]"
+    : tone === "warning"
+      ? "text-[var(--warning)]"
+      : tone === "success"
+        ? "text-[var(--success)]"
+        : accent
+          ? "text-white"
+          : "text-[var(--ink)]";
 
 function MiniLine({ data, color }) {
   return (
@@ -20,11 +46,20 @@ function MiniLine({ data, color }) {
   );
 }
 
+// No entry animation: the sparkline is a read-out, not an entrance — the bars
+// must be painted on the first frame the card is visible (the card itself
+// already animates in via framer-motion).
 function MiniBars({ data, color }) {
   return (
     <ResponsiveContainer width="100%" height={42}>
       <BarChart data={data} margin={{ top: 6, right: 0, bottom: 0, left: 0 }}>
-        <Bar dataKey="v" fill={color} radius={[3, 3, 0, 0]} barSize={6} />
+        <Bar
+          dataKey="v"
+          fill={color}
+          radius={[3, 3, 0, 0]}
+          barSize={6}
+          isAnimationActive={false}
+        />
       </BarChart>
     </ResponsiveContainer>
   );
@@ -35,16 +70,44 @@ export function StatCard({
   value,
   suffix,
   delta,
+  // Period-over-period delta. `deltaPolarity` decides which direction reads as
+  // "good": spend/records going up is bad news ("up-bad"), while balances and
+  // counts going up is good ("up-good", the default). `deltaCaption` states the
+  // comparison basis ("vs Aug 1 - Aug 31") — a bare percentage is never enough.
+  deltaCaption,
+  deltaPolarity = "up-good",
   chart = "line",
   data = [],
   breakdown,
   breakdownCaption = "Per reference",
+  // Compact alternative to `breakdown`: up to 3 `{ key, label, value, tone }`
+  // figures rendered as one full-width strip (hairline-divided columns, no
+  // scrollbar) — the "just the numbers that matter" density for KPI rows.
+  stats,
   loading = false,
   icon: Icon,
   accent = false,
   tone,
+  // Optional status pill rendered right under the value (e.g. a depleted /
+  // overdrawn balance notice). `{ tone, label, icon: StatusIcon }` — tone
+  // reuses the same vocabulary as `tone` (`warning` / `danger` / `success`),
+  // and the pill carries `role="status"` so screen readers announce it.
+  status,
 }) {
-  const positive = delta == null ? null : delta >= 0;
+  const deltaUp = delta != null && delta > 0;
+  const deltaFlat = delta === 0;
+  const deltaGood = deltaPolarity === "up-bad" ? !deltaUp : deltaUp;
+  const deltaTone = accent
+    ? "ink"
+    : deltaFlat
+      ? "neutral"
+      : deltaGood
+        ? "success"
+        : "danger";
+  // Direction is carried by an arrow + a word as well as the color, so the
+  // badge still reads for anyone who can't separate red from green.
+  const DeltaIcon = deltaFlat ? Minus : deltaUp ? TrendingUp : TrendingDown;
+  const deltaWord = deltaFlat ? "no change" : deltaUp ? "increase" : "decrease";
   const color = accent
     ? "#FFFFFF"
     : tone === "success"
@@ -58,7 +121,8 @@ export function StatCard({
   const displayValue = value == null || value === "" ? "—" : value;
   const hasData = Array.isArray(data) && data.length > 0;
   const hasBreakdown = Array.isArray(breakdown);
-  const hasCaption = !hasBreakdown && Boolean(breakdownCaption);
+  const hasStats = Array.isArray(stats) && stats.length > 0;
+  const hasCaption = !hasBreakdown && !hasStats && Boolean(breakdownCaption);
 
   const iconTile = accent
     ? "bg-white/15 text-white"
@@ -114,7 +178,7 @@ export function StatCard({
             )}
           />
         )}
-        {(hasData || hasBreakdown) && (
+        {(hasData || hasBreakdown || hasStats) && (
           <div
             className={cn(
               "mt-3 h-14 rounded-lg animate-pulse",
@@ -133,6 +197,10 @@ export function StatCard({
         "relative overflow-hidden",
         accent && "text-white hover:shadow-hover",
         !accent && "hover:-translate-y-0.5",
+        // Tone-matched hairline so warning/danger states read immediately —
+        // even before the eye reaches the value or the status pill.
+        !accent && tone === "warning" && "border-[var(--warning)]/45",
+        !accent && tone === "danger" && "border-[var(--danger)]/45",
       )}
     >
       {accent && (
@@ -190,14 +258,46 @@ export function StatCard({
               </span>
             )}
           </div>
+          {status?.label != null &&
+            (() => {
+              const StatusIcon = status.icon ?? AlertCircle;
+              return (
+                <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
+                  <Badge
+                    role="status"
+                    tone={status.tone ?? "neutral"}
+                    className={cn(accent && "bg-white/15 text-white")}
+                  >
+                    <StatusIcon size={13} aria-hidden />
+                    {status.label}
+                  </Badge>
+                </div>
+              );
+            })()}
           {delta != null && (
-            <Badge
-              tone={accent ? "ink" : positive ? "success" : "danger"}
-              className={cn(accent && "bg-white/15 text-white")}
-            >
-              {positive ? "+" : ""}
-              {delta}%
-            </Badge>
+            <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
+              <Badge
+                tone={deltaTone}
+                className={cn(accent && "bg-white/15 text-white")}
+              >
+                <DeltaIcon size={13} aria-hidden />
+                {deltaFlat ? "0%" : `${deltaUp ? "+" : ""}${delta}%`}
+                <span className="sr-only">
+                  {deltaWord}
+                  {deltaCaption ? ` ${deltaCaption}` : ""}
+                </span>
+              </Badge>
+              {deltaCaption && (
+                <span
+                  className={cn(
+                    "text-xs font-medium",
+                    accent ? "text-white/60" : "text-[var(--ink-muted)]",
+                  )}
+                >
+                  {deltaCaption}
+                </span>
+              )}
+            </div>
           )}
 
           {hasCaption && (
@@ -265,13 +365,7 @@ export function StatCard({
                           aria-hidden
                           className={cn(
                             "h-1.5 w-1.5 shrink-0 rounded-full",
-                            item.tone === "danger"
-                              ? "bg-[var(--danger)]"
-                              : item.tone === "success"
-                                ? "bg-[var(--success)]"
-                                : accent
-                                  ? "bg-white/40"
-                                  : "bg-[var(--accent)]/60",
+                            breakdownDotTone(item.tone, accent),
                           )}
                         />
                         {/* Single-line row: label with the date inline after
@@ -296,13 +390,7 @@ export function StatCard({
                       <span
                         className={cn(
                           "shrink-0 font-semibold tabular-nums",
-                          item.tone === "danger"
-                            ? "text-[var(--danger)]"
-                            : item.tone === "success"
-                              ? "text-[var(--success)]"
-                              : accent
-                                ? "text-white"
-                                : "text-[var(--ink)]",
+                          breakdownValueTone(item.tone, accent),
                         )}
                       >
                         {item.value ?? "—"}
@@ -321,6 +409,49 @@ export function StatCard({
           </div>
         )}
       </div>
+
+      {hasStats && (
+        <div
+          aria-label="Card figures"
+          className={cn(
+            "mt-4 grid border-t pt-3",
+            accent ? "border-white/20" : "border-[var(--border)]",
+          )}
+          style={{ gridTemplateColumns: `repeat(${stats.length}, minmax(0, 1fr))` }}
+        >
+          {stats.map((stat, i) => (
+            <div
+              key={stat.key ?? i}
+              className={cn(
+                "min-w-0 px-3 first:pl-0 last:pr-0",
+                i > 0 &&
+                  (accent
+                    ? "border-l border-white/15"
+                    : "border-l border-[var(--border)]"),
+              )}
+            >
+              <p
+                className={cn(
+                  "type-eyebrow truncate text-[10px]",
+                  accent ? "text-white/55" : "text-[var(--ink-muted)]",
+                )}
+                title={stat.label}
+              >
+                {stat.label}
+              </p>
+              <p
+                className={cn(
+                  "mt-1 truncate text-sm font-semibold tabular-nums",
+                  breakdownValueTone(stat.tone, accent),
+                )}
+                title={typeof stat.value === "string" ? stat.value : undefined}
+              >
+                {stat.value ?? "—"}
+              </p>
+            </div>
+          ))}
+        </div>
+      )}
     </Card>
   );
 }

@@ -1,6 +1,12 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
-import { Calendar, ChevronLeft, ChevronRight, RotateCcw } from "lucide-react";
+import {
+  CalendarOff,
+  CalendarRange,
+  ChevronLeft,
+  ChevronRight,
+  RotateCcw,
+} from "lucide-react";
 import { Button } from "./Button";
 import {
   addDays,
@@ -17,14 +23,9 @@ import {
   startOfMonth,
 } from "@/lib/utils";
 
-// Same entrance easing the other admin popovers/dialogs use.
 const DIALOG_EASE = [0.16, 1, 0.3, 1];
 const WEEKDAYS = ["Su", "Mo", "Tu", "We", "Th", "Fr", "Sa"];
 
-/**
- * Quick-pick ranges in the left rail. `rangeFor` is evaluated against "today"
- * on every render so a panel left open across midnight stays correct.
- */
 const PRESETS = [
   {
     key: "this-month",
@@ -56,8 +57,6 @@ const PRESETS = [
   },
 ];
 
-/** Local-midnight version of a `{ start, end }` range — `Date` comparisons
- * (`<`, `>`) then behave like calendar-day comparisons. */
 function normalizeRange(range) {
   return {
     start: range?.start ? startOfDay(range.start) : null,
@@ -65,14 +64,12 @@ function normalizeRange(range) {
   };
 }
 
-/** True when both ranges cover the same two days (order-independent). */
 function isSameRange(a, b) {
   const left = normalizeRange(a);
   const right = normalizeRange(b);
   return isSameDay(left.start, right.start) && isSameDay(left.end, right.end);
 }
 
-/** Round icon button used for the month pager. */
 function NavButton({ label, onClick, children }) {
   return (
     <button
@@ -86,20 +83,6 @@ function NavButton({ label, onClick, children }) {
   );
 }
 
-/**
- * Popover date-range selector. Uses the shared panel conventions from
- * `NotificationsPopover` / `Listbox` (relative trigger + animated absolute
- * card + outside-click & Escape dismissal).
- *
- * Controlled API:
- *   value    → `{ start: Date|null, end: Date|null }`
- *   onChange → receives the committed `{ start, end }` when Apply is pressed
- *
- * Picking takes two clicks: the first sets the start, the second the end
- * (an earlier second click is swapped automatically, the same day yields a
- * single-day range, and clicking again after a complete range restarts).
- * Nothing is committed until Apply, so Escape / outside-click discards edits.
- */
 export function DateRangePicker({
   value,
   onChange,
@@ -111,9 +94,7 @@ export function DateRangePicker({
   const [open, setOpen] = useState(false);
   const [draft, setDraft] = useState(() => normalizeRange(value));
   const [hover, setHover] = useState(null);
-  // Month currently rendered in the calendar (the first month of the value).
   const [viewMonth, setViewMonth] = useState(() => startOfMonth(value?.start));
-  // Direction of the last month change, used for the slide transition.
   const [slide, setSlide] = useState(1);
   const rootRef = useRef(null);
   const triggerRef = useRef(null);
@@ -121,8 +102,7 @@ export function DateRangePicker({
   const today = useMemo(() => startOfDay(), []);
   const cells = useMemo(() => getMonthGrid(viewMonth), [viewMonth]);
   const label = formatDateRange(value, placeholder);
-
-  // The range being drawn: the draft, or start → hover while the end is open.
+  const hasValue = Boolean(value?.start && value?.end);
   const painted = useMemo(() => rangeWithPreview(draft, hover), [draft, hover]);
 
   const close = useCallback((refocus = true) => {
@@ -131,8 +111,6 @@ export function DateRangePicker({
     if (refocus) triggerRef.current?.focus();
   }, []);
 
-  // Opening re-seeds the draft from the controlled value, so a discarded edit
-  // never leaks into the next session (no sync-in-effect needed).
   const openPanel = () => {
     const range = normalizeRange(value);
     setDraft(range);
@@ -144,13 +122,13 @@ export function DateRangePicker({
 
   const toggle = () => (open ? close() : openPanel());
 
-  // Dismiss on outside click / Escape (mirrors NotificationsPopover).
   useEffect(() => {
     if (!open) return;
 
     const onPointerDown = (e) => {
       if (!rootRef.current?.contains(e.target)) close(false);
     };
+
     const onKeyDown = (e) => {
       if (e.key !== "Escape") return;
       e.stopPropagation();
@@ -194,20 +172,43 @@ export function DateRangePicker({
     close();
   };
 
+  const draftComplete = Boolean(draft.start && draft.end);
+  const canClear = hasValue && !draftComplete;
+
+  const clearRange = () => {
+    onChange?.({ start: null, end: null });
+    close();
+  };
+
   return (
     <div ref={rootRef} className="relative">
       <Button
         ref={triggerRef}
         type="button"
         variant="soft"
-        className={cn("px-5", className)}
+        className={cn(
+          "px-5",
+          hasValue
+            ? "border border-[var(--accent)]/35 font-semibold shadow-card"
+            : "border border-dashed border-[var(--border)] bg-transparent font-medium text-[var(--ink-muted)] hover:border-[var(--accent)]/40 hover:bg-[var(--surface-2)] hover:text-[var(--ink)]",
+          className,
+        )}
+        data-state={hasValue ? "set" : "unset"}
         onClick={toggle}
         disabled={disabled}
         aria-haspopup="dialog"
         aria-expanded={open}
-        aria-label={`Date range: ${label}`}
+        aria-label={
+          hasValue
+            ? `Date range: ${label}`
+            : `Date range: ${label} — no date range set`
+        }
       >
-        <Calendar size={15} aria-hidden />
+        {hasValue ? (
+          <CalendarRange size={15} aria-hidden />
+        ) : (
+          <CalendarOff size={15} aria-hidden />
+        )}
         <span className="tabular-nums">{label}</span>
       </Button>
 
@@ -222,8 +223,6 @@ export function DateRangePicker({
             transition={{ duration: 0.18, ease: DIALOG_EASE }}
             className={cn(
               "absolute top-[calc(100%+8px)] z-40 w-[min(92vw,632px)] overflow-hidden rounded-3xl border border-[var(--border)] bg-[var(--surface)] shadow-hover",
-              // Right-anchored from `sm` up. On phones the trigger sits mid-row
-              // (the Add button follows it), so pinning left keeps it on screen.
               align === "end"
                 ? "left-0 right-auto sm:left-auto sm:right-0"
                 : "left-0",
@@ -234,12 +233,16 @@ export function DateRangePicker({
                 Date range
               </span>
               <span className="truncate text-sm font-semibold text-[var(--ink-muted)]">
-                {formatDateRange(draft, "Pick a start and end date")}
+                {formatDateRange(
+                  draft,
+                  hasValue
+                    ? "Pick a start and end date"
+                    : "No range set — all records",
+                )}
               </span>
             </div>
 
             <div className="grid gap-4 p-4 sm:grid-cols-[152px_1fr] sm:p-5">
-              {/* Quick ranges */}
               <div
                 role="group"
                 aria-label="Quick ranges"
@@ -266,7 +269,6 @@ export function DateRangePicker({
                 })}
               </div>
 
-              {/* Calendar */}
               <div className="min-w-0" onMouseLeave={() => setHover(null)}>
                 <div className="mb-2 flex items-center justify-between">
                   <NavButton
@@ -302,14 +304,22 @@ export function DateRangePicker({
                   <AnimatePresence mode="popLayout" initial={false}>
                     <motion.div
                       key={`${viewMonth.getFullYear()}-${viewMonth.getMonth()}`}
-                      initial={{ opacity: 0, x: slide > 0 ? 14 : -14 }}
+                      initial={{
+                        opacity: 0,
+                        x: slide > 0 ? 14 : -14,
+                      }}
                       animate={{ opacity: 1, x: 0 }}
-                      exit={{ opacity: 0, x: slide > 0 ? -14 : 14 }}
-                      transition={{ duration: 0.18, ease: DIALOG_EASE }}
+                      exit={{
+                        opacity: 0,
+                        x: slide > 0 ? -14 : 14,
+                      }}
+                      transition={{
+                        duration: 0.18,
+                        ease: DIALOG_EASE,
+                      }}
                       className="grid grid-cols-7 gap-y-1"
                     >
                       {cells.map((day, index) => {
-                        // Leading/trailing padding cell — keeps the 6x7 grid.
                         if (!day) {
                           return <span key={`pad-${index}`} className="h-9" />;
                         }
@@ -338,7 +348,11 @@ export function DateRangePicker({
                             className={cn(
                               "flex h-9 items-center justify-center text-sm font-medium tabular-nums transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)]/40",
                               isEdge
-                                ? "rounded-full bg-[var(--accent)] text-white hover:bg-[var(--accent-strong)]"
+                                ? cn(
+                                    "bg-[var(--accent)] text-white hover:bg-[var(--accent-strong)]",
+                                    isStart && "rounded-l-lg",
+                                    isEnd && "rounded-r-lg",
+                                  )
                                 : inRange
                                   ? "bg-[var(--accent-soft)] text-[var(--accent-strong)]"
                                   : "rounded-full text-[var(--ink)] hover:bg-[var(--surface-2)]",
@@ -368,10 +382,10 @@ export function DateRangePicker({
                 <Button
                   type="button"
                   variant="accent"
-                  onClick={apply}
-                  disabled={!draft.start || !draft.end}
+                  onClick={draftComplete ? apply : clearRange}
+                  disabled={!draftComplete && !canClear}
                 >
-                  Apply
+                  {canClear ? "Show all dates" : "Apply"}
                 </Button>
               </div>
             </div>

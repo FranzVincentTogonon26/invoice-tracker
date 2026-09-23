@@ -1,6 +1,10 @@
 import { useEffect, useMemo, useState } from "react";
 import { motion } from "framer-motion";
 import {
+  CalendarOff,
+  CalendarRange,
+  CircleAlert,
+  CircleX,
   ClipboardList,
   HandCoins,
   Plus,
@@ -11,6 +15,7 @@ import {
 } from "lucide-react";
 import toast from "react-hot-toast";
 import { Button } from "../../components/ui/Button";
+import { Badge } from "../../components/ui/Badge";
 import { PageHeader } from "../../components/ui/PageHeader";
 import { StatCard } from "../../components/ui/StatCard";
 import { DateRangePicker } from "../../components/ui/DateRangePicker";
@@ -29,15 +34,17 @@ import {
 } from "../../components/ui/DataState";
 import { Pager } from "../../components/ui/Pager";
 import {
+  addDays,
+  addMonths,
   cn,
+  endOfMonth,
   formatMoney,
-  monthRange,
   startOfDay,
+  toDate,
   toISODate,
 } from "../../lib/utils";
 import { useNavigate } from "react-router-dom";
 import { useQueryClient } from "@tanstack/react-query";
-import { Download } from "lucide-react";
 import { PAYMENT_METHODS } from "../../constants";
 import { useExpenses, useExpensesMutations } from "../../hooks/useExpenses";
 import {
@@ -61,9 +68,8 @@ const item = {
 };
 
 const PAGE_SIZE = 50;
+const emptyRange = () => ({ start: null, end: null });
 
-// Status values across both ledger sources — expenses (paid/draft/cancel) and
-// budget issuances (open/close/cancel) — so one dropdown can filter both.
 const STATUS_OPTIONS = [
   { value: "all", label: "All status" },
   { value: "paid", label: "Paid" },
@@ -73,18 +79,109 @@ const STATUS_OPTIONS = [
   { value: "cancel", label: "Cancelled" },
 ];
 
-const matchesDayRange = (iso, start, end) => {
-  if (!iso) return true;
-  const day = startOfDay(new Date(`${iso}T00:00:00`));
+const dayOf = (value) => {
+  const parsed = toDate(value);
+  return parsed ? startOfDay(parsed) : null;
+};
+
+const rowDay = (row) => dayOf(row?.expense_date ?? row?.date);
+
+const matchesDayRange = (value, start, end) => {
+  const day = dayOf(value);
   if (!day) return true;
   if (start && day < startOfDay(start)) return false;
   if (end && day > startOfDay(end)) return false;
   return true;
 };
 
+const LEDGER_STATUS_META = {
+  paid: { tone: "success", label: "Paid" },
+  open: { tone: "warning", label: "Open" },
+  draft: { tone: "warning", label: "Draft" },
+  close: { tone: "warning", label: "Closed" },
+  cancel: { tone: "danger", label: "Cancelled" },
+};
+
+const LEDGER_STATUS_ORDER = ["paid", "open", "draft", "close", "cancel"];
+const DAY_MS = 24 * 60 * 60 * 1000;
+
+const countDays = (start, end) =>
+  Math.round((startOfDay(end) - startOfDay(start)) / DAY_MS) + 1;
+
+const previousWindow = (range) => {
+  const start = range?.start ? startOfDay(range.start) : null;
+  const end = range?.end ? startOfDay(range.end) : null;
+  if (!start || !end || end < start) return null;
+
+  const wholeMonth =
+    start.getDate() === 1 &&
+    start.getMonth() === end.getMonth() &&
+    start.getFullYear() === end.getFullYear() &&
+    end.getDate() === endOfMonth(end).getDate();
+
+  if (wholeMonth) {
+    const prevStart = addMonths(start, -1);
+    return { start: prevStart, end: endOfMonth(prevStart) };
+  }
+
+  const prevEnd = addDays(start, -1);
+  return {
+    start: addDays(prevEnd, -(countDays(start, end) - 1)),
+    end: prevEnd,
+  };
+};
+
+const percentChange = (current, previous) =>
+  previous > 0 && Number.isFinite(current)
+    ? Math.round(((current - previous) / previous) * 100)
+    : null;
+
+const shortRangeLabel = (range) => {
+  if (!range?.start || !range?.end) return "";
+  const withYear = range.start.getFullYear() !== range.end.getFullYear();
+  const format = (day) =>
+    day.toLocaleDateString("en-US", {
+      month: "short",
+      day: "numeric",
+      ...(withYear ? { year: "numeric" } : {}),
+    });
+  return `${format(range.start)} - ${format(range.end)}`;
+};
+
+const buildRangeSeries = (range, rows, measure) => {
+  const start = range?.start ? startOfDay(range.start) : null;
+  const end = range?.end ? startOfDay(range.end) : null;
+  if (!start || !end || end < start) return [];
+
+  const days = countDays(start, end);
+  const bucketDays = days <= 14 ? 1 : Math.ceil(days / 14);
+  const totals = new Array(Math.ceil(days / bucketDays)).fill(0);
+
+  for (const row of rows) {
+    const day = rowDay(row);
+    if (!day || day < start || day > end) continue;
+    const bucket = Math.floor((countDays(start, day) - 1) / bucketDays);
+    totals[bucket] += measure(row);
+  }
+
+  return totals.map((v) => ({ v }));
+};
+
+const rowsWindow = (rows) => {
+  let start = null;
+  let end = null;
+  for (const row of rows) {
+    const day = rowDay(row);
+    if (!day) continue;
+    if (!start || day < start) start = day;
+    if (!end || day > end) end = day;
+  }
+  return start && end ? { start, end } : null;
+};
+
 const AdminExpenses = () => {
   const nav = useNavigate();
-  const [dateRange, setDateRange] = useState(() => monthRange());
+  const [dateRange, setDateRange] = useState(() => emptyRange());
   const { data, expenses, categories, isLoading, error, refetch } = useExpenses(
     {
       from: dateRange?.start ? toISODate(dateRange.start) : undefined,
@@ -96,8 +193,6 @@ const AdminExpenses = () => {
     useBudgetMutations();
   const queryClient = useQueryClient();
 
-  // Budget issuances (issued_budget ⨝ budget_issued_reference ⨝ users) — the
-  // "Budget Issued" lines of the ledger, fetched from the budget API.
   const {
     data: issuedTransactions,
     isLoading: issuedLoading,
@@ -112,6 +207,8 @@ const AdminExpenses = () => {
   const [status, setStatus] = useState("all");
   const [page, setPage] = useState(0);
 
+  const hasDateRange = Boolean(dateRange?.start && dateRange?.end);
+
   useEffect(() => {
     const timer = setTimeout(() => setDebouncedSearch(search), 300);
     return () => clearTimeout(timer);
@@ -123,6 +220,13 @@ const AdminExpenses = () => {
   const totalExpenses = Number(overview.totalExpenses ?? 0);
   const cashOnHand = totalBudget - (totalIssued + totalExpenses);
 
+  // Same cent-rounded depleted/overdrawn states as AdminBudget's My Balance
+  // card: anything formatting as ₱0.00 warns, anything below warns harder.
+  // Depleted only applies once there is an allocation to deplete.
+  const isBalanceOverdrawn = cashOnHand < -0.004;
+  const isBalanceDepleted =
+    !isBalanceOverdrawn && Math.abs(cashOnHand) < 0.005 && totalBudget > 0;
+
   const rangedExpenses = useMemo(
     () =>
       (expenses ?? []).filter((e) =>
@@ -131,8 +235,6 @@ const AdminExpenses = () => {
     [expenses, dateRange],
   );
 
-  // Issued-budget lines scoped to the same date range (issue date =
-  // issued_budget.created_at), mapped into the ledger row shape.
   const rangedIssued = useMemo(
     () =>
       (issuedTransactions ?? [])
@@ -156,7 +258,6 @@ const AdminExpenses = () => {
     [issuedTransactions, dateRange],
   );
 
-  // Unified ledger: every expense is "Expense", every issuance "Budget Issued".
   const ledgerRows = useMemo(
     () =>
       [
@@ -184,15 +285,185 @@ const AdminExpenses = () => {
     [rangedExpenses, rangedIssued],
   );
 
+  const activeRanged = useMemo(
+    () => rangedExpenses.filter((e) => e.status !== "cancel"),
+    [rangedExpenses],
+  );
+
   const rangedTotal = useMemo(
     () =>
-      rangedExpenses.reduce(
+      activeRanged.reduce((sum, e) => sum + (Number(e.total_amount) || 0), 0),
+    [activeRanged],
+  );
+
+  const prevWindow = useMemo(() => previousWindow(dateRange), [dateRange]);
+  const prevParams = useMemo(
+    () =>
+      prevWindow
+        ? { from: toISODate(prevWindow.start), to: toISODate(prevWindow.end) }
+        : {},
+    [prevWindow],
+  );
+  const { expenses: prevExpenses, isLoading: prevLoading } = useExpenses(
+    prevParams,
+    { enabled: Boolean(prevWindow) },
+  );
+
+  const prevTotal = useMemo(
+    () =>
+      prevExpenses.reduce(
         (sum, e) =>
           e.status === "cancel" ? sum : sum + (Number(e.total_amount) || 0),
         0,
       ),
-    [rangedExpenses],
+    [prevExpenses],
   );
+
+  const prevRangedIssued = useMemo(
+    () =>
+      (issuedTransactions ?? []).filter((t) =>
+        matchesDayRange(t.date_issued, prevWindow?.start, prevWindow?.end),
+      ),
+    [issuedTransactions, prevWindow],
+  );
+
+  const prevRecordCount = prevExpenses.length + prevRangedIssued.length;
+
+  const deltaCaption = useMemo(
+    () => (prevWindow ? `vs ${shortRangeLabel(prevWindow)}` : null),
+    [prevWindow],
+  );
+
+  const rangeLabel = shortRangeLabel(dateRange);
+
+  const expensesDelta =
+    prevWindow && !prevLoading ? percentChange(rangedTotal, prevTotal) : null;
+
+  const recordsDelta =
+    !prevWindow || prevLoading || issuedLoading
+      ? null
+      : percentChange(ledgerRows.length, prevRecordCount);
+
+  const spendWindow = useMemo(
+    () => (hasDateRange ? dateRange : rowsWindow(activeRanged)),
+    [hasDateRange, dateRange, activeRanged],
+  );
+
+  const recordWindow = useMemo(
+    () => (hasDateRange ? dateRange : rowsWindow(ledgerRows)),
+    [hasDateRange, dateRange, ledgerRows],
+  );
+
+  const spendSeries = useMemo(
+    () =>
+      buildRangeSeries(
+        spendWindow,
+        activeRanged,
+        (e) => Number(e.total_amount) || 0,
+      ),
+    [spendWindow, activeRanged],
+  );
+
+  const recordSeries = useMemo(
+    () => buildRangeSeries(recordWindow, ledgerRows, () => 1),
+    [recordWindow, ledgerRows],
+  );
+
+  const paceDays = useMemo(() => {
+    const start = spendWindow?.start ? startOfDay(spendWindow.start) : null;
+    const end = spendWindow?.end ? startOfDay(spendWindow.end) : null;
+    return start && end && end >= start ? countDays(start, end) : 0;
+  }, [spendWindow]);
+
+  const dailyAverage = paceDays > 0 ? rangedTotal / paceDays : 0;
+
+  const topCategory = useMemo(() => {
+    const totals = new Map();
+    for (const e of activeRanged) {
+      const key = e.category_name || "Uncategorized";
+      totals.set(key, (totals.get(key) ?? 0) + (Number(e.total_amount) || 0));
+    }
+    const top = [...totals.entries()].sort((a, b) => b[1] - a[1])[0];
+    return top ? top[0] : null;
+  }, [activeRanged]);
+
+  const heroStats = useMemo(
+    () => [
+      { key: "top", label: "Top category", value: topCategory ?? "—" },
+      {
+        key: "pace",
+        label: "Avg / day",
+        value: paceDays > 0 ? formatMoney(dailyAverage) : "—",
+      },
+    ],
+    [topCategory, dailyAverage, paceDays],
+  );
+
+  const balanceStats = useMemo(
+    () => [
+      {
+        key: "allocated",
+        label: "Allocated",
+        value: formatMoney(totalBudget),
+      },
+      {
+        key: "issued",
+        label: "Issued",
+        value:
+          totalIssued > 0 ? `-${formatMoney(totalIssued)}` : formatMoney(0),
+        tone: "warning",
+      },
+      {
+        key: "expenses",
+        label: "Spent",
+        value:
+          totalExpenses > 0 ? `-${formatMoney(totalExpenses)}` : formatMoney(0),
+        tone: "danger",
+      },
+    ],
+    [totalBudget, totalIssued, totalExpenses],
+  );
+
+  const issuedSources = overview.overviewIssuedBudget;
+  const issuedStats = useMemo(() => {
+    const rows = issuedSources ?? [];
+    const largest = rows.reduce(
+      (max, row) => Math.max(max, Number(row.amount) || 0),
+      0,
+    );
+    return [
+      { key: "sources", label: "Budget Sources", value: rows.length },
+      { key: "largest", label: "Largest", value: formatMoney(largest) },
+    ];
+  }, [issuedSources]);
+
+  const statusStats = useMemo(() => {
+    const counts = new Map();
+    for (const row of ledgerRows) {
+      const status = row.status || "draft";
+      counts.set(status, (counts.get(status) ?? 0) + 1);
+    }
+
+    const order = [
+      ...LEDGER_STATUS_ORDER.filter((status) => counts.has(status)),
+      ...[...counts.keys()].filter(
+        (status) => !LEDGER_STATUS_ORDER.includes(status),
+      ),
+    ];
+
+    return order.map((status) => {
+      const meta = LEDGER_STATUS_META[status] ?? {
+        tone: "neutral",
+        label: status,
+      };
+      return {
+        key: status,
+        label: meta.label,
+        value: counts.get(status),
+        tone: meta.tone,
+      };
+    });
+  }, [ledgerRows]);
 
   const categoryOptions = useMemo(
     () => [
@@ -207,7 +478,7 @@ const AdminExpenses = () => {
 
   const methodOptions = useMemo(
     () => [{ value: "all", label: "All methods" }, ...PAYMENT_METHODS],
-    [], // PAYMENT_METHODS is a module constant — never changes
+    [],
   );
 
   const filteredRows = useMemo(() => {
@@ -219,13 +490,8 @@ const AdminExpenses = () => {
         r.categoryId !== category
       )
         return false;
-      // Issuance rows have no category — they stay visible under
-      // "All categories" only (the kind guard above handles that).
-
       if (method !== "all" && r.method !== method) return false;
-
       if (status !== "all" && r.status !== status) return false;
-
       if (!q) return true;
       return [r.description, r.category, r.employee, r.method]
         .filter(Boolean)
@@ -235,6 +501,7 @@ const AdminExpenses = () => {
 
   const pageCount = Math.max(1, Math.ceil(filteredRows.length / PAGE_SIZE));
   const currentPage = Math.min(page, pageCount - 1);
+
   const pageRows = useMemo(
     () =>
       filteredRows.slice(
@@ -243,15 +510,20 @@ const AdminExpenses = () => {
       ),
     [filteredRows, currentPage],
   );
+
   const rangeStart =
     filteredRows.length === 0 ? 0 : currentPage * PAGE_SIZE + 1;
   const rangeEnd = Math.min(filteredRows.length, (currentPage + 1) * PAGE_SIZE);
+
   const hasActiveFilters =
+    hasDateRange ||
     category !== "all" ||
     method !== "all" ||
     status !== "all" ||
     search.trim().length > 0;
+
   const clearFilters = () => {
+    setDateRange(emptyRange());
     setCategory("all");
     setMethod("all");
     setStatus("all");
@@ -259,57 +531,9 @@ const AdminExpenses = () => {
     setPage(0);
   };
 
-  // Export the currently filtered ledger (not just the visible page) to CSV.
-  // Quotes every value and escapes embedded quotes so commas/newlines in
-  // descriptions can't break the file; BOM keeps Excel happy with UTF-8.
-  const handleExport = () => {
-    const header = [
-      "Date",
-      "Type",
-      "Description",
-      "Category",
-      "Amount",
-      "Employee",
-      "Method",
-      "Status",
-    ];
-    const methodLabelOf = (m) =>
-      PAYMENT_METHODS.find((p) => p.value === m)?.label ?? (m || "—");
-    const csvEscape = (v) => `"${String(v ?? "").replace(/"/g, '""')}"`;
-    const lines = [
-      header.join(","),
-      ...filteredRows.map((r) =>
-        [
-          r.date || "",
-          r.kind === "issued" ? "Budget Issued" : "Expense",
-          r.description || "Untitled expense",
-          r.category || "Uncategorized",
-          (Number(r.amount) || 0).toFixed(2),
-          r.employee || "—",
-          methodLabelOf(r.method),
-          r.status || "—",
-        ]
-          .map(csvEscape)
-          .join(","),
-      ),
-    ];
-    const blob = new Blob([`\uFEFF${lines.join("\r\n")}`], {
-      type: "text/csv;charset=utf-8;",
-    });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement("a");
-    const from = dateRange?.start ? toISODate(dateRange.start) : "all";
-    const to = dateRange?.end ? toISODate(dateRange.end) : "time";
-    link.href = url;
-    link.download = `expenses_${from}_to_${to}.csv`;
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-    URL.revokeObjectURL(url);
-    toast.success(
-      `Exported ${filteredRows.length} ${filteredRows.length === 1 ? "record" : "records"}`,
-    );
-  };
+  const emptyFilterMessage = hasDateRange
+    ? "Try a wider date range, a different category, or a different search term."
+    : "Try a different category or search term.";
 
   const handleDelete = async (id) => {
     try {
@@ -320,11 +544,6 @@ const AdminExpenses = () => {
     }
   };
 
-  // Issued-transaction actions (burger menu on "Budget Issued" rows):
-  //   - cancel  → budget_issued_reference.status -> 'cancel'
-  //   - restore → back to its previous status ('open')
-  // The Expenses overview (Total Issued Budget / My Balance cards) is served
-  // from the ["expenses"] cache, so it is invalidated after every mutation.
   const handleIssuedAction = async (action, row) => {
     if (action === "restore") {
       try {
@@ -339,7 +558,9 @@ const AdminExpenses = () => {
       }
       return;
     }
+
     if (action !== "cancel") return;
+
     try {
       await cancelIssuedTransaction.mutateAsync(row.id);
       queryClient.invalidateQueries({ queryKey: ["expenses"] });
@@ -348,11 +569,12 @@ const AdminExpenses = () => {
       toast.error(err?.message || "Couldn't cancel budget issuance");
     }
   };
+
   return (
     <div className="space-y-5 pb-2">
       <PageHeader
         title="Expenses"
-        description="Track every peso you spend. Filter by date or category, then drill into each line."
+        description="Every expense and budget issuance, all records by default — narrow it with a date range."
         actions={
           <div className="flex w-full flex-wrap items-center gap-2 sm:w-auto justify-end">
             <DateRangePicker
@@ -361,6 +583,7 @@ const AdminExpenses = () => {
                 setDateRange(r);
                 setPage(0);
               }}
+              placeholder="All dates"
               align="end"
             />
             <Button variant="accent" onClick={() => nav("/admin/expenses/add")}>
@@ -369,6 +592,7 @@ const AdminExpenses = () => {
           </div>
         }
       />
+
       <section aria-label="Expenses overview" className="space-y-4">
         <motion.div
           variants={container}
@@ -383,39 +607,82 @@ const AdminExpenses = () => {
               icon={ReceiptText}
               loading={isLoading}
               accent
-              breakdownCaption="Across the selected range"
+              delta={expensesDelta}
+              deltaPolarity="up-bad"
+              deltaCaption={deltaCaption}
+              chart="bars"
+              data={spendSeries}
+              stats={heroStats}
             />
           </motion.div>
+
           <motion.div variants={item} className="h-full min-w-0 [&>div]:h-full">
             <StatCard
               label="My Balance"
               value={formatMoney(cashOnHand)}
               icon={Wallet}
               loading={isLoading}
-              tone={cashOnHand < 0 ? "danger" : undefined}
-              breakdownCaption={null}
+              tone={
+                isBalanceOverdrawn
+                  ? "danger"
+                  : isBalanceDepleted
+                    ? "warning"
+                    : undefined
+              }
+              status={
+                isBalanceOverdrawn
+                  ? {
+                      tone: "danger",
+                      label: "Overdrawn — over budget",
+                      icon: CircleX,
+                    }
+                  : isBalanceDepleted
+                    ? {
+                        tone: "warning",
+                        label: "Depleted — no funds left",
+                        icon: CircleAlert,
+                      }
+                    : undefined
+              }
+              stats={balanceStats}
             />
           </motion.div>
+
           <motion.div variants={item} className="h-full min-w-0 [&>div]:h-full">
             <StatCard
               label="Total Issued Budget"
               value={formatMoney(totalIssued)}
               icon={HandCoins}
               loading={isLoading}
-              breakdownCaption={null}
+              stats={issuedStats}
             />
           </motion.div>
+
           <motion.div variants={item} className="h-full min-w-0 [&>div]:h-full">
             <StatCard
               label="Transactions"
-              value={rangedExpenses.length}
+              value={ledgerRows.length}
               icon={ClipboardList}
-              loading={isLoading}
-              breakdownCaption={null}
+              loading={isLoading || issuedLoading}
+              delta={recordsDelta}
+              deltaPolarity="up-bad"
+              deltaCaption={deltaCaption}
+              chart="bars"
+              data={recordSeries}
+              stats={statusStats}
             />
           </motion.div>
         </motion.div>
+
+        <p className="px-1 text-xs text-[var(--ink-muted)]">
+          Money figures exclude cancelled lines · Transactions counts every row
+          in the table (expenses + budget issuances), cancelled included ·{" "}
+          {hasDateRange
+            ? "Charts and Avg / day follow the selected range · My Balance and Total Issued Budget are all-time"
+            : "No date range set — all records included, no period comparison; charts and Avg / day span the records from first to last · My Balance and Total Issued Budget are all-time"}
+        </p>
       </section>
+
       <Card
         padding="lg"
         className="relative overflow-hidden rounded-3xl px-2 sm:px-6"
@@ -424,55 +691,73 @@ const AdminExpenses = () => {
           <div>
             <CardTitle className="text-lg">All Expenses</CardTitle>
             <CardDescription className="text-sm">
-              Every expense and budget issuance in the selected range.
+              <span className="inline-flex flex-wrap items-center gap-1.5">
+                {hasDateRange ? (
+                  <Badge tone="accent" className="font-semibold">
+                    <CalendarRange size={12} aria-hidden />
+                    {rangeLabel}
+                  </Badge>
+                ) : (
+                  <Badge tone="neutral">
+                    <CalendarOff size={12} aria-hidden />
+                    All dates
+                  </Badge>
+                )}
+                <span>
+                  {hasDateRange
+                    ? "· expenses and budget issuances in this range"
+                    : "· no date range set — showing all expenses and budget issuances"}
+                </span>
+              </span>
             </CardDescription>
           </div>
-          <Button
-            onClick={handleExport}
-            disabled={filteredRows.length === 0}
-            aria-label="Export filtered expenses to CSV"
-          >
-            <Download size={15} /> Export CSV
-          </Button>
         </CardHeader>
-        <div className="mb-4 flex flex-col gap-2.5 lg:flex-row lg:items-center">
-          <div className="w-full lg:w-[200px] lg:shrink-0">
-            <Listbox
-              options={categoryOptions}
-              value={category}
-              onChange={(v) => {
-                setCategory(v);
-                setPage(0);
-              }}
-              placeholder="All categories"
-            />
+
+        <div className="mb-5 flex flex-col gap-3 lg:flex-row lg:items-center">
+          <div
+            role="group"
+            aria-label="Issued transaction filters"
+            className="flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center"
+          >
+            <div className="w-full lg:w-[200px] lg:shrink-0">
+              <Listbox
+                options={categoryOptions}
+                value={category}
+                onChange={(v) => {
+                  setCategory(v);
+                  setPage(0);
+                }}
+                placeholder="All categories"
+              />
+            </div>
+            <div className="w-full lg:w-[150px] lg:shrink-0">
+              <Listbox
+                options={methodOptions}
+                value={method}
+                onChange={(v) => {
+                  setMethod(v);
+                  setPage(0);
+                }}
+                placeholder="All methods"
+              />
+            </div>
+            <div className="w-full lg:w-[150px] lg:shrink-0">
+              <Listbox
+                options={STATUS_OPTIONS}
+                value={status}
+                onChange={(v) => {
+                  setStatus(v);
+                  setPage(0);
+                }}
+                placeholder="All status"
+              />
+            </div>
           </div>
-          <div className="w-full lg:w-[150px] lg:shrink-0">
-            <Listbox
-              options={methodOptions}
-              value={method}
-              onChange={(v) => {
-                setMethod(v);
-                setPage(0);
-              }}
-              placeholder="All methods"
-            />
-          </div>
-          <div className="w-full lg:w-[150px] lg:shrink-0">
-            <Listbox
-              options={STATUS_OPTIONS}
-              value={status}
-              onChange={(v) => {
-                setStatus(v);
-                setPage(0);
-              }}
-              placeholder="All status"
-            />
-          </div>
-          <div className="w-full lg:flex-1">
+
+          <div className="lg:ml-auto lg:w-[450px]">
             <SearchInput
               leftIcon={<Search size={16} />}
-              placeholder="Search by description, category, or spender..."
+              placeholder="Search..."
               value={search}
               onChange={(e) => {
                 setSearch(e.target.value);
@@ -496,6 +781,7 @@ const AdminExpenses = () => {
             />
           </div>
         </div>
+
         {isLoading || issuedLoading ? (
           <LoadingSkeleton rows={6} />
         ) : error || issuedError ? (
@@ -518,7 +804,7 @@ const AdminExpenses = () => {
             }
             message={
               hasActiveFilters
-                ? "Try a different category or search term."
+                ? emptyFilterMessage
                 : 'Use the "Add Expense" button to record the first one.'
             }
             onClear={hasActiveFilters ? clearFilters : undefined}

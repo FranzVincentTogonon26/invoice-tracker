@@ -111,13 +111,20 @@ const EmployeeBudget = ({ employeeIssuedBudget = [], isLoading, onOpen }) => {
         >
           {groups.map((group) => {
             const labelList = Object.values(group.labelGroups);
+            // Only label groups with a non-zero money total count as "multiple refs"
+            // and qualify for the references breakdown rows.
+            const nonZeroLabelList = labelList.filter(
+              (lg) => Number(lg.total ?? 0) !== 0,
+            );
             const total = labelList.reduce(
               (sum, lg) => sum + Number(lg.total ?? 0),
               0,
             );
 
-            const hasMultipleRefs = labelList.length > 1;
-            const singleRef = labelList[0];
+            // Show the breakdown only when 2+ references have a non-zero total.
+            // If only one total is greater than 0, fall back to the single-ref layout.
+            const hasMultipleRefs = nonZeroLabelList.length > 1;
+            const singleRef = nonZeroLabelList[0] ?? labelList[0];
             return (
               <motion.button
                 key={group.user_id}
@@ -183,10 +190,12 @@ const EmployeeBudget = ({ employeeIssuedBudget = [], isLoading, onOpen }) => {
                   </span>
                 </div>
 
-                {/* References — soft inset rows: dot · label · count · date · total */}
+                {/* References — soft inset rows: dot · label · count · date · total.
+                    Only shown when 2+ references have a non-zero total; rows with
+                    a 0 total are omitted. */}
                 {hasMultipleRefs && (
                   <div className="mt-3 overflow-hidden rounded-xl border border-[var(--border)]/70 bg-[var(--surface-2)]/70">
-                    {labelList.map((labelGroup, i) => (
+                    {nonZeroLabelList.map((labelGroup, i) => (
                       <div
                         key={labelGroup.label}
                         className={cn(

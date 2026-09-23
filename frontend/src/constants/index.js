@@ -27,8 +27,12 @@ export const STATUS = {
   pending: { tone: "warning", label: "Pending" },
   added: { tone: "accent", label: "Added" },
   cancelled: { tone: "danger", label: "Cancelled" },
-  // budget_issued_reference.status values (Budget Issued Transaction tab)
-  open: { tone: "accent", label: "Open" },
+  // budget_issued_reference.status values (Budget Issued Transaction tab).
+  // `open` reads amber (warning) — an open issuance is live money still waiting
+  // to be closed out, an actionable state — not the decorative accent teal.
+  // `close` stays amber as its resolved twin and `cancel` keeps danger, so a
+  // cancelled line is never amber while an expense Cancelled is red.
+  open: { tone: "warning", label: "Open" },
   cancel: { tone: "danger", label: "Cancelled" },
   close: { tone: "warning", label: "Closed" },
   // users.status values (Employees tab)

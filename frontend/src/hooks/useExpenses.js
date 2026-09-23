@@ -4,10 +4,14 @@ import { expensesApi } from "../api/expenses";
 /* ── Expenses ──────────────────────────────────────────────────── */
 export const expensesKey = (params) => ["expenses", params || {}];
 
-export function useExpenses(params) {
+export function useExpenses(params, options = {}) {
   const query = useQuery({
     queryKey: expensesKey(params),
     queryFn: () => expensesApi.list(params),
+    // Extra options let a caller open a *second* window against the same
+    // endpoint (the Expenses page compares the selected range with the one
+    // before it) — disabled until that window is actually known.
+    ...options,
   });
 
   // The API returns `{ expenses, categories, overview, gemini_model }` with an

@@ -53,9 +53,12 @@ export function formatTime(date) {
 
 /**
  * Normalizes a value into a valid `Date`, or `null` when it can't be parsed.
- * Strings/numbers are passed through the `Date` constructor.
+ * Strings/numbers are passed through the `Date` constructor. Exported for
+ * callers that must tell "unparseable" apart from "today": `startOfDay()`
+ * falls back to *now*, which would quietly fold a bad date into today instead
+ * of letting the caller skip the row.
  */
-function toDate(value) {
+export function toDate(value) {
   if (value instanceof Date) return Number.isNaN(value.getTime()) ? null : value;
   if (typeof value === "number") {
     const d = new Date(value);

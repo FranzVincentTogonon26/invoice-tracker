@@ -20,7 +20,7 @@ export function Topbar({ onOpenPalette }) {
           Hello, {firstName}.
         </h1>
         <p className="mt-1 text-sm leading-relaxed text-[var(--ink-muted)]">
-          Here&apos;s what&apos;s happening with your billing today.
+          Here&apos;s what&apos;s happening with your budget today.
         </p>
       </div>
 
