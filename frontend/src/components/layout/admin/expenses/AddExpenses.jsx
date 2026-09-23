@@ -328,8 +328,13 @@ const AddExpenses = () => {
   // With more than one open source the admin must pick which one funds these
   // lines: saving with nothing selected would file the expenses against no
   // budget at all (the server stores a NULL reference_id). A lone source is
-  // auto-mirrored above and zero sources save unfunded, so neither needs a pick.
+  // auto-mirrored above, so it never needs a pick of its own.
   const sourceUnselected = funding.sources.length > 1 && !funding.source;
+  // No source of funds exists at all (or the references haven't loaded yet):
+  // there is nothing that could fund the draft, so the Save button is
+  // disabled and handleSave refuses the state below as a backstop against a
+  // stale click — expenses never save against a missing budget source.
+  const noSources = funding.sources.length === 0;
 
   const handleCategoryAdded = (category) => {
     if (!category?.category_id) return;
@@ -408,6 +413,20 @@ const AddExpenses = () => {
     // From here on the summary may flag the offending ₱0.00 rows — the Save
     // button was clicked, so calling them out is no longer premature.
     setShowZeroAmountErrors(true);
+    // Source-of-funds gate: expenses may only save against a selected budget
+    // source. Both states disable the Save button, so these guards only fire
+    // on a stale click or a race with refreshed references — the request can
+    // never go out with no funder at all.
+    if (funding.sources.length === 0) {
+      setFormError(
+        "No source of funds detected — add a budget source before saving.",
+      );
+      return;
+    }
+    if (!selectedReferenceId) {
+      setFormError("Please select source of funds to proceed.");
+      return;
+    }
     const touched = items.filter(
       (item) =>
         item.description.trim() ||
@@ -437,14 +456,6 @@ const AddExpenses = () => {
     if (invalidIndex >= 0) {
       setFormError(
         `Line ${invalidIndex + 1} needs a description and an amount greater than zero.`,
-      );
-      return;
-    }
-    // Several open sources demand a funder — nothing picked would save the
-    // lines with no budget reference at all.
-    if (sourceUnselected) {
-      setFormError(
-        "Select a budget source to fund these expenses before saving.",
       );
       return;
     }
@@ -924,13 +935,15 @@ const AddExpenses = () => {
                 className="w-full"
                 type="button"
                 onClick={handleSave}
-                disabled={saving || insufficientFunds || sourceUnselected}
+                disabled={saving || insufficientFunds || sourceUnselected || noSources}
                 title={
-                  sourceUnselected
-                    ? "Select a budget source to fund these expenses"
-                    : insufficientFunds
-                      ? "Cannot proceed — the selected budget source is insufficient"
-                      : undefined
+                  noSources
+                    ? "No source of funds detected — add a budget source first"
+                    : sourceUnselected
+                      ? "Select a budget source to fund these expenses"
+                      : insufficientFunds
+                        ? "Cannot proceed — the selected budget source is insufficient"
+                        : undefined
                 }
               >
                 {saving ? (
