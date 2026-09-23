@@ -175,9 +175,7 @@ export default function AdminBudget() {
               value={formatMoney(cashOnHand)}
               icon={PhilippinePesoIcon}
               loading={isLoading}
-              tone={
-                isOverdrawn ? "danger" : isDepleted ? "warning" : undefined
-              }
+              tone={isOverdrawn ? "danger" : isDepleted ? "warning" : undefined}
               status={
                 isOverdrawn
                   ? {
@@ -265,7 +263,9 @@ export default function AdminBudget() {
                 </p>
               </div>
               <Badge
-                tone={isOverdrawn ? "danger" : isDepleted ? "warning" : "accent"}
+                tone={
+                  isOverdrawn ? "danger" : isDepleted ? "warning" : "accent"
+                }
                 className="w-fit shrink-0"
               >
                 {isOverdrawn ? (

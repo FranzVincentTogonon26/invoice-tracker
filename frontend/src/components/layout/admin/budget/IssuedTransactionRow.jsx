@@ -67,11 +67,12 @@ export function EmployeeCell({ name, role, avatarUrl, size = "md" }) {
 }
 
 function NotesCell({ notes }) {
-  if (!notes) return <span className="text-sm text-[var(--ink-muted)]">—</span>;
+  if (!notes)
+    return <span className="text-[13px] text-[var(--ink-muted)]">—</span>;
   return (
     <p
       title={notes}
-      className="line-clamp-2 whitespace-normal break-words text-sm leading-relaxed text-[var(--ink-muted)]"
+      className="line-clamp-2 whitespace-normal break-words text-[13px] leading-relaxed text-[var(--ink-muted)]"
     >
       {notes}
     </p>
@@ -143,7 +144,11 @@ export function IssuedTransactionRow({ transaction: t, onAction }) {
       </td>
       <td className="px-4 py-3.5 pr-5 align-middle">
         <div className="flex justify-end">
-          <IssuedTransactionActions transaction={t} onAction={onAction} />
+          <IssuedTransactionActions
+            transaction={t}
+            onAction={onAction}
+            variant="menu"
+          />
         </div>
       </td>
     </tr>

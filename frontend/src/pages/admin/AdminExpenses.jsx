@@ -34,14 +34,10 @@ import {
 } from "../../components/ui/DataState";
 import { Pager } from "../../components/ui/Pager";
 import {
-  addDays,
-  addMonths,
   cn,
-  endOfMonth,
   formatMoney,
   startOfDay,
   toDate,
-  toISODate,
 } from "../../lib/utils";
 import { useNavigate } from "react-router-dom";
 import { useQueryClient } from "@tanstack/react-query";
@@ -108,34 +104,6 @@ const DAY_MS = 24 * 60 * 60 * 1000;
 const countDays = (start, end) =>
   Math.round((startOfDay(end) - startOfDay(start)) / DAY_MS) + 1;
 
-const previousWindow = (range) => {
-  const start = range?.start ? startOfDay(range.start) : null;
-  const end = range?.end ? startOfDay(range.end) : null;
-  if (!start || !end || end < start) return null;
-
-  const wholeMonth =
-    start.getDate() === 1 &&
-    start.getMonth() === end.getMonth() &&
-    start.getFullYear() === end.getFullYear() &&
-    end.getDate() === endOfMonth(end).getDate();
-
-  if (wholeMonth) {
-    const prevStart = addMonths(start, -1);
-    return { start: prevStart, end: endOfMonth(prevStart) };
-  }
-
-  const prevEnd = addDays(start, -1);
-  return {
-    start: addDays(prevEnd, -(countDays(start, end) - 1)),
-    end: prevEnd,
-  };
-};
-
-const percentChange = (current, previous) =>
-  previous > 0 && Number.isFinite(current)
-    ? Math.round(((current - previous) / previous) * 100)
-    : null;
-
 const shortRangeLabel = (range) => {
   if (!range?.start || !range?.end) return "";
   const withYear = range.start.getFullYear() !== range.end.getFullYear();
@@ -182,12 +150,10 @@ const rowsWindow = (rows) => {
 const AdminExpenses = () => {
   const nav = useNavigate();
   const [dateRange, setDateRange] = useState(() => emptyRange());
-  const { data, expenses, categories, isLoading, error, refetch } = useExpenses(
-    {
-      from: dateRange?.start ? toISODate(dateRange.start) : undefined,
-      to: dateRange?.end ? toISODate(dateRange.end) : undefined,
-    },
-  );
+  // Fetch every expense up front: the overview cards must not react to the
+  // date range — the picker only narrows the table below (client-side).
+  const { data, expenses, categories, isLoading, error, refetch } =
+    useExpenses();
   const { remove } = useExpensesMutations();
   const { cancelIssuedTransaction, restoreIssuedTransaction } =
     useBudgetMutations();
@@ -227,41 +193,24 @@ const AdminExpenses = () => {
   const isBalanceDepleted =
     !isBalanceOverdrawn && Math.abs(cashOnHand) < 0.005 && totalBudget > 0;
 
-  const rangedExpenses = useMemo(
-    () =>
-      (expenses ?? []).filter((e) =>
-        matchesDayRange(e.expense_date, dateRange?.start, dateRange?.end),
-      ),
-    [expenses, dateRange],
+  // Overview source — all-time: the date range never touches the cards
+  // above, it only narrows the table further down.
+  const activeExpenses = useMemo(
+    () => (expenses ?? []).filter((e) => e.status !== "cancel"),
+    [expenses],
   );
 
-  const rangedIssued = useMemo(
+  const activeTotal = useMemo(
     () =>
-      (issuedTransactions ?? [])
-        .filter((t) =>
-          matchesDayRange(t.date_issued, dateRange?.start, dateRange?.end),
-        )
-        .map((t) => ({
-          kind: "issued",
-          id: t.id,
-          date: t.date_issued,
-          timeDate: t.date_issued,
-          description: t.description,
-          category: t.source_of_funds,
-          amount: Number(t.amount) || 0,
-          employee: t.employee,
-          employeeRole: t.employee_role,
-          employeeAvatar: t.avatar_url,
-          method: t.method,
-          status: t.status,
-        })),
-    [issuedTransactions, dateRange],
+      activeExpenses.reduce((sum, e) => sum + (Number(e.total_amount) || 0), 0),
+    [activeExpenses],
   );
 
-  const ledgerRows = useMemo(
+  // Full ledger (expenses + budget issuances) for the overview cards.
+  const allLedgerRows = useMemo(
     () =>
       [
-        ...rangedExpenses.map((e) => ({
+        ...(expenses ?? []).map((e) => ({
           kind: "expense",
           id: e.id,
           date: e.expense_date,
@@ -276,97 +225,62 @@ const AdminExpenses = () => {
           method: e.payment_method,
           status: e.status,
         })),
-        ...rangedIssued,
+        ...(issuedTransactions ?? []).map((t) => ({
+          kind: "issued",
+          id: t.id,
+          date: t.date_issued,
+          timeDate: t.date_issued,
+          description: t.description,
+          category: t.source_of_funds,
+          amount: Number(t.amount) || 0,
+          employee: t.employee,
+          employeeRole: t.employee_role,
+          employeeAvatar: t.avatar_url,
+          method: t.method,
+          status: t.status,
+        })),
       ].sort((a, b) => {
         const ta = new Date(a.timeDate ?? a.date ?? 0).getTime() || 0;
         const tb = new Date(b.timeDate ?? b.date ?? 0).getTime() || 0;
         return tb - ta;
       }),
-    [rangedExpenses, rangedIssued],
+    [expenses, issuedTransactions],
   );
 
-  const activeRanged = useMemo(
-    () => rangedExpenses.filter((e) => e.status !== "cancel"),
-    [rangedExpenses],
-  );
-
-  const rangedTotal = useMemo(
+  // Table source — the only thing the date range filters.
+  const ledgerRows = useMemo(
     () =>
-      activeRanged.reduce((sum, e) => sum + (Number(e.total_amount) || 0), 0),
-    [activeRanged],
-  );
-
-  const prevWindow = useMemo(() => previousWindow(dateRange), [dateRange]);
-  const prevParams = useMemo(
-    () =>
-      prevWindow
-        ? { from: toISODate(prevWindow.start), to: toISODate(prevWindow.end) }
-        : {},
-    [prevWindow],
-  );
-  const { expenses: prevExpenses, isLoading: prevLoading } = useExpenses(
-    prevParams,
-    { enabled: Boolean(prevWindow) },
-  );
-
-  const prevTotal = useMemo(
-    () =>
-      prevExpenses.reduce(
-        (sum, e) =>
-          e.status === "cancel" ? sum : sum + (Number(e.total_amount) || 0),
-        0,
+      allLedgerRows.filter((r) =>
+        matchesDayRange(r.date, dateRange?.start, dateRange?.end),
       ),
-    [prevExpenses],
-  );
-
-  const prevRangedIssued = useMemo(
-    () =>
-      (issuedTransactions ?? []).filter((t) =>
-        matchesDayRange(t.date_issued, prevWindow?.start, prevWindow?.end),
-      ),
-    [issuedTransactions, prevWindow],
-  );
-
-  const prevRecordCount = prevExpenses.length + prevRangedIssued.length;
-
-  const deltaCaption = useMemo(
-    () => (prevWindow ? `vs ${shortRangeLabel(prevWindow)}` : null),
-    [prevWindow],
+    [allLedgerRows, dateRange],
   );
 
   const rangeLabel = shortRangeLabel(dateRange);
 
-  const expensesDelta =
-    prevWindow && !prevLoading ? percentChange(rangedTotal, prevTotal) : null;
-
-  const recordsDelta =
-    !prevWindow || prevLoading || issuedLoading
-      ? null
-      : percentChange(ledgerRows.length, prevRecordCount);
-
   const spendWindow = useMemo(
-    () => (hasDateRange ? dateRange : rowsWindow(activeRanged)),
-    [hasDateRange, dateRange, activeRanged],
+    () => rowsWindow(activeExpenses),
+    [activeExpenses],
   );
 
   const recordWindow = useMemo(
-    () => (hasDateRange ? dateRange : rowsWindow(ledgerRows)),
-    [hasDateRange, dateRange, ledgerRows],
+    () => rowsWindow(allLedgerRows),
+    [allLedgerRows],
   );
 
   const spendSeries = useMemo(
     () =>
       buildRangeSeries(
         spendWindow,
-        activeRanged,
+        activeExpenses,
         (e) => Number(e.total_amount) || 0,
       ),
-    [spendWindow, activeRanged],
+    [spendWindow, activeExpenses],
   );
 
   const recordSeries = useMemo(
-    () => buildRangeSeries(recordWindow, ledgerRows, () => 1),
-    [recordWindow, ledgerRows],
+    () => buildRangeSeries(recordWindow, allLedgerRows, () => 1),
+    [recordWindow, allLedgerRows],
   );
 
   const paceDays = useMemo(() => {
@@ -375,17 +289,17 @@ const AdminExpenses = () => {
     return start && end && end >= start ? countDays(start, end) : 0;
   }, [spendWindow]);
 
-  const dailyAverage = paceDays > 0 ? rangedTotal / paceDays : 0;
+  const dailyAverage = paceDays > 0 ? activeTotal / paceDays : 0;
 
   const topCategory = useMemo(() => {
     const totals = new Map();
-    for (const e of activeRanged) {
+    for (const e of activeExpenses) {
       const key = e.category_name || "Uncategorized";
       totals.set(key, (totals.get(key) ?? 0) + (Number(e.total_amount) || 0));
     }
     const top = [...totals.entries()].sort((a, b) => b[1] - a[1])[0];
     return top ? top[0] : null;
-  }, [activeRanged]);
+  }, [activeExpenses]);
 
   const heroStats = useMemo(
     () => [
@@ -439,7 +353,7 @@ const AdminExpenses = () => {
 
   const statusStats = useMemo(() => {
     const counts = new Map();
-    for (const row of ledgerRows) {
+    for (const row of allLedgerRows) {
       const status = row.status || "draft";
       counts.set(status, (counts.get(status) ?? 0) + 1);
     }
@@ -463,7 +377,7 @@ const AdminExpenses = () => {
         tone: meta.tone,
       };
     });
-  }, [ledgerRows]);
+  }, [allLedgerRows]);
 
   const categoryOptions = useMemo(
     () => [
@@ -574,7 +488,7 @@ const AdminExpenses = () => {
     <div className="space-y-5 pb-2">
       <PageHeader
         title="Expenses"
-        description="Every expense and budget issuance, all records by default — narrow it with a date range."
+        description="Track expenses against your budget"
         actions={
           <div className="flex w-full flex-wrap items-center gap-2 sm:w-auto justify-end">
             <DateRangePicker
@@ -603,13 +517,10 @@ const AdminExpenses = () => {
           <motion.div variants={item} className="h-full min-w-0 [&>div]:h-full">
             <StatCard
               label="Total Expenses"
-              value={formatMoney(rangedTotal)}
+              value={formatMoney(activeTotal)}
               icon={ReceiptText}
               loading={isLoading}
               accent
-              delta={expensesDelta}
-              deltaPolarity="up-bad"
-              deltaCaption={deltaCaption}
               chart="bars"
               data={spendSeries}
               stats={heroStats}
@@ -661,12 +572,9 @@ const AdminExpenses = () => {
           <motion.div variants={item} className="h-full min-w-0 [&>div]:h-full">
             <StatCard
               label="Transactions"
-              value={ledgerRows.length}
+              value={allLedgerRows.length}
               icon={ClipboardList}
               loading={isLoading || issuedLoading}
-              delta={recordsDelta}
-              deltaPolarity="up-bad"
-              deltaCaption={deltaCaption}
               chart="bars"
               data={recordSeries}
               stats={statusStats}
@@ -676,16 +584,15 @@ const AdminExpenses = () => {
 
         <p className="px-1 text-xs text-[var(--ink-muted)]">
           Money figures exclude cancelled lines · Transactions counts every row
-          in the table (expenses + budget issuances), cancelled included ·{" "}
-          {hasDateRange
-            ? "Charts and Avg / day follow the selected range · My Balance and Total Issued Budget are all-time"
-            : "No date range set — all records included, no period comparison; charts and Avg / day span the records from first to last · My Balance and Total Issued Budget are all-time"}
+          (expenses + budget issuances), cancelled included · The overview cards
+          above are always all-time — charts and Avg / day span the records from
+          first to last, and the date range only filters the table below
         </p>
       </section>
 
       <Card
         padding="lg"
-        className="relative overflow-hidden rounded-3xl px-2 sm:px-6"
+        className="relative  rounded-3xl px-2 sm:px-6"
       >
         <CardHeader>
           <div>

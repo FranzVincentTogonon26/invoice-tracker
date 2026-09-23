@@ -380,7 +380,7 @@ export function StatCard({
                         >
                           {item.label ?? "—"}
                           {item.hint != null && (
-                            <span className="text-sm opacity-60">
+                            <span className="text-[12px] opacity-60">
                               {" · "}
                               {item.hint}
                             </span>
@@ -417,7 +417,9 @@ export function StatCard({
             "mt-4 grid border-t pt-3",
             accent ? "border-white/20" : "border-[var(--border)]",
           )}
-          style={{ gridTemplateColumns: `repeat(${stats.length}, minmax(0, 1fr))` }}
+          style={{
+            gridTemplateColumns: `repeat(${stats.length}, minmax(0, 1fr))`,
+          }}
         >
           {stats.map((stat, i) => (
             <div
@@ -432,7 +434,7 @@ export function StatCard({
             >
               <p
                 className={cn(
-                  "type-eyebrow truncate text-[10px]",
+                  "type-eyebrow truncate text-[12px]",
                   accent ? "text-white/55" : "text-[var(--ink-muted)]",
                 )}
                 title={stat.label}

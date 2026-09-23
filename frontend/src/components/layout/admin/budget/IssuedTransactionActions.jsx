@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useId, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { AnimatePresence, motion } from "framer-motion";
-import { Ban, Flag, Loader2, RefreshCcw } from "lucide-react";
+import { Ban, EllipsisVertical, Flag, Loader2, RefreshCcw } from "lucide-react";
 import { cn, formatMoney } from "../../../../lib/utils";
 import { Button } from "../../../ui/Button";
 import { LockBodyScroll } from "../../../../hooks/useLockBody";
@@ -74,15 +74,25 @@ function DialogShell({
  *   - 'cancel' → a "Restore" trigger that calls `onAction("restore", …)`
  *                directly (the issuance is put back to 'open').
  *   - any other status ('close') → a non-interactive "Closed" chip.
+ *
+ * `variant="menu"` (used by the desktop `IssuedTransactionRow`) swaps the
+ * inline pills for an `<EllipsisVertical>` kebab button that opens a portal
+ * dropdown carrying the exact same status-driven logic; 'close' rows keep the
+ * Closed chip. The default `inline` variant keeps the original pills (used by
+ * the mobile `IssuedTransactionCard`).
  */
 export function IssuedTransactionActions({
   transaction,
   onAction,
   className,
   pending = false,
+  variant = "inline",
 }) {
   const [open, setOpen] = useState(false);
+  const [menuOpen, setMenuOpen] = useState(false);
+  const [position, setPosition] = useState(null);
   const triggerRef = useRef(null);
+  const menuRef = useRef(null);
   const initialFocusRef = useRef(null);
   const titleId = useId();
   const descriptionId = useId();
@@ -115,6 +125,40 @@ export function IssuedTransactionActions({
     window.addEventListener("keydown", onKeyDown, true);
     return () => window.removeEventListener("keydown", onKeyDown, true);
   }, [open, closeDialog]);
+
+  // Kebab menu (variant="menu"): close on outside pointerdown, Escape, scroll
+  // or resize, then hand focus back to the trigger — mirrors the behaviour of
+  // ExpensesTable's RowActions menu.
+  useEffect(() => {
+    if (!menuOpen) return undefined;
+    const close = () => {
+      setMenuOpen(false);
+      triggerRef.current?.focus();
+    };
+    const handlePointerDown = (e) => {
+      if (
+        !triggerRef.current?.contains(e.target) &&
+        !menuRef.current?.contains(e.target)
+      )
+        close();
+    };
+    const handleKeyDown = (e) => {
+      if (e.key === "Escape") {
+        e.stopPropagation();
+        close();
+      }
+    };
+    window.addEventListener("pointerdown", handlePointerDown);
+    window.addEventListener("keydown", handleKeyDown);
+    window.addEventListener("scroll", close, { capture: true, passive: true });
+    window.addEventListener("resize", close);
+    return () => {
+      window.removeEventListener("pointerdown", handlePointerDown);
+      window.removeEventListener("keydown", handleKeyDown);
+      window.removeEventListener("scroll", close, { capture: true });
+      window.removeEventListener("resize", close);
+    };
+  }, [menuOpen]);
 
   // Minimal focus trap — the dialog only contains one or two buttons.
   const handleDialogKeyDown = (e) => {
@@ -149,9 +193,98 @@ export function IssuedTransactionActions({
     triggerRef.current?.focus();
   };
 
+  const openMenu = () => {
+    const rect = triggerRef.current?.getBoundingClientRect();
+    if (rect)
+      setPosition({
+        top: rect.bottom + 6,
+        right: window.innerWidth - rect.right,
+      });
+    setMenuOpen(true);
+  };
+
+  // The menu always holds a single status-driven item, mirroring the inline
+  // pills: 'open' rows cancel through the confirmation dialog, 'cancel' rows
+  // restore directly. Closed rows never reach the menu — they keep the chip.
+  const closedChip = (
+    <span className="inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-sm font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 text-[var(--ink-muted)] bg-[var(--ink)]/14 text-[var(--ink)]">
+      <Flag size={13} strokeWidth={2.5} aria-hidden />
+      Closed
+    </span>
+  );
+
   return (
     <>
-      {transaction.status === "open" ? (
+      {variant === "menu" ? (
+        transaction.status === "open" || transaction.status === "cancel" ? (
+          <>
+            <button
+              ref={triggerRef}
+              type="button"
+              onClick={() => (menuOpen ? setMenuOpen(false) : openMenu())}
+              aria-haspopup="menu"
+              aria-expanded={menuOpen}
+              aria-label="Transaction actions"
+              disabled={pending}
+              className={cn(
+                "inline-flex h-8 w-8 items-center justify-center rounded-full text-[var(--ink-muted)] transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)]/30",
+                "hover:bg-[var(--surface-2)] hover:text-[var(--ink)] disabled:pointer-events-none disabled:opacity-40",
+                className,
+              )}
+            >
+              <EllipsisVertical size={16} aria-hidden />
+            </button>
+            {menuOpen &&
+              position &&
+              createPortal(
+                <div
+                  ref={menuRef}
+                  role="menu"
+                  aria-label="Transaction actions"
+                  style={{ top: position.top, right: position.right }}
+                  className="fixed z-[70] min-w-[11rem] overflow-hidden rounded-2xl border border-[var(--border)] bg-[var(--surface)] py-1 shadow-hover"
+                >
+                  {transaction.status === "open" ? (
+                    <button
+                      type="button"
+                      role="menuitem"
+                      disabled={pending}
+                      onClick={() => {
+                        setMenuOpen(false);
+                        // Opens the existing destructive-confirm dialog;
+                        // confirming calls onAction("cancel", transaction).
+                        setOpen(true);
+                      }}
+                      className="flex w-full items-center gap-2.5 px-3.5 py-2 text-sm font-medium text-[var(--danger)] transition-colors hover:bg-[var(--surface-2)] disabled:pointer-events-none disabled:opacity-40"
+                    >
+                      <Ban size={15} aria-hidden />
+                      Cancel issuance
+                    </button>
+                  ) : (
+                    <button
+                      type="button"
+                      role="menuitem"
+                      disabled={pending}
+                      onClick={() => {
+                        setMenuOpen(false);
+                        // Same path as the inline "Restore" pill:
+                        // onAction("restore", transaction) + focus hand-back.
+                        confirmRestore();
+                      }}
+                      className="flex w-full items-center gap-2.5 px-3.5 py-2 text-sm font-medium text-[var(--ink)] transition-colors hover:bg-[var(--surface-2)] disabled:pointer-events-none disabled:opacity-40"
+                    >
+                      <RefreshCcw size={15} aria-hidden />
+                      Restore issuance
+                    </button>
+                  )}
+                </div>,
+                document.body,
+              )}
+          </>
+        ) : (
+          closedChip
+        )
+      ) : transaction.status === "open" ? (
         <button
           ref={triggerRef}
           type="button"
@@ -182,10 +315,7 @@ export function IssuedTransactionActions({
           Restore
         </button>
       ) : (
-        <span className="inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-sm font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 text-[var(--ink-muted)] bg-[var(--ink)]/14 text-[var(--ink)]">
-          <Flag size={13} strokeWidth={2.5} aria-hidden />
-          Closed
-        </span>
+        closedChip
       )}
       {/* NOTE: the portal must NOT be a direct child of <AnimatePresence> —
           a portal is not a valid React element (isValidElement(portal) is

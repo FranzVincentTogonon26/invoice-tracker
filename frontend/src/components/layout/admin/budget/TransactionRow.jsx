@@ -79,6 +79,7 @@ export function TransactionRow({
             role={role}
             onAction={onAction}
             valueRemaining={valueRemaining}
+            variant="menu"
           />
         </div>
       </td>
