@@ -33,12 +33,7 @@ import {
   LoadingSkeleton,
 } from "../../components/ui/DataState";
 import { Pager } from "../../components/ui/Pager";
-import {
-  cn,
-  formatMoney,
-  startOfDay,
-  toDate,
-} from "../../lib/utils";
+import { cn, formatMoney, startOfDay, toDate } from "../../lib/utils";
 import { useNavigate } from "react-router-dom";
 import { useQueryClient } from "@tanstack/react-query";
 import { PAYMENT_METHODS } from "../../constants";
@@ -206,6 +201,14 @@ const AdminExpenses = () => {
     [activeExpenses],
   );
 
+  // Total Expenses headline = open budget issuances + recorded expenses — the
+  // exact money the My Balance card deducts from the allocation. `totalIssued`
+  // is the Total Issued Budget card's value, so the two cards always agree.
+  const totalSpend = useMemo(
+    () => totalIssued + activeTotal,
+    [totalIssued, activeTotal],
+  );
+
   // Full ledger (expenses + budget issuances) for the overview cards.
   const allLedgerRows = useMemo(
     () =>
@@ -247,6 +250,21 @@ const AdminExpenses = () => {
     [expenses, issuedTransactions],
   );
 
+  // Rows behind the Total Expenses headline: non-cancelled expenses plus the
+  // budget issuances the Total Issued Budget card counts (only 'open'
+  // references — 'close' / 'cancel' are excluded, exactly like the backend
+  // overview). The card's chart and Avg / day come from this same set, so
+  // every figure on the card reconciles with the headline.
+  const spendRows = useMemo(
+    () =>
+      allLedgerRows.filter((row) =>
+        row.kind === "expense"
+          ? row.status !== "cancel"
+          : row.status === "open",
+      ),
+    [allLedgerRows],
+  );
+
   // Table source — the only thing the date range filters.
   const ledgerRows = useMemo(
     () =>
@@ -258,10 +276,7 @@ const AdminExpenses = () => {
 
   const rangeLabel = shortRangeLabel(dateRange);
 
-  const spendWindow = useMemo(
-    () => rowsWindow(activeExpenses),
-    [activeExpenses],
-  );
+  const spendWindow = useMemo(() => rowsWindow(spendRows), [spendRows]);
 
   const recordWindow = useMemo(
     () => rowsWindow(allLedgerRows),
@@ -269,13 +284,8 @@ const AdminExpenses = () => {
   );
 
   const spendSeries = useMemo(
-    () =>
-      buildRangeSeries(
-        spendWindow,
-        activeExpenses,
-        (e) => Number(e.total_amount) || 0,
-      ),
-    [spendWindow, activeExpenses],
+    () => buildRangeSeries(spendWindow, spendRows, (row) => row.amount),
+    [spendWindow, spendRows],
   );
 
   const recordSeries = useMemo(
@@ -289,7 +299,8 @@ const AdminExpenses = () => {
     return start && end && end >= start ? countDays(start, end) : 0;
   }, [spendWindow]);
 
-  const dailyAverage = paceDays > 0 ? activeTotal / paceDays : 0;
+  // Same measure as the headline, so the stat reconciles with it.
+  const dailyAverage = paceDays > 0 ? totalSpend / paceDays : 0;
 
   const topCategory = useMemo(() => {
     const totals = new Map();
@@ -303,7 +314,11 @@ const AdminExpenses = () => {
 
   const heroStats = useMemo(
     () => [
-      { key: "top", label: "Top category", value: topCategory ?? "—" },
+      {
+        key: "top",
+        label: "Top category",
+        value: topCategory ?? "Budget Issued",
+      },
       {
         key: "pace",
         label: "Avg / day",
@@ -517,9 +532,9 @@ const AdminExpenses = () => {
           <motion.div variants={item} className="h-full min-w-0 [&>div]:h-full">
             <StatCard
               label="Total Expenses"
-              value={formatMoney(activeTotal)}
+              value={formatMoney(totalSpend)}
               icon={ReceiptText}
-              loading={isLoading}
+              loading={isLoading || issuedLoading}
               accent
               chart="bars"
               data={spendSeries}
@@ -583,17 +598,15 @@ const AdminExpenses = () => {
         </motion.div>
 
         <p className="px-1 text-xs text-[var(--ink-muted)]">
-          Money figures exclude cancelled lines · Transactions counts every row
-          (expenses + budget issuances), cancelled included · The overview cards
-          above are always all-time — charts and Avg / day span the records from
-          first to last, and the date range only filters the table below
+          Money figures exclude cancelled lines · Total Expenses adds open
+          budget issuances to expenses · Transactions counts every row (expenses
+          + budget issuances), cancelled included · The overview cards above are
+          always all-time — charts and Avg / day span the records from first to
+          last, and the date range only filters the table below
         </p>
       </section>
 
-      <Card
-        padding="lg"
-        className="relative  rounded-3xl px-2 sm:px-6"
-      >
+      <Card padding="lg" className="relative  rounded-3xl px-2 sm:px-6">
         <CardHeader>
           <div>
             <CardTitle className="text-lg">All Expenses</CardTitle>
