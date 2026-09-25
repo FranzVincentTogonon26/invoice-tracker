@@ -390,17 +390,23 @@ const BudgetModal = ({
   const balanceQuery = useBudgetBalance(form.reference_id, !isAddBudget);
 
   // Restriction guard — an employee may only hold ONE open issued budget
-  // reference at a time. Re-checked whenever the employee or the source of
-  // funds changes, so switching back to the conflicting reference keeps
-  // blocking while switching to the same source does not. Same-source
-  // top-ups stay allowed; the backend enforces the same rule on create.
+  // reference at a time. Validation runs ONLY when both the employee AND the
+  // budget source are selected: with either missing there is nothing
+  // meaningful to check, so no request fires and no conflict is surfaced.
+  // Once both are picked it re-checks whenever either changes, so switching
+  // back to the conflicting reference keeps blocking while switching to the
+  // same source does not. Same-source top-ups stay allowed; the backend
+  // enforces the same rule on create.
+  const guardReady = Boolean(form.employee && form.reference_id);
   const guardQuery = useEmployeeIssuedGuard(
     form.employee,
     form.reference_id,
     open && !isAddBudget,
   );
-  const issuedConflict = isAddBudget ? null : guardQuery.data?.conflict;
-  const issuedConflictMessage = isAddBudget ? null : guardQuery.data?.message;
+  const issuedConflict =
+    isAddBudget || !guardReady ? null : guardQuery.data?.conflict;
+  const issuedConflictMessage =
+    isAddBudget || !guardReady ? null : guardQuery.data?.message;
 
   const bodyRef = useSmoothScroll();
 

@@ -18,7 +18,7 @@ import { Badge } from "../../../ui/Badge";
 import { Button } from "../../../ui/Button";
 import { MethodIcon } from "../../../ui/Select";
 import { useExpenseDetail } from "../../../../hooks/useExpenses";
-import { formatDate, formatMoney, methodLabel } from "../../../../lib/utils";
+import { formatDate, formatMoney, formatTime, methodLabel } from "../../../../lib/utils";
 import { isReceiptPdf, openReceiptFile } from "../../../../lib/receiptMedia";
 import { ExpenseStatusBadge } from "./ExpensesTable";
 
@@ -66,7 +66,7 @@ const RecommendationTip = ({ tip }) => {
   const Icon = tone.Icon;
   return (
     <div
-      className={`flex items-start gap-3 rounded-2xl border px-4 py-3.5 ${tone.wrap}`}
+      className={`flex items-start gap-3 rounded-2xl border px-3.5 py-3 ${tone.wrap}`}
     >
       <span
         className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-xl ${tone.badge}`}
@@ -85,52 +85,31 @@ const RecommendationTip = ({ tip }) => {
   );
 };
 
-// ── Breathable receipt list — full width, not squeezed
+// ── Receipt list — full width, not squeezed
 // Data comes straight from the `receipt` table via GET /expenses/detail/:id
-// (Expenses.receiptLinesForExpense) — no re-scan. Footer shows DB sum only.
-const ReceiptLineList = ({ lines, linesTotal }) => (
-  <div>
-    <ul className="space-y-3">
-      {lines.map((item) => (
-        <li
-          key={item.key}
-          className="flex items-start justify-between gap-5 rounded-2xl border border-[var(--border)] bg-[var(--surface)] px-5 py-4 transition-colors hover:bg-[var(--surface-2)]/40"
-        >
-          <div className="min-w-0 flex-1">
-            <p className="break-words text-[14px] font-medium leading-snug text-[var(--ink)]">
-              {item.description || "Unnamed item"}
-            </p>
-            <div className="mt-2 flex flex-wrap items-center gap-2">
-              <span className="inline-flex items-center rounded-full bg-[var(--surface-2)] px-3 py-1 text-xs font-medium tabular-nums text-[var(--ink-muted)]">
-                × {formatQty(item.quantity)}
-              </span>
-              <span className="text-xs text-[var(--ink-muted)]">@</span>
-              <span className="text-xs tabular-nums text-[var(--ink-muted)]">
-                {formatMoney(item.rate)} each
-              </span>
-            </div>
-          </div>
-          <span className="shrink-0 pt-1 text-[14px] font-semibold tabular-nums text-[var(--ink)]">
-            {formatMoney(item.amount)}
-          </span>
-        </li>
-      ))}
-    </ul>
-
-    <div className="mt-4 flex items-center justify-between gap-4 rounded-2xl border border-[var(--border)] bg-[var(--surface-2)] px-5 py-4">
-      <div className="min-w-0">
-        <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-[var(--ink-muted)]">
-          Receipt total
-        </p>
-        <p className="mt-1 text-xs text-[var(--ink-muted)]">
-          {lines.length} {lines.length === 1 ? "item" : "items"} from receipt
-        </p>
-      </div>
-      <span className="font-display shrink-0 text-[22px] font-semibold tabular-nums tracking-tight text-[var(--ink)]">
-        {formatMoney(linesTotal)}
-      </span>
-    </div>
-  </div>
+// (Expenses.receiptLinesForExpense) — no re-scan. Count + DB sum live on the
+// toggle above, so the list itself stays label-free.
+const ReceiptLineList = ({ lines }) => (
+  <ul className="space-y-2">
+    {lines.map((item) => (
+      <li
+        key={item.key}
+        className="flex items-start justify-between gap-4 rounded-xl border border-[var(--border)] bg-[var(--surface)] px-4 py-3 transition-colors hover:bg-[var(--surface-2)]/40"
+      >
+        <div className="min-w-0 flex-1">
+          <p className="break-words text-sm font-medium leading-snug text-[var(--ink)]">
+            {item.description || "Unnamed item"}
+          </p>
+          <p className="mt-1 text-xs tabular-nums text-[var(--ink-muted)]">
+            × {formatQty(item.quantity)} @ {formatMoney(item.rate)} each
+          </p>
+        </div>
+        <span className="shrink-0 text-sm font-semibold tabular-nums text-[var(--ink)]">
+          {formatMoney(item.amount)}
+        </span>
+      </li>
+    ))}
+  </ul>
 );
 
 const EmployeeBlock = ({ name, role, avatarUrl }) => (
@@ -167,7 +146,6 @@ const ExpenseDetailsModal = ({
   onClose,
 }) => {
   const titleId = useId();
-  const itemsTitleId = useId();
   const itemsRegionId = useId();
   const [failedUrl, setFailedUrl] = useState(null);
   const row = expense;
@@ -313,7 +291,7 @@ const ExpenseDetailsModal = ({
             className="relative flex max-h-[calc(100dvh-1.5rem)] w-full max-w-[880px] flex-col overflow-hidden rounded-[28px] border border-[var(--border)] bg-[var(--surface)] shadow-hover"
           >
             {/* ── Header ── */}
-            <div className="flex shrink-0 items-start justify-between gap-4 border-b border-[var(--border)] px-5 pb-4 pt-5 sm:px-6 sm:pt-6">
+            <div className="flex shrink-0 items-start justify-between gap-4 border-b border-[var(--border)] px-4 pb-3.5 pt-4 sm:px-6 sm:pb-4 sm:pt-5">
               <div className="min-w-0 flex gap-3">
                 <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-[var(--accent-soft)] text-[var(--accent-strong)]">
                   <ReceiptText size={18} aria-hidden />
@@ -344,16 +322,16 @@ const ExpenseDetailsModal = ({
             </div>
 
             {/* ── Body ── */}
-            <div className="scrollbar-slim min-h-0 flex-1 overflow-y-auto overscroll-contain px-4 py-5 sm:px-6 sm:py-6">
-              <div className="space-y-6">
+            <div className="scrollbar-slim min-h-0 flex-1 overflow-y-auto overscroll-contain px-4 py-4 sm:px-6 sm:py-5">
+              <div className="space-y-4 sm:space-y-5">
                 {/* Hero — amount + core context, no redundant labels */}
-                <div className="rounded-[24px] border border-[var(--border)] bg-[var(--surface-2)]/50 p-5 sm:p-6">
-                  <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+                <div className="rounded-[24px] border border-[var(--border)] bg-[var(--surface-2)]/50 p-4 sm:p-5">
+                  <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
                     <div className="min-w-0 flex-1">
                       <p className="break-words text-[15px] font-semibold leading-snug text-[var(--ink)]">
                         {row?.description || "Untitled expense"}
                       </p>
-                      <div className="mt-3 flex flex-wrap items-center gap-2">
+                      <div className="mt-2.5 flex flex-wrap items-center gap-2">
                         <ExpenseStatusBadge status={row?.status} />
                         <Badge tone="accent" className="max-w-full">
                           <span className="truncate">
@@ -363,17 +341,15 @@ const ExpenseDetailsModal = ({
                       </div>
                     </div>
                     <div className="shrink-0 sm:text-right">
-                      <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-[var(--ink-muted)]">
-                        Amount
-                      </p>
-                      <p className="mt-1 font-display text-[26px] font-semibold tabular-nums leading-none tracking-tight text-[var(--ink)] sm:text-[28px]">
+                      <p className="sr-only">Amount</p>
+                      <p className="font-display text-[26px] font-semibold tabular-nums leading-none tracking-tight text-[var(--ink)] sm:text-[28px]">
                         {formatMoney(recordedTotal)}
                       </p>
                     </div>
                   </div>
 
                   {/* essential meta as pills — no MetaRow wall */}
-                  <div className="mt-4 flex flex-wrap items-center gap-2">
+                  <div className="mt-3 flex flex-wrap items-center gap-2">
                     <span className="inline-flex items-center gap-1.5 rounded-full border border-[var(--border)] bg-[var(--surface)] px-3 py-1.5 text-xs font-medium text-[var(--ink-muted)]">
                       <CalendarDays
                         size={13}
@@ -399,35 +375,30 @@ const ExpenseDetailsModal = ({
                     )}
                   </div>
 
-                  {/* notes — only when present, as a soft quote */}
+                  {/* notes — soft quote, no nested card or label */}
                   {row?.notes && (
-                    <div className="mt-4 rounded-2xl border border-[var(--border)] bg-[var(--surface)] px-4 py-3">
-                      <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-[var(--ink-muted)]">
-                        Note
-                      </p>
-                      <p className="mt-1.5 break-words text-sm leading-relaxed text-[var(--ink)]">
-                        {row.notes}
-                      </p>
-                    </div>
+                    <p className="mt-3 border-l-2 border-[var(--accent)]/40 pl-3 text-sm italic leading-relaxed text-[var(--ink-muted)]">
+                      {row.notes}
+                    </p>
                   )}
-                </div>
 
-                {/* Filed by — compact, single line */}
-                <div className="flex items-center justify-between gap-4 rounded-2xl border border-[var(--border)] bg-[var(--surface)] px-4 py-3.5">
-                  <EmployeeBlock
-                    name={row?.employee}
-                    role={row?.employeeRole}
-                    avatarUrl={row?.employeeAvatar}
-                  />
-                  <span className="hidden shrink-0 text-xs tabular-nums text-[var(--ink-muted)] sm:inline-flex">
-                    {formatDate(row?.timeDate)}
-                  </span>
+                  {/* filed by — merged row, no extra card */}
+                  <div className="mt-3.5 flex items-center justify-between gap-3 border-t border-[var(--border)] pt-3">
+                    <EmployeeBlock
+                      name={row?.employee}
+                      role={row?.employeeRole}
+                      avatarUrl={row?.employeeAvatar}
+                    />
+                    <span className="shrink-0 text-xs tabular-nums text-[var(--ink-muted)]">
+                      Filed {formatTime(row?.timeDate)}
+                    </span>
+                  </div>
                 </div>
 
                 {/* Receipt */}
                 {hasReceipt && (
                   <section aria-label="Receipt" className="space-y-3">
-                    <div className="flex items-center justify-between gap-3 px-1">
+                    <div className="px-1">
                       <h4 className="flex items-center gap-2 text-[11px] font-semibold uppercase tracking-[0.12em] text-[var(--ink-muted)]">
                         <ReceiptText
                           size={13}
@@ -436,31 +407,22 @@ const ExpenseDetailsModal = ({
                         />
                         Receipt
                       </h4>
-                      {!linesLoading && receiptLines.length > 0 && (
-                        <span
-                          id={itemsTitleId}
-                          className="rounded-full bg-[var(--surface-2)] px-2.5 py-1 text-[11px] font-semibold tabular-nums text-[var(--ink-muted)]"
-                        >
-                          {receiptLines.length}{" "}
-                          {receiptLines.length === 1 ? "item" : "items"}
-                        </span>
-                      )}
                     </div>
 
-                    <div className="space-y-4">
+                    <div className="space-y-3">
                       {/* image — full width so the item list below stays breathable and not squeezed into a half column */}
                       {canPreviewImage ? (
                         <button
                           type="button"
                           onClick={() => openReceiptFile(receiptUrl)}
                           aria-label="Open receipt image"
-                          className="group relative block w-full overflow-hidden rounded-2xl border border-white/10 bg-[#101817] p-3 sm:p-4"
+                          className="group relative block w-full overflow-hidden rounded-2xl border border-white/10 bg-[#101817] p-2.5 sm:p-3"
                         >
                           <img
                             src={receiptUrl}
                             alt="Stored receipt"
                             onError={() => setFailedUrl(receiptUrl)}
-                            className="mx-auto max-h-[380px] w-full max-w-[420px] rounded-xl bg-white object-contain shadow-[0_8px_32px_rgba(0,0,0,0.35)] transition-transform duration-200 group-hover:scale-[1.01] sm:max-h-[420px]"
+                            className="mx-auto max-h-[300px] w-full max-w-[420px] rounded-xl bg-white object-contain shadow-[0_8px_32px_rgba(0,0,0,0.35)] transition-transform duration-200 group-hover:scale-[1.01] sm:max-h-[360px]"
                           />
                           <span className="pointer-events-none absolute inset-x-0 bottom-0 flex items-center justify-center gap-1.5 bg-black/65 px-3 py-2.5 text-xs font-medium text-white opacity-0 backdrop-blur-sm transition-opacity group-hover:opacity-100 group-focus-visible:opacity-100">
                             <Eye size={13} aria-hidden />
@@ -468,7 +430,7 @@ const ExpenseDetailsModal = ({
                           </span>
                         </button>
                       ) : (
-                        <div className="flex min-h-[140px] w-full flex-col items-center justify-center gap-3 rounded-2xl border border-dashed border-[var(--border)] bg-[var(--surface-2)]/50 px-4 py-6 text-center">
+                        <div className="flex min-h-[120px] w-full flex-col items-center justify-center gap-3 rounded-2xl border border-dashed border-[var(--border)] bg-[var(--surface-2)]/50 px-4 py-5 text-center">
                           <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-[var(--surface-2)] text-[var(--ink-muted)]">
                             <ImageOff size={16} aria-hidden />
                           </span>
@@ -507,14 +469,14 @@ const ExpenseDetailsModal = ({
                       >
                         {linesLoading ? (
                           <div
-                            className="space-y-2.5"
+                            className="space-y-2"
                             role="status"
                             aria-label="Loading receipt lines"
                           >
                             {[0, 1, 2].map((i) => (
                               <div
                                 key={i}
-                                className="h-[76px] animate-pulse rounded-2xl border border-[var(--border)] bg-[var(--surface-2)]/60"
+                                className="h-[68px] animate-pulse rounded-xl border border-[var(--border)] bg-[var(--surface-2)]/60"
                               />
                             ))}
                           </div>
@@ -553,7 +515,7 @@ const ExpenseDetailsModal = ({
                             </Button>
                           </div>
                         ) : receiptLines.length === 0 ? (
-                          <div className="rounded-2xl border border-[var(--border)] bg-[var(--surface-2)]/40 px-4 py-8 text-center">
+                          <div className="rounded-2xl border border-[var(--border)] bg-[var(--surface-2)]/40 px-4 py-6 text-center">
                             <span className="mx-auto flex h-9 w-9 items-center justify-center rounded-xl bg-[var(--surface)] text-[var(--ink-muted)]">
                               <ListChecks size={16} aria-hidden />
                             </span>
@@ -576,10 +538,10 @@ const ExpenseDetailsModal = ({
                               }
                               aria-expanded={itemsOpen}
                               aria-controls={itemsRegionId}
-                              className="flex min-h-[54px] w-full items-center justify-between gap-3 rounded-2xl border border-[var(--border)] bg-[var(--surface)] px-4 py-3 text-left transition-colors hover:border-[var(--accent)]/25 hover:bg-[var(--surface-2)]/40"
+                              className="flex min-h-[52px] w-full items-center justify-between gap-3 rounded-xl border border-[var(--border)] bg-[var(--surface)] px-3.5 py-2.5 text-left transition-colors hover:border-[var(--accent)]/25 hover:bg-[var(--surface-2)]/40"
                             >
                               <span className="flex min-w-0 items-center gap-3">
-                                <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-[var(--accent-soft)] text-[var(--accent-strong)]">
+                                <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-[var(--accent-soft)] text-[var(--accent-strong)]">
                                   <ListChecks size={16} aria-hidden />
                                 </span>
                                 <span className="min-w-0">
@@ -618,11 +580,8 @@ const ExpenseDetailsModal = ({
                                   }}
                                   className="overflow-hidden"
                                 >
-                                  <div className="pt-3">
-                                    <ReceiptLineList
-                                      lines={receiptLines}
-                                      linesTotal={linesTotal}
-                                    />
+                                  <div className="pt-2.5">
+                                    <ReceiptLineList lines={receiptLines} />
                                   </div>
                                 </motion.div>
                               )}
@@ -637,7 +596,7 @@ const ExpenseDetailsModal = ({
                 {/* Recommendations — only when there’s something to act on */}
                 {hasRecommendations && (
                   <section aria-label="Insights" className="space-y-3">
-                    <div className="flex items-center justify-between gap-3 px-1">
+                    <div className="px-1">
                       <h4 className="flex items-center gap-2 text-[11px] font-semibold uppercase tracking-[0.12em] text-[var(--ink-muted)]">
                         <Sparkles
                           size={13}
@@ -646,11 +605,8 @@ const ExpenseDetailsModal = ({
                         />
                         Insights
                       </h4>
-                      <span className="text-[11px] font-semibold tabular-nums text-[var(--ink-muted)]">
-                        {recommendations.length}
-                      </span>
                     </div>
-                    <div className="space-y-2.5">
+                    <div className="space-y-2">
                       {recommendations.map((tip) => (
                         <RecommendationTip key={tip.key} tip={tip} />
                       ))}
@@ -661,7 +617,7 @@ const ExpenseDetailsModal = ({
             </div>
 
             {/* ── Footer ── */}
-            <div className="flex shrink-0 items-center justify-end gap-2 border-t border-[var(--border)] bg-[var(--surface)] px-5 py-4 sm:px-6">
+            <div className="flex shrink-0 items-center justify-end gap-2 border-t border-[var(--border)] bg-[var(--surface)] px-4 py-3 sm:px-6">
               <Button
                 type="button"
                 variant="outline"

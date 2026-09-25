@@ -1,5 +1,8 @@
 import { useState, useMemo, useEffect } from "react";
 import {
+  Banknote,
+  CreditCard,
+  Landmark,
   Layers,
   Search,
   X,
@@ -7,30 +10,74 @@ import {
   Wallet,
   ReceiptText,
   HandCoins,
+  Wallet as MethodWalletIcon,
 } from "lucide-react";
-import { Card } from "../../components/ui/Card";
-import { Badge, StatusBadge } from "../../components/ui/Badge";
-import { SearchInput } from "../../components/ui/Input";
-import { MethodIcon } from "../../components/ui/Select";
-import { Pager } from "../../components/ui/Pager";
-import { EmptyState, LoadingSkeleton } from "../../components/ui/DataState";
+import { Card } from "../../../ui/Card";
+import { Badge } from "../../../ui/Badge";
+import { SearchInput } from "../../../ui/Input";
+import { Pager } from "../../../ui/Pager";
+import { EmptyState, LoadingSkeleton } from "../../../ui/DataState";
 import {
   cn,
+  emptyDateRange,
   formatDate,
+  formatDateRange,
   formatMoney,
   formatTime,
+  matchesDayRange,
   methodLabel,
-} from "../../lib/utils";
+  toDate,
+} from "../../../../lib/utils";
+import DateRangePicker from "../../../ui/DateRangePicker";
+
+// Short "20 Oct" date for the compact mobile meta row. Falls back to the
+// full `formatDate` for valid non-midnight timestamps only when parsing
+// fails entirely — invalid dates render as "—", never "Invalid Date".
+const formatShortDate = (value) => {
+  const parsed = toDate(value);
+  if (!parsed) return "—";
+  return parsed.toLocaleDateString("en-GB", {
+    day: "numeric",
+    month: "short",
+  });
+};
+
+const TYPE_LABEL_SHORT = {
+  issued: "Received",
+  expense: "Spent",
+};
+
+// Instant-scan method badge: tint + glyph per payment method so the type is
+// readable without parsing text. Unknown methods fall back to neutral.
+const METHOD_BADGE = {
+  cash: { tone: "success", icon: Banknote },
+  bank_transfer: { tone: "accent", icon: Landmark },
+  e_wallet: { tone: "warning", icon: MethodWalletIcon },
+};
+
+const MethodBadge = ({ method, className }) => {
+  const config = METHOD_BADGE[method] ?? { tone: "neutral", icon: CreditCard };
+  const BadgeIcon = config.icon;
+  return (
+    <Badge
+      tone={config.tone}
+      className={cn("shrink-0 px-1.5 py-0.5 text-[10px]", className)}
+    >
+      <BadgeIcon size={11} aria-hidden />
+      {methodLabel(method)}
+    </Badge>
+  );
+};
 
 const TYPE_CONFIG = {
   issued: {
-    label: "Budget Issued",
+    label: "Received",
     badgeTone: "accent",
     icon: Wallet,
     iconWrapperClass: "bg-[var(--accent-soft)] text-[var(--accent-strong)]",
   },
   expense: {
-    label: "Expense",
+    label: "Paid",
     badgeTone: "neutral",
     icon: ReceiptText,
     iconWrapperClass: "bg-[var(--accent-soft)] text-[var(--accent-strong)]",
@@ -43,27 +90,21 @@ const TYPE_CONFIG = {
   },
 };
 
-const EXPENSE_STATUS_TONES = {
-  paid: "success",
-  draft: "warning",
-  cancel: "danger",
-};
-
-const ABONO_STATUS_TONES = {
-  open: "warning",
-  settled: "success",
-};
-
 const PAGE_SIZE = 10;
-const COLUMN_WIDTHS = ["14%", "15%", "23%", "16%", "12%", "10%", "10%"];
+const COLUMN_WIDTHS = ["16%", "28%", "18%", "16%", "22%"];
 
-export const TransactionsSection = ({
+export const TransactionsSectionExpenses = ({
   transactions = [],
   isLoading = false,
 }) => {
   const [search, setSearch] = useState("");
   const [debouncedSearch, setDebouncedSearch] = useState("");
   const [page, setPage] = useState(0);
+  // Date window applied on top of the text search (client-side; the hook
+  // keeps fetching everything so clearing the range restores all rows).
+  const [dateRange, setDateRange] = useState(emptyDateRange);
+
+  const hasDateRange = Boolean(dateRange?.start && dateRange?.end);
 
   useEffect(() => {
     const timer = setTimeout(() => {
@@ -75,8 +116,11 @@ export const TransactionsSection = ({
 
   const filteredTransactions = useMemo(() => {
     const q = debouncedSearch.trim().toLowerCase();
-    if (!q) return transactions;
+    const { start, end } = dateRange ?? {};
+    const inRange = (tx) => matchesDayRange(tx.date, start, end);
+    if (!q) return transactions.filter(inRange);
     return transactions.filter((tx) => {
+      if (!inRange(tx)) return false;
       const typeLabel = TYPE_CONFIG[tx.kind]?.label?.toLowerCase() || "";
       const desc = (tx.description || "").toLowerCase();
       const refLabel = (tx.reference_label || "").toLowerCase();
@@ -95,7 +139,7 @@ export const TransactionsSection = ({
         amountStr.includes(q)
       );
     });
-  }, [transactions, debouncedSearch]);
+  }, [transactions, debouncedSearch, dateRange]);
 
   const pageCount = Math.max(
     1,
@@ -121,27 +165,24 @@ export const TransactionsSection = ({
           <div>
             <div className="flex items-center gap-2">
               <h3 className="font-display text-base font-semibold tracking-tight text-[var(--ink)]">
-                All Transactions
+                All Expenses
               </h3>
-              {!isLoading && (
-                <Badge tone="neutral" className="tabular-nums">
-                  {filteredTransactions.length}
-                </Badge>
-              )}
             </div>
-            <p className="text-xs text-[var(--ink-muted)]">
-              Every budget issuance, expense and abono reimbursement
+            <p className="text-xs text-[var(--ink-muted)] truncate">
+              Monitor spending and expenses.
             </p>
           </div>
         </div>
 
-        {/* Top Searchbar */}
-        <div className="w-full md:w-80">
+        {/* Search + date filter — one row; the search field takes the room */}
+        <div className="flex w-full flex-1 items-center gap-2 md:max-w-2xl">
           <SearchInput
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             leftIcon={<Search size={16} />}
-            placeholder="Search transactions..."
+            placeholder="Search..."
+            aria-label="Search Expenses"
+            className="min-w-0 flex-1"
             rightSlot={
               search ? (
                 <button
@@ -155,6 +196,17 @@ export const TransactionsSection = ({
               ) : null
             }
           />
+          {/* Icon-only on mobile (`compactOnMobile`), full label on `sm:`+ */}
+          <DateRangePicker
+            value={dateRange}
+            onChange={(r) => {
+              setDateRange(r);
+              setPage(0);
+            }}
+            placeholder="All dates"
+            align="end"
+            compactOnMobile
+          />
         </div>
       </div>
       {/* ── CONTENT: DESKTOP TABLE VIEW ── */}
@@ -167,17 +219,23 @@ export const TransactionsSection = ({
             title={
               debouncedSearch
                 ? "No matching transactions"
-                : "No transactions found"
+                : hasDateRange
+                  ? "No transactions in this range"
+                  : "No transactions found"
             }
             description={
-              debouncedSearch
-                ? `No transactions matched "${debouncedSearch}". Try clearing your search.`
-                : "No budget issuances, expenses, or abono records yet."
+              debouncedSearch && hasDateRange
+                ? `Nothing in ${formatDateRange(dateRange)} matched "${debouncedSearch}".`
+                : hasDateRange
+                  ? `Nothing was recorded in ${formatDateRange(dateRange)}. Try a wider range.`
+                  : debouncedSearch
+                    ? `No transactions matched "${debouncedSearch}". Try clearing your search.`
+                    : "No budget issuances, expenses, or abono records yet."
             }
           />
         ) : (
-          <div className="overflow-x-auto rounded-2xl border border-[var(--border)] bg-[var(--surface)]">
-            <table className="w-full table-fixed border-collapse text-left">
+          <div className="overflow-x-auto rounded-2xl border border-[var(--border)] bg-[var(--surface)] shadow-card">
+            <table className="w-full min-w-[720px] table-fixed border-collapse text-left">
               <caption className="sr-only">
                 Employee all transactions list
               </caption>
@@ -186,27 +244,22 @@ export const TransactionsSection = ({
                   <col key={i} style={{ width }} />
                 ))}
               </colgroup>
-              <thead className="sticky top-0 z-[1] bg-[var(--surface-2)]/80 backdrop-blur">
+              <thead className="sticky top-0 z-[1] bg-[var(--surface-2)]">
                 <tr>
-                  <th className="border-b border-[var(--border)] px-4 py-3.5 type-eyebrow text-[var(--ink-muted)] first:pl-5">
+                  <th className="whitespace-nowrap border-b border-[var(--border)] px-4 py-3 type-eyebrow text-[var(--ink-muted)] first:pl-5">
                     Date
                   </th>
-                  <th className="border-b border-[var(--border)] px-4 py-3.5 type-eyebrow text-[var(--ink-muted)]">
-                    Type
-                  </th>
-                  <th className="border-b border-[var(--border)] px-4 py-3.5 type-eyebrow text-[var(--ink-muted)]">
+
+                  <th className="whitespace-nowrap border-b border-[var(--border)] px-4 py-3 type-eyebrow text-[var(--ink-muted)]">
                     Description
                   </th>
-                  <th className="border-b border-[var(--border)] px-4 py-3.5 type-eyebrow text-[var(--ink-muted)]">
-                    Reference
-                  </th>
-                  <th className="border-b border-[var(--border)] px-4 py-3.5 type-eyebrow text-[var(--ink-muted)]">
+                  <th className="whitespace-nowrap border-b border-[var(--border)] px-4 py-3 type-eyebrow text-[var(--ink-muted)]">
                     Method
                   </th>
-                  <th className="border-b border-[var(--border)] px-4 py-3.5 text-center type-eyebrow text-[var(--ink-muted)]">
-                    Status
+                  <th className="whitespace-nowrap border-b border-[var(--border)] px-4 py-3 type-eyebrow text-[var(--ink-muted)]">
+                    Type
                   </th>
-                  <th className="border-b border-[var(--border)] px-4 py-3.5 text-right type-eyebrow text-[var(--ink-muted)] last:pr-5">
+                  <th className="whitespace-nowrap border-b border-[var(--border)] px-4 py-3 text-right type-eyebrow text-[var(--ink-muted)] last:pr-5">
                     Amount
                   </th>
                 </tr>
@@ -225,20 +278,43 @@ export const TransactionsSection = ({
                   return (
                     <tr
                       key={`${tx.kind}-${tx.id}`}
-                      className="group transition-colors duration-150 hover:bg-[var(--accent)]/[0.04]"
+                      className="transition-colors duration-150 hover:bg-[var(--accent)]/[0.05]"
                     >
-                      <td className="px-4 py-3.5 first:pl-5 align-middle">
-                        <p className="text-sm font-medium leading-none tabular-nums text-[var(--ink)]">
+                      <td className="px-4 py-3 first:pl-5 align-middle">
+                        <p className="whitespace-nowrap text-[13px] font-semibold leading-none tabular-nums text-[var(--ink)]">
                           {formatDate(tx.date)}
                         </p>
-                        <p className="mt-1 text-xs leading-none tabular-nums text-[var(--ink-muted)]">
+                        <p className="mt-1 whitespace-nowrap text-[11px] leading-none tabular-nums text-[var(--ink-muted)]">
                           {formatTime(tx.date)}
                         </p>
                       </td>
-                      <td className="px-4 py-3.5 align-middle">
+
+                      <td className="px-4 py-3 align-middle">
+                        <p
+                          className="truncate text-[13px] font-semibold leading-snug text-[var(--ink)]"
+                          title={tx.reference_label || tx.description}
+                        >
+                          {tx.reference_label || tx.description || "—"}
+                        </p>
+                        {tx.reference_label && tx.description ? (
+                          <p
+                            className="mt-0.5 truncate text-[11px] leading-snug text-[var(--ink-muted)]"
+                            title={tx.description}
+                          >
+                            {tx.description}
+                          </p>
+                        ) : null}
+                      </td>
+                      <td className="px-4 py-3 align-middle">
+                        <MethodBadge
+                          method={tx.method}
+                          className="max-w-full"
+                        />
+                      </td>
+                      <td className="px-4 py-3 align-middle">
                         <Badge
                           tone={meta.badgeTone}
-                          className="max-w-full gap-1.5"
+                          className="max-w-full gap-1.5 px-2 py-1 text-[11px]"
                         >
                           <Icon
                             size={12}
@@ -248,63 +324,10 @@ export const TransactionsSection = ({
                           <span className="truncate">{meta.label}</span>
                         </Badge>
                       </td>
-                      <td className="px-4 py-3.5 align-middle">
-                        <p
-                          className="truncate text-sm font-semibold text-[var(--ink)]"
-                          title={tx.description}
-                        >
-                          {tx.description || "—"}
-                        </p>
-                        {tx.notes && (
-                          <p
-                            className="mt-0.5 truncate text-xs text-[var(--ink-muted)]"
-                            title={tx.notes}
-                          >
-                            {tx.notes}
-                          </p>
-                        )}
-                      </td>
-                      <td className="px-4 py-3.5 align-middle">
-                        <p className="truncate text-xs font-medium text-[var(--ink-muted)]">
-                          {tx.reference_label || "—"}
-                        </p>
-                      </td>
-                      <td className="px-4 py-3.5 align-middle">
-                        <span className="inline-flex items-center gap-1.5 text-xs text-[var(--ink-muted)]">
-                          <MethodIcon
-                            method={tx.method}
-                            className="h-3.5 w-3.5 shrink-0"
-                          />
-                          <span className="truncate capitalize">
-                            {methodLabel(tx.method)}
-                          </span>
-                        </span>
-                      </td>
-                      <td className="px-4 py-3.5 text-center align-middle">
-                        {tx.kind === "issued" ? (
-                          <StatusBadge status={tx.status} />
-                        ) : tx.kind === "expense" ? (
-                          <Badge
-                            tone={EXPENSE_STATUS_TONES[tx.status] ?? "neutral"}
-                            className="capitalize"
-                          >
-                            <span className="h-1.5 w-1.5 rounded-full bg-current opacity-80" />
-                            {tx.status || "—"}
-                          </Badge>
-                        ) : (
-                          <Badge
-                            tone={ABONO_STATUS_TONES[tx.status] ?? "neutral"}
-                            className="capitalize"
-                          >
-                            <span className="h-1.5 w-1.5 rounded-full bg-current opacity-80" />
-                            {tx.status || "open"}
-                          </Badge>
-                        )}
-                      </td>
-                      <td className="px-4 py-3.5 text-right last:pr-5 align-middle">
+                      <td className="px-4 py-3 text-right last:pr-5 align-middle">
                         <span
                           className={cn(
-                            "font-display text-sm font-semibold tabular-nums",
+                            "whitespace-nowrap font-display text-[15px] font-semibold tabular-nums",
                             amountColor,
                           )}
                         >
@@ -347,12 +370,18 @@ export const TransactionsSection = ({
             title={
               debouncedSearch
                 ? "No matching transactions"
-                : "No transactions found"
+                : hasDateRange
+                  ? "No transactions in this range"
+                  : "No transactions found"
             }
             description={
-              debouncedSearch
-                ? `No transactions matched "${debouncedSearch}".`
-                : "No transactions recorded yet."
+              debouncedSearch && hasDateRange
+                ? `Nothing in ${formatDateRange(dateRange)} matched "${debouncedSearch}".`
+                : hasDateRange
+                  ? `Nothing was recorded in ${formatDateRange(dateRange)}. Try a wider range.`
+                  : debouncedSearch
+                    ? `No transactions matched "${debouncedSearch}".`
+                    : "No transactions recorded yet."
             }
           />
         ) : (
@@ -385,9 +414,21 @@ export const TransactionsSection = ({
                     <p className="truncate text-xs font-semibold leading-none text-[var(--ink)]">
                       {tx.description || meta.label}
                     </p>
-                    <p className="mt-1 truncate text-[11px] font-medium leading-none text-[var(--ink-muted)]">
-                      {meta.label} · {formatDate(tx.date)}{" "}
-                      {tx.reference_label ? `· ${tx.reference_label}` : ""}
+                    {/* Meta row: type · short date · method badge */}
+                    <p className="mt-1.5 flex min-w-0 items-center gap-1.5 text-[11px] font-medium leading-none text-[var(--ink-muted)]">
+                      <span className="shrink-0">
+                        {TYPE_LABEL_SHORT[tx.kind] ?? meta.label}
+                      </span>
+                      <span aria-hidden className="shrink-0 opacity-40">
+                        |
+                      </span>
+                      <span className="shrink-0 tabular-nums">
+                        {formatShortDate(tx.date)}
+                      </span>
+                      <span aria-hidden className="shrink-0 opacity-40">
+                        |
+                      </span>
+                      <MethodBadge method={tx.method} />
                     </p>
                   </div>
                 </div>
@@ -396,7 +437,7 @@ export const TransactionsSection = ({
                 <div className="text-right shrink-0">
                   <p
                     className={cn(
-                      "font-display text-sm font-semibold tabular-nums",
+                      "font-display text-base font-semibold tabular-nums",
                       amountColor,
                     )}
                   >
@@ -404,28 +445,6 @@ export const TransactionsSection = ({
                       ? `-${formatMoney(tx.amount)}`
                       : `+${formatMoney(tx.amount)}`}
                   </p>
-                  <div className="mt-1 flex justify-end">
-                    {tx.kind === "issued" ? (
-                      <StatusBadge
-                        status={tx.status}
-                        className="text-[10px] px-1.5 py-0.5"
-                      />
-                    ) : tx.kind === "expense" ? (
-                      <Badge
-                        tone={EXPENSE_STATUS_TONES[tx.status] ?? "neutral"}
-                        className="capitalize text-[10px] px-1.5 py-0.5"
-                      >
-                        {tx.status || "—"}
-                      </Badge>
-                    ) : (
-                      <Badge
-                        tone={ABONO_STATUS_TONES[tx.status] ?? "neutral"}
-                        className="capitalize text-[10px] px-1.5 py-0.5"
-                      >
-                        {tx.status || "open"}
-                      </Badge>
-                    )}
-                  </div>
                 </div>
               </div>
             );
@@ -455,4 +474,4 @@ export const TransactionsSection = ({
   );
 };
 
-export default TransactionsSection;
+export default TransactionsSectionExpenses;

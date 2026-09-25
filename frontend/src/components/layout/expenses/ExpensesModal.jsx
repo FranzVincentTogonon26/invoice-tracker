@@ -2,21 +2,21 @@ import { useCallback, useEffect, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import { Loader2, X } from "lucide-react";
 import toast from "react-hot-toast";
-import { Button } from "../../../ui/Button";
-import { useExpensesMutations } from "../../../../hooks/useExpenses";
-import useSmoothScroll from "../../../../hooks/useSmoothScroll";
-import { useReceiptScan } from "../../../../hooks/useReceiptScan";
+import { Button } from "../../ui/Button";
+import { useExpensesMutations } from "../../../hooks/useExpenses";
+import useSmoothScroll from "../../../hooks/useSmoothScroll";
+import { useReceiptScan } from "../../../hooks/useReceiptScan";
 import {
   buildReceiptDraft,
   savePendingReceipt,
-} from "../../../../lib/receiptDraft";
+} from "../../../lib/receiptDraft";
 import {
   ERROR_VISIBLE_MS,
   MAX_RECEIPT_BYTES,
   MAX_RECEIPT_LABEL,
   MODAL_COPY,
   blankReceipt,
-} from "../../../../constants";
+} from "../../../constants";
 import CategoryPanel from "./CategoryPanel";
 import ScanOverlay from "./ScanOverlay";
 import ErrorAlert from "./ErrorAlert";
@@ -35,7 +35,6 @@ const ExpensesModal = ({
 }) => {
   const { create, removeCategory } = useExpensesMutations();
   const tableRef = useSmoothScroll();
-
   const [newCategory, setNewCategory] = useState("");
   const [err, setErr] = useState("");
   const [adding, setAdding] = useState(false);
@@ -43,10 +42,8 @@ const ExpensesModal = ({
   const [saving, setSaving] = useState(false);
   const [receipt, setReceipt] = useState(blankReceipt);
   const [confirmClear, setConfirmClear] = useState(false);
-
   const busy = adding || deletingId !== null || saving;
 
-  // Anything worth confirming before discarding (image, parsed fields, lines).
   const hasReceiptData =
     Boolean(receipt.imageUrl) ||
     Boolean(receipt.fileName) ||
@@ -56,11 +53,8 @@ const ExpensesModal = ({
     Number(receipt.total) > 0 ||
     (receipt.items ?? []).length > 0;
 
-  // Confirm Receipt requires an actual upload � line items alone (e.g.
-  // manually added after a failed scan) must not enable it.
   const hasReceiptImage = Boolean(receipt.imageUrl);
 
-  // Live sum of the editable line items shown in the scan panel.
   const itemsTotal = (receipt.items ?? []).reduce(
     (sum, item) =>
       sum + (Number(item.quantity) || 0) * (Number(item.rate) || 0),
@@ -71,18 +65,10 @@ const ExpensesModal = ({
 
   useEffect(() => {
     if (!err) return undefined;
-
     const id = setTimeout(() => setErr(""), ERROR_VISIBLE_MS);
     return () => clearTimeout(id);
   }, [err]);
 
-  // Scan wiring lives above the open/transaction reset below � that reset
-  // runs during render and clears the hook's error state, so the hook must
-  // be declared first (calling setScanErr before initialization would throw
-  // a ReferenceError the moment the modal opens).
-  // Fill the form + "Scan list items" card from the AI result. Prefer the
-  // itemized lines; fall back to vendor + grand total when Gemini couldn't
-  // split items.
   const handleParsed = useCallback((parsed) => {
     const items = parsed.lineItems?.length
       ? parsed.lineItems.map((li) => ({
@@ -109,18 +95,13 @@ const ExpensesModal = ({
       currency: parsed.currency || "",
       total: parsed.total || 0,
       suggestedCategory: parsed.suggested_category || "",
-      // The backend stored the upload during the scan and answered with its
-      // public URL — the draft only ever carries this short string, so a big
-      // photo can no longer be dropped for not fitting in localStorage.
       imageUrl: parsed.imageUrl || "",
-      // The browser knows the picked file's real name; the server's copy is a
-      // fallback (multer can mangle non-ASCII file names).
       fileName: r.fileName || parsed.fileName,
     }));
+
     toast.success("Receipt scanned � check the details below.");
   }, []);
 
-  // Surface scan errors in the shared alert box like every other error.
   const handleScanError = useCallback((message) => {
     setErr(message);
   }, []);
@@ -132,15 +113,11 @@ const ExpensesModal = ({
     scanFile,
   } = useReceiptScan({ onParsed: handleParsed, onError: handleScanError });
 
-  // Full Details / items / total sections only appear once a receipt is
-  // attached (or a scan is running) AND the scan didn't fail � an error
-  // reverts the card to the "No scan yet" placeholder instead of showing a
-  // hollow Details/items/total form. Declared after `scanning` � TDZ otherwise.
   const hasScannedContent = scanning || (hasReceiptData && !scanErr);
-  // A failed scan reverts the attachment card to the dropzone.
   const scanFailed = Boolean(scanErr);
 
   const [prev, setPrev] = useState({ open, transaction });
+
   if (prev.open !== open || prev.transaction !== transaction) {
     setPrev({ open, transaction });
     setNewCategory("");
@@ -159,13 +136,11 @@ const ExpensesModal = ({
     onClose?.();
   };
 
-  /* ── category panel actions ──────────────────────────────────── */
-
   const handleAddCategory = async (e) => {
     e.preventDefault();
     setErr("");
-
     const category_name = newCategory.trim();
+
     if (!category_name) {
       setErr("Category name is required.");
       return;
@@ -178,8 +153,6 @@ const ExpensesModal = ({
         category_name,
       });
       await onAdd?.(created);
-
-      // Stay open � adding several categories in a row is the common case.
       setNewCategory("");
       toast.success(
         `Category "${created.category_name ?? category_name}" added!`,
@@ -195,6 +168,7 @@ const ExpensesModal = ({
     if (busy) return;
     setErr("");
     setDeletingId(categoryId);
+
     try {
       await removeCategory.mutateAsync(categoryId);
       onDelete?.(categoryId);
@@ -217,12 +191,7 @@ const ExpensesModal = ({
         return;
       }
 
-      // No FileReader here: the scan stores the image server-side and answers
-      // with `image_url`, so a multi-megabyte photo never has to become a data
-      // URL in this state (or in the localStorage draft). Only the display name
-      // is kept locally until the parse result arrives.
       setReceipt((r) => ({ ...r, fileName: file.name }));
-
       scanFile(file);
     },
     [scanFile, setScanErr],
@@ -310,25 +279,29 @@ const ExpensesModal = ({
       return;
     }
 
-    // -- Server flow (no parent handler wired) ----------------------
     const description = receipt.description.trim();
+
     if (description.length < 2) {
       setErr("Receipt description is required.");
       return;
     }
+
     const qty = Number(receipt.qty) || 0;
     const rate = Number(receipt.rate) || 0;
+
     if (qty <= 0) {
       setErr("Quantity must be at least 1.");
       return;
     }
+
     if (rate <= 0) {
       setErr("Rate must be greater than zero.");
       return;
     }
-    const amount = Number((qty * rate).toFixed(2));
 
+    const amount = Number((qty * rate).toFixed(2));
     setSaving(true);
+
     try {
       const created = await create.mutateAsync({
         type: "receipt",
@@ -354,7 +327,6 @@ const ExpensesModal = ({
     if (!open) return undefined;
 
     const onKeyDown = (e) => {
-      // Scanning locks the whole dialog � no Escape close mid-scan.
       if (e.key === "Escape" && (busy || scanning)) return;
       if (e.key === "Escape") {
         e.stopPropagation();
@@ -362,6 +334,7 @@ const ExpensesModal = ({
         onClose?.();
       }
     };
+
     window.addEventListener("keydown", onKeyDown, true);
     return () => window.removeEventListener("keydown", onKeyDown, true);
   }, [open, busy, scanning, onClose]);
@@ -406,6 +379,7 @@ const ExpensesModal = ({
                     {copy.description}
                   </p>
                 </div>
+
                 <button
                   type="button"
                   onClick={handleClose}
@@ -435,6 +409,7 @@ const ExpensesModal = ({
                     deletingId={deletingId}
                   />
                 )}
+
                 {isScanMode && (
                   <ReceiptPanel
                     receipt={receipt}
@@ -452,6 +427,7 @@ const ExpensesModal = ({
                     onAddItem={handleAddItem}
                   />
                 )}
+
                 <ConfirmClearDialog
                   open={confirmClear}
                   onKeep={() => setConfirmClear(false)}
@@ -472,6 +448,7 @@ const ExpensesModal = ({
                     .
                   </p>
                 )}
+
                 <Button
                   type="button"
                   variant="outline"
@@ -481,6 +458,7 @@ const ExpensesModal = ({
                 >
                   {isScanMode ? "Cancel" : "Close"}
                 </Button>
+
                 {isScanMode && (
                   <Button
                     type="submit"
@@ -499,8 +477,6 @@ const ExpensesModal = ({
                     disabled={
                       saving ||
                       scanning ||
-                      // A failed rescan hides the previous lines behind the
-                      // dropzone — don't let Confirm send that stale draft.
                       scanFailed ||
                       !hasReceiptImage ||
                       (receipt.items ?? []).length === 0

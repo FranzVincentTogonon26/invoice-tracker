@@ -4,6 +4,9 @@ export const expensesApi = {
   list: (params = {}) =>
     apiClient.get("/expenses", { params }).then((r) => r.data),
 
+  employee: (params = {}) =>
+    apiClient.get("/expenses/employee", { params }).then((r) => r.data),
+
   create: (payload) =>
     apiClient
       .post("/expenses", payload)

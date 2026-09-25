@@ -1,15 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
-import {
-  Ban,
-  EllipsisVertical,
-  Eye,
-  HandCoins,
-  ReceiptText,
-  RefreshCcw,
-  Trash2,
-} from "lucide-react";
-import { Badge, StatusBadge } from "../../../ui/Badge";
+import { EllipsisVertical, Eye, Trash2 } from "lucide-react";
+import { Badge } from "../../../ui/Badge";
 import { MethodIcon } from "../../../ui/Select";
 import {
   cn,
@@ -19,13 +11,12 @@ import {
   methodLabel,
 } from "../../../../lib/utils";
 
-const COLUMN_WIDTHS = ["11%", "23%", "18%", "15%", "13%", "15%", "5%"];
+const COLUMN_WIDTHS = ["11%", "27%", "19%", "14%", "24%", "5%"];
 
 const HEADERS = [
   { label: "Date" },
   { label: "Description" },
   { label: "Employee" },
-  { label: "Type" },
   { label: "Status" },
   { label: "Amount", align: "right" },
   { label: "Actions", srOnly: true, align: "right" },
@@ -35,11 +26,6 @@ const EXPENSE_STATUS = {
   paid: { tone: "success", label: "Paid" },
   draft: { tone: "warning", label: "Draft" },
   cancel: { tone: "danger", label: "Cancelled" },
-};
-
-const TYPE_META = {
-  expense: { label: "Expense", tone: "neutral", Icon: ReceiptText },
-  issued: { label: "Budget Issued", tone: "accent", Icon: HandCoins },
 };
 
 export function ExpenseStatusBadge({ status, className }) {
@@ -55,23 +41,11 @@ export function ExpenseStatusBadge({ status, className }) {
   );
 }
 
-function TypeBadge({ kind, className }) {
-  const meta = TYPE_META[kind] ?? TYPE_META.expense;
-  const Icon = meta.Icon;
-  return (
-    <Badge tone={meta.tone} className={cn("min-w-0", className)}>
-      <Icon size={12} strokeWidth={2.25} aria-hidden className="shrink-0" />
-      <span className="truncate">{meta.label}</span>
-    </Badge>
-  );
-}
-
-function RowActions({ row, pending, onView, onDelete, onIssuedAction }) {
+function RowActions({ row, pending, onView, onDelete }) {
   const [open, setOpen] = useState(false);
   const [position, setPosition] = useState(null);
   const btnRef = useRef(null);
   const menuRef = useRef(null);
-  const isFinalized = row.kind === "issued" && row.status === "close";
 
   useEffect(() => {
     if (!open) return undefined;
@@ -112,47 +86,24 @@ function RowActions({ row, pending, onView, onDelete, onIssuedAction }) {
     };
   }, [open]);
 
-  if (isFinalized) return null;
-
-  const items =
-    row.kind === "expense"
-      ? [
-          {
-            key: "view",
-            label: "View expense",
-            Icon: Eye,
-            danger: false,
-            onSelect: () => onView?.(row),
-          },
-          {
-            key: "delete",
-            label: "Delete expense",
-            Icon: Trash2,
-            danger: true,
-            // Asks the page for confirmation — nothing is deleted until the
-            // dialog's "yes" runs the mutation.
-            onSelect: () => onDelete?.(row),
-          },
-        ]
-      : row.status === "cancel"
-        ? [
-            {
-              key: "restore",
-              label: "Restore issuance",
-              Icon: RefreshCcw,
-              danger: false,
-              onSelect: () => onIssuedAction?.("restore", row),
-            },
-          ]
-        : [
-            {
-              key: "cancel",
-              label: "Cancel issuance",
-              Icon: Ban,
-              danger: true,
-              onSelect: () => onIssuedAction?.("cancel", row),
-            },
-          ];
+  const items = [
+    {
+      key: "view",
+      label: "View expense",
+      Icon: Eye,
+      danger: false,
+      onSelect: () => onView?.(row),
+    },
+    {
+      key: "delete",
+      label: "Delete expense",
+      Icon: Trash2,
+      danger: true,
+      // Asks the page for confirmation — nothing is deleted until the
+      // dialog's "yes" runs the mutation.
+      onSelect: () => onDelete?.(row),
+    },
+  ];
 
   const openMenu = () => {
     const rect = btnRef.current?.getBoundingClientRect();
@@ -269,14 +220,7 @@ function EmployeeCell({ name, role, avatarUrl, size = "md" }) {
   );
 }
 
-function LedgerRow({
-  row,
-  removePending,
-  issuedPending,
-  onView,
-  onDelete,
-  onIssuedAction,
-}) {
+function LedgerRow({ row, removePending, onView, onDelete }) {
   return (
     <tr className="group border-b border-[var(--border)] transition-colors duration-150 last:border-b-0 hover:bg-[var(--accent)]/[0.04]">
       <td className="relative px-4 py-4 pl-5 align-middle">
@@ -317,15 +261,7 @@ function LedgerRow({
       </td>
 
       <td className="px-4 py-4 align-middle">
-        <TypeBadge kind={row.kind} className="max-w-full" />
-      </td>
-
-      <td className="px-4 py-4 align-middle">
-        {row.kind === "issued" ? (
-          <StatusBadge status={row.status} />
-        ) : (
-          <ExpenseStatusBadge status={row.status} />
-        )}
+        <ExpenseStatusBadge status={row.status} />
       </td>
 
       <td className="px-4 py-4 text-right align-middle">
@@ -345,10 +281,9 @@ function LedgerRow({
         <div className="flex justify-end">
           <RowActions
             row={row}
-            pending={removePending || issuedPending}
+            pending={removePending}
             onView={onView}
             onDelete={onDelete}
-            onIssuedAction={onIssuedAction}
           />
         </div>
       </td>
@@ -356,14 +291,7 @@ function LedgerRow({
   );
 }
 
-function LedgerCard({
-  row,
-  removePending,
-  issuedPending,
-  onView,
-  onDelete,
-  onIssuedAction,
-}) {
+function LedgerCard({ row, removePending, onView, onDelete }) {
   return (
     <div className="relative overflow-hidden rounded-3xl border border-[var(--border)] bg-[var(--surface)] p-4 shadow-card transition-shadow hover:shadow-hover">
       <div
@@ -371,8 +299,7 @@ function LedgerCard({
         className="pointer-events-none absolute inset-x-6 top-0 h-px bg-[linear-gradient(90deg,transparent,var(--accent)/60,transparent)]"
       />
 
-      <div className="flex items-start justify-between gap-3">
-        <TypeBadge kind={row.kind} className="max-w-full" />
+      <div className="flex items-start justify-end">
         <span className="shrink-0 text-base font-semibold tabular-nums text-[var(--ink)]">
           {formatMoney(row.amount)}
         </span>
@@ -390,11 +317,7 @@ function LedgerCard({
       </p>
 
       <div className="mt-3 flex flex-wrap items-center gap-x-3 gap-y-2 border-t border-[var(--border)] pt-3">
-        {row.kind === "issued" ? (
-          <StatusBadge status={row.status} />
-        ) : (
-          <ExpenseStatusBadge status={row.status} />
-        )}
+        <ExpenseStatusBadge status={row.status} />
 
         <span className="flex min-w-0 items-center gap-1.5 text-xs text-[var(--ink-muted)]">
           <MethodIcon method={row.method} className="h-3.5 w-3.5" />
@@ -407,29 +330,21 @@ function LedgerCard({
 
         <RowActions
           row={row}
-          pending={removePending || issuedPending}
+          pending={removePending}
           onView={onView}
           onDelete={onDelete}
-          onIssuedAction={onIssuedAction}
         />
       </div>
     </div>
   );
 }
 
-const ExpensesTable = ({
-  rows,
-  removePending = false,
-  issuedPending = false,
-  onView,
-  onDelete,
-  onIssuedAction,
-}) => (
+const ExpensesTable = ({ rows, removePending = false, onView, onDelete }) => (
   <>
     <div
       className="hidden overflow-x-auto rounded-3xl focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)]/30 md:block"
       tabIndex={0}
-      aria-label="Expenses and budget issuances"
+      aria-label="Expenses"
     >
       <div className="relative min-w-[1020px] overflow-hidden rounded-3xl border border-[var(--border)] bg-[var(--surface)] shadow-card">
         <div
@@ -439,9 +354,8 @@ const ExpensesTable = ({
 
         <table className="w-full table-fixed border-collapse text-left">
           <caption className="sr-only">
-            Unified ledger of expenses and budget issuances with date,
-            description and category, employee, type, status, and amount with
-            payment method
+            Expense records with date, description and category, employee,
+            status, and amount with payment method
           </caption>
 
           <colgroup>
@@ -457,7 +371,11 @@ const ExpensesTable = ({
                   key={h.label}
                   scope="col"
                   className={cn(
-                    "border-b border-[var(--accent)]/25 px-4 py-4 type-eyebrow text-[var(--ink-muted)] first:pl-5 last:pr-5",
+                    // Spacing redesign: taller header (pt-6) with labels
+                    // bottom-anchored (pb-4 + align-bottom) so they sit close
+                    // to the divider — horizontal padding stays px-4 with
+                    // pl-5/pr-5 edges to line up with the row cells below.
+                    "border-b border-[var(--accent)]/30 px-4 pb-4 pt-6 type-eyebrow tracking-[0.15em] text-[var(--ink-muted)] align-bottom first:pl-5 last:pr-5",
                     {
                       "text-left": h.align === "left",
                       "text-center": h.align === "center",
@@ -479,10 +397,8 @@ const ExpensesTable = ({
                 key={row.id}
                 row={row}
                 removePending={removePending}
-                issuedPending={issuedPending}
                 onView={onView}
                 onDelete={onDelete}
-                onIssuedAction={onIssuedAction}
               />
             ))}
           </tbody>
@@ -496,10 +412,8 @@ const ExpensesTable = ({
           key={row.id}
           row={row}
           removePending={removePending}
-          issuedPending={issuedPending}
           onView={onView}
           onDelete={onDelete}
-          onIssuedAction={onIssuedAction}
         />
       ))}
     </div>

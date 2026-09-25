@@ -6,19 +6,15 @@ import {
   PhilippinePesoIcon,
   WalletIcon,
 } from "lucide-react";
-import { Badge } from "../../../ui/Badge";
-import SelectReference from "../../../ui/SelectReference";
-import { cn, formatDate, formatMoney } from "../../../../lib/utils";
+import { Badge } from "../../ui/Badge";
+import SelectReference from "../../ui/SelectReference";
+import { cn, formatDate, formatMoney } from "../../../lib/utils";
 import {
   FUNDING_STATUS,
   fundingAlternatives,
   fundingState,
-} from "../../../../lib/funding";
+} from "../../../lib/funding";
 
-/* The three funding states the balance card can be in:
-   `insufficient` = the draft costs more than the source has left,
-   `depleted`     = it uses the rest up exactly (or the source holds nothing),
-   `funded`       = the source still covers everything typed in. */
 const FUNDING = {
   funded: {
     label: "Funded",
@@ -49,9 +45,6 @@ const FUNDING = {
   },
 };
 
-/* Eyebrow + control wrapper (same shape as the AddExpenses `Field`). It is a
-   `div` on purpose: the picker's trigger is a button, so clicking a wrapping
-   `<label>` would fire it a second time. */
 function Field({ label, hint, children }) {
   return (
     <div className="block min-w-0">
@@ -68,14 +61,13 @@ function Field({ label, hint, children }) {
   );
 }
 
-/** Dashed prompt shown until a source is picked, or when none is available. */
 function BalancePrompt({ title, description }) {
   return (
     <div className="flex items-center gap-3 rounded-2xl border border-dashed border-[var(--border)] bg-[var(--surface-2)]/40 px-3.5 py-3">
       <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-[var(--surface-2)] text-[var(--ink-muted)]">
         <WalletIcon size={15} />
       </div>
-      <div className="flex-1 min-w-0">
+      <div className="min-w-0 flex-1">
         <p className="text-sm font-semibold text-[var(--ink-muted)]">{title}</p>
         <p className="text-xs leading-snug text-[var(--ink-muted)]">
           {description}
@@ -85,14 +77,6 @@ function BalancePrompt({ title, description }) {
   );
 }
 
-/**
- * Picks the budget source ("budget reference") that funds the draft and shows
- * its live balance minus the expenses entered so far.
- *
- * Controlled: the parent owns `value` (a `reference_id`) and is notified
- * through `onChange`. With a single open source there is nothing to choose —
- * the parent mirrors that fallback, this card just renders it as auto-selected.
- */
 const SelectSourceFund = ({
   references = [],
   value = "",
@@ -101,9 +85,6 @@ const SelectSourceFund = ({
   disabled = false,
   loading = false,
 }) => {
-  // The picker's fallback, the live balance and the funding status all come
-  // from one shared calculation — the Add Expenses save validates against the
-  // very same numbers, so the card can never disagree with the save.
   const {
     sources,
     source: selected,
@@ -123,8 +104,6 @@ const SelectSourceFund = ({
   const funding =
     FUNDING[insufficient ? "insufficient" : depleted ? "depleted" : "funded"];
 
-  // Sources that could still absorb this draft — offered as one-tap switches
-  // when the picked one can't cover it (only useful with more than one source).
   const alternatives = useMemo(
     () =>
       insufficient
@@ -143,8 +122,6 @@ const SelectSourceFund = ({
 
   return (
     <div className="space-y-3">
-      {/* Sources still loading — a skeleton, so the empty state below never
-          flashes "No open budget source" while the request is in flight. */}
       {loading && sources.length === 0 && (
         <div
           role="status"
@@ -161,8 +138,6 @@ const SelectSourceFund = ({
         </div>
       )}
 
-      {/* No open source at all — point at the fix instead of rendering an
-          empty picker. */}
       {!loading && sources.length === 0 && (
         <BalancePrompt
           title="No open budget source"
@@ -170,7 +145,6 @@ const SelectSourceFund = ({
         />
       )}
 
-      {/* More than one source: let the admin choose which one funds the lines. */}
       {canChoose && (
         <Field
           label="Budget reference"
@@ -186,7 +160,6 @@ const SelectSourceFund = ({
         </Field>
       )}
 
-      {/* Nothing picked yet — the dashed prompt the budget forms use. */}
       {sources.length > 0 && !selected && (
         <BalancePrompt
           title="Balance"
@@ -210,7 +183,8 @@ const SelectSourceFund = ({
             >
               <WalletIcon size={15} />
             </div>
-            <div className="flex-1 min-w-0">
+
+            <div className="min-w-0 flex-1">
               <p className="type-eyebrow text-[var(--ink-muted)]">Balance</p>
               <p
                 className={cn(
@@ -218,22 +192,19 @@ const SelectSourceFund = ({
                   funding.amount,
                 )}
               >
-                <PhilippinePesoIcon
-                  size={20}
-                  className="shrink-0 opacity-70 "
-                />
+                <PhilippinePesoIcon size={20} className="shrink-0 opacity-70" />
                 {Number(balance).toLocaleString("en-PH", {
                   minimumFractionDigits: 2,
                   maximumFractionDigits: 2,
                 })}
               </p>
             </div>
+
             <Badge tone={funding.badgeTone} className="shrink-0 text-xs">
               {funding.label}
             </Badge>
           </div>
 
-          {/* Which source the numbers belong to — a lone source is auto-picked. */}
           <div className="mt-3 flex items-center justify-between gap-2 border-t border-[var(--border)] pt-3">
             <span className="flex min-w-0 items-center gap-1.5 text-xs text-[var(--ink-muted)]">
               <HandCoins size={13} aria-hidden className="shrink-0" />
@@ -249,12 +220,12 @@ const SelectSourceFund = ({
                 </span>
               )}
             </span>
+
             <span className="shrink-0 text-xs tabular-nums text-[var(--ink-muted)]">
               {formatDate(selected.created_at)}
             </span>
           </div>
 
-          {/* Live math: what this draft costs vs. what the source has left. */}
           <div className="mt-3 grid grid-cols-2 gap-2">
             <div className="min-w-0">
               <p className="type-eyebrow text-xs text-[var(--ink-muted)]">
@@ -264,8 +235,9 @@ const SelectSourceFund = ({
                 {formatMoney(expenses)}
               </p>
             </div>
+
             <div className="min-w-0 text-right">
-              <p className="type-eyebrow text-[var(--ink-muted)] text-xs">
+              <p className="type-eyebrow text-xs text-[var(--ink-muted)]">
                 {insufficient ? "Short by" : "Remaining"}
               </p>
               <p
@@ -317,13 +289,12 @@ const SelectSourceFund = ({
                 </span>
               </p>
 
-              {/* Recommendations: a source that still covers the draft is one
-                  tap away; otherwise point at the two ways to make it fit. */}
               {alternatives.length > 0 ? (
                 <div className="mt-2.5 border-t border-[var(--danger)]/20 pt-2.5">
                   <p className="type-eyebrow text-[var(--danger)]">
                     Sources that still cover this
                   </p>
+
                   <div className="mt-1.5 flex flex-wrap gap-1.5">
                     {alternatives.map((source) => (
                       <button

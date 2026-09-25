@@ -1,7 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { motion } from "framer-motion";
 import {
-  Ban,
   CalendarOff,
   CalendarRange,
   CircleAlert,
@@ -46,13 +45,8 @@ import {
   toDate,
 } from "../../lib/utils";
 import { useNavigate } from "react-router-dom";
-import { useQueryClient } from "@tanstack/react-query";
 import { PAYMENT_METHODS } from "../../constants";
 import { useExpenses, useExpensesMutations } from "../../hooks/useExpenses";
-import {
-  useBudgetIssuedTransaction,
-  useBudgetMutations,
-} from "../../hooks/useBudget";
 import ExpensesTable from "../../components/layout/admin/expenses/ExpensesTable";
 import ConfirmActionDialog from "../../components/layout/admin/expenses/ConfirmActionDialog";
 import ExpenseDetailsModal from "../../components/layout/admin/expenses/ExpenseDetailsModal";
@@ -79,8 +73,6 @@ const STATUS_OPTIONS = [
   { value: "all", label: "All status" },
   { value: "paid", label: "Paid" },
   { value: "draft", label: "Draft" },
-  { value: "open", label: "Open" },
-  { value: "close", label: "Closed (issued)" },
   { value: "cancel", label: "Cancelled" },
 ];
 
@@ -105,12 +97,7 @@ const matchesDayRange = (value, start, end) => {
  * preview can never disagree about what matches.
  */
 const matchesLedgerFilters = (row, { category, method, status, query }) => {
-  if (
-    category !== "all" &&
-    row.kind === "expense" &&
-    row.categoryId !== category
-  )
-    return false;
+  if (category !== "all" && row.categoryId !== category) return false;
   if (method !== "all" && row.method !== method) return false;
   if (status !== "all" && row.status !== status) return false;
   if (!query) return true;
@@ -121,13 +108,11 @@ const matchesLedgerFilters = (row, { category, method, status, query }) => {
 
 const LEDGER_STATUS_META = {
   paid: { tone: "success", label: "Paid" },
-  open: { tone: "warning", label: "Open" },
   draft: { tone: "warning", label: "Draft" },
-  close: { tone: "warning", label: "Closed" },
   cancel: { tone: "danger", label: "Cancelled" },
 };
 
-const LEDGER_STATUS_ORDER = ["paid", "open", "draft", "close", "cancel"];
+const LEDGER_STATUS_ORDER = ["paid", "draft", "cancel"];
 const DAY_MS = 24 * 60 * 60 * 1000;
 
 const countDays = (start, end) =>
@@ -184,16 +169,6 @@ const AdminExpenses = () => {
   const { data, expenses, categories, references, isLoading, error, refetch } =
     useExpenses();
   const { remove } = useExpensesMutations();
-  const { cancelIssuedTransaction, restoreIssuedTransaction } =
-    useBudgetMutations();
-  const queryClient = useQueryClient();
-
-  const {
-    data: issuedTransactions,
-    isLoading: issuedLoading,
-    error: issuedError,
-    refetch: refetchIssued,
-  } = useBudgetIssuedTransaction();
 
   const [search, setSearch] = useState("");
   const [debouncedSearch, setDebouncedSearch] = useState("");
@@ -261,12 +236,12 @@ const AdminExpenses = () => {
     [totalIssued, activeTotal],
   );
 
-  // Full ledger (expenses + budget issuances) for the overview cards.
+  // Full expense ledger — rows straight from the expenses table only, so
+  // budget issuances never appear among the records below.
   const allLedgerRows = useMemo(
     () =>
-      [
-        ...(expenses ?? []).map((e) => ({
-          kind: "expense",
+      (expenses ?? [])
+        .map((e) => ({
           id: e.id,
           date: e.expense_date,
           timeDate: e.created_at,
@@ -284,41 +259,20 @@ const AdminExpenses = () => {
           receiptId: e.receipt_id,
           imageUrl: e.image_url,
           receiptDate: e.receipt_date,
-        })),
-        ...(issuedTransactions ?? []).map((t) => ({
-          kind: "issued",
-          id: t.id,
-          date: t.date_issued,
-          timeDate: t.date_issued,
-          description: t.description,
-          category: t.source_of_funds,
-          amount: Number(t.amount) || 0,
-          employee: t.employee,
-          employeeRole: t.employee_role,
-          employeeAvatar: t.avatar_url,
-          method: t.method,
-          status: t.status,
-        })),
-      ].sort((a, b) => {
-        const ta = new Date(a.timeDate ?? a.date ?? 0).getTime() || 0;
-        const tb = new Date(b.timeDate ?? b.date ?? 0).getTime() || 0;
-        return tb - ta;
-      }),
-    [expenses, issuedTransactions],
+        }))
+        .sort((a, b) => {
+          const ta = new Date(a.timeDate ?? a.date ?? 0).getTime() || 0;
+          const tb = new Date(b.timeDate ?? b.date ?? 0).getTime() || 0;
+          return tb - ta;
+        }),
+    [expenses],
   );
 
-  // Rows behind the Total Expenses headline: non-cancelled expenses plus the
-  // budget issuances the Total Issued Budget card counts (only 'open'
-  // references — 'close' / 'cancel' are excluded, exactly like the backend
-  // overview). The card's chart and Avg / day come from this same set, so
-  // every figure on the card reconciles with the headline.
+  // Rows behind the Total Expenses chart: non-cancelled expense records only.
+  // The headline itself still adds the open issuances from the overview (see
+  // totalSpend above), while the chart plots the expense ledger.
   const spendRows = useMemo(
-    () =>
-      allLedgerRows.filter((row) =>
-        row.kind === "expense"
-          ? row.status !== "cancel"
-          : row.status === "open",
-      ),
+    () => allLedgerRows.filter((row) => row.status !== "cancel"),
     [allLedgerRows],
   );
 
@@ -506,8 +460,7 @@ const AdminExpenses = () => {
     if (method !== "all") {
       chips.push({
         key: "method",
-        label:
-          methodOptions.find((o) => o.value === method)?.label ?? "Method",
+        label: methodOptions.find((o) => o.value === method)?.label ?? "Method",
         onClear: () => {
           setMethod("all");
           setPage(0);
@@ -529,7 +482,11 @@ const AdminExpenses = () => {
   }, [category, categoryOptions, method, methodOptions, status]);
 
   // The mobile sheet applies its staged draft in one go.
-  const applyMobileFilters = ({ category: nextCategory, method: nextMethod, status: nextStatus }) => {
+  const applyMobileFilters = ({
+    category: nextCategory,
+    method: nextMethod,
+    status: nextStatus,
+  }) => {
     setCategory(nextCategory);
     setMethod(nextMethod);
     setStatus(nextStatus);
@@ -581,16 +538,11 @@ const AdminExpenses = () => {
   // "Delete expense" never runs straight from the menu — it opens the
   // confirmation dialog, and only its "yes" submits (see runConfirmedAction).
   const requestDelete = (row) => {
-    setConfirmAction({ kind: "delete", row });
+    setConfirmAction({ row });
     setConfirmOpen(true);
   };
 
-  const confirmPending =
-    confirmAction?.kind === "delete"
-      ? remove.isPending
-      : confirmAction?.kind === "cancel-issuance"
-        ? cancelIssuedTransaction.isPending
-        : false;
+  const confirmPending = remove.isPending;
 
   const closeConfirm = () => {
     if (!confirmPending) setConfirmOpen(false);
@@ -598,67 +550,26 @@ const AdminExpenses = () => {
 
   const runConfirmedAction = async () => {
     if (!confirmAction) return;
-    const { kind, row } = confirmAction;
 
     try {
-      if (kind === "delete") {
-        await remove.mutateAsync(row.id);
-        toast.success("Expense deleted");
-      } else {
-        await cancelIssuedTransaction.mutateAsync(row.id);
-        queryClient.invalidateQueries({ queryKey: ["expenses"] });
-        toast.success("Budget issuance cancelled");
-      }
+      await remove.mutateAsync(confirmAction.row.id);
+      toast.success("Expense deleted");
       setConfirmOpen(false);
     } catch (err) {
-      toast.error(
-        err?.message ||
-          (kind === "delete"
-            ? "Couldn't delete expense"
-            : "Couldn't cancel budget issuance"),
-      );
+      toast.error(err?.message || "Couldn't delete expense");
     }
   };
 
-  const handleIssuedAction = async (action, row) => {
-    // Restoring is non-destructive — it stays a one-click action (same as the
-    // Budget page).
-    if (action === "restore") {
-      try {
-        await restoreIssuedTransaction.mutateAsync({
-          id: row.id,
-          status: "open",
-        });
-        queryClient.invalidateQueries({ queryKey: ["expenses"] });
-        toast.success("Budget issuance restored");
-      } catch (err) {
-        toast.error(err?.message || "Couldn't restore budget issuance");
-      }
-      return;
-    }
-
-    if (action !== "cancel") return;
-
-    // Cancelling asks first — nothing is submitted until the dialog's "yes".
-    setConfirmAction({ kind: "cancel-issuance", row });
-    setConfirmOpen(true);
-  };
-
-  // The row summary both confirmations show, so the admin confirms exactly the
-  // record being deleted / reversed.
+  // The row summary the confirmation shows, so the admin confirms exactly the
+  // record being deleted.
   const confirmSummary = confirmAction ? (
     <div className="mt-4 flex items-center gap-3 rounded-2xl border border-[var(--border)] bg-[var(--surface-2)]/60 px-4 py-3">
       <div className="min-w-0 flex-1">
         <p className="truncate text-base font-semibold text-[var(--ink)]">
-          {confirmAction.row.description ||
-            (confirmAction.kind === "delete"
-              ? "Untitled expense"
-              : "Budget issuance")}
+          {confirmAction.row.description || "Untitled expense"}
         </p>
         <p className="mt-0.5 truncate text-xs text-[var(--ink-muted)]">
-          {confirmAction.kind === "delete"
-            ? `${confirmAction.row.category || "Uncategorized"} · ${formatDate(confirmAction.row.date)}`
-            : "Amount to reverse"}
+          {`${confirmAction.row.category || "Uncategorized"} · ${formatDate(confirmAction.row.date)}`}
         </p>
       </div>
       <span className="shrink-0 text-sm font-semibold tabular-nums text-[var(--ink)]">
@@ -667,34 +578,51 @@ const AdminExpenses = () => {
     </div>
   ) : null;
 
-  // One search field, mounted in both toolbars: below `lg` it sits next to the
-  // filter button (and takes the rest of the row); from `lg` up it closes the
-  // inline filter row. Only one of the two wrappers is displayed at a time.
+  // Search + date filter in one aligned row: the search field takes the free
+  // space (`flex-1`), the picker hugs its content. Below `sm` the picker
+  // collapses to its icon-only trigger via `compactOnMobile`; from `sm` up
+  // it shows the full range label. Mounted in both toolbars (mobile row +
+  // desktop row) — only one wrapper is displayed at a time.
   const searchField = (
-    <SearchInput
-      leftIcon={<Search size={16} />}
-      placeholder="Search..."
-      value={search}
-      onChange={(e) => {
-        setSearch(e.target.value);
-        setPage(0);
-      }}
-      rightSlot={
-        search ? (
-          <button
-            type="button"
-            onClick={() => {
-              setSearch("");
-              setPage(0);
-            }}
-            aria-label="Clear search"
-            className="flex h-8 w-8 items-center justify-center rounded-full text-[var(--ink-muted)] transition-colors hover:bg-[var(--surface-2)] hover:text-[var(--ink)]"
-          >
-            <X size={14} />
-          </button>
-        ) : null
-      }
-    />
+    <div className="flex w-full items-center gap-2">
+      <SearchInput
+        leftIcon={<Search size={16} />}
+        placeholder="Search..."
+        aria-label="Search expenses"
+        value={search}
+        onChange={(e) => {
+          setSearch(e.target.value);
+          setPage(0);
+        }}
+        className="h-11 min-w-0 flex-1 sm:h-10"
+        rightSlot={
+          search ? (
+            <button
+              type="button"
+              onClick={() => {
+                setSearch("");
+                setPage(0);
+              }}
+              aria-label="Clear search"
+              className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-[var(--ink-muted)] transition-colors hover:bg-[var(--surface-2)] hover:text-[var(--ink)]"
+            >
+              <X size={14} />
+            </button>
+          ) : null
+        }
+      />
+      {/* Icon-only trigger on mobile, full label from `sm` up */}
+      <DateRangePicker
+        value={dateRange}
+        onChange={(r) => {
+          setDateRange(r);
+          setPage(0);
+        }}
+        placeholder="All dates"
+        align="end"
+        compactOnMobile
+      />
+    </div>
   );
 
   // Accessible name for the mobile filter trigger — it announces how many
@@ -713,15 +641,6 @@ const AdminExpenses = () => {
         description="Track expenses against your budget"
         actions={
           <div className="flex w-full flex-nowrap items-center gap-2 sm:w-auto justify-end">
-            <DateRangePicker
-              value={dateRange}
-              onChange={(r) => {
-                setDateRange(r);
-                setPage(0);
-              }}
-              placeholder="All dates"
-              align="end"
-            />
             <Button
               variant="accent"
               onClick={() => nav("/admin/expenses/add")}
@@ -745,7 +664,7 @@ const AdminExpenses = () => {
               label="Total Expenses"
               value={formatMoney(totalSpend)}
               icon={ReceiptText}
-              loading={isLoading || issuedLoading}
+              loading={isLoading}
               accent
               chart="bars"
               data={spendSeries}
@@ -800,7 +719,7 @@ const AdminExpenses = () => {
               label="Transactions"
               value={allLedgerRows.length}
               icon={ClipboardList}
-              loading={isLoading || issuedLoading}
+              loading={isLoading}
               chart="bars"
               data={recordSeries}
               stats={statusStats}
@@ -810,10 +729,10 @@ const AdminExpenses = () => {
 
         <p className="px-1 text-xs text-[var(--ink-muted)]">
           Money figures exclude cancelled lines · Total Expenses adds open
-          budget issuances to expenses · Transactions counts every row (expenses
-          + budget issuances), cancelled included · The overview cards above are
-          always all-time — charts and Avg / day span the records from first to
-          last, and the date range only filters the table below
+          budget issuances to expenses · Transactions counts every expense row,
+          cancelled included · The overview cards above are always all-time —
+          charts and Avg / day span the records from first to last, and the date
+          range only filters the table below
         </p>
       </section>
 
@@ -836,8 +755,8 @@ const AdminExpenses = () => {
                 )}
                 <span>
                   {hasDateRange
-                    ? "· expenses and budget issuances in this range"
-                    : "· no date range set — showing all expenses and budget issuances"}
+                    ? "· expenses in this range"
+                    : "· no date range set — showing all expenses"}
                 </span>
               </span>
             </CardDescription>
@@ -850,6 +769,16 @@ const AdminExpenses = () => {
         <div className="mb-5 flex flex-col gap-3 lg:flex-row lg:items-center">
           <div className="flex items-center gap-2 lg:hidden">
             <div className="min-w-0 flex-1">{searchField}</div>
+
+            {/* <DateRangePicker
+              value={dateRange}
+              onChange={(r) => {
+                setDateRange(r);
+                setPage(0);
+              }}
+              placeholder="All dates"
+              align="end"
+            /> */}
 
             <IconButton
               type="button"
@@ -875,7 +804,7 @@ const AdminExpenses = () => {
 
           <div
             role="group"
-            aria-label="Issued transaction filters"
+            aria-label="Expense filters"
             className="hidden lg:flex lg:flex-row lg:flex-wrap lg:items-center lg:gap-2"
           >
             <div className="w-full lg:w-[200px] lg:shrink-0">
@@ -913,7 +842,7 @@ const AdminExpenses = () => {
             </div>
           </div>
 
-          <div className="hidden lg:block lg:ml-auto lg:w-[450px]">
+          <div className="hidden lg:block lg:ml-auto lg:w-[650px] ">
             {searchField}
           </div>
         </div>
@@ -931,16 +860,13 @@ const AdminExpenses = () => {
           }}
         />
 
-        {isLoading || issuedLoading ? (
+        {isLoading ? (
           <LoadingSkeleton rows={6} />
-        ) : error || issuedError ? (
+        ) : error ? (
           <ErrorState
             title="Couldn't load expenses"
             message="Something went wrong while fetching expenses."
-            onRetry={() => {
-              refetch();
-              refetchIssued();
-            }}
+            onRetry={refetch}
             onClearFilters={hasActiveFilters ? clearFilters : undefined}
           />
         ) : pageRows.length === 0 ? (
@@ -963,13 +889,8 @@ const AdminExpenses = () => {
             <ExpensesTable
               rows={pageRows}
               removePending={remove.isPending}
-              issuedPending={
-                cancelIssuedTransaction.isPending ||
-                restoreIssuedTransaction.isPending
-              }
               onView={handleViewRow}
               onDelete={requestDelete}
-              onIssuedAction={handleIssuedAction}
             />
             <div
               className={cn(
@@ -1010,33 +931,13 @@ const AdminExpenses = () => {
 
       <ConfirmActionDialog
         open={confirmOpen}
-        icon={
-          confirmAction?.kind === "delete" ? (
-            <Trash2 size={20} aria-hidden />
-          ) : (
-            <Ban size={20} aria-hidden />
-          )
-        }
-        title={
-          confirmAction?.kind === "delete"
-            ? "Delete this expense?"
-            : "Cancel this budget issuance?"
-        }
-        description={
-          confirmAction?.kind === "delete"
-            ? "This permanently removes the expense record — and the receipt image stored with it, unless another expense still uses it. This can't be undone."
-            : "Are you sure you want to cancel this budget issuance? Its status will be updated to cancelled."
-        }
+        icon={<Trash2 size={20} aria-hidden />}
+        title="Delete this expense?"
+        description="This permanently removes the expense record — and the receipt image stored with it, unless another expense still uses it. This can't be undone."
         summary={confirmSummary}
-        cancelLabel={
-          confirmAction?.kind === "delete" ? "Keep expense" : "Keep issuance"
-        }
-        confirmLabel={
-          confirmAction?.kind === "delete" ? "Yes, delete it" : "Yes, cancel it"
-        }
-        pendingLabel={
-          confirmAction?.kind === "delete" ? "Deleting…" : "Cancelling…"
-        }
+        cancelLabel="Keep expense"
+        confirmLabel="Yes, delete it"
+        pendingLabel="Deleting…"
         pending={confirmPending}
         onCancel={closeConfirm}
         onConfirm={runConfirmedAction}

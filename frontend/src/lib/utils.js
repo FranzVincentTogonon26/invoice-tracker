@@ -240,6 +240,28 @@ export function rangeWithPreview(draft, hover) {
     : { start, end: pointed };
 }
 
+/**
+ * True when `value`'s calendar day falls inside `[start, end]` — the shared
+ * client-side predicate for DateRangePicker-backed ledger tables. An unset
+ * bound is ignored, and an unparseable value passes through so a row with a
+ * broken date is never silently hidden by an active range filter.
+ */
+export function matchesDayRange(value, start, end) {
+  const day = toDate(value);
+  if (!day) return true;
+  const atMidnight = startOfDay(day);
+  if (start && atMidnight < startOfDay(start)) return false;
+  if (end && atMidnight > startOfDay(end)) return false;
+  return true;
+}
+
+/**
+ * An unset `{ start, end }` range — the shared empty value for
+ * DateRangePicker state. Pass the function itself to `useState` so each
+ * consumer gets its own object (`useState(emptyDateRange)`).
+ */
+export const emptyDateRange = () => ({ start: null, end: null });
+
 /* -------------------------------------------------------------------------- */
 /* Header identity helpers (admin + employee top bars)                        */
 /* -------------------------------------------------------------------------- */

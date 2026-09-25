@@ -15,25 +15,22 @@ import { useNavigate } from "react-router-dom";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import toast from "react-hot-toast";
-import { Button } from "../../../ui/Button";
-import { Badge } from "../../../ui/Badge";
-import { Card, CardDescription, CardTitle } from "../../../ui/Card";
-import { DatePicker } from "../../../ui/DatePicker";
-import { Input, TextArea } from "../../../ui/Input";
-import Listbox from "../../../ui/Listbox";
-import { cn, formatMoney, toISODate } from "../../../../lib/utils";
-import { FUNDING_STATUS, fundingState } from "../../../../lib/funding";
-import { ERROR_VISIBLE_MS, MAX_RECEIPT_LABEL } from "../../../../constants";
-import {
-  useExpenses,
-  useExpensesMutations,
-} from "../../../../hooks/useExpenses";
-import { useExpenseSuggestion } from "../../../../hooks/useExpenseSuggestion";
+import { Button } from "../../ui/Button";
+import { Badge } from "../../ui/Badge";
+import { Card, CardDescription, CardTitle } from "../../ui/Card";
+import { DatePicker } from "../../ui/DatePicker";
+import { Input, TextArea } from "../../ui/Input";
+import Listbox from "../../ui/Listbox";
+import { cn, formatMoney, toISODate } from "../../../lib/utils";
+import { FUNDING_STATUS, fundingState } from "../../../lib/funding";
+import { ERROR_VISIBLE_MS, MAX_RECEIPT_LABEL } from "../../../constants";
+import { useExpenses, useExpensesMutations } from "../../../hooks/useExpenses";
+import { useExpenseSuggestion } from "../../../hooks/useExpenseSuggestion";
 import {
   clearPendingReceipts,
   readPendingReceipt,
   removePendingReceipt,
-} from "../../../../lib/receiptDraft";
+} from "../../../lib/receiptDraft";
 import ConfirmRemoveItemDialog from "./ConfirmRemoveItemDialog";
 import ExpensesModal from "./ExpensesModal";
 import ReceiptDraftModal from "./ReceiptDraftModal";
@@ -69,15 +66,11 @@ const missingFieldsFor = (item) => {
 const firstIncompleteIndex = (items) =>
   items.findIndex((item) => missingFieldsFor(item).length > 0);
 
-/* Draft lines the save can't accept yet: an amount of 0 (nothing typed) reads
-   as ₱0.00 in the summary, which is exactly what the save error and the red row
-   flag point at. */
 const zeroAmountIndexesFor = (items) =>
   items
     .map((item, index) => (!(Number(item.totalAmount) > 0) ? index : -1))
     .filter((index) => index >= 0);
 
-/* "Line 2 (Pamasahe)" — how the save errors point at one draft line. */
 const lineLabel = (item, index) =>
   `Line ${index + 1}${
     item.description.trim() ? ` (${item.description.trim()})` : ""
@@ -168,10 +161,6 @@ const AddExpenses = () => {
   const [modal, setModal] = useState(null);
   const [formError, setFormError] = useState("");
   const [addItemError, setAddItemError] = useState("");
-  // Zero-amount flags + the "Line N still reads ₱0.00 …" footer only render
-  // after the Save button is clicked — a fresh blank row isn't an error until
-  // a save is attempted. The flagged list stays derived from the live draft,
-  // so corrected lines revert on the next keystroke.
   const [showZeroAmountErrors, setShowZeroAmountErrors] = useState(false);
   const [removeIndex, setRemoveIndex] = useState(null);
   const [viewReceipt, setViewReceipt] = useState(null);
@@ -305,35 +294,16 @@ const AddExpenses = () => {
       : "";
   }, [references, referenceId]);
 
-  // Lines still missing an amount — refused by the save ("Cannot proceed …
-  // ₱0.00 = 0.00 … add an amount to proceed"). `flaggedLines` below is the
-  // same list, gated on a save attempt so it stays empty until the Save
-  // button is actually clicked.
   const zeroAmountIndexes = useMemo(() => zeroAmountIndexesFor(items), [items]);
   const flaggedLines = showZeroAmountErrors ? zeroAmountIndexes : [];
 
-  // The source funding this draft and how it stands — the very same shared
-  // calculation the SelectSourceFund card renders, so the save's insufficient
-  // funds check can never disagree with the balance on screen.
   const funding = useMemo(
     () => fundingState(references, selectedReferenceId, total),
     [references, selectedReferenceId, total],
   );
-  // The same state that turns the SelectSourceFund badge "Insufficient": the
-  // picked source can't cover the draft, so saving is blocked outright. While
-  // it holds, the Save button is disabled and this guard keeps a stale click
-  // (or a race with refreshed references) from sending the request anyway.
-  // `depleted` still saves — it uses the source up exactly.
+
   const insufficientFunds = funding.status === FUNDING_STATUS.insufficient;
-  // With more than one open source the admin must pick which one funds these
-  // lines: saving with nothing selected would file the expenses against no
-  // budget at all (the server stores a NULL reference_id). A lone source is
-  // auto-mirrored above, so it never needs a pick of its own.
   const sourceUnselected = funding.sources.length > 1 && !funding.source;
-  // No source of funds exists at all (or the references haven't loaded yet):
-  // there is nothing that could fund the draft, so the Save button is
-  // disabled and handleSave refuses the state below as a backstop against a
-  // stale click — expenses never save against a missing budget source.
   const noSources = funding.sources.length === 0;
 
   const handleCategoryAdded = (category) => {
@@ -410,35 +380,32 @@ const AddExpenses = () => {
     e?.preventDefault();
     setFormError("");
     setAddItemError("");
-    // From here on the summary may flag the offending ₱0.00 rows — the Save
-    // button was clicked, so calling them out is no longer premature.
     setShowZeroAmountErrors(true);
-    // Source-of-funds gate: expenses may only save against a selected budget
-    // source. Both states disable the Save button, so these guards only fire
-    // on a stale click or a race with refreshed references — the request can
-    // never go out with no funder at all.
+
     if (funding.sources.length === 0) {
       setFormError(
         "No source of funds detected — add a budget source before saving.",
       );
       return;
     }
+
     if (!selectedReferenceId) {
       setFormError("Please select source of funds to proceed.");
       return;
     }
+
     const touched = items.filter(
       (item) =>
         item.description.trim() ||
         Number(item.totalAmount) > 0 ||
         item.receiptId,
     );
+
     if (touched.length === 0) {
       setFormError("Add at least one expense line before saving.");
       return;
     }
-    // A line whose amount still reads ₱0.00 = 0.00 can't be saved — name the
-    // ones at fault so nobody has to hunt for the empty amount field.
+
     if (zeroAmountIndexes.length > 0) {
       setFormError(
         `Cannot proceed with your request — ${zeroAmountIndexes
@@ -452,6 +419,7 @@ const AddExpenses = () => {
       );
       return;
     }
+
     const invalidIndex = firstIncompleteIndex(items);
     if (invalidIndex >= 0) {
       setFormError(
@@ -459,9 +427,7 @@ const AddExpenses = () => {
       );
       return;
     }
-    // Funding is checked against the drafted total before anything is sent: an
-    // insufficient source is a hard stop here, not a surprise after the round
-    // trip. `depleted` still goes through — it uses the source up exactly.
+
     if (insufficientFunds) {
       setFormError(
         `Cannot proceed with your request — insufficient funds in ${
@@ -474,9 +440,11 @@ const AddExpenses = () => {
       );
       return;
     }
+
     try {
       const receipts = [];
       const drafts = new Map();
+
       for (const item of touched) {
         if (!item.receiptLocal || !item.receiptId) continue;
         if (drafts.has(item.receiptId)) continue;
@@ -494,6 +462,7 @@ const AddExpenses = () => {
           })),
         });
       }
+
       await create.mutateAsync({
         type: "expense",
         reference_id: selectedReferenceId || undefined,
@@ -507,13 +476,12 @@ const AddExpenses = () => {
           });
         }),
       });
-      // Saved cleanly — drop every parked draft so the next Add Expenses form
-      // starts fresh (leftover drafts would point at receipts that now exist).
+
       clearPendingReceipts();
       toast.success(
         `Saved ${touched.length} expense line${touched.length === 1 ? "" : "s"}.`,
       );
-      nav("/admin/expenses");
+      nav("/expenses");
     } catch (error) {
       setFormError(error?.message || "Couldn't save expenses.");
     }
@@ -533,12 +501,12 @@ const AddExpenses = () => {
           </button>
           <div className="min-w-0">
             <div className="flex flex-wrap items-center gap-2">
-              <h2 className="font-display text-2xl font-semibold tracking-tight text-[var(--ink)]">
+              <h2 className="font-display sm:text-2xl text-lg font-semibold tracking-tight text-[var(--ink)]">
                 Add Expenses
               </h2>
               <Badge tone="accent">New draft</Badge>
             </div>
-            <p className="mt-1 text-sm text-[var(--ink-muted)]">
+            <p className="mt-1 text-sm text-[var(--ink-muted)] truncate">
               Log expense lines, attach receipts and keep the total in sync.
             </p>
           </div>
@@ -844,10 +812,6 @@ const AddExpenses = () => {
 
             <div className="mt-4 space-y-1">
               {items.map((it, i) => {
-                // An amount still at 0 (nothing typed) reads ₱0.00 = 0.00 — the
-                // exact thing the save refuses. The flag only appears after
-                // the Save button is clicked, so a fresh blank line is never
-                // scolded on sight.
                 const missingAmount = flaggedLines.includes(i);
                 return (
                   <div
@@ -935,7 +899,9 @@ const AddExpenses = () => {
                 className="w-full"
                 type="button"
                 onClick={handleSave}
-                disabled={saving || insufficientFunds || sourceUnselected || noSources}
+                disabled={
+                  saving || insufficientFunds || sourceUnselected || noSources
+                }
                 title={
                   noSources
                     ? "No source of funds detected — add a budget source first"

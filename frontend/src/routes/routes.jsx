@@ -18,7 +18,8 @@ import AdminBudget from "../pages/admin/AdminBudget";
 import AdminProfile from "../pages/admin/AdminProfile";
 import AdminTransaction from "../pages/admin/AdminTransaction";
 import AdminExpenses from "../pages/admin/AdminExpenses";
-import AddExpenses from "../components/layout/admin/expenses/AddExpenses";
+
+import AddExpenses from "../components/layout/expenses/AddExpenses";
 
 import EmployeeOverview from "../pages/employee/EmployeeOverview";
 import EmployeeBudget from "../pages/employee/EmployeeBudget";
@@ -70,6 +71,7 @@ export const router = createBrowserRouter([
               { path: "overview", element: <EmployeeOverview /> },
               { path: "budget", element: <EmployeeBudget /> },
               { path: "expenses", element: <EmployeeExpenses /> },
+              { path: "expenses/add", element: <AddExpenses /> },
               { path: "abono", element: <EmployeeAbono /> },
               { path: "setting", element: <EmployeeSetting /> },
             ],

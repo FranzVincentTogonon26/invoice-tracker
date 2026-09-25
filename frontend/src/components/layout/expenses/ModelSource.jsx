@@ -1,8 +1,8 @@
 import { useMemo, useState } from "react";
-import Listbox from "../../../ui/Listbox";
+import Listbox from "../../ui/Listbox";
 
-import { useExpenses } from "../../../../hooks/useExpenses";
-import { getGeminiModel, setGeminiModel } from "../../../../lib/geminiModel";
+import { useExpenses } from "../../../hooks/useExpenses";
+import { getGeminiModel, setGeminiModel } from "../../../lib/geminiModel";
 
 const toOptions = (models) =>
   models.map(({ model }) => ({ value: model, label: model }));

@@ -1,6 +1,6 @@
 import { ScanLine, Upload } from "lucide-react";
 import { useRef } from "react";
-import { MAX_RECEIPT_LABEL } from "../../../../constants";
+import { MAX_RECEIPT_LABEL } from "../../../constants";
 
 const ReceiptScanButton = ({ scanning = false, onFile }) => {
   const inputRef = useRef(null);

@@ -9,10 +9,10 @@ import {
   Store,
   X,
 } from "lucide-react";
-import { Badge } from "../../../ui/Badge";
-import { Button } from "../../../ui/Button";
-import { formatDate, formatMoney } from "../../../../lib/utils";
-import { openReceiptFile } from "../../../../lib/receiptMedia";
+import { Badge } from "../../ui/Badge";
+import { Button } from "../../ui/Button";
+import { formatDate, formatMoney } from "../../../lib/utils";
+import { openReceiptFile } from "../../../lib/receiptMedia";
 
 const MetaRow = ({ label, value, Icon }) => (
   <div className="flex items-start justify-between gap-4 py-2">

@@ -359,51 +359,51 @@ class Expenses {
     });
   }
 
-  static async expensesOverview({ from, to } = {}) {
-    const categories = await this.categoryList();
-    const gemini_model = await this.geminiModel();
-    const references = await this.budgetReference();
-    const where = [];
-    const params = [];
+static async expensesOverview({ from, to } = {}) {
+     const categories = await this.categoryList();
+     const gemini_model = await this.geminiModel();
+     const references = await this.budgetReference();
+     const where = [];
+     const params = [];
 
-    if (from) {
-      params.push(from);
-      where.push(`e.expense_date >= $${params.length}::date`);
-    }
+     if (from) {
+       params.push(from);
+       where.push(`e.expense_date >= $${params.length}::date`);
+     }
 
-    if (to) {
-      params.push(to);
-      where.push(`e.expense_date <= $${params.length}::date`);
-    }
+     if (to) {
+       params.push(to);
+       where.push(`e.expense_date <= $${params.length}::date`);
+     }
 
-    const expenses = await query(
-      `SELECT
-          e.id,
-          e.description,
-          e.total_amount::float8 AS total_amount,
-          e.expense_date::text AS expense_date,
-          e.payment_method,
-          e.status,
-          e.notes,
-          e.created_at,
-          e.category_id,
-          c.category_name,
-          e.receipt_id,
-          e.image_url,
-          e.receipt_date,
-          e.reference_id,
-          e.issued_ref_id,
-          e.user_id,
-          u.name AS created_by,
-          u.role AS created_by_role,
-          u.avatar_url AS created_by_avatar
-       FROM expenses e
-       LEFT JOIN category c ON c.category_id = e.category_id
-       LEFT JOIN users u ON u.user_id = e.user_id
-       ${where.length ? `WHERE ${where.join(" AND ")}` : ""}
-       ORDER BY e.expense_date DESC, e.created_at DESC`,
-      params,
-    );
+     const expenses = await query(
+       `SELECT
+           e.id,
+           e.description,
+           e.total_amount::float8 AS total_amount,
+           e.expense_date::text AS expense_date,
+           e.payment_method,
+           e.status,
+           e.notes,
+           e.created_at,
+           e.category_id,
+           c.category_name,
+           e.receipt_id,
+           e.image_url,
+           e.receipt_date,
+           e.reference_id,
+           e.issued_ref_id,
+           e.user_id,
+           u.name AS created_by,
+           u.role AS created_by_role,
+           u.avatar_url AS created_by_avatar
+        FROM expenses e
+        LEFT JOIN category c ON c.category_id = e.category_id
+        LEFT JOIN users u ON u.user_id = e.user_id
+        ${where.length ? `WHERE ${where.join(" AND ")}` : ""}
+        ORDER BY e.expense_date DESC, e.created_at DESC`,
+       params,
+     );
 
     const stats = await query(
       `SELECT
@@ -484,23 +484,118 @@ class Expenses {
       0,
     );
 
-    return {
-      categories,
-      references,
-      gemini_model,
-      expenses: expenses.rows,
-      overview: {
-        overviewBudget: overviewBudget.rows,
-        overviewIssuedBudget: overviewIssuedBudget.rows,
-        overviewExpenses: overviewExpenses.rows,
-        totalBudget,
-        totalIssued,
-        totalExpenses,
-        totalCategories: categories.length,
-        totalTransaction: totalTransaction.rows[0]?.total ?? 0,
-      },
-    };
-  }
+      return {
+        categories,
+        references,
+        gemini_model,
+        expenses: expenses.rows,
+        overview: {
+          overviewBudget: overviewBudget.rows,
+          overviewIssuedBudget: overviewIssuedBudget.rows,
+          overviewExpenses: overviewExpenses.rows,
+          totalBudget,
+          totalIssued,
+          totalExpenses,
+          totalCategories: categories.length,
+          totalTransaction: totalTransaction.rows[0]?.total ?? 0,
+        },
+      };
+    }
+
+    static async expensesOverviewEmployee({ from, to } = {}, userId) {
+      const categories = await this.categoryList();
+      const references = await this.budgetReference();
+      const where = [];
+      const params = [];
+
+      params.push(userId);
+      where.push(`e.user_id = $${params.length}::uuid`);
+
+      if (from) {
+        params.push(from);
+        where.push(`e.expense_date >= $${params.length}::date`);
+      }
+
+      if (to) {
+        params.push(to);
+        where.push(`e.expense_date <= $${params.length}::date`);
+      }
+
+      const expenses = await query(
+        `SELECT
+            e.id,
+            e.description,
+            e.total_amount::float8 AS total_amount,
+            e.expense_date::text AS expense_date,
+            e.payment_method,
+            e.status,
+            e.notes,
+            e.created_at,
+            e.category_id,
+            c.category_name,
+            e.receipt_id,
+            e.image_url,
+            e.receipt_date,
+            e.reference_id,
+            e.issued_ref_id,
+            e.user_id,
+            u.name AS created_by,
+            u.role AS created_by_role,
+            u.avatar_url AS created_by_avatar,
+            br.label AS reference_label
+         FROM expenses e
+         LEFT JOIN category c ON c.category_id = e.category_id
+         LEFT JOIN users u ON u.user_id = e.user_id
+         LEFT JOIN budget_reference br ON br.reference_id = e.reference_id
+         ${where.length ? `WHERE ${where.join(" AND ")}` : ""}
+         ORDER BY e.expense_date DESC, e.created_at DESC`,
+        params,
+      );
+
+      const stats = await query(
+        `SELECT
+            COALESCE(SUM(e.total_amount), 0)::float8 AS total_expenses,
+            COALESCE(SUM(e.total_amount) FILTER (
+              WHERE e.expense_date >= date_trunc('month', CURRENT_DATE)
+            ), 0)::float8 AS this_month,
+            COUNT(*)::int AS total_transactions,
+            COALESCE((
+              SELECT SUM(ib.amount)
+              FROM budget_issued_reference bir
+              JOIN issued_budget ib ON ib.issued_ref_id = bir.id
+              WHERE bir.user_id = $1 AND bir.status = 'open'
+            ), 0)::float8 AS total_budget,
+            COALESCE((
+              SELECT SUM(ea.amount)
+              FROM employee_abono ea
+              WHERE ea.user_id = $1
+            ), 0)::float8 AS total_abono
+         FROM expenses e
+         WHERE e.user_id = $1 AND e.status != 'cancel'`,
+        [userId],
+      );
+
+      const s = stats.rows[0] ?? {};
+      const totalBudget = Number(s.total_budget) || 0;
+      const totalExpenses = Number(s.total_expenses) || 0;
+      const totalAbono = Number(s.total_abono) || 0;
+      const totalBalance = totalBudget + totalAbono - totalExpenses;
+
+      return {
+        categories,
+        references,
+        expenses: expenses.rows,
+        overview: {
+          totalBudget,
+          totalExpenses,
+          totalAbono,
+          totalBalance,
+          thisMonth: Number(s.this_month) || 0,
+          totalTransactions: Number(s.total_transactions) || 0,
+          totalCategories: categories.length,
+        },
+      };
+    }
 }
 
 export default Expenses;

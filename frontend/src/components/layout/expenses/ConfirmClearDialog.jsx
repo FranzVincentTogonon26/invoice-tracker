@@ -1,6 +1,6 @@
 import { AnimatePresence, motion } from "framer-motion";
 import { Trash2 } from "lucide-react";
-import { Button } from "../../../ui/Button";
+import { Button } from "../../ui/Button";
 
 // "Remove scanned receipt?" confirm dialog shown before discarding a
 // receipt that already has data attached.

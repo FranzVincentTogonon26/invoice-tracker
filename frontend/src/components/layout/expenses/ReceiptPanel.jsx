@@ -1,5 +1,5 @@
 import { ScanLine } from "lucide-react";
-import { Card } from "../../../ui/Card";
+import { Card } from "../../ui/Card";
 import ReceiptPreview from "./ReceiptPreview";
 import ReceiptDropzone from "./ReceiptDropzone";
 import ReceiptDetails from "./ReceiptDetails";

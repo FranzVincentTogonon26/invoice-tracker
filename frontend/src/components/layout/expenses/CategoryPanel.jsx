@@ -1,7 +1,7 @@
 import { BadgeCheck, Hash, Loader2, Plus, Trash2 } from "lucide-react";
-import { Input } from "../../../ui/Input";
-import { Button } from "../../../ui/Button";
-import { formatDate } from "../../../../lib/utils";
+import { Input } from "../../ui/Input";
+import { Button } from "../../ui/Button";
+import { formatDate } from "../../../lib/utils";
 
 // "Expense Categories" panel: add form + scrollable table. Pure presentation —
 // every mutation is owned by ExpensesModal and passed down as handlers.

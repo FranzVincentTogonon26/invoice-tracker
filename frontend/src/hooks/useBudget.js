@@ -99,8 +99,10 @@ export function useBudgetBalance(referenceId, enabled = true) {
 }
 
 // Restriction guard for the issuedBudget form: an employee may only be issued
-// from ONE open budget reference at a time. Fetched once an employee is picked
-// and re-checked whenever the source of funds changes (issuing more from the
+// from ONE open budget reference at a time. Fetched only once BOTH the
+// employee and the source of funds are picked — if either is missing there is
+// nothing to validate against, so no request is fired and no conflict can be
+// surfaced — and re-checked whenever either changes (issuing more from the
 // same source stays allowed). Nested under ["budgets", …] so the shared
 // invalidate() refetches it after every create/cancel/restore.
 export function useEmployeeIssuedGuard(employeeId, referenceId, enabled = true) {
@@ -112,7 +114,7 @@ export function useEmployeeIssuedGuard(employeeId, referenceId, enabled = true) 
       referenceId || null,
     ],
     queryFn: () => budgetsApi.employeeIssuedGuard(employeeId, referenceId),
-    enabled: Boolean(enabled && employeeId),
+    enabled: Boolean(enabled && employeeId && referenceId),
   });
 
   return {

@@ -7,9 +7,9 @@ import {
   Receipt,
   Settings,
   LogOut,
-  Menu as MenuIcon,
   X,
   Wallet,
+  House,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/context/AuthContext";
@@ -18,7 +18,7 @@ import AILogo from "../../ui/AILogo";
 const NAV = [
   {
     to: "/employee/overview",
-    icon: LayoutGrid,
+    icon: House,
     label: "Overview",
     primary: true,
   },
@@ -116,12 +116,12 @@ function ActionRow({ icon: Icon, label, onClick, to }) {
  * ------------------------------------------------------------------------- */
 
 const DOCK_CELL =
-  "flex-1 min-w-0 rounded-2xl focus-visible:outline-none " +
+  "flex-1 min-w-0 rounded-full focus-visible:outline-none " +
   "focus-visible:ring-2 focus-visible:ring-[var(--accent)]/30";
 
 const DOCK_INNER =
-  "relative flex h-14 w-full flex-col items-center justify-center gap-1 " +
-  "rounded-2xl transition-colors duration-200";
+  "relative flex h-13 w-full flex-col items-center justify-center gap-1 " +
+  "rounded-full transition-colors duration-200";
 
 const SHEET_TILE =
   "flex items-center gap-2.5 rounded-2xl border px-3 py-3 transition-colors";
@@ -148,7 +148,7 @@ function MobileDock({ onOpenMenu }) {
       aria-label="Primary"
       className="md:hidden pointer-events-none fixed inset-x-0 bottom-0 z-40 flex justify-center px-1 pb-[calc(env(safe-area-inset-bottom)+0.75rem)]"
     >
-      <div className="pointer-events-auto flex w-full max-w-[390px] items-center gap-0 rounded-2xl border border-[var(--border)] bg-[var(--surface)]/85 p-0.5 shadow-hover backdrop-blur-xl">
+      <div className="pointer-events-auto flex w-full max-w-[290px] items-center gap-0 rounded-full border border-[var(--border)] bg-[var(--surface)]/85 p-0.5 shadow-hover backdrop-blur-xl">
         {DOCK_ITEMS.map(({ to, icon: Icon, label }) => (
           <NavLink key={to} to={to} title={label} className={DOCK_CELL}>
             {({ isActive }) => (
@@ -157,13 +157,13 @@ function MobileDock({ onOpenMenu }) {
                   DOCK_INNER,
                   isActive
                     ? "text-[var(--accent-strong)]"
-                    : "text-[var(--ink-muted)]",
+                    : "text-[var(--ink-muted)] ",
                 )}
               >
                 {isActive && (
                   <motion.span
                     layoutId="mobile-dock-active"
-                    className="absolute inset-0 rounded-2xl bg-[var(--accent-soft)]"
+                    className="absolute inset-0 rounded-full bg-[var(--accent-soft)]"
                     transition={{
                       type: "spring",
                       duration: 0.45,
@@ -173,12 +173,9 @@ function MobileDock({ onOpenMenu }) {
                 )}
                 <Icon
                   size={20}
-                  strokeWidth={isActive ? 2.4 : 2}
+                  strokeWidth={isActive ? 2.5 : 2.3}
                   className="relative z-10"
                 />
-                <span className="relative z-10 max-w-full truncate text-[12px] font-medium leading-none">
-                  {label}
-                </span>
               </span>
             )}
           </NavLink>
@@ -192,10 +189,7 @@ function MobileDock({ onOpenMenu }) {
           className={cn(DOCK_CELL, "text-[var(--ink-muted)]")}
         >
           <span className={cn(DOCK_INNER, "hover:bg-[var(--surface-2)]")}>
-            <MenuIcon size={18} />
-            <span className="max-w-full truncate text-xs font-medium leading-none">
-              Menu
-            </span>
+            <LayoutGrid size={18} strokeWidth={2.3} />
           </span>
         </button>
       </div>

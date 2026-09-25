@@ -1,7 +1,7 @@
 import { Plus, Trash2 } from "lucide-react";
-import { Input } from "../../../ui/Input";
-import { CardTitle } from "../../../ui/Card";
-import { formatMoney } from "../../../../lib/utils";
+import { Input } from "../../ui/Input";
+import { CardTitle } from "../../ui/Card";
+import { formatMoney } from "../../../lib/utils";
 
 const GRID_COLS = "grid-cols-[minmax(350px,1fr)_64px_96px_80px_36px]";
 const GRID_COLS_SM = "sm:grid-cols-[minmax(320px,1fr)_64px_96px_112px_36px]";

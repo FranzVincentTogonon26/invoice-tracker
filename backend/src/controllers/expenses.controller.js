@@ -24,6 +24,17 @@ export const expenses = async (req, res, next) => {
   }
 };
 
+export const expensesEmployee = async (req, res, next) => {
+  try {
+    const { from, to } = req.query;
+    const { categories, expenses: rows, overview, references } =
+      await Expenses.expensesOverviewEmployee({ from, to }, req.user.id);
+    return res.status(200).json({ expenses: rows, categories, overview, references });
+  } catch (err) {
+    next(err);
+  }
+};
+
 export const create = async (req, res, next) => {
   try {
     const payload = validate(createExpensesSchema, req.body);

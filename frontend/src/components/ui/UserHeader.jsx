@@ -24,7 +24,7 @@ export function UserHeader({ user }) {
         </h1>
 
         <div
-          className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-[var(--accent-soft)] text-sm font-semibold text-[var(--accent-strong)] ring-2 ring-[var(--surface)]"
+          className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-[var(--accent-soft)] text-sm font-semibold text-[var(--accent-strong)] "
           aria-hidden="true"
         >
           {getInitials(user?.name)}

@@ -1,5 +1,5 @@
 import { Store, CalendarDays, Coins } from "lucide-react";
-import { CardTitle } from "../../../ui/Card";
+import { CardTitle } from "../../ui/Card";
 
 const ROW = "flex items-start justify-between gap-4 py-2 first:pt-0 last:pb-0";
 
@@ -37,26 +37,32 @@ const ReceiptDetails = ({ receipt, scanning }) => {
           </div>
         ))}
 
-      {/* Fallback while scanned details are still empty */}
-      {!scanning && !receipt.vendor && !receipt.receiptDate && !receipt.currency && (
-        <p className="mt-1 rounded-xl bg-[var(--surface-2)]/60 px-3 py-2 text-sm leading-relaxed text-[var(--ink-muted)] lg:px-3 lg:py-2.5">
-          Couldn’t read vendor details — items are listed below.
-        </p>
-      )}
+        {/* Fallback while scanned details are still empty */}
+        {!scanning &&
+          !receipt.vendor &&
+          !receipt.receiptDate &&
+          !receipt.currency && (
+            <p className="mt-1 rounded-xl bg-[var(--surface-2)]/60 px-3 py-2 text-sm leading-relaxed text-[var(--ink-muted)] lg:px-3 lg:py-2.5">
+              Couldn’t read vendor details — items are listed below.
+            </p>
+          )}
 
-      {/* Skeleton while the scan is extracting */}
-      {scanning && !receipt.vendor && !receipt.receiptDate && (
-        <div className="space-y-1.5 pt-0.5">
-          {[0, 1, 2].map((i) => (
-            <div key={i} className="flex items-center justify-between gap-3 py-1.5">
-              <div className="h-7 w-24 animate-pulse rounded-xl bg-[var(--surface-2)]" />
-              <div className="h-2.5 w-20 animate-pulse rounded-full bg-[var(--surface-2)]" />
-            </div>
-          ))}
-        </div>
-      )}
+        {/* Skeleton while the scan is extracting */}
+        {scanning && !receipt.vendor && !receipt.receiptDate && (
+          <div className="space-y-1.5 pt-0.5">
+            {[0, 1, 2].map((i) => (
+              <div
+                key={i}
+                className="flex items-center justify-between gap-3 py-1.5"
+              >
+                <div className="h-7 w-24 animate-pulse rounded-xl bg-[var(--surface-2)]" />
+                <div className="h-2.5 w-20 animate-pulse rounded-full bg-[var(--surface-2)]" />
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
     </div>
-  </div>
   );
 };
 

@@ -1,6 +1,6 @@
 import { useDropzone } from "react-dropzone";
 import ReceiptScanButton from "./ScanReceipt";
-import { RECEIPT_ACCEPT } from "../../../../constants";
+import { RECEIPT_ACCEPT } from "../../../constants";
 
 // Dropzone wrapper for the receipt panel. A scan in progress disables it so
 // nothing can be dropped or picked until the current scan ends.

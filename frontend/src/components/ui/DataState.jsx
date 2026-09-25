@@ -88,7 +88,9 @@ export function EmptyState({
       <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-[var(--accent-soft)] text-[var(--accent-strong)]">
         <Icon size={20} />
       </div>
-      <p className="mt-4 font-display text-lg font-semibold tracking-tight text-[var(--ink)]">{title}</p>
+      <p className="mt-4 font-display sm:text-lg text-base font-semibold tracking-tight text-[var(--ink)]">
+        {title}
+      </p>
       {message && (
         <p className="mt-1.5 max-w-xs text-sm leading-relaxed text-[var(--ink-muted)]">
           {message}

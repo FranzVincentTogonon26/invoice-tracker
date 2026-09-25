@@ -1,15 +1,6 @@
 import { AnimatePresence, motion } from "framer-motion";
 import { AlertCircle } from "lucide-react";
 
-// Shared animated alert box — every error in the modal surfaces here.
-//
-// The modal renders this in a pinned `shrink-0` row ABOVE its scrollable
-// body, so the alert is always in normal flow and visible on mobile the
-// moment `message` is truthy — no scroll-chasing needed. For that reason this
-// animates y/opacity ONLY: no height/margin animation (mobile text wrap makes
-// "auto" targets unreliable) and no popLayout mode (it would lift the alert
-// out of the pinned row on small viewports). The static `mb-4` keeps the
-// rhythm with the panels below and only exists while the alert does.
 const ErrorAlert = ({ message }) => (
   <AnimatePresence initial={false}>
     {message && (
