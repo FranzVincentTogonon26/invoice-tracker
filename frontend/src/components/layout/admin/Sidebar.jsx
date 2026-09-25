@@ -18,7 +18,6 @@ import {
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/context/AuthContext";
 import AILogo from "../../ui/AILogo";
-import { LockBodyScroll } from "@/hooks/useLockBody";
 
 const NAV = [
   {
@@ -133,12 +132,12 @@ function ActionRow({ icon: Icon, label, onClick, to }) {
  * ------------------------------------------------------------------------- */
 
 const DOCK_CELL =
-  "flex-1 min-w-0 rounded-full focus-visible:outline-none " +
+  "flex-1 min-w-0 rounded-2xl focus-visible:outline-none " +
   "focus-visible:ring-2 focus-visible:ring-[var(--accent)]/30";
 
 const DOCK_INNER =
-  "relative flex h-12 w-full flex-col items-center justify-center gap-0.5 " +
-  "rounded-full transition-colors duration-200";
+  "relative flex h-14 w-full flex-col items-center justify-center gap-1 " +
+  "rounded-2xl transition-colors duration-200";
 
 const SHEET_TILE =
   "flex items-center gap-2.5 rounded-2xl border px-3 py-3 transition-colors";
@@ -163,9 +162,9 @@ function MobileDock({ onOpenMenu }) {
   return (
     <nav
       aria-label="Primary"
-      className="md:hidden pointer-events-none fixed inset-x-0 bottom-0 z-40 flex justify-center px-4 pb-[calc(env(safe-area-inset-bottom)+0.75rem)]"
+      className="md:hidden pointer-events-none fixed inset-x-0 bottom-0 z-40 flex justify-center px-1 pb-[calc(env(safe-area-inset-bottom)+0.75rem)]"
     >
-      <div className="pointer-events-auto flex w-full max-w-[430px] items-center gap-1 rounded-full border border-[var(--border)] bg-[var(--surface)]/85 p-1 shadow-hover backdrop-blur-xl">
+      <div className="pointer-events-auto flex w-full max-w-[390px] items-center gap-0 rounded-2xl border border-[var(--border)] bg-[var(--surface)]/85 p-0.5 shadow-hover backdrop-blur-xl">
         {DOCK_ITEMS.map(({ to, icon: Icon, label }) => (
           <NavLink key={to} to={to} title={label} className={DOCK_CELL}>
             {({ isActive }) => (
@@ -180,7 +179,7 @@ function MobileDock({ onOpenMenu }) {
                 {isActive && (
                   <motion.span
                     layoutId="mobile-dock-active"
-                    className="absolute inset-0 rounded-full bg-[var(--accent-soft)]"
+                    className="absolute inset-0 rounded-2xl bg-[var(--accent-soft)]"
                     transition={{
                       type: "spring",
                       duration: 0.45,
@@ -189,11 +188,11 @@ function MobileDock({ onOpenMenu }) {
                   />
                 )}
                 <Icon
-                  size={18}
+                  size={20}
                   strokeWidth={isActive ? 2.4 : 2}
                   className="relative z-10"
                 />
-                <span className="relative z-10 max-w-full truncate text-xs font-medium leading-none">
+                <span className="relative z-10 max-w-full truncate text-[12px] font-medium leading-none">
                   {label}
                 </span>
               </span>
@@ -263,7 +262,6 @@ function MobileMenuSheet({ open, onClose, onLogout, user }) {
           exit={{ opacity: 0 }}
           transition={{ duration: 0.18 }}
         >
-          <LockBodyScroll />
           <div
             className="absolute inset-0 bg-[var(--ink)]/40 backdrop-blur-sm"
             onClick={onClose}

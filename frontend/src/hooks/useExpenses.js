@@ -4,6 +4,27 @@ import { expensesApi } from "../api/expenses";
 /* ── Expenses ──────────────────────────────────────────────────── */
 export const expensesKey = (params) => ["expenses", params || {}];
 
+/* ── Expense detail (View expense modal) ─────────────────────────── */
+
+// One saved expense + its scanned receipt lines, fetched on demand when the
+// View expense modal opens — the list only carries what the table shows, so
+// the line items travel here instead of bloating every ledger row.
+export function useExpenseDetail(id, options = {}) {
+  const query = useQuery({
+    queryKey: ["expenses", "detail", id || null],
+    queryFn: () => expensesApi.detail(id),
+    enabled: Boolean(id),
+    ...options,
+  });
+
+  return {
+    ...query,
+    expense: query.data?.expense ?? null,
+    receiptItems: query.data?.receiptItems ?? [],
+    vendor: query.data?.vendor ?? "",
+  };
+}
+
 export function useExpenses(params, options = {}) {
   const query = useQuery({
     queryKey: expensesKey(params),

@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { Inbox } from "lucide-react";
 import toast from "react-hot-toast";
 import { Card, CardDescription, CardHeader, CardTitle } from "../../../ui/Card";
@@ -13,6 +13,18 @@ import IssuedTransactionFilters from "./IssuedTransactionFilters";
 import IssuedTransactionTable from "./IssuedTransactionTable";
 
 const PAGE_SIZE = 100;
+
+/**
+ * Dropdown predicate for the issued-transaction list — one source of truth so
+ * the table (desktop and mobile) and the mobile filter sheet's live "N results"
+ * preview can never disagree about what matches. "all" (or an unset value)
+ * matches everything, exactly like the inline Listboxes have always behaved.
+ */
+const matchesIssuedFilters = (row, { employee, method, fund, status }) =>
+  (employee === "all" || row.employee === employee) &&
+  (method === "all" || row.method === method) &&
+  (fund === "all" || row.source_of_funds === fund) &&
+  (status === "all" || row.status === status);
 
 const BudgetIssuedTransaction = () => {
   const [search, setSearch] = useState("");
@@ -154,14 +166,18 @@ const BudgetIssuedTransaction = () => {
 
   const filteredRows = useMemo(
     () =>
-      rows.filter(
-        (r) =>
-          (employee === "all" || r.employee === employee) &&
-          (method === "all" || r.method === method) &&
-          (fund === "all" || r.source_of_funds === fund) &&
-          (status === "all" || r.status === status),
+      rows.filter((r) =>
+        matchesIssuedFilters(r, { employee, method, fund, status }),
       ),
     [rows, employee, method, fund, status],
+  );
+
+  // Live "N results" preview for the mobile filter sheet: the sheet stages its
+  // own draft, so it asks the page how many rows that draft would return (the
+  // search itself is applied server-side through the fetch params).
+  const countIssuedMatches = useCallback(
+    (draft) => rows.filter((r) => matchesIssuedFilters(r, draft)).length,
+    [rows],
   );
 
   const pageCount = Math.max(1, Math.ceil(filteredRows.length / PAGE_SIZE));
@@ -225,6 +241,8 @@ const BudgetIssuedTransaction = () => {
           onFilterChange={handleFilterChange}
           search={search}
           onSearch={updateSearch}
+          countMatches={countIssuedMatches}
+          totalRows={rows.length}
         />
 
         {isLoading ? (

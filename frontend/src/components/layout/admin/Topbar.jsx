@@ -1,5 +1,6 @@
 import { Sun, Moon, Search } from "lucide-react";
 import { IconButton } from "@/components/ui/IconButton";
+import { UserHeader } from "@/components/ui/UserHeader";
 import { useTheme } from "@/context/ThemeContext";
 import { useAuth } from "@/context/AuthContext";
 import { NotificationsPopover } from "../../ui/NotificationsPopover";
@@ -7,24 +8,17 @@ import { NotificationsPopover } from "../../ui/NotificationsPopover";
 export function Topbar({ onOpenPalette }) {
   const { theme, toggle } = useTheme();
   const { user } = useAuth();
-  const firstName = user?.name?.split(" ")[0] || "there";
 
   const isMac =
     typeof navigator !== "undefined" &&
     /Mac|iPhone|iPad/i.test(navigator.platform);
 
   return (
-    <header className="mb-6 flex items-start justify-between gap-4 md:mb-8 md:gap-6">
-      <div className="min-w-0">
-        <h1 className="font-display text-3xl font-semibold leading-tight tracking-tight text-[var(--ink)] md:text-4xl">
-          Hello, {firstName}.
-        </h1>
-        <p className="mt-1 text-sm leading-relaxed text-[var(--ink-muted)]">
-          Here&apos;s what&apos;s happening with your budget today.
-        </p>
-      </div>
+    <header className="mb-6 flex items-start justify-between gap-3 md:mb-8 md:gap-6">
+      {/* Desktop: greeting. Mobile: signed-in user (avatar, name, email). */}
+      <UserHeader user={user} />
 
-      <div className="flex items-center gap-3 shrink-0">
+      <div className="flex shrink-0 items-center gap-2 md:gap-3">
         <button
           type="button"
           onClick={onOpenPalette}

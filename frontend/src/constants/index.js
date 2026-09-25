@@ -44,7 +44,13 @@ export const STATUS = {
 // so the panels, the modal and the scan engine all quote the same values.
 
 export const ERROR_VISIBLE_MS = 5000;
-export const MAX_RECEIPT_BYTES = 2 * 1024 * 1024;
+
+// Max receipt upload size — kept in sync with the backend multer limit
+// (middleware/upload.js, 10MB). The scan stores the file server-side and the
+// draft only carries its URL, so this cap is about what the AI can read, not
+// about what fits in localStorage.
+export const MAX_RECEIPT_BYTES = 10 * 1024 * 1024;
+export const MAX_RECEIPT_LABEL = "10MB";
 
 export const MODAL_COPY = {
   category: {

@@ -4,6 +4,7 @@ import budgetRoutes from "./budget.route.js";
 import employeesRoutes from "./employees.route.js";
 import expensesRoutes from "./expenses.route.js";
 import aiRoutes from "./ai.route.js";
+import employeeOverviewRoutes from "./employee.overview.route.js";
 
 const router = express.Router();
 
@@ -20,5 +21,6 @@ router.use("/budgets", budgetRoutes);
 router.use("/employees", employeesRoutes);
 router.use("/expenses", expensesRoutes);
 router.use("/ai", aiRoutes);
+router.use("/employee_overview", employeeOverviewRoutes);
 
 export default router;

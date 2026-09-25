@@ -1,5 +1,6 @@
 import { ScanLine, Upload } from "lucide-react";
 import { useRef } from "react";
+import { MAX_RECEIPT_LABEL } from "../../../../constants";
 
 const ReceiptScanButton = ({ scanning = false, onFile }) => {
   const inputRef = useRef(null);
@@ -44,7 +45,7 @@ const ReceiptScanButton = ({ scanning = false, onFile }) => {
             <>
               <span className="sm:hidden">Tap to pick a photo or PDF</span>
               <span className="hidden sm:inline">
-                PNG, JPG, WEBP or PDF · up to 2MB
+                PNG, JPG, WEBP or PDF · up to {MAX_RECEIPT_LABEL}
               </span>
             </>
           )}

@@ -181,13 +181,13 @@ export function DateRangePicker({
   };
 
   return (
-    <div ref={rootRef} className="relative">
+    <div ref={rootRef} className="relative min-w-0 flex-1 sm:flex-none">
       <Button
         ref={triggerRef}
         type="button"
         variant="soft"
         className={cn(
-          "px-5",
+          "max-w-full px-5",
           hasValue
             ? "border border-[var(--accent)]/35 font-semibold shadow-card"
             : "border border-dashed border-[var(--border)] bg-transparent font-medium text-[var(--ink-muted)] hover:border-[var(--accent)]/40 hover:bg-[var(--surface-2)] hover:text-[var(--ink)]",
@@ -209,7 +209,9 @@ export function DateRangePicker({
         ) : (
           <CalendarOff size={15} aria-hidden />
         )}
-        <span className="tabular-nums">{label}</span>
+        <span className="min-w-0 max-w-full truncate tabular-nums">
+          {label}
+        </span>
       </Button>
 
       <AnimatePresence>
@@ -224,7 +226,7 @@ export function DateRangePicker({
             className={cn(
               "absolute top-[calc(100%+8px)] z-40 w-[min(92vw,632px)] overflow-hidden rounded-3xl border border-[var(--border)] bg-[var(--surface)] shadow-hover",
               align === "end"
-                ? "left-0 right-auto sm:left-auto sm:right-0"
+                ? "max-sm:fixed max-sm:inset-x-4 max-sm:top-[10vh] max-sm:max-h-[80dvh] max-sm:overflow-y-auto sm:left-auto sm:right-0"
                 : "left-0",
             )}
           >

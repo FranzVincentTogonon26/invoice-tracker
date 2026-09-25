@@ -23,6 +23,16 @@ router.delete(
   expensesController.removeCategory,
 );
 
+// The View expense modal: this row plus its scanned receipt lines.
+// Placed before "/:id" so the literal "detail" segment never parses as the
+// validated uuid route below — express.Router matches top-down.
+router.get(
+  "/detail/:id",
+  authMiddleware,
+  requireAdminAccess,
+  expensesController.detail,
+);
+
 router.delete(
   "/:id",
   authMiddleware,

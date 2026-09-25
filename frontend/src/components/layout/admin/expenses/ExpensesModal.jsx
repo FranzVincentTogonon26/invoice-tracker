@@ -5,7 +5,6 @@ import toast from "react-hot-toast";
 import { Button } from "../../../ui/Button";
 import { useExpensesMutations } from "../../../../hooks/useExpenses";
 import useSmoothScroll from "../../../../hooks/useSmoothScroll";
-import { LockBodyScroll } from "../../../../hooks/useLockBody";
 import { useReceiptScan } from "../../../../hooks/useReceiptScan";
 import {
   buildReceiptDraft,
@@ -14,6 +13,7 @@ import {
 import {
   ERROR_VISIBLE_MS,
   MAX_RECEIPT_BYTES,
+  MAX_RECEIPT_LABEL,
   MODAL_COPY,
   blankReceipt,
 } from "../../../../constants";
@@ -109,6 +109,13 @@ const ExpensesModal = ({
       currency: parsed.currency || "",
       total: parsed.total || 0,
       suggestedCategory: parsed.suggested_category || "",
+      // The backend stored the upload during the scan and answered with its
+      // public URL — the draft only ever carries this short string, so a big
+      // photo can no longer be dropped for not fitting in localStorage.
+      imageUrl: parsed.imageUrl || "",
+      // The browser knows the picked file's real name; the server's copy is a
+      // fallback (multer can mangle non-ASCII file names).
+      fileName: r.fileName || parsed.fileName,
     }));
     toast.success("Receipt scanned � check the details below.");
   }, []);
@@ -206,19 +213,15 @@ const ExpensesModal = ({
       if (!file) return;
 
       if (file.size > MAX_RECEIPT_BYTES) {
-        setErr("Receipt must be 2MB or smaller.");
+        setErr(`Receipt must be ${MAX_RECEIPT_LABEL} or smaller.`);
         return;
       }
 
-      const reader = new FileReader();
-      reader.onload = () =>
-        setReceipt((r) => ({
-          ...r,
-          imageUrl: String(reader.result ?? ""),
-          fileName: file.name,
-        }));
-      reader.onerror = () => setErr("Couldn't read that file.");
-      reader.readAsDataURL(file);
+      // No FileReader here: the scan stores the image server-side and answers
+      // with `image_url`, so a multi-megabyte photo never has to become a data
+      // URL in this state (or in the localStorage draft). Only the display name
+      // is kept locally until the parse result arrives.
+      setReceipt((r) => ({ ...r, fileName: file.name }));
 
       scanFile(file);
     },
@@ -301,7 +304,7 @@ const ExpensesModal = ({
         !persisted
           ? "Receipt confirmed � grouped line added for this session only."
           : imageDropped
-            ? "Receipt confirmed � grouped line added (image too large to keep)."
+            ? "Receipt confirmed � grouped line added (image couldn't be kept in this browser)."
             : "Receipt confirmed � grouped line added.",
       );
       return;
@@ -373,7 +376,6 @@ const ExpensesModal = ({
           className="fixed inset-0 z-50 flex items-center justify-center p-4"
           exit={{ opacity: 0 }}
         >
-          <LockBodyScroll />
           <div className="absolute inset-0 bg-[var(--ink)]/40 backdrop-blur-sm flex items-center justify-center px-2">
             <motion.div
               onClick={(e) => e.stopPropagation()}
@@ -416,6 +418,10 @@ const ExpensesModal = ({
 
               {isScanMode && scanning && <ScanOverlay />}
 
+              <div className="shrink-0">
+                <ErrorAlert message={err} />
+              </div>
+
               <div className="scrollbar-slim min-h-0 flex-1 overflow-y-auto overscroll-contain pb-1 sm:pb-0">
                 {isCategoryMode && (
                   <CategoryPanel
@@ -429,7 +435,6 @@ const ExpensesModal = ({
                     deletingId={deletingId}
                   />
                 )}
-
                 {isScanMode && (
                   <ReceiptPanel
                     receipt={receipt}
@@ -447,14 +452,11 @@ const ExpensesModal = ({
                     onAddItem={handleAddItem}
                   />
                 )}
-
                 <ConfirmClearDialog
                   open={confirmClear}
                   onKeep={() => setConfirmClear(false)}
                   onConfirm={handleConfirmClear}
                 />
-
-                <ErrorAlert message={err} />
               </div>
 
               <div className="flex shrink-0 flex-col gap-2 mt-4 pt-4 border-t border-[var(--border)] sm:mt-5 sm:flex-row sm:items-center sm:justify-end sm:pt-5">
@@ -497,6 +499,9 @@ const ExpensesModal = ({
                     disabled={
                       saving ||
                       scanning ||
+                      // A failed rescan hides the previous lines behind the
+                      // dropzone — don't let Confirm send that stale draft.
+                      scanFailed ||
                       !hasReceiptImage ||
                       (receipt.items ?? []).length === 0
                     }

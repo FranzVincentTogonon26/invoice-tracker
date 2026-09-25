@@ -7,6 +7,7 @@ import {
   WalletIcon,
   AlertCircle,
   Lock,
+  ShieldAlert,
   X,
   Plus,
 } from "lucide-react";
@@ -17,9 +18,11 @@ import { SelectEmployee } from "../../../ui/SelectEmployee";
 import { SelectReference } from "../../../ui/SelectReference";
 import { Button } from "../../../ui/Button";
 import ReferencesModal from "./ReferencesModal";
-import { useBudgetBalance } from "../../../../hooks/useBudget";
+import {
+  useBudgetBalance,
+  useEmployeeIssuedGuard,
+} from "../../../../hooks/useBudget";
 import useSmoothScroll from "../../../../hooks/useSmoothScroll";
-import { LockBodyScroll } from "../../../../hooks/useLockBody";
 import { formatMoney } from "../../../../lib/utils";
 import toast from "react-hot-toast";
 
@@ -386,6 +389,19 @@ const BudgetModal = ({
   const isAddBudget = transaction === "addBudget";
   const balanceQuery = useBudgetBalance(form.reference_id, !isAddBudget);
 
+  // Restriction guard — an employee may only hold ONE open issued budget
+  // reference at a time. Re-checked whenever the employee or the source of
+  // funds changes, so switching back to the conflicting reference keeps
+  // blocking while switching to the same source does not. Same-source
+  // top-ups stay allowed; the backend enforces the same rule on create.
+  const guardQuery = useEmployeeIssuedGuard(
+    form.employee,
+    form.reference_id,
+    open && !isAddBudget,
+  );
+  const issuedConflict = isAddBudget ? null : guardQuery.data?.conflict;
+  const issuedConflictMessage = isAddBudget ? null : guardQuery.data?.message;
+
   const bodyRef = useSmoothScroll();
 
   const errRef = useRef(null);
@@ -460,6 +476,13 @@ const BudgetModal = ({
       return "Please select a budget reference first.";
     if (!form.employee && !isAddBudget)
       return "Please select an employee first.";
+    // Restriction guard — the selected employee still has an open issuance
+    // from another source of funds.
+    if (!isAddBudget && issuedConflict)
+      return (
+        issuedConflictMessage ||
+        "Cannot proceed your request because the employee you select has already issued from another source of funds, to avoid conflict on the issued budget, only one budget reference is allowed per employee — please reimburse the existing issued budget first before issuing a new budget."
+      );
     if (!form.method) return "Please select a payment method.";
     if (!form.description || form.description.trim().length < 2)
       return "Description is required.";
@@ -540,7 +563,6 @@ const BudgetModal = ({
           className="fixed inset-0 z-50 flex items-center justify-center p-4"
           exit={{ opacity: 0 }}
         >
-          <LockBodyScroll />
           <div className="absolute inset-0 bg-[var(--ink)]/40 backdrop-blur-sm flex items-center justify-center px-2">
             <motion.form
               onSubmit={onSubmit}
@@ -695,6 +717,26 @@ const BudgetModal = ({
                         disabled={saving}
                       />
                     </Field>
+
+                    {/* Restriction guard — blocks the issuance while the
+                        employee still holds an open budget from another
+                        source of funds (only one reference is allowed). */}
+                    <AnimatePresence initial={false}>
+                      {issuedConflict && (
+                        <motion.div
+                          role="alert"
+                          initial={{ opacity: 0, y: -4, height: 0 }}
+                          animate={{ opacity: 1, y: 0, height: "auto" }}
+                          exit={{ opacity: 0, y: -4, height: 0 }}
+                          transition={{ duration: 0.25, ease: "easeOut" }}
+                          className="flex items-start gap-2 overflow-hidden text-sm leading-snug text-[var(--danger)] bg-[var(--danger)]/10 border border-[var(--danger)]/20 rounded-xl px-3.5 py-2.5"
+                        >
+                          <ShieldAlert size={18} className="mt-px shrink-0" />
+                          <span>{issuedConflictMessage}</span>
+                        </motion.div>
+                      )}
+                    </AnimatePresence>
+
                     <AmountField
                       value={form?.amount}
                       onChange={set("amount")}
@@ -806,7 +848,11 @@ const BudgetModal = ({
                 <Button type="button" variant="outline" onClick={handleClose}>
                   Cancel
                 </Button>
-                <Button type="submit" variant="accent" disabled={saving}>
+                <Button
+                  type="submit"
+                  variant="accent"
+                  disabled={saving || Boolean(issuedConflict)}
+                >
                   {saving && <Loader2 size={14} className="animate-spin" />}
                   {transaction === "addBudget" ? "Add Budget" : "Issue Budget"}
                 </Button>

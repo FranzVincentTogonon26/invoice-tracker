@@ -3,7 +3,6 @@ import { createPortal } from "react-dom";
 import { AnimatePresence, motion } from "framer-motion";
 import { Loader2, Trash2 } from "lucide-react";
 import { Button } from "../../../ui/Button";
-import { LockBodyScroll } from "../../../../hooks/useLockBody";
 
 // Shared entrance/exit easing — the same curve the other admin dialogs use.
 const DIALOG_EASE = [0.16, 1, 0.3, 1];
@@ -20,7 +19,6 @@ function DeleteDialog({ titleId, descriptionId, pending, onClose, onConfirm }) {
       exit={{ opacity: 0 }}
       transition={{ duration: 0.2, ease: DIALOG_EASE }}
     >
-      <LockBodyScroll />
       {/* Backdrop click = dismiss (a no-op while the request is in flight). */}
       <div
         className="absolute inset-0 bg-[var(--ink)]/30 backdrop-blur-sm"

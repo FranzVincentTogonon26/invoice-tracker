@@ -1,7 +1,6 @@
 import { AnimatePresence, motion } from "framer-motion";
 import { Trash2 } from "lucide-react";
 import { Button } from "../../../ui/Button";
-import { LockBodyScroll } from "../../../../hooks/useLockBody";
 
 // "Remove scanned receipt?" confirm dialog shown before discarding a
 // receipt that already has data attached.
@@ -15,7 +14,6 @@ const ConfirmClearDialog = ({ open, onKeep, onConfirm }) => (
         className="fixed inset-0 z-[70] flex items-center justify-center bg-black/50 p-4"
         onClick={onKeep}
       >
-        <LockBodyScroll />
         <motion.div
           initial={{ opacity: 0, scale: 0.96, y: 8 }}
           animate={{ opacity: 1, scale: 1, y: 0 }}

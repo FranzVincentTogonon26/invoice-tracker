@@ -1,6 +1,7 @@
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { motion } from "framer-motion";
 import {
+  Ban,
   CalendarOff,
   CalendarRange,
   CircleAlert,
@@ -10,12 +11,15 @@ import {
   Plus,
   ReceiptText,
   Search,
+  SlidersHorizontal,
+  Trash2,
   Wallet,
   X,
 } from "lucide-react";
 import toast from "react-hot-toast";
 import { Button } from "../../components/ui/Button";
 import { Badge } from "../../components/ui/Badge";
+import { IconButton } from "../../components/ui/IconButton";
 import { PageHeader } from "../../components/ui/PageHeader";
 import { StatCard } from "../../components/ui/StatCard";
 import { DateRangePicker } from "../../components/ui/DateRangePicker";
@@ -27,13 +31,20 @@ import {
 } from "../../components/ui/Card";
 import { SearchInput } from "../../components/ui/Input";
 import Listbox from "../../components/ui/Listbox";
+import { FilterChips } from "../../components/ui/MobileFilters";
 import {
   EmptyState,
   ErrorState,
   LoadingSkeleton,
 } from "../../components/ui/DataState";
 import { Pager } from "../../components/ui/Pager";
-import { cn, formatMoney, startOfDay, toDate } from "../../lib/utils";
+import {
+  cn,
+  formatDate,
+  formatMoney,
+  startOfDay,
+  toDate,
+} from "../../lib/utils";
 import { useNavigate } from "react-router-dom";
 import { useQueryClient } from "@tanstack/react-query";
 import { PAYMENT_METHODS } from "../../constants";
@@ -43,6 +54,9 @@ import {
   useBudgetMutations,
 } from "../../hooks/useBudget";
 import ExpensesTable from "../../components/layout/admin/expenses/ExpensesTable";
+import ConfirmActionDialog from "../../components/layout/admin/expenses/ConfirmActionDialog";
+import ExpenseDetailsModal from "../../components/layout/admin/expenses/ExpenseDetailsModal";
+import ExpensesMobileFilters from "../../components/layout/admin/expenses/ExpensesMobileFilters";
 
 const container = {
   hidden: {},
@@ -83,6 +97,26 @@ const matchesDayRange = (value, start, end) => {
   if (start && day < startOfDay(start)) return false;
   if (end && day > startOfDay(end)) return false;
   return true;
+};
+
+/**
+ * The ledger's dropdown + text filter predicate — one source of truth so the
+ * table (desktop and mobile) and the mobile filter sheet's live "N results"
+ * preview can never disagree about what matches.
+ */
+const matchesLedgerFilters = (row, { category, method, status, query }) => {
+  if (
+    category !== "all" &&
+    row.kind === "expense" &&
+    row.categoryId !== category
+  )
+    return false;
+  if (method !== "all" && row.method !== method) return false;
+  if (status !== "all" && row.status !== status) return false;
+  if (!query) return true;
+  return [row.description, row.category, row.employee, row.method]
+    .filter(Boolean)
+    .some((v) => String(v).toLowerCase().includes(query));
 };
 
 const LEDGER_STATUS_META = {
@@ -147,7 +181,7 @@ const AdminExpenses = () => {
   const [dateRange, setDateRange] = useState(() => emptyRange());
   // Fetch every expense up front: the overview cards must not react to the
   // date range — the picker only narrows the table below (client-side).
-  const { data, expenses, categories, isLoading, error, refetch } =
+  const { data, expenses, categories, references, isLoading, error, refetch } =
     useExpenses();
   const { remove } = useExpensesMutations();
   const { cancelIssuedTransaction, restoreIssuedTransaction } =
@@ -167,6 +201,24 @@ const AdminExpenses = () => {
   const [method, setMethod] = useState("all");
   const [status, setStatus] = useState("all");
   const [page, setPage] = useState(0);
+  // Mobile only: the inline dropdown row collapses into this bottom sheet
+  // below `lg` (the trigger button and the sheet are both `lg:hidden`).
+  const [filtersOpen, setFiltersOpen] = useState(false);
+
+  // "View expense" row + the pending destructive confirmation. Each stays
+  // mounted after closing so the overlay's exit animation still has content —
+  // `viewOpen` / `confirmOpen` alone control visibility.
+  const [viewRow, setViewRow] = useState(null);
+  const [viewOpen, setViewOpen] = useState(false);
+  const [confirmAction, setConfirmAction] = useState(null);
+  const [confirmOpen, setConfirmOpen] = useState(false);
+
+  // "Source of funds" label for the View expense modal (the list only carries
+  // open references, so a row funded from a closed one shows no label).
+  const referenceLabels = useMemo(
+    () => new Map((references ?? []).map((r) => [r.reference_id, r.label])),
+    [references],
+  );
 
   const hasDateRange = Boolean(dateRange?.start && dateRange?.end);
 
@@ -227,6 +279,11 @@ const AdminExpenses = () => {
           employeeAvatar: e.created_by_avatar,
           method: e.payment_method,
           status: e.status,
+          notes: e.notes,
+          referenceId: e.reference_id,
+          receiptId: e.receipt_id,
+          imageUrl: e.image_url,
+          receiptDate: e.receipt_date,
         })),
         ...(issuedTransactions ?? []).map((t) => ({
           kind: "issued",
@@ -411,22 +468,73 @@ const AdminExpenses = () => {
   );
 
   const filteredRows = useMemo(() => {
-    const q = debouncedSearch.trim().toLowerCase();
-    return ledgerRows.filter((r) => {
-      if (
-        category !== "all" &&
-        r.kind === "expense" &&
-        r.categoryId !== category
-      )
-        return false;
-      if (method !== "all" && r.method !== method) return false;
-      if (status !== "all" && r.status !== status) return false;
-      if (!q) return true;
-      return [r.description, r.category, r.employee, r.method]
-        .filter(Boolean)
-        .some((v) => String(v).toLowerCase().includes(q));
-    });
+    const query = debouncedSearch.trim().toLowerCase();
+    return ledgerRows.filter((row) =>
+      matchesLedgerFilters(row, { category, method, status, query }),
+    );
   }, [ledgerRows, category, method, status, debouncedSearch]);
+
+  // Live "N results" preview for the mobile filter sheet: it stages its own
+  // draft, so it asks the page how many rows that draft would return (date
+  // range and search included — exactly what the ledger would then show).
+  const countLedgerMatches = useCallback(
+    (draft) => {
+      const query = debouncedSearch.trim().toLowerCase();
+      return ledgerRows.filter((row) =>
+        matchesLedgerFilters(row, { ...draft, query }),
+      ).length;
+    },
+    [ledgerRows, debouncedSearch],
+  );
+
+  // The mobile sheet's choices, recapped as removable chips so a narrowed
+  // ledger never looks narrowed "for no reason" while the sheet is closed.
+  const mobileFilterChips = useMemo(() => {
+    const chips = [];
+    if (category !== "all") {
+      chips.push({
+        key: "category",
+        label:
+          categoryOptions.find((o) => o.value === category)?.label ??
+          "Category",
+        onClear: () => {
+          setCategory("all");
+          setPage(0);
+        },
+      });
+    }
+    if (method !== "all") {
+      chips.push({
+        key: "method",
+        label:
+          methodOptions.find((o) => o.value === method)?.label ?? "Method",
+        onClear: () => {
+          setMethod("all");
+          setPage(0);
+        },
+      });
+    }
+    if (status !== "all") {
+      chips.push({
+        key: "status",
+        label:
+          STATUS_OPTIONS.find((o) => o.value === status)?.label ?? "Status",
+        onClear: () => {
+          setStatus("all");
+          setPage(0);
+        },
+      });
+    }
+    return chips;
+  }, [category, categoryOptions, method, methodOptions, status]);
+
+  // The mobile sheet applies its staged draft in one go.
+  const applyMobileFilters = ({ category: nextCategory, method: nextMethod, status: nextStatus }) => {
+    setCategory(nextCategory);
+    setMethod(nextMethod);
+    setStatus(nextStatus);
+    setPage(0);
+  };
 
   const pageCount = Math.max(1, Math.ceil(filteredRows.length / PAGE_SIZE));
   const currentPage = Math.min(page, pageCount - 1);
@@ -464,16 +572,57 @@ const AdminExpenses = () => {
     ? "Try a wider date range, a different category, or a different search term."
     : "Try a different category or search term.";
 
-  const handleDelete = async (id) => {
+  // "View expense" opens the read-only details modal for the picked row.
+  const handleViewRow = (row) => {
+    setViewRow(row);
+    setViewOpen(true);
+  };
+
+  // "Delete expense" never runs straight from the menu — it opens the
+  // confirmation dialog, and only its "yes" submits (see runConfirmedAction).
+  const requestDelete = (row) => {
+    setConfirmAction({ kind: "delete", row });
+    setConfirmOpen(true);
+  };
+
+  const confirmPending =
+    confirmAction?.kind === "delete"
+      ? remove.isPending
+      : confirmAction?.kind === "cancel-issuance"
+        ? cancelIssuedTransaction.isPending
+        : false;
+
+  const closeConfirm = () => {
+    if (!confirmPending) setConfirmOpen(false);
+  };
+
+  const runConfirmedAction = async () => {
+    if (!confirmAction) return;
+    const { kind, row } = confirmAction;
+
     try {
-      await remove.mutateAsync(id);
-      toast.success("Expense removed");
+      if (kind === "delete") {
+        await remove.mutateAsync(row.id);
+        toast.success("Expense deleted");
+      } else {
+        await cancelIssuedTransaction.mutateAsync(row.id);
+        queryClient.invalidateQueries({ queryKey: ["expenses"] });
+        toast.success("Budget issuance cancelled");
+      }
+      setConfirmOpen(false);
     } catch (err) {
-      toast.error(err?.message || "Couldn't delete expense");
+      toast.error(
+        err?.message ||
+          (kind === "delete"
+            ? "Couldn't delete expense"
+            : "Couldn't cancel budget issuance"),
+      );
     }
   };
 
   const handleIssuedAction = async (action, row) => {
+    // Restoring is non-destructive — it stays a one-click action (same as the
+    // Budget page).
     if (action === "restore") {
       try {
         await restoreIssuedTransaction.mutateAsync({
@@ -490,14 +639,72 @@ const AdminExpenses = () => {
 
     if (action !== "cancel") return;
 
-    try {
-      await cancelIssuedTransaction.mutateAsync(row.id);
-      queryClient.invalidateQueries({ queryKey: ["expenses"] });
-      toast.success("Budget issuance cancelled");
-    } catch (err) {
-      toast.error(err?.message || "Couldn't cancel budget issuance");
-    }
+    // Cancelling asks first — nothing is submitted until the dialog's "yes".
+    setConfirmAction({ kind: "cancel-issuance", row });
+    setConfirmOpen(true);
   };
+
+  // The row summary both confirmations show, so the admin confirms exactly the
+  // record being deleted / reversed.
+  const confirmSummary = confirmAction ? (
+    <div className="mt-4 flex items-center gap-3 rounded-2xl border border-[var(--border)] bg-[var(--surface-2)]/60 px-4 py-3">
+      <div className="min-w-0 flex-1">
+        <p className="truncate text-base font-semibold text-[var(--ink)]">
+          {confirmAction.row.description ||
+            (confirmAction.kind === "delete"
+              ? "Untitled expense"
+              : "Budget issuance")}
+        </p>
+        <p className="mt-0.5 truncate text-xs text-[var(--ink-muted)]">
+          {confirmAction.kind === "delete"
+            ? `${confirmAction.row.category || "Uncategorized"} · ${formatDate(confirmAction.row.date)}`
+            : "Amount to reverse"}
+        </p>
+      </div>
+      <span className="shrink-0 text-sm font-semibold tabular-nums text-[var(--ink)]">
+        {formatMoney(confirmAction.row.amount)}
+      </span>
+    </div>
+  ) : null;
+
+  // One search field, mounted in both toolbars: below `lg` it sits next to the
+  // filter button (and takes the rest of the row); from `lg` up it closes the
+  // inline filter row. Only one of the two wrappers is displayed at a time.
+  const searchField = (
+    <SearchInput
+      leftIcon={<Search size={16} />}
+      placeholder="Search..."
+      value={search}
+      onChange={(e) => {
+        setSearch(e.target.value);
+        setPage(0);
+      }}
+      rightSlot={
+        search ? (
+          <button
+            type="button"
+            onClick={() => {
+              setSearch("");
+              setPage(0);
+            }}
+            aria-label="Clear search"
+            className="flex h-8 w-8 items-center justify-center rounded-full text-[var(--ink-muted)] transition-colors hover:bg-[var(--surface-2)] hover:text-[var(--ink)]"
+          >
+            <X size={14} />
+          </button>
+        ) : null
+      }
+    />
+  );
+
+  // Accessible name for the mobile filter trigger — it announces how many
+  // dropdown filters the sheet currently has applied.
+  const mobileFiltersLabel =
+    mobileFilterChips.length > 0
+      ? `Filter ledger — ${mobileFilterChips.length} ${
+          mobileFilterChips.length === 1 ? "filter" : "filters"
+        } active`
+      : "Filter ledger";
 
   return (
     <div className="space-y-5 pb-2">
@@ -505,7 +712,7 @@ const AdminExpenses = () => {
         title="Expenses"
         description="Track expenses against your budget"
         actions={
-          <div className="flex w-full flex-wrap items-center gap-2 sm:w-auto justify-end">
+          <div className="flex w-full flex-nowrap items-center gap-2 sm:w-auto justify-end">
             <DateRangePicker
               value={dateRange}
               onChange={(r) => {
@@ -515,7 +722,11 @@ const AdminExpenses = () => {
               placeholder="All dates"
               align="end"
             />
-            <Button variant="accent" onClick={() => nav("/admin/expenses/add")}>
+            <Button
+              variant="accent"
+              onClick={() => nav("/admin/expenses/add")}
+              className="shrink-0"
+            >
               <Plus size={15} /> Add Expense
             </Button>
           </div>
@@ -633,11 +844,39 @@ const AdminExpenses = () => {
           </div>
         </CardHeader>
 
+        {/* Ledger toolbar. Below `lg` the row keeps only the search plus a
+            filter button — the same three dropdowns then open in a bottom
+            sheet; from `lg` up the inline dropdown row is unchanged. */}
         <div className="mb-5 flex flex-col gap-3 lg:flex-row lg:items-center">
+          <div className="flex items-center gap-2 lg:hidden">
+            <div className="min-w-0 flex-1">{searchField}</div>
+
+            <IconButton
+              type="button"
+              title="Filter"
+              aria-label={mobileFiltersLabel}
+              aria-haspopup="dialog"
+              aria-expanded={filtersOpen}
+              onClick={() => setFiltersOpen(true)}
+              className={cn(
+                "shrink-0 sm:h-10 sm:w-10",
+                mobileFilterChips.length > 0 &&
+                  "border-[var(--accent)]/40 bg-[var(--accent-soft)] text-[var(--accent-strong)]",
+              )}
+            >
+              <SlidersHorizontal size={16} aria-hidden />
+              {mobileFilterChips.length > 0 && (
+                <span className="absolute -right-0.5 -top-0.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-[var(--accent)] px-1 text-[10px] font-semibold leading-none text-white ring-2 ring-[var(--surface)]">
+                  {mobileFilterChips.length}
+                </span>
+              )}
+            </IconButton>
+          </div>
+
           <div
             role="group"
             aria-label="Issued transaction filters"
-            className="flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center"
+            className="hidden lg:flex lg:flex-row lg:flex-wrap lg:items-center lg:gap-2"
           >
             <div className="w-full lg:w-[200px] lg:shrink-0">
               <Listbox
@@ -674,33 +913,23 @@ const AdminExpenses = () => {
             </div>
           </div>
 
-          <div className="lg:ml-auto lg:w-[450px]">
-            <SearchInput
-              leftIcon={<Search size={16} />}
-              placeholder="Search..."
-              value={search}
-              onChange={(e) => {
-                setSearch(e.target.value);
-                setPage(0);
-              }}
-              rightSlot={
-                search ? (
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setSearch("");
-                      setPage(0);
-                    }}
-                    aria-label="Clear search"
-                    className="flex h-8 w-8 items-center justify-center rounded-full text-[var(--ink-muted)] transition-colors hover:bg-[var(--surface-2)] hover:text-[var(--ink)]"
-                  >
-                    <X size={14} />
-                  </button>
-                ) : null
-              }
-            />
+          <div className="hidden lg:block lg:ml-auto lg:w-[450px]">
+            {searchField}
           </div>
         </div>
+
+        {/* Mobile-only recap of the sheet's choices: the applied dropdowns as
+            chips, each removable in one tap (renders nothing on `lg` up or when
+            nothing is set). */}
+        <FilterChips
+          chips={mobileFilterChips}
+          onClearAll={() => {
+            setCategory("all");
+            setMethod("all");
+            setStatus("all");
+            setPage(0);
+          }}
+        />
 
         {isLoading || issuedLoading ? (
           <LoadingSkeleton rows={6} />
@@ -738,7 +967,8 @@ const AdminExpenses = () => {
                 cancelIssuedTransaction.isPending ||
                 restoreIssuedTransaction.isPending
               }
-              onDelete={handleDelete}
+              onView={handleViewRow}
+              onDelete={requestDelete}
               onIssuedAction={handleIssuedAction}
             />
             <div
@@ -763,6 +993,73 @@ const AdminExpenses = () => {
           </>
         )}
       </Card>
+
+      {/* Read-only expense recap + the confirmations behind the row actions.
+          Fixed/portal overlays, so they sit outside the page layout and stay
+          intact on mobile. */}
+      <ExpenseDetailsModal
+        open={viewOpen}
+        expense={viewRow}
+        referenceLabel={
+          viewRow?.referenceId
+            ? (referenceLabels.get(viewRow.referenceId) ?? "")
+            : ""
+        }
+        onClose={() => setViewOpen(false)}
+      />
+
+      <ConfirmActionDialog
+        open={confirmOpen}
+        icon={
+          confirmAction?.kind === "delete" ? (
+            <Trash2 size={20} aria-hidden />
+          ) : (
+            <Ban size={20} aria-hidden />
+          )
+        }
+        title={
+          confirmAction?.kind === "delete"
+            ? "Delete this expense?"
+            : "Cancel this budget issuance?"
+        }
+        description={
+          confirmAction?.kind === "delete"
+            ? "This permanently removes the expense record — and the receipt image stored with it, unless another expense still uses it. This can't be undone."
+            : "Are you sure you want to cancel this budget issuance? Its status will be updated to cancelled."
+        }
+        summary={confirmSummary}
+        cancelLabel={
+          confirmAction?.kind === "delete" ? "Keep expense" : "Keep issuance"
+        }
+        confirmLabel={
+          confirmAction?.kind === "delete" ? "Yes, delete it" : "Yes, cancel it"
+        }
+        pendingLabel={
+          confirmAction?.kind === "delete" ? "Deleting…" : "Cancelling…"
+        }
+        pending={confirmPending}
+        onCancel={closeConfirm}
+        onConfirm={runConfirmedAction}
+      />
+
+      {/* Mobile-only filter sheet — the inline dropdown row's small-screen
+          counterpart (both the trigger and the sheet are `lg:hidden`, so
+          tablet/desktop keep the inline row untouched). */}
+      <ExpensesMobileFilters
+        open={filtersOpen}
+        onClose={() => setFiltersOpen(false)}
+        category={category}
+        method={method}
+        status={status}
+        categoryOptions={categoryOptions}
+        methodOptions={methodOptions}
+        statusOptions={STATUS_OPTIONS}
+        onApply={applyMobileFilters}
+        onClearAll={clearFilters}
+        countMatches={countLedgerMatches}
+        totalRows={ledgerRows.length}
+        hasActiveFilters={hasActiveFilters}
+      />
     </div>
   );
 };

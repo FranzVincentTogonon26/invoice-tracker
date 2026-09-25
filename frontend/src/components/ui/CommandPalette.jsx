@@ -13,7 +13,6 @@ import {
 import { cn, formatMoney } from "@/lib/utils";
 import { useInvoices } from "@/hooks/useInvoices";
 import { useClients } from "@/hooks/useClients";
-import { LockBodyScroll } from "@/hooks/useLockBody";
 
 const NAV_ITEMS = [
   {
@@ -227,7 +226,6 @@ function PaletteBody({ onClose }) {
       exit={{ opacity: 0 }}
       transition={{ duration: 0.15 }}
     >
-      <LockBodyScroll />
       <div
         className="absolute inset-0 bg-[var(--ink)]/30 backdrop-blur-sm"
         onClick={onClose}

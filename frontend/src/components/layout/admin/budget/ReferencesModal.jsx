@@ -16,7 +16,6 @@ import toast from "react-hot-toast";
 import { formatDate } from "../../../../lib/utils";
 import { useBudgetMutations } from "../../../../hooks/useBudget";
 import useSmoothScroll from "../../../../hooks/useSmoothScroll";
-import { LockBodyScroll } from "../../../../hooks/useLockBody";
 
 const ERROR_VISIBLE_MS = 5000;
 
@@ -123,7 +122,6 @@ const ReferencesModal = ({
           className="fixed inset-0 z-[60] flex items-center justify-center p-4"
           exit={{ opacity: 0 }}
         >
-          <LockBodyScroll />
           <div
             onClick={handleClose}
             className="absolute inset-0 bg-[var(--ink)]/30 backdrop-blur-sm flex items-center justify-center px-2"

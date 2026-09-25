@@ -3,6 +3,7 @@ import { createPortal } from "react-dom";
 import {
   Ban,
   EllipsisVertical,
+  Eye,
   HandCoins,
   ReceiptText,
   RefreshCcw,
@@ -10,8 +11,13 @@ import {
 } from "lucide-react";
 import { Badge, StatusBadge } from "../../../ui/Badge";
 import { MethodIcon } from "../../../ui/Select";
-import { cn, formatDate, formatMoney, formatTime } from "../../../../lib/utils";
-import { PAYMENT_METHODS } from "../../../../constants";
+import {
+  cn,
+  formatDate,
+  formatMoney,
+  formatTime,
+  methodLabel,
+} from "../../../../lib/utils";
 
 const COLUMN_WIDTHS = ["11%", "23%", "18%", "15%", "13%", "15%", "5%"];
 
@@ -49,16 +55,6 @@ export function ExpenseStatusBadge({ status, className }) {
   );
 }
 
-const methodLabel = (method) => {
-  const found = PAYMENT_METHODS.find((m) => m.value === method)?.label;
-  if (found) return found;
-  if (!method) return "-";
-  return String(method)
-    .split("_")
-    .map((w) => w.charAt(0).toUpperCase() + w.slice(1))
-    .join(" ");
-};
-
 function TypeBadge({ kind, className }) {
   const meta = TYPE_META[kind] ?? TYPE_META.expense;
   const Icon = meta.Icon;
@@ -70,7 +66,7 @@ function TypeBadge({ kind, className }) {
   );
 }
 
-function RowActions({ row, pending, onDelete, onIssuedAction }) {
+function RowActions({ row, pending, onView, onDelete, onIssuedAction }) {
   const [open, setOpen] = useState(false);
   const [position, setPosition] = useState(null);
   const btnRef = useRef(null);
@@ -122,10 +118,19 @@ function RowActions({ row, pending, onDelete, onIssuedAction }) {
     row.kind === "expense"
       ? [
           {
+            key: "view",
+            label: "View expense",
+            Icon: Eye,
+            danger: false,
+            onSelect: () => onView?.(row),
+          },
+          {
             key: "delete",
             label: "Delete expense",
             Icon: Trash2,
             danger: true,
+            // Asks the page for confirmation — nothing is deleted until the
+            // dialog's "yes" runs the mutation.
             onSelect: () => onDelete?.(row),
           },
         ]
@@ -268,6 +273,7 @@ function LedgerRow({
   row,
   removePending,
   issuedPending,
+  onView,
   onDelete,
   onIssuedAction,
 }) {
@@ -340,6 +346,7 @@ function LedgerRow({
           <RowActions
             row={row}
             pending={removePending || issuedPending}
+            onView={onView}
             onDelete={onDelete}
             onIssuedAction={onIssuedAction}
           />
@@ -353,6 +360,7 @@ function LedgerCard({
   row,
   removePending,
   issuedPending,
+  onView,
   onDelete,
   onIssuedAction,
 }) {
@@ -400,6 +408,7 @@ function LedgerCard({
         <RowActions
           row={row}
           pending={removePending || issuedPending}
+          onView={onView}
           onDelete={onDelete}
           onIssuedAction={onIssuedAction}
         />
@@ -412,6 +421,7 @@ const ExpensesTable = ({
   rows,
   removePending = false,
   issuedPending = false,
+  onView,
   onDelete,
   onIssuedAction,
 }) => (
@@ -470,6 +480,7 @@ const ExpensesTable = ({
                 row={row}
                 removePending={removePending}
                 issuedPending={issuedPending}
+                onView={onView}
                 onDelete={onDelete}
                 onIssuedAction={onIssuedAction}
               />
@@ -486,6 +497,7 @@ const ExpensesTable = ({
           row={row}
           removePending={removePending}
           issuedPending={issuedPending}
+          onView={onView}
           onDelete={onDelete}
           onIssuedAction={onIssuedAction}
         />

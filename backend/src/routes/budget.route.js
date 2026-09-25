@@ -59,6 +59,14 @@ router.get(
   requireAdminAccess,
   budgetController.referenceBalance,
 );
+// Pre-submit restriction guard for issuing budgets — reports whether an
+// employee still holds an open issuance from a different budget reference.
+router.get(
+  "/issued_guard/:employeeId",
+  authMiddleware,
+  requireAdminAccess,
+  budgetController.employeeIssuedGuard,
+);
 router.delete(
   "/:referenceId",
   authMiddleware,

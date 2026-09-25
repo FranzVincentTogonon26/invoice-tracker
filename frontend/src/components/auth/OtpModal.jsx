@@ -2,7 +2,6 @@ import { useEffect, useRef, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import { Loader2, MailCheck, X } from "lucide-react";
 import { AuthPrimaryButton } from "./AuthShell";
-import { LockBodyScroll } from "../../hooks/useLockBody";
 
 const CODE_LENGTH = 6;
 const RESEND_SECONDS = 45;
@@ -172,7 +171,6 @@ function OtpModalContent({ email, onClose, onVerify, onResend }) {
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-      <LockBodyScroll />
       {/* Backdrop */}
       <motion.div
         className="absolute inset-0"

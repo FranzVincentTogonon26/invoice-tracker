@@ -21,7 +21,7 @@ export default function RootRedirect() {
     case USER_ROLES.ADMIN:
       return <Navigate to="/admin/dashboard" replace />;
     case USER_ROLES.EMPLOYEE:
-      return <Navigate to="/employee/dashboard" replace />;
+      return <Navigate to="/employee/overview" replace />;
     default:
       return <Navigate to="/login" replace />;
   }

@@ -97,3 +97,28 @@ export function useBudgetBalance(referenceId, enabled = true) {
     data: query.data ?? { allocated: 0, issued: 0, expenses: 0, balance: 0 },
   };
 }
+
+// Restriction guard for the issuedBudget form: an employee may only be issued
+// from ONE open budget reference at a time. Fetched once an employee is picked
+// and re-checked whenever the source of funds changes (issuing more from the
+// same source stays allowed). Nested under ["budgets", …] so the shared
+// invalidate() refetches it after every create/cancel/restore.
+export function useEmployeeIssuedGuard(employeeId, referenceId, enabled = true) {
+  const query = useQuery({
+    queryKey: [
+      "budgets",
+      "issuedGuard",
+      employeeId || null,
+      referenceId || null,
+    ],
+    queryFn: () => budgetsApi.employeeIssuedGuard(employeeId, referenceId),
+    enabled: Boolean(enabled && employeeId),
+  });
+
+  return {
+    ...query,
+    // Resolve to a conflict-free shape while loading / on failure so callers
+    // can read `data.conflict` / `data.message` without extra guards.
+    data: query.data ?? { openReferences: [], conflict: null, message: null },
+  };
+}

@@ -28,3 +28,6 @@ dist-ssr
 .env
 .env.*
 !.env.example
+
+# Uploaded receipt scans (kept on disk, served at /api/uploads)
+uploads/

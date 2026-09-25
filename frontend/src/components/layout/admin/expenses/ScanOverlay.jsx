@@ -6,7 +6,7 @@ const ScanOverlay = () => (
   <div
     aria-live="polite"
     aria-busy="true"
-    className="absolute inset-0 z-20 flex flex-col items-center justify-center gap-4 rounded-t-3xl bg-[var(--surface)]/80 px-6 text-center backdrop-blur-[3px] sm:rounded-3xl sm:px-0"
+    className="absolute inset-0 z-20 rounded-2xl flex flex-col items-center justify-center gap-4 rounded-t-3xl bg-[var(--surface)]/80 px-6 text-center backdrop-blur-[3px] sm:rounded-3xl sm:px-0"
   >
     <div className="relative flex h-16 w-16 items-center justify-center sm:h-20 sm:w-20">
       <span className="absolute inset-0 animate-ping rounded-full bg-[var(--accent-soft)]" />

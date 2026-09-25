@@ -1,12 +1,17 @@
-// Shared scan engine: validates the picked file, POSTs it to
+// Shared scan engine: validates the picked file (type + the shared size gate,
+// kept in sync with the backend upload middleware), POSTs it to
 // /ai/receipt-parse and hands the normalized result to `onParsed` (or the
 // message to `onError`). Used by the modal's dropzone (auto-scan on upload)
 // and the manual scan icon.
+//
+// The backend stores the upload during this call and answers with its public
+// URL (`image_url`), which the draft keeps instead of the multi-megabyte data
+// URL that used to overflow localStorage.
 import { useCallback, useRef, useState } from "react";
 import { aiApi } from "../api/ai";
 import { useAuth } from "../context/AuthContext";
+import { MAX_RECEIPT_BYTES, MAX_RECEIPT_LABEL } from "../constants";
 
-const MAX_RECEIPT_BYTES = 2 * 1024 * 1024;
 const ACCEPTED_MIME = new Set([
   "image/png",
   "image/jpeg",
@@ -42,6 +47,10 @@ const normalizeParsedReceipt = (res) => {
     subtotal: num(res?.subtotal, 0),
     total: num(res?.total, 0),
     suggested_category: str(res?.suggested_category),
+    // The scan stores the upload on the server and returns its public URL —
+    // this is the value that ends up in `expenses.image_url`.
+    imageUrl: str(res?.image_url),
+    fileName: str(res?.file_name),
   };
 };
 
@@ -70,7 +79,7 @@ export const useReceiptScan = ({ onParsed, onError }) => {
         return false;
       }
       if (file.size > MAX_RECEIPT_BYTES) {
-        const message = "Receipt must be 2MB or smaller.";
+        const message = `Receipt must be ${MAX_RECEIPT_LABEL} or smaller.`;
         setErr(message);
         onError?.(message);
         return false;

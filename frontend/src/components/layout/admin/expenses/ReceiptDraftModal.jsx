@@ -11,35 +11,8 @@ import {
 } from "lucide-react";
 import { Badge } from "../../../ui/Badge";
 import { Button } from "../../../ui/Button";
-import { LockBodyScroll } from "../../../../hooks/useLockBody";
 import { formatDate, formatMoney } from "../../../../lib/utils";
-
-/**
- * Draws a data-URL receipt into a fresh tab. Chrome refuses top-level
- * navigation to `data:` URLs, so the payload is converted to a Blob URL first
- * (and revoked once the tab has had time to load it).
- */
-function openReceiptImage(url) {
-  if (!url) return;
-
-  try {
-    const [meta, base64] = url.split(",");
-    if (!base64) throw new Error("not a data url");
-
-    const mime = /:(.*?);/.exec(meta)?.[1] || "image/png";
-    const bytes = atob(base64);
-    const buffer = new Uint8Array(bytes.length);
-    for (let i = 0; i < bytes.length; i += 1) {
-      buffer[i] = bytes.charCodeAt(i);
-    }
-
-    const blobUrl = URL.createObjectURL(new Blob([buffer], { type: mime }));
-    window.open(blobUrl, "_blank", "noopener");
-    setTimeout(() => URL.revokeObjectURL(blobUrl), 60_000);
-  } catch {
-    window.open(url, "_blank", "noopener");
-  }
-}
+import { openReceiptFile } from "../../../../lib/receiptMedia";
 
 const MetaRow = ({ label, value, Icon }) => (
   <div className="flex items-start justify-between gap-4 py-2">
@@ -58,7 +31,7 @@ const MetaRow = ({ label, value, Icon }) => (
 // "View Receipt" for a confirmed scan: the temporary draft parked in
 // localStorage is rendered as a read-only recap — vendor, date, the scanned
 // lines (description / qty / rate / amount) and the grand total, plus the
-// stored image when the draft still carries one.
+// scanned image (stored on the server during the scan, linked as a URL).
 const ReceiptDraftModal = ({ open, receipt, onClose }) => {
   const items = receipt?.items ?? [];
   const itemsTotal = items.reduce(
@@ -92,7 +65,6 @@ const ReceiptDraftModal = ({ open, receipt, onClose }) => {
           className="fixed inset-0 z-[70] flex items-center justify-center bg-[var(--ink)]/40 p-3 backdrop-blur-sm sm:p-4"
           onClick={onClose}
         >
-          <LockBodyScroll />
           <motion.div
             initial={{ opacity: 0, scale: 0.97, y: 10 }}
             animate={{ opacity: 1, scale: 1, y: 0 }}
@@ -223,7 +195,7 @@ const ReceiptDraftModal = ({ open, receipt, onClose }) => {
                 </div>
               </div>
 
-              {/* ── Attachment (kept locally until the form is saved) ── */}
+              {/* ── Attachment (stored on the server during the scan) ── */}
               <div className="mt-3 flex items-center gap-3 rounded-2xl border border-dashed border-[var(--border)] bg-[var(--surface)]/70 px-3.5 py-3">
                 {receipt?.imageUrl ? (
                   <>
@@ -237,14 +209,14 @@ const ReceiptDraftModal = ({ open, receipt, onClose }) => {
                         {receipt?.fileName || "Receipt image"}
                       </p>
                       <p className="text-xs text-[var(--ink-muted)]">
-                        Stored temporarily in this browser
+                        Uploaded with this receipt
                       </p>
                     </div>
                     <Button
                       variant="soft"
                       size="sm"
                       type="button"
-                      onClick={() => openReceiptImage(receipt.imageUrl)}
+                      onClick={() => openReceiptFile(receipt.imageUrl)}
                     >
                       <Eye size={13} />
                       Open image
@@ -260,8 +232,8 @@ const ReceiptDraftModal = ({ open, receipt, onClose }) => {
                         No image stored
                       </p>
                       <p className="text-xs text-[var(--ink-muted)]">
-                        The scanned lines were kept — the image didn&apos;t fit
-                        in local storage.
+                        The scanned lines were kept — this draft has no image
+                        attached.
                       </p>
                     </div>
                   </>

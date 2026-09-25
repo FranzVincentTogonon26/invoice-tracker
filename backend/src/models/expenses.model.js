@@ -231,10 +231,82 @@ class Expenses {
     const result = await query(
       `DELETE FROM expenses
         WHERE id = $1
-        RETURNING id, description, total_amount`,
+        RETURNING id, description, total_amount, image_url`,
       [id],
     );
     return result.rows[0] ?? null;
+  }
+
+  // How many expense rows still point at the same stored image. One scan can
+  // back several lines (each line of a confirmed receipt carries the same
+  // `image_url`), so the file may only be deleted once the last reference is
+  // gone — see the expenses controller's `remove`.
+  static async countByImageUrl(image_url) {
+    if (!image_url) return 0;
+    const result = await query(
+      `SELECT COUNT(*)::int AS count
+         FROM expenses
+        WHERE image_url = $1`,
+      [image_url],
+    );
+    return result.rows[0]?.count ?? 0;
+  }
+
+  // One saved expense for the View expense modal — the same joined shape as
+  // the overview list, plus the source-of-funds label.
+  static async findExpenseById(id) {
+    const result = await query(
+      `SELECT
+          e.id,
+          e.description,
+          e.total_amount::float8 AS total_amount,
+          e.expense_date::text AS expense_date,
+          e.payment_method,
+          e.status,
+          e.notes,
+          e.created_at,
+          e.category_id,
+          c.category_name,
+          e.receipt_id,
+          e.image_url,
+          e.receipt_date,
+          e.reference_id,
+          e.issued_ref_id,
+          e.user_id,
+          u.name AS created_by,
+          u.role AS created_by_role,
+          u.avatar_url AS created_by_avatar,
+          br.label AS reference_label
+       FROM expenses e
+       LEFT JOIN category c ON c.category_id = e.category_id
+       LEFT JOIN users u ON u.user_id = e.user_id
+       LEFT JOIN budget_reference br ON br.reference_id = e.reference_id
+       WHERE e.id = $1::uuid
+       LIMIT 1`,
+      [id],
+    );
+    return result.rows[0] ?? null;
+  }
+
+  // Every scanned line of the receipt an expense was saved from. An expense
+  // points at ONE `receipt` line row, but all lines of the same scan share its
+  // draft id (`receipt.receipt_id`) — so resolve the draft first, then pull
+  // every line. A row without a receipt (or with a dangling one) yields [].
+  static async receiptLinesForExpense(receiptRowId) {
+    if (!receiptRowId) return [];
+    const result = await query(
+      `SELECT r.id, r.vendor, r.description, r.qty, r.rate, r.amount
+         FROM receipt r
+        WHERE r.receipt_id = (
+                SELECT ref.receipt_id
+                  FROM receipt ref
+                 WHERE ref.id = $1::uuid
+                 LIMIT 1
+              )
+        ORDER BY r.created_at ASC`,
+      [receiptRowId],
+    );
+    return result.rows;
   }
 
   static async budgetReference() {
@@ -317,6 +389,9 @@ class Expenses {
           e.category_id,
           c.category_name,
           e.receipt_id,
+          e.image_url,
+          e.receipt_date,
+          e.reference_id,
           e.issued_ref_id,
           e.user_id,
           u.name AS created_by,

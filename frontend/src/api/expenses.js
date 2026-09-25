@@ -12,6 +12,11 @@ export const expensesApi = {
           r.data.expenses ?? r.data.category ?? r.data.receipt ?? r.data,
       ),
 
+  // One saved expense for the View expense modal — the row itself plus its
+  // scanned receipt lines (and the vendor the lines carry).
+  detail: (id) =>
+    apiClient.get(`/expenses/detail/${id}`).then((r) => r.data),
+
   // Removes one expense line.
   remove: (id) => apiClient.delete(`/expenses/${id}`).then((r) => r.data),
 

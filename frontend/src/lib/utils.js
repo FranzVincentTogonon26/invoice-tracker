@@ -1,8 +1,24 @@
 import { clsx } from "clsx";
 import { twMerge } from "tailwind-merge";
+import { PAYMENT_METHODS } from "../constants";
 
 export function cn(...inputs) {
   return twMerge(clsx(inputs));
+}
+
+/**
+ * Human-readable label for a payment method value (`expenses.payment_method`),
+ * falling back to a Title Cased copy of unknown values so legacy rows still
+ * read sensibly.
+ */
+export function methodLabel(method) {
+  const found = PAYMENT_METHODS.find((m) => m.value === method)?.label;
+  if (found) return found;
+  if (!method) return "-";
+  return String(method)
+    .split("_")
+    .map((w) => w.charAt(0).toUpperCase() + w.slice(1))
+    .join(" ");
 }
 
 export function formatMoney(amount, currency = "PHP") {
@@ -222,4 +238,41 @@ export function rangeWithPreview(draft, hover) {
   return pointed < start
     ? { start: pointed, end: start }
     : { start, end: pointed };
+}
+
+/* -------------------------------------------------------------------------- */
+/* Header identity helpers (admin + employee top bars)                        */
+/* -------------------------------------------------------------------------- */
+
+/**
+ * Time-appropriate greeting for the current user's local clock:
+ *   - 05:00 – 11:59 → "Good morning"
+ *   - 12:00 – 16:59 → "Good afternoon"
+ *   - 17:00 – 04:59 → "Good evening"
+ * `date` is injectable so callers (and tests) can pin the hour; anything
+ * unparseable falls back to *now* rather than rendering a blank greeting.
+ */
+export function greetingFor(date = new Date()) {
+  const d = toDate(date) ?? new Date();
+  const hour = d.getHours();
+  if (hour >= 5 && hour < 12) return "Good morning";
+  if (hour >= 12 && hour < 17) return "Good afternoon";
+  return "Good evening";
+}
+
+/**
+ * Up-to-two-letter initials for an avatar fallback: first letter of the
+ * first word plus the first letter of the last word ("Franz Vincent
+ * Togonon" → "FT"). Single-word names keep their one letter and blank
+ * names yield "?" so the circle never renders empty.
+ */
+export function getInitials(name) {
+  const words = String(name ?? "")
+    .trim()
+    .split(/\s+/)
+    .filter(Boolean);
+  if (words.length === 0) return "?";
+  const first = words[0][0];
+  const last = words.length > 1 ? words[words.length - 1][0] : "";
+  return `${first}${last}`.toUpperCase();
 }

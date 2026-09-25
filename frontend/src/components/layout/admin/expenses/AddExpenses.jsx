@@ -23,7 +23,7 @@ import { Input, TextArea } from "../../../ui/Input";
 import Listbox from "../../../ui/Listbox";
 import { cn, formatMoney, toISODate } from "../../../../lib/utils";
 import { FUNDING_STATUS, fundingState } from "../../../../lib/funding";
-import { ERROR_VISIBLE_MS } from "../../../../constants";
+import { ERROR_VISIBLE_MS, MAX_RECEIPT_LABEL } from "../../../../constants";
 import {
   useExpenses,
   useExpensesMutations,
@@ -746,7 +746,7 @@ const AddExpenses = () => {
                           ? it.receiptLocal
                             ? `${it.receiptName || "Scanned receipt"} · #${String(it.receiptId).slice(0, 8).toUpperCase()}`
                             : "Stored with this expense line"
-                          : "PNG, JPG or WEBP · up to 2MB"}
+                          : `PNG, JPG or WEBP · up to ${MAX_RECEIPT_LABEL}`}
                       </p>
                     </div>
                   </div>

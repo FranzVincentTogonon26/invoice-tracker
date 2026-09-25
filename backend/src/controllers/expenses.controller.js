@@ -2,6 +2,7 @@ import Expenses from "../models/expenses.model.js";
 import ApiError from "../utils/ApiError.js";
 import { validate } from "../utils/validate.js";
 import { createExpensesSchema } from "../validations/expenses.validation.js";
+import { deleteReceiptImage } from "../utils/receiptImage.js";
 
 const UUID_RE =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -95,6 +96,32 @@ export const removeCategory = async (req, res, next) => {
   }
 };
 
+export const detail = async (req, res, next) => {
+  try {
+    const { id } = req.params;
+    if (!UUID_RE.test(id || ""))
+      throw ApiError.badRequest("Invalid expense id", "VALIDATION_ERROR");
+
+    const expense = await Expenses.findExpenseById(id);
+    if (!expense)
+      throw ApiError.notFound("Expense not found", "EXPENSE_NOT_FOUND");
+
+    // The scanned lines of the receipt this expense was saved from (empty when
+    // the row has no receipt). Pulled through the shared draft id so the modal
+    // can show every line, not just the one the expense points at.
+    const receiptItems = await Expenses.receiptLinesForExpense(
+      expense.receipt_id,
+    );
+    const vendor =
+      receiptItems.find((item) => String(item?.vendor ?? "").trim())
+        ?.vendor?.trim() ?? "";
+
+    return res.status(200).json({ expense, receiptItems, vendor });
+  } catch (err) {
+    next(err);
+  }
+};
+
 export const remove = async (req, res, next) => {
   try {
     const { id } = req.params;
@@ -103,6 +130,17 @@ export const remove = async (req, res, next) => {
     const expense = await Expenses.removeExpense(id);
     if (!expense)
       throw ApiError.notFound("Expense not found", "EXPENSE_NOT_FOUND");
+
+    // Also drop the stored receipt file from uploads/receipts — but only once
+    // nothing else points at it: every line of one confirmed scan carries the
+    // same `image_url`, so siblings keep their image until they're deleted too.
+    if (expense.image_url) {
+      const stillReferenced = await Expenses.countByImageUrl(
+        expense.image_url,
+      );
+      if (stillReferenced === 0) await deleteReceiptImage(expense.image_url);
+    }
+
     return res
       .status(200)
       .json({ expense, message: "Expense removed successfully." });

@@ -4,7 +4,6 @@ import { AnimatePresence, motion } from "framer-motion";
 import { ImagePlus, Sparkles, Trash2 } from "lucide-react";
 import { Button } from "../../../ui/Button";
 import { formatDate, formatMoney } from "../../../../lib/utils";
-import { LockBodyScroll } from "../../../../hooks/useLockBody";
 
 // Shared entrance/exit easing — the same curve the other admin dialogs use.
 const DIALOG_EASE = [0.16, 1, 0.3, 1];
@@ -87,7 +86,6 @@ const ConfirmRemoveItemDialog = ({
           exit={{ opacity: 0 }}
           transition={{ duration: 0.2, ease: DIALOG_EASE }}
         >
-          <LockBodyScroll />
           {/* Backdrop click = cancel — the removal is local, nothing is in flight. */}
           <div
             className="absolute inset-0 bg-[var(--ink)]/30 backdrop-blur-sm"

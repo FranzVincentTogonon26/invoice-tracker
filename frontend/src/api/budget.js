@@ -23,6 +23,16 @@ export const budgetsApi = {
     apiClient
       .get(`/budgets/balance/${referenceId}`)
       .then((r) => r.data.balance),
+  // Restriction guard for the issuedBudget form — an employee may only hold
+  // one OPEN issued budget reference at a time. `referenceId` is the source
+  // being issued from and is excluded from the check (top-ups from the same
+  // source stay allowed). Returns `{ openReferences, conflict, message }`.
+  employeeIssuedGuard: (employeeId, referenceId) =>
+    apiClient
+      .get(`/budgets/issued_guard/${employeeId}`, {
+        params: referenceId ? { reference_id: referenceId } : undefined,
+      })
+      .then((r) => r.data),
   // Cancels a budget transaction (budget.status -> 'cancelled'). Returns
   // `{ previousStatus, budget }` so the UI can offer an undo window.
   cancelTransaction: (id) =>

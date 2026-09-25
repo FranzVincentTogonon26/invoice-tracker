@@ -7,6 +7,8 @@ import RoleGuard from "../components/auth/RoleGuard";
 import AdminShell from "../components/layout/AdminShell";
 import EmployeeShell from "../components/layout/EmployeeShell";
 
+import { USER_ROLES } from "../constants";
+
 import Login from "../pages/Login";
 import Register from "../pages/Register";
 
@@ -14,14 +16,15 @@ import AdminDashboard from "../pages/admin/AdminDashboard";
 import AdminEmployees from "../pages/admin/AdminEmployees";
 import AdminBudget from "../pages/admin/AdminBudget";
 import AdminProfile from "../pages/admin/AdminProfile";
-
-import EmployeeDashboard from "../pages/employee/EmployeeDashboard";
-import EmployeeProfile from "../pages/employee/EmployeeProfile";
-
-import { USER_ROLES } from "../constants";
 import AdminTransaction from "../pages/admin/AdminTransaction";
 import AdminExpenses from "../pages/admin/AdminExpenses";
 import AddExpenses from "../components/layout/admin/expenses/AddExpenses";
+
+import EmployeeOverview from "../pages/employee/EmployeeOverview";
+import EmployeeBudget from "../pages/employee/EmployeeBudget";
+import EmployeeExpenses from "../pages/employee/EmployeeExpenses";
+import EmployeeAbono from "../pages/employee/EmployeeAbono";
+import EmployeeSetting from "../pages/employee/EmployeeSetting";
 
 export const router = createBrowserRouter([
   {
@@ -64,14 +67,11 @@ export const router = createBrowserRouter([
             path: "/employee",
             element: <EmployeeShell />,
             children: [
-              {
-                path: "dashboard",
-                element: <EmployeeDashboard />,
-              },
-              {
-                path: "profile",
-                element: <EmployeeProfile />,
-              },
+              { path: "overview", element: <EmployeeOverview /> },
+              { path: "budget", element: <EmployeeBudget /> },
+              { path: "expenses", element: <EmployeeExpenses /> },
+              { path: "abono", element: <EmployeeAbono /> },
+              { path: "setting", element: <EmployeeSetting /> },
             ],
           },
         ],

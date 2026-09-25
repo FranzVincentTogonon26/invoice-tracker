@@ -6,10 +6,12 @@
 // real `receipt` row is only created when the form is saved, which keeps
 // `expenses.receipt_id` free of ids that don't exist yet.
 //
-// The image travels as a data URL (up to ~2MB → ~2.7MB base64), which can blow
-// the ~5MB localStorage quota, so `savePendingReceipt` retries without it and
-// reports whether anything was persisted at all — the in-memory flow still
-// works when it wasn't.
+// The image no longer travels through localStorage: the scan stores the upload
+// on the server (`POST /ai/receipt-parse` → `image_url`) and the draft carries
+// only that short URL — which is exactly what `expenses.image_url` ends up
+// storing when the form is saved. `savePendingReceipt` still degrades
+// gracefully when the quota is full of something else: it prunes older drafts'
+// image links first and only drops the new draft's own link as a last resort.
 
 const STORAGE_KEY = "invoice-tracker.pending-receipts";
 const MAX_DRAFTS = 10;
@@ -108,9 +110,12 @@ export const readPendingReceipt = (receiptId) =>
 
 /**
  * Persists a draft (newest first, capped) and returns
- * `{ draft, persisted, imageDropped }`. The returned `draft` is the one the
- * caller should keep using: when the image alone overflows the quota it comes
- * back without one.
+ * `{ draft, persisted, imageDropped }`.
+ *
+ * The image now rides as a short server URL, so the full write almost always
+ * fits. When the quota is genuinely exhausted it is spent on *older* drafts'
+ * image links first — the freshly confirmed scan keeps its image — and only a
+ * last-resort retry drops the new draft's own link, reporting `imageDropped`.
  */
 export const savePendingReceipt = (draft) => {
   if (!draft?.receiptId) return { draft, persisted: false, imageDropped: false };
@@ -121,11 +126,19 @@ export const savePendingReceipt = (draft) => {
     return { draft, persisted: true, imageDropped: false };
   }
 
-  // The image data URL is the size hog — keep the lines, lose the attachment.
+  // Quota full — shave the image links off the older drafts first (their files
+  // are still on the server; only the preview link is lost — and a line kept in
+  // this session still holds the URL in form state, which the save uses).
+  const pruned = others.map((d) => ({ ...d, imageUrl: "" }));
+  if (writeAll([draft, ...pruned].slice(0, MAX_DRAFTS))) {
+    return { draft, persisted: true, imageDropped: false };
+  }
+
+  // Still no room: keep the scanned lines, lose only this draft's image link.
   const light = { ...draft, imageUrl: "" };
   return {
     draft: light,
-    persisted: writeAll([light, ...others].slice(0, MAX_DRAFTS)),
+    persisted: writeAll([light, ...pruned].slice(0, MAX_DRAFTS)),
     imageDropped: true,
   };
 };

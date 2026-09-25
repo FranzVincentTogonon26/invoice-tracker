@@ -218,6 +218,40 @@ class Budget {
     return { allocated, issued, expenses, balance: allocated - issued - expenses };
   }
 
+  // Restriction guard for issuing budgets — an employee may only hold ONE open
+  // issued budget reference at a time. Returns the employee's
+  // `budget_issued_reference` rows that are still validated as status 'open',
+  // joined to their source-of-funds label (budget_reference).
+  // `reference_id` (the source being issued from) is excluded when provided:
+  // issuing MORE funds from the same source is allowed — only a DIFFERENT
+  // source of funds conflicts. Omit it to inspect every open issuance.
+  static async employeeOpenIssuedReferences({ user_id, reference_id } = {}) {
+    const params = [user_id];
+    let excludeClause = "";
+
+    if (reference_id) {
+      params.push(reference_id);
+      excludeClause = `AND bir.reference_id <> $2`;
+    }
+
+    const result = await query(
+      `SELECT
+          bir.id,
+          bir.reference_id,
+          bir.status,
+          bir.created_at,
+          br.label
+       FROM budget_issued_reference bir
+       LEFT JOIN budget_reference br ON br.reference_id = bir.reference_id
+       WHERE bir.user_id = $1
+         AND bir.status = 'open'
+         ${excludeClause}
+       ORDER BY bir.created_at DESC`,
+      params,
+    );
+    return result.rows;
+  }
+
   // Soft-delete a Budget Reference (status 'open' -> 'cut_off'). A hard
   // DELETE would cascade-destroy the dependent `budget` and
 

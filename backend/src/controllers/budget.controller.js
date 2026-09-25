@@ -15,6 +15,22 @@ const RESTORE_STATUSES = ["added", "closed"];
 // status is 'open' | 'close' | 'cancel', so the only undo target is 'open').
 const RESTORE_ISSUED_STATUSES = ["open"];
 
+// Restriction notice rendered when an employee still holds an open issued
+// budget from a DIFFERENT source of funds — only one budget reference may be
+// issued per employee at a time, so the existing issuance has to be reimbursed
+// (cancelled / closed) first. Shared by the pre-submit guard endpoint and the
+// create-time conflict so both surfaces show the exact same wording.
+const issuedConflictMessage = (conflict) => {
+  const source =
+    conflict?.label || conflict?.reference_id || "another reference";
+
+  return (
+    `Cannot proceed your request because the employee you select has already issued from another source of funds (${source}). ` +
+    `To avoid conflict on the issued budget, only one budget reference is allowed per employee — ` +
+    `please reimburse the existing issued budget (${source}) first before issuing a new budget.`
+  );
+};
+
 export const create = async (req, res, next) => {
   try {
     // `note` was used below but never destructured -- that crashed the
@@ -38,6 +54,21 @@ export const create = async (req, res, next) => {
       const validateEmployee = await Employee.findEmployeeById(employeeId);
       if (!validateEmployee)
         throw ApiError.badRequest("Employee not found", "EMPLOYEE_NOT_FOUND");
+
+      // Restriction guard — an employee may only hold ONE open issued budget
+      // reference at a time. An open issuance tied to a DIFFERENT source of
+      // funds blocks the request until that issuance is reimbursed (cancelled
+      // or closed). Same-reference top-ups stay allowed.
+      const [conflictingReference] = await Budget.employeeOpenIssuedReferences({
+        user_id: employeeId,
+        reference_id: reference_id || null,
+      });
+
+      if (conflictingReference)
+        throw ApiError.conflict(
+          issuedConflictMessage(conflictingReference),
+          "EMPLOYEE_ISSUED_CONFLICT",
+        );
 
       const issuedReferenceBudget = await Budget.createIssuedReferenceBudget({
         reference_id: reference_id,
@@ -91,6 +122,39 @@ export const referenceBalance = async (req, res, next) => {
 
     const summary = await Budget.referenceBalance(referenceId);
     return res.status(200).json({ balance: summary });
+  } catch (err) {
+    next(err);
+  }
+};
+
+// Pre-submit restriction guard for the issuedBudget form: given an employee
+// (and optionally the source of funds being issued from), reports whether the
+// employee still holds an open issuance from another budget reference.
+// Responds with `{ openReferences, conflict, message }` — `conflict` is the
+// most recent offending row (null when the employee is clear) so the modal can
+// block submission and explain how to proceed (reimburse the existing
+// issuance first).
+export const employeeIssuedGuard = async (req, res, next) => {
+  try {
+    const { employeeId } = req.params;
+    const { reference_id } = req.query;
+
+    if (!UUID_RE.test(employeeId || ""))
+      throw ApiError.badRequest("Invalid employee id", "VALIDATION_ERROR");
+    if (reference_id && !UUID_RE.test(reference_id))
+      throw ApiError.badRequest("Invalid reference id", "VALIDATION_ERROR");
+
+    const openReferences = await Budget.employeeOpenIssuedReferences({
+      user_id: employeeId,
+      reference_id: reference_id || null,
+    });
+    const conflict = openReferences[0] ?? null;
+
+    return res.status(200).json({
+      openReferences,
+      conflict,
+      message: conflict ? issuedConflictMessage(conflict) : null,
+    });
   } catch (err) {
     next(err);
   }

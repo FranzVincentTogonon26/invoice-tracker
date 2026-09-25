@@ -59,9 +59,9 @@ function unlockBody() {
 }
 
 /**
- * Lock body scroll while `active` is true. Prefers the `<LockBodyScroll />`
- * component below (mount-bound, survives exit animations); this hook is for
- * cases where a boolean flag is more convenient.
+ * Lock body scroll while `active` is true. The lock engages in an effect
+ * (so it also survives re-renders) and releases when `active` flips false
+ * or the component unmounts; nested overlays stack via the ref counter.
  */
 export function useLockBody(active = true) {
   useEffect(() => {
@@ -71,21 +71,6 @@ export function useLockBody(active = true) {
       unlockBody();
     };
   }, [active]);
-}
-
-/**
- * Mount-to-unmount body lock. Render it *inside* the overlay's motion
- * container so the page stays locked through AnimatePresence exit
- * animations, and nested overlays stack correctly via the ref counter.
- *
- *   <motion.div className="fixed inset-0 z-50 ...">
- *     <LockBodyScroll />
- *     ...
- *   </motion.div>
- */
-export function LockBodyScroll() {
-  useLockBody(true);
-  return null;
 }
 
 export default useLockBody;
