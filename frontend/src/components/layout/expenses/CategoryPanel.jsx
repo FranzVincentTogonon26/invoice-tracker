@@ -25,7 +25,6 @@ const CategoryPanel = ({
         placeholder="New category name…"
         Icon={Hash}
         disabled={adding}
-        autoFocus
       />
       <Button
         type="submit"

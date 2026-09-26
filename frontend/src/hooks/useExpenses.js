@@ -58,6 +58,9 @@ export function useExpensesMutations() {
   const qc = useQueryClient();
   const invalidate = () => {
     qc.invalidateQueries({ queryKey: ["expenses"] });
+    // The employee ledger lives under its own key (see useEmployeeExpenses)
+    // and must refresh too when a row is saved or deleted from it.
+    qc.invalidateQueries({ queryKey: ["employeeExpenses"] });
   };
   return {
     // Saves expense lines / adds a category / saves a receipt — dispatched by
@@ -68,6 +71,12 @@ export function useExpensesMutations() {
     }),
     remove: useMutation({
       mutationFn: expensesApi.remove,
+      onSuccess: invalidate,
+    }),
+    // Soft delete: keeps the row and only flips its status — the employee
+    // ledger's "Delete expense" parks the record back in 'draft' through this.
+    setStatus: useMutation({
+      mutationFn: ({ id, status }) => expensesApi.updateStatus(id, status),
       onSuccess: invalidate,
     }),
     // Deletes a category (UNIQUE-style feedback comes back as a 409).

@@ -16,10 +16,24 @@ apiClient.interceptors.request.use((config) => {
   return config;
 });
 
+// 403 codes that mean "this session may no longer call this API at all": a
+// suspended account, or a token whose role doesn't match the employee-only
+// endpoints. Both end the session like a 401 would — the user is sent back to
+// /login instead of keeping a half-valid session alive (anti-impersonation).
+const TERMINAL_CODES = new Set([
+  "ACCOUNT_NOT_ACTIVE",
+  "EMPLOYEE_ACCESS_REQUIRED",
+]);
+
 apiClient.interceptors.response.use(
   (res) => res,
   (error) => {
-    if (error.response?.status === 401 && getToken()) {
+    const status = error.response?.status;
+    const code = error.response?.data?.code;
+    if (
+      (status === 401 || (status === 403 && TERMINAL_CODES.has(code))) &&
+      getToken()
+    ) {
       clearToken();
       if (!location.pathname.startsWith("/login")) location.assign("/login");
     }

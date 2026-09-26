@@ -56,7 +56,7 @@ class Employee {
 
   //   Remove an employee account. Budget references issued to the user are
   //   cascaded away by `budget_issued_reference.user_id ON DELETE CASCADE`.
-  static async removeCategory(id) {
+  static async removeEmployee(id) {
     const result = await query(
       `DELETE FROM users
         WHERE user_id = $1 AND role = 'employee'
@@ -73,8 +73,12 @@ class Employee {
   //       (the budget page calls this with no args) it defaults to 'active'
   //       so the "Budget Issued" employee picker only lists active accounts.
   //   Each row carries the employee's issued-budget total (issued_budget rows
-  //   joined through open budget_issued_reference rows) so the UI can show how
-  //   much funding has been handed out to them.
+  //   joined through open budget_issued_reference rows) plus the total they
+  //   actually spent — SUM(expenses.total_amount) of PAID rows only, so a
+  //   soft-deleted row parked in 'draft' or a voided one in 'cancel' never
+  //   reads as spent (same rule as the employee overview aggregates). The UI
+  //   uses the pair to show funding handed out vs. funding consumed and derive
+  //   the real remaining balance.
   static async employeeList({ search, status } = {}) {
     const where = [];
     const params = [];
@@ -111,6 +115,11 @@ class Employee {
             JOIN budget_issued_reference bir ON ib.issued_ref_id = bir.id
             WHERE bir.user_id = u.user_id AND bir.status = 'open'
           ), 0)::float8 AS issued_budget,
+          COALESCE((
+            SELECT SUM(e.total_amount)
+            FROM expenses e
+            WHERE e.user_id = u.user_id AND e.status = 'paid'
+          ), 0)::float8 AS total_spent,
           (
             SELECT COUNT(*)
             FROM budget_issued_reference bir2

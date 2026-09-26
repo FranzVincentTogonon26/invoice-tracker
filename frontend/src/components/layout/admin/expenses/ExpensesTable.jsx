@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
-import { EllipsisVertical, Eye, Trash2 } from "lucide-react";
+import { EllipsisVertical, Eye, Trash2, Wallet } from "lucide-react";
 import { Badge } from "../../../ui/Badge";
 import { MethodIcon } from "../../../ui/Select";
 import {
@@ -11,12 +11,13 @@ import {
   methodLabel,
 } from "../../../../lib/utils";
 
-const COLUMN_WIDTHS = ["11%", "27%", "19%", "14%", "24%", "5%"];
+const COLUMN_WIDTHS = ["11%", "27%", "19%", "14%", "14%", "24%", "5%"];
 
 const HEADERS = [
   { label: "Date" },
   { label: "Description" },
   { label: "Employee" },
+  { label: "Source of Funds" },
   { label: "Status" },
   { label: "Amount", align: "right" },
   { label: "Actions", srOnly: true, align: "right" },
@@ -28,6 +29,10 @@ const EXPENSE_STATUS = {
   cancel: { tone: "danger", label: "Cancelled" },
 };
 
+// Source-of-funds label forced on every row created by an employee, whatever
+// reference the record is tagged with.
+const EMPLOYEE_SOURCE_LABEL = "Employee balance";
+
 export function ExpenseStatusBadge({ status, className }) {
   const s = EXPENSE_STATUS[status] ?? {
     tone: "neutral",
@@ -37,6 +42,33 @@ export function ExpenseStatusBadge({ status, className }) {
     <Badge tone={s.tone} className={className}>
       <span className="h-1.5 w-1.5 rounded-full bg-current opacity-80" />
       {s.label}
+    </Badge>
+  );
+}
+
+// Source of funds pill shared by the table row and the mobile card — the
+// budget_reference label resolved from expenses.reference_id (the page
+// guarantees a non-empty source), with a defensive em-dash branch kept for
+// rows that reach the table without one.
+function SourceFundsBadge({ source, tone }) {
+  if (!source) {
+    return (
+      <span
+        className="text-xs text-[var(--ink-muted)]"
+        title="No source of funds recorded"
+      >
+        —
+      </span>
+    );
+  }
+  return (
+    <Badge
+      tone={tone ?? (source === "No source of funds" ? "neutral" : "accent")}
+      className="max-w-full"
+      title={source}
+    >
+      <Wallet size={12} aria-hidden className="shrink-0" />
+      <span className="min-w-0 truncate">{source}</span>
     </Badge>
   );
 }
@@ -94,15 +126,22 @@ function RowActions({ row, pending, onView, onDelete }) {
       danger: false,
       onSelect: () => onView?.(row),
     },
-    {
-      key: "delete",
-      label: "Delete expense",
-      Icon: Trash2,
-      danger: true,
-      // Asks the page for confirmation — nothing is deleted until the
-      // dialog's "yes" runs the mutation.
-      onSelect: () => onDelete?.(row),
-    },
+    // Employee-authored rows stay read-only from this menu unless the record
+    // is still a draft — only then can an admin delete it. Paid or cancelled
+    // employee rows keep just "View expense".
+    ...(row?.employeeRole === "employee" && row?.status !== "draft"
+      ? []
+      : [
+          {
+            key: "delete",
+            label: "Delete expense",
+            Icon: Trash2,
+            danger: true,
+            // Asks the page for confirmation — nothing is deleted until the
+            // dialog's "yes" runs the mutation.
+            onSelect: () => onDelete?.(row),
+          },
+        ]),
   ];
 
   const openMenu = () => {
@@ -261,6 +300,17 @@ function LedgerRow({ row, removePending, onView, onDelete }) {
       </td>
 
       <td className="px-4 py-4 align-middle">
+        <SourceFundsBadge
+          source={
+            row.employeeRole === "employee"
+              ? EMPLOYEE_SOURCE_LABEL
+              : row.sourceOfFunds
+          }
+          tone={row.employeeRole === "employee" ? "warning" : undefined}
+        />
+      </td>
+
+      <td className="px-4 py-4 align-middle">
         <ExpenseStatusBadge status={row.status} />
       </td>
 
@@ -307,16 +357,18 @@ function LedgerCard({ row, removePending, onView, onDelete }) {
 
       <p
         title={row.description}
-        className="mt-3 truncate text-sm font-semibold leading-snug text-[var(--ink)]"
+        className="mt-2 truncate text-sm font-semibold leading-snug text-[var(--ink)]"
       >
         {row.description || "Untitled"}
       </p>
 
       <p className="mt-0.5 truncate text-xs leading-snug text-[var(--ink-muted)]">
-        {[row.category, row.employee].filter(Boolean).join(" · ") || "—"}
+        {[row.category, row.employee].filter(Boolean).join(" | ") || "—"}{" "}
+        {" | "}
+        {row.sourceOfFunds}
       </p>
 
-      <div className="mt-3 flex flex-wrap items-center gap-x-3 gap-y-2 border-t border-[var(--border)] pt-3">
+      <div className="mt-2.5 flex flex-wrap items-center gap-x-3 gap-y-1.5 border-t border-[var(--border)] pt-2.5">
         <ExpenseStatusBadge status={row.status} />
 
         <span className="flex min-w-0 items-center gap-1.5 text-xs text-[var(--ink-muted)]">
@@ -355,7 +407,7 @@ const ExpensesTable = ({ rows, removePending = false, onView, onDelete }) => (
         <table className="w-full table-fixed border-collapse text-left">
           <caption className="sr-only">
             Expense records with date, description and category, employee,
-            status, and amount with payment method
+            source of funds, status, and amount with payment method
           </caption>
 
           <colgroup>
@@ -371,10 +423,6 @@ const ExpensesTable = ({ rows, removePending = false, onView, onDelete }) => (
                   key={h.label}
                   scope="col"
                   className={cn(
-                    // Spacing redesign: taller header (pt-6) with labels
-                    // bottom-anchored (pb-4 + align-bottom) so they sit close
-                    // to the divider — horizontal padding stays px-4 with
-                    // pl-5/pr-5 edges to line up with the row cells below.
                     "border-b border-[var(--accent)]/30 px-4 pb-4 pt-6 type-eyebrow tracking-[0.15em] text-[var(--ink-muted)] align-bottom first:pl-5 last:pr-5",
                     {
                       "text-left": h.align === "left",

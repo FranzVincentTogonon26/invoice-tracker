@@ -55,17 +55,32 @@ const EmployeeExpenses = () => {
   const totalBalance = Number(data?.overview?.totalBalance) || 0;
   const expenses = data?.expenses ?? [];
 
-  const transactions = expenses.map((exp) => ({
+  // The ledger below lists live rows only: soft-deleted rows are parked in
+  // 'draft' by the row actions (and cancelled ones are voided), so both keep
+  // their database record but must not show up as normal expenses here.
+  const paidExpenses = expenses.filter((exp) => exp.status === "paid");
+
+  const transactions = paidExpenses.map((exp) => ({
     kind: "expense",
     id: exp.id,
     description: exp.description,
     date: exp.expense_date,
+    timeDate: exp.created_at,
     amount: Number(exp.total_amount) || 0,
     method: exp.payment_method,
     status: exp.status,
     reference_label: exp.reference_label || "",
     notes: exp.notes || "",
+    category: exp.category_name || "",
     category_name: exp.category_name,
+    // Everything the View expense modal needs: receipt (image + line items
+    // are fetched by id) and the source-of-funds label.
+    receiptId: exp.receipt_id,
+    imageUrl: exp.image_url || "",
+    sourceOfFunds: exp.reference_label || "",
+    employee: exp.created_by,
+    employeeRole: exp.created_by_role,
+    employeeAvatar: exp.created_by_avatar,
   }));
 
   const isOverdrawn = totalBalance < -0.004;

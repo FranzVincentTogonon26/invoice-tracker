@@ -451,11 +451,16 @@ export function Sidebar() {
     <>
       <aside
         className={cn(
-          "group/sidebar hidden md:flex shrink-0 h-[calc(100vh-32px)] sticky top-4 ml-4",
+          "group/sidebar hidden md:flex shrink-0 h-[calc(100vh-32px)] sticky top-4 ml-4 z-30",
           "flex-col items-center justify-between py-5 rounded-3xl",
           "bg-[var(--surface)] border border-[var(--border)] shadow-card overflow-hidden",
-          "w-[82px] hover:w-[248px]",
-          "transition-[width] duration-300 ease-[cubic-bezier(0.16,1,0.3,1)]",
+          // The fly-out must not change the rail's footprint: the negative
+          // right margin exactly cancels the growth (248 - 166 = 82), so the
+          // shell never re-flows and the page never gains a scrollbar. Both
+          // properties share one easing curve, so the footprint stays 82px on
+          // every frame of the animation.
+          "w-[82px] hover:w-[248px] hover:-mr-[166px] hover:shadow-hover",
+          "transition-[width,margin-right,box-shadow] duration-300 ease-[cubic-bezier(0.16,1,0.3,1)]",
         )}
       >
         <div className="flex flex-col items-center gap-6 w-full">

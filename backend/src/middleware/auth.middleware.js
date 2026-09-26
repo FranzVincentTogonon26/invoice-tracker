@@ -31,6 +31,9 @@ const authMiddleware = async (req, res, next) => {
       email: user.email,
       name: user.name,
       role: user.role,
+      // Kept so role guards downstream (employee routes) can re-verify the
+      // account is still active without a second users-table round trip.
+      status: user.status,
     };
     next();
   } catch (err) {

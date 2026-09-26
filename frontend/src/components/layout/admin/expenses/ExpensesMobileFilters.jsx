@@ -2,16 +2,22 @@ import { useState } from "react";
 import { RotateCcw } from "lucide-react";
 import { FilterSheet, FilterSheetField } from "../../../ui/MobileFilters";
 import Listbox from "../../../ui/Listbox";
+import { employeeListboxProps } from "./EmployeeFilter";
 
 // The Listboxes' "no filter" value, matching the leading "All …" option.
-const DEFAULTS = { category: "all", method: "all", status: "all" };
+const DEFAULTS = {
+  employee: "all",
+  category: "all",
+  method: "all",
+  status: "all",
+};
 
 /**
  * Mobile counterpart of AdminExpenses' inline filter row (rendered below `lg`
  * only — the trigger button and this sheet are both `lg:hidden`, so tablet and
  * desktop keep the exact same inline Listbox row they had).
  *
- * The sheet stages the three dropdowns and only hands them back through
+ * The sheet stages the four dropdowns and only hands them back through
  * `onApply` when the admin confirms, which makes the footer buttons real:
  * "Reset" rewinds the draft, "Show N results" commits it. `countMatches` lets
  * the page print the live row count for the staged draft, so a choice is never
@@ -20,9 +26,11 @@ const DEFAULTS = { category: "all", method: "all", status: "all" };
 const ExpensesMobileFilters = ({
   open,
   onClose,
+  employee,
   category,
   method,
   status,
+  employeeOptions = [],
   categoryOptions,
   methodOptions,
   statusOptions,
@@ -32,21 +40,22 @@ const ExpensesMobileFilters = ({
   totalRows = 0,
   hasActiveFilters = false,
 }) => {
-  const [draft, setDraft] = useState({ category, method, status });
+  const [draft, setDraft] = useState({ employee, category, method, status });
 
   // Every open starts from what is actually applied — a dismissed sheet never
   // leaves half-made choices behind. Adjusting state during render is the
   // documented alternative to a setState-in-effect (same pattern as
   // AdminShell's palette reset) and it also keeps the draft honest if the page
   // clears its filters while the sheet is open.
-  const appliedKey = `${open}|${category}|${method}|${status}`;
+  const appliedKey = `${open}|${employee}|${category}|${method}|${status}`;
   const [syncedKey, setSyncedKey] = useState(appliedKey);
   if (syncedKey !== appliedKey) {
     setSyncedKey(appliedKey);
-    if (open) setDraft({ category, method, status });
+    if (open) setDraft({ employee, category, method, status });
   }
 
   const draftIsDefault =
+    draft.employee === DEFAULTS.employee &&
     draft.category === DEFAULTS.category &&
     draft.method === DEFAULTS.method &&
     draft.status === DEFAULTS.status;
@@ -64,7 +73,7 @@ const ExpensesMobileFilters = ({
       open={open}
       onClose={onClose}
       title="Filters"
-      description="Narrow the ledger by category, method or status."
+      description="Narrow the ledger by employee, category, method or status."
       draftIsDefault={draftIsDefault}
       matchCount={matchCount}
       totalRows={total}
@@ -85,6 +94,16 @@ const ExpensesMobileFilters = ({
         ) : null
       }
     >
+      <FilterSheetField label="Employee">
+        <Listbox
+          options={employeeOptions}
+          value={draft.employee}
+          onChange={(v) => setDraft((d) => ({ ...d, employee: v }))}
+          placeholder="All Employee"
+          {...employeeListboxProps("All Employee")}
+        />
+      </FilterSheetField>
+
       <FilterSheetField label="Category">
         <Listbox
           options={categoryOptions}

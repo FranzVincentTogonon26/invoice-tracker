@@ -84,7 +84,11 @@ const SelectSourceFund = ({
   total = 0,
   disabled = false,
   loading = false,
+  // "budget" → admins pick among open budget references (the existing logic).
+  // "balance" → an employee's own remaining balance, always the single source.
+  mode = "budget",
 }) => {
+  const isBalance = mode === "balance";
   const {
     sources,
     source: selected,
@@ -125,7 +129,11 @@ const SelectSourceFund = ({
       {loading && sources.length === 0 && (
         <div
           role="status"
-          aria-label="Loading budget sources"
+          aria-label={
+            isBalance
+              ? "Loading your remaining balance"
+              : "Loading budget sources"
+          }
           className="rounded-2xl border border-[var(--border)] bg-[var(--surface-2)]/60 px-3.5 py-3 shadow-card"
         >
           <div className="flex items-center gap-3">
@@ -140,8 +148,14 @@ const SelectSourceFund = ({
 
       {!loading && sources.length === 0 && (
         <BalancePrompt
-          title="No open budget source"
-          description="Create a budget reference first — these lines are funded against it."
+          title={
+            isBalance ? "No remaining balance" : "No open budget source"
+          }
+          description={
+            isBalance
+              ? "Your issued budget and abono will show up here once an admin adds them."
+              : "Create a budget reference first — these lines are funded against it."
+          }
         />
       )}
 
@@ -211,7 +225,7 @@ const SelectSourceFund = ({
               <span className="truncate">
                 {selected.label || "Untitled source"}
               </span>
-              {!canChoose && (
+              {!canChoose && !isBalance && (
                 <span
                   className="shrink-0 rounded-full bg-[var(--surface)] px-1.5 py-0.5 text-xs font-semibold text-[var(--ink-muted)]"
                   title="Selected automatically — it is the only open budget source"
@@ -221,9 +235,11 @@ const SelectSourceFund = ({
               )}
             </span>
 
-            <span className="shrink-0 text-xs tabular-nums text-[var(--ink-muted)]">
-              {formatDate(selected.created_at)}
-            </span>
+            {!isBalance && (
+              <span className="shrink-0 text-xs tabular-nums text-[var(--ink-muted)]">
+                {formatDate(selected.created_at)}
+              </span>
+            )}
           </div>
 
           <div className="mt-3 grid grid-cols-2 gap-2">
@@ -269,8 +285,17 @@ const SelectSourceFund = ({
           </div>
 
           <p className="mt-2 text-xs leading-snug text-[var(--ink-muted)]">
-            Allocated {formatMoney(selected.allocated)} · Issued{" "}
-            {formatMoney(selected.issued)}
+            {isBalance ? (
+              <>
+                Received {formatMoney(selected.allocated)} · Spent{" "}
+                {formatMoney(selected.expenses)}
+              </>
+            ) : (
+              <>
+                Allocated {formatMoney(selected.allocated)} · Issued{" "}
+                {formatMoney(selected.issued)}
+              </>
+            )}
           </p>
 
           {insufficient && (
@@ -326,9 +351,11 @@ const SelectSourceFund = ({
                 <ul className="mt-2 list-disc space-y-1 border-t border-[var(--danger)]/20 pt-2.5 pl-4 text-xs leading-snug text-[var(--danger)]">
                   <li>Lower an amount on any line so the total fits.</li>
                   <li>
-                    {canChoose
-                      ? "Top up this budget reference, or pick another source above."
-                      : "Top up this budget reference so it can cover the draft."}
+                    {isBalance
+                      ? "Ask your admin to issue more budget or add abono to raise your balance."
+                      : canChoose
+                        ? "Top up this budget reference, or pick another source above."
+                        : "Top up this budget reference so it can cover the draft."}
                   </li>
                 </ul>
               )}

@@ -33,6 +33,8 @@ class Budget {
       [],
     );
 
+    // Employee rows are excluded — their spend already left the reference as
+    // `issued` (see referenceBalance below).
     const overviewExpenses = await query(
       `SELECT
           br.reference_id,
@@ -41,6 +43,10 @@ class Budget {
           COALESCE(SUM(e.total_amount), 0) AS amount
        FROM expenses e
        JOIN budget_reference br ON br.reference_id = e.reference_id
+       WHERE NOT EXISTS (
+         SELECT 1 FROM users u
+          WHERE u.user_id = e.user_id AND u.role = 'employee'
+       )
        GROUP BY br.reference_id, br.label, br.created_at
        ORDER BY br.created_at DESC`,
       [],
@@ -189,6 +195,11 @@ class Budget {
   //                the same formula the AdminBudget overview uses.
   // Scalar subqueries with COALESCE keep empty references at 0 instead of NULL
   // (SUM returns NULL over zero rows).
+  //
+  // Employee expenses ARE tagged with their source reference now, but their
+  // spend left the reference when it was issued — counting those rows here as
+  // well would subtract them twice, so every admin-side expense sum below
+  // (here and in expenses.model.js) skips rows owned by an employee.
   static async referenceBalance(referenceId) {
     const result = await query(
       `SELECT
@@ -207,6 +218,10 @@ class Budget {
             SELECT SUM(e.total_amount)
             FROM expenses e
             WHERE e.reference_id = $1 AND e.status != 'cancel'
+              AND NOT EXISTS (
+                SELECT 1 FROM users u
+                 WHERE u.user_id = e.user_id AND u.role = 'employee'
+              )
           ), 0) AS expenses`,
       [referenceId],
     );
@@ -250,6 +265,90 @@ class Budget {
       params,
     );
     return result.rows;
+  }
+
+  // Employee budget page — every `issued_budget` row the employee received,
+  // reached through THEIR OWN `budget_issued_reference` rows (scoped by
+  // `user_id`, never a query param), joined to the source budget reference
+  // label. Unlike the overview totals below, ALL statuses are returned so a
+  // cancelled/closed issuance stays visible in the list with its status badge.
+  // Optional filter:
+  //   - `search`: matched against description, notes, method and the source
+  //     of funds label (ILIKE)
+  static async employeeBudget(userId, { search } = {}) {
+    // Overview mirrors employee.overview.model: the hero reads money the
+    // employee still HOLDS (open issuances only) minus what they SPENT
+    // (PAID expenses only — drafts/cancelled rows never count as spent).
+    const overviewResult = await query(
+      `SELECT
+          COALESCE((
+            SELECT SUM(ib.amount)
+            FROM budget_issued_reference bir
+            JOIN issued_budget ib ON ib.issued_ref_id = bir.id
+            WHERE bir.user_id = $1 AND bir.status = 'open'
+          ), 0)::float8 AS total_budget,
+          COALESCE((
+            SELECT SUM(e.total_amount)
+            FROM expenses e
+            WHERE e.user_id = $1 AND e.status = 'paid'
+          ), 0)::float8 AS total_expenses,
+          COALESCE((
+            SELECT COUNT(*)
+            FROM budget_issued_reference bir
+            WHERE bir.user_id = $1 AND bir.status = 'open'
+          ), 0)::int AS active_references`,
+      [userId],
+    );
+
+    const txParams = [userId];
+    let searchClause = "";
+    if (search && search.trim()) {
+      txParams.push(`%${search.trim()}%`);
+      searchClause = `AND (ib.description ILIKE $2
+              OR ib.notes ILIKE $2
+              OR ib.method ILIKE $2
+              OR br.label ILIKE $2)`;
+    }
+
+    // `::float8` casts DECIMAL (returned by pg as strings) to a JS number.
+    const txResult = await query(
+      `SELECT
+          ib.id,
+          ib.issued_ref_id,
+          bir.reference_id,
+          br.label AS source_of_funds,
+          'issued' AS kind,
+          ib.description,
+          ib.notes,
+          ib.amount::float8 AS amount,
+          ib.method,
+          bir.status,
+          bir.date_cut_off,
+          ib.created_at AS date,
+          ib.created_at AS created_at
+       FROM budget_issued_reference bir
+       JOIN issued_budget ib ON ib.issued_ref_id = bir.id
+       LEFT JOIN budget_reference br ON br.reference_id = bir.reference_id
+       WHERE bir.user_id = $1
+       ${searchClause}
+       ORDER BY ib.created_at DESC`,
+      txParams,
+    );
+
+    const row = overviewResult.rows[0] ?? {};
+    const toMoney = (value) => Math.round((Number(value) || 0) * 100) / 100;
+    const totalBudget = toMoney(row.total_budget);
+    const totalExpenses = toMoney(row.total_expenses);
+
+    return {
+      overview: {
+        totalBudget,
+        totalExpenses,
+        totalBalance: toMoney(totalBudget - totalExpenses),
+        activeReferences: Number(row.active_references) || 0,
+      },
+      transactions: txResult.rows,
+    };
   }
 
   // Soft-delete a Budget Reference (status 'open' -> 'cut_off'). A hard

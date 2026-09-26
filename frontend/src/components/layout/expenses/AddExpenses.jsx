@@ -23,7 +23,12 @@ import { Input, TextArea } from "../../ui/Input";
 import Listbox from "../../ui/Listbox";
 import { cn, formatMoney, toISODate } from "../../../lib/utils";
 import { FUNDING_STATUS, fundingState } from "../../../lib/funding";
-import { ERROR_VISIBLE_MS, MAX_RECEIPT_LABEL } from "../../../constants";
+import {
+  ERROR_VISIBLE_MS,
+  MAX_RECEIPT_LABEL,
+  USER_ROLES,
+} from "../../../constants";
+import { useAuth } from "../../../context/AuthContext";
 import { useExpenses, useExpensesMutations } from "../../../hooks/useExpenses";
 import { useExpenseSuggestion } from "../../../hooks/useExpenseSuggestion";
 import {
@@ -50,16 +55,34 @@ const blankItem = () => ({
   aiSuggested: false,
 });
 
+// True as soon as the amount box holds anything the user typed — "0", "0.00"
+// and "-0" included. A typed zero is a filled-in line that must be corrected,
+// not a blank row to skip: treating it as untouched would drop it from the
+// request without ever showing the zero-amount guard.
+const hasAmountInput = (item) => String(item.totalAmount ?? "").trim() !== "";
+
+// `totalAmount` is either "" or numeric text; everything that isn't greater
+// than zero (blank, 0, 0.00, negative) counts as a zero amount.
+const isZeroAmount = (item) => !(Number(item.totalAmount) > 0);
+
 const isUntouchedItem = (item) =>
   !item.description.trim() &&
   !item.categoryId &&
   !item.receiptId &&
-  !(Number(item.totalAmount) > 0);
+  !hasAmountInput(item);
+
+// A line the user actually typed into (description, amount or a scanned
+// receipt). Only these are saved and validated — a row that was just added and
+// left empty is skipped instead of blocking the save.
+const isTouchedLine = (item) =>
+  Boolean(item.description.trim()) ||
+  hasAmountInput(item) ||
+  Boolean(item.receiptId);
 
 const missingFieldsFor = (item) => {
   const missing = [];
   if (!item.description.trim()) missing.push("description");
-  if (!(Number(item.totalAmount) > 0)) missing.push("amount");
+  if (isZeroAmount(item)) missing.push("amount");
   return missing;
 };
 
@@ -68,7 +91,7 @@ const firstIncompleteIndex = (items) =>
 
 const zeroAmountIndexesFor = (items) =>
   items
-    .map((item, index) => (!(Number(item.totalAmount) > 0) ? index : -1))
+    .map((item, index) => (isZeroAmount(item) ? index : -1))
     .filter((index) => index >= 0);
 
 const lineLabel = (item, index) =>
@@ -138,7 +161,7 @@ const applySuggestion = (item, suggestion, categories) => ({
   aiSuggested: Boolean(suggestion.description) || item.aiSuggested,
 });
 
-function Field({ label, children, hint }) {
+function Field({ label, children, hint, hintTone = "muted" }) {
   return (
     <div className="block min-w-0">
       <span className="mb-1.5 block type-eyebrow text-[var(--ink-muted)]">
@@ -146,7 +169,14 @@ function Field({ label, children, hint }) {
       </span>
       {children}
       {hint && (
-        <span className="mt-1.5 block text-xs leading-snug text-[var(--ink-muted)]">
+        <span
+          className={cn(
+            "mt-1.5 block text-xs leading-snug",
+            hintTone === "danger"
+              ? "text-[var(--danger)]"
+              : "text-[var(--ink-muted)]",
+          )}
+        >
           {hint}
         </span>
       )}
@@ -156,6 +186,7 @@ function Field({ label, children, hint }) {
 
 const AddExpenses = () => {
   const nav = useNavigate();
+  const { user } = useAuth();
   const [form, setForm] = useState({ items: [blankItem()] });
   const [referenceId, setReferenceId] = useState("");
   const [modal, setModal] = useState(null);
@@ -173,6 +204,14 @@ const AddExpenses = () => {
     isLoading: referencesLoading,
   } = useExpenses();
   const { create } = useExpensesMutations();
+
+  // Mirrors the backend auth middleware: a valid login is a real users row
+  // (user_id exists) whose status is 'active'. Employees draw their source of
+  // funds from their own remaining balance; admins keep the existing
+  // budget-reference picker.
+  const isActiveSession = Boolean(user?.user_id && user?.status === "active");
+  const isEmployee = user?.role === USER_ROLES.EMPLOYEE;
+  const sourceMode = isEmployee ? "balance" : "budget";
 
   const categoryOptions = useMemo(
     () =>
@@ -295,7 +334,14 @@ const AddExpenses = () => {
   }, [references, referenceId]);
 
   const zeroAmountIndexes = useMemo(() => zeroAmountIndexesFor(items), [items]);
-  const flaggedLines = showZeroAmountErrors ? zeroAmountIndexes : [];
+  // Zero-amount validation — after a save attempt every listed item whose
+  // amount is not greater than zero (blank / 0 / 0.00) is flagged so the danger
+  // border points at the exact rows that must be fixed before the request can
+  // proceed. `handleSave` denies on this very same set.
+  const flaggedLines = useMemo(
+    () => (showZeroAmountErrors ? zeroAmountIndexes : []),
+    [showZeroAmountErrors, zeroAmountIndexes],
+  );
 
   const funding = useMemo(
     () => fundingState(references, selectedReferenceId, total),
@@ -382,9 +428,18 @@ const AddExpenses = () => {
     setAddItemError("");
     setShowZeroAmountErrors(true);
 
+    if (!isActiveSession) {
+      setFormError(
+        "Your login must belong to an active user account to save expenses — contact an administrator.",
+      );
+      return;
+    }
+
     if (funding.sources.length === 0) {
       setFormError(
-        "No source of funds detected — add a budget source before saving.",
+        isEmployee
+          ? "No remaining balance found — ask your admin to issue budget or add abono before saving."
+          : "No source of funds detected — add a budget source before saving.",
       );
       return;
     }
@@ -394,33 +449,45 @@ const AddExpenses = () => {
       return;
     }
 
-    const touched = items.filter(
-      (item) =>
-        item.description.trim() ||
-        Number(item.totalAmount) > 0 ||
-        item.receiptId,
+    const touchedIndexes = items.reduce(
+      (acc, item, index) => (isTouchedLine(item) ? [...acc, index] : acc),
+      [],
     );
+    const touched = touchedIndexes.map((index) => items[index]);
 
     if (touched.length === 0) {
+      // Nothing filled in yet — there is no 0.00 item to fix, so drop any flag
+      // left over from an earlier attempt instead of painting the blank
+      // starter row red.
+      setShowZeroAmountErrors(false);
       setFormError("Add at least one expense line before saving.");
       return;
     }
 
+    // Zero-amount restriction — EVERY item listed in the summary must carry a
+    // value greater than zero, so a blank / 0 / 0.00 line (including a trailing
+    // row that was added but left empty) denies the whole request and is called
+    // out by line number. The same `flaggedLines` set paints those rows red, so
+    // it is obvious which items need an amount before saving again.
     if (zeroAmountIndexes.length > 0) {
+      const zeroLabels = zeroAmountIndexes.map(
+        (index) =>
+          `${lineLabel(items[index], index)} has a ${formatMoney(
+            items[index].totalAmount,
+          )} value`,
+      );
       setFormError(
-        `Cannot proceed with your request — ${zeroAmountIndexes
-          .map(
-            (index) =>
-              `${lineLabel(items[index], index)} is ${formatMoney(
-                items[index].totalAmount,
-              )} = 0.00`,
-          )
-          .join(", ")}. Add an amount to proceed.`,
+        `Cannot proceed with your request — ${zeroLabels.join(
+          ", ",
+        )}. Every item must be greater than zero, please add a value or remove the line to proceed.`,
       );
       return;
     }
 
-    const invalidIndex = firstIncompleteIndex(items);
+    const invalidIndex = items.findIndex(
+      (item, index) =>
+        touchedIndexes.includes(index) && missingFieldsFor(item).length > 0,
+    );
     if (invalidIndex >= 0) {
       setFormError(
         `Line ${invalidIndex + 1} needs a description and an amount greater than zero.`,
@@ -430,13 +497,15 @@ const AddExpenses = () => {
 
     if (insufficientFunds) {
       setFormError(
-        `Cannot proceed with your request — insufficient funds in ${
-          funding.source?.label || "the selected budget source"
-        }. These expenses total ${formatMoney(total)}, but only ${formatMoney(
-          funding.balance,
-        )} is left (short by ${formatMoney(
-          funding.shortfall,
-        )}). Lower an amount or pick another budget source.`,
+        isEmployee
+          ? `Cannot proceed with your request — insufficient funds. These expenses total ${formatMoney(total)}, but only ${formatMoney(funding.balance)} is left in your remaining balance (short by ${formatMoney(funding.shortfall)}). Lower an amount on any line to fit your balance.`
+          : `Cannot proceed with your request — insufficient funds in ${
+              funding.source?.label || "the selected budget source"
+            }. These expenses total ${formatMoney(total)}, but only ${formatMoney(
+              funding.balance,
+            )} is left (short by ${formatMoney(
+              funding.shortfall,
+            )}). Lower an amount or pick another budget source.`,
       );
       return;
     }
@@ -465,6 +534,10 @@ const AddExpenses = () => {
 
       await create.mutateAsync({
         type: "expense",
+        // Every save is tagged with the picked source from `references` —
+        // admins tag the budget reference, employees tag the reference their
+        // remaining balance was issued from (the server keeps it only when the
+        // employee actually holds an open issuance for it).
         reference_id: selectedReferenceId || undefined,
         receipts,
         items: touched.map((item) => {
@@ -481,7 +554,9 @@ const AddExpenses = () => {
       toast.success(
         `Saved ${touched.length} expense line${touched.length === 1 ? "" : "s"}.`,
       );
-      nav("/expenses");
+      // Land each role back on its own expenses list — the Add Expenses form
+      // is shared, but the shells nest it under /admin and /employee.
+      nav(isEmployee ? "/employee/expenses" : "/admin/expenses");
     } catch (error) {
       setFormError(error?.message || "Couldn't save expenses.");
     }
@@ -537,7 +612,7 @@ const AddExpenses = () => {
         </span>
         <div className="min-w-0">
           <p className="type-eyebrow text-[var(--accent-strong)]">Smart tip</p>
-          <p className="truncate text-sm text-[var(--ink-muted)]">
+          <p className="truncate text-xs text-[var(--ink-muted)]">
             Scan a receipt to fill one grouped line — description, category,
             date and total.
           </p>
@@ -551,7 +626,7 @@ const AddExpenses = () => {
               <CardTitle className="text-base text-lg">
                 Transactions items
               </CardTitle>
-              <CardDescription className="text-sm">
+              <CardDescription className="text-xs">
                 One confirmed receipt lands here as one grouped row.
               </CardDescription>
             </div>
@@ -574,11 +649,23 @@ const AddExpenses = () => {
                 key={i}
                 initial={{ opacity: 0, y: 10 }}
                 animate={{ opacity: 1, y: 0 }}
-                className="group relative rounded-2xl border border-[var(--border)] bg-[var(--surface-2)]/50 p-4 sm:p-5"
+                className={cn(
+                  "group relative rounded-2xl border border-[var(--border)] bg-[var(--surface-2)]/50 p-4 transition-colors sm:p-5",
+                  // Zero-amount guard — this line is denied on save until its
+                  // amount is greater than zero, so it carries the danger
+                  // border the summary also points at.
+                  flaggedLines.includes(i) &&
+                    "border-[var(--danger)]/40 bg-[var(--danger)]/5",
+                )}
               >
                 <div className="mb-3 flex items-center justify-between gap-2">
                   <div className="flex min-w-0 items-center gap-2.5">
-                    <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-[var(--ink)] font-display text-xs font-semibold tabular-nums text-[var(--bg)]">
+                    <span
+                      className={cn(
+                        "flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-[var(--ink)] font-display text-xs font-semibold tabular-nums text-[var(--bg)]",
+                        flaggedLines.includes(i) && "bg-[var(--danger)]",
+                      )}
+                    >
                       {String(i + 1).padStart(2, "0")}
                     </span>
                     <p className="truncate text-sm font-semibold text-[var(--ink)]">
@@ -662,13 +749,27 @@ const AddExpenses = () => {
                   <Field
                     label="Amount"
                     hint={
-                      it.amountLocked
-                        ? "The receipt's grand total — locked."
-                        : undefined
+                      // The same flag that paints this card's danger border —
+                      // a blank / 0 / 0.00 amount blocks the save.
+                      flaggedLines.includes(i)
+                        ? `This item has a ${formatMoney(
+                            it.totalAmount,
+                          )} value — add an amount greater than zero to proceed.`
+                        : it.amountLocked
+                          ? "The receipt's grand total — locked."
+                          : undefined
                     }
+                    hintTone={flaggedLines.includes(i) ? "danger" : undefined}
                   >
                     <div className="relative">
-                      <span className="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 text-sm font-semibold text-[var(--ink-muted)]">
+                      <span
+                        className={cn(
+                          "pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 text-sm font-semibold",
+                          flaggedLines.includes(i)
+                            ? "text-[var(--danger)]"
+                            : "text-[var(--ink-muted)]",
+                        )}
+                      >
                         ₱
                       </span>
                       <Input
@@ -680,7 +781,14 @@ const AddExpenses = () => {
                           setItem(i, { totalAmount: e.target.value })
                         }
                         placeholder="0.00"
-                        className="pl-8 text-right font-semibold tabular-nums"
+                        aria-invalid={
+                          flaggedLines.includes(i) ? true : undefined
+                        }
+                        className={cn(
+                          "pl-8 text-right font-semibold tabular-nums",
+                          flaggedLines.includes(i) &&
+                            "border-[var(--danger)]/50 focus:border-[var(--danger)]/60 focus:ring-[var(--danger)]/20",
+                        )}
                         disabled={it.amountLocked}
                         title={
                           it.amountLocked
@@ -807,6 +915,7 @@ const AddExpenses = () => {
                 total={total}
                 disabled={saving}
                 loading={referencesLoading}
+                mode={sourceMode}
               />
             </div>
 
@@ -817,9 +926,9 @@ const AddExpenses = () => {
                   <div
                     key={i}
                     className={cn(
-                      "-mx-2 flex items-center justify-between gap-2 rounded-xl px-2 py-1.5 text-sm transition-colors hover:bg-[var(--surface-2)]/70",
+                      "flex items-center justify-between gap-2 rounded-xl px-2 py-1.5 text-sm transition-colors hover:bg-[var(--surface-2)]/70",
                       missingAmount &&
-                        "bg-[var(--danger)]/10 ring-1 ring-inset ring-[var(--danger)]/20",
+                        "bg-[var(--danger)]/10 ring-1 ring-inset ring-[var(--danger)]/30",
                     )}
                   >
                     <span className="flex min-w-0 items-center gap-2 text-[var(--ink-muted)]">
@@ -845,9 +954,11 @@ const AddExpenses = () => {
                     {missingAmount ? (
                       <span
                         className="shrink-0 text-right leading-tight"
-                        title="Add an amount greater than zero to proceed"
+                        title={`Line ${i + 1} has a ${formatMoney(
+                          it.totalAmount,
+                        )} value — add an amount greater than zero to proceed`}
                       >
-                        <span className="block font-semibold tabular-nums text-[var(--danger)]">
+                        <span className="flex items-center justify-end gap-1 font-semibold tabular-nums text-[var(--danger)]">
                           {formatMoney(it.totalAmount)}
                         </span>
                       </span>
@@ -900,16 +1011,22 @@ const AddExpenses = () => {
                 type="button"
                 onClick={handleSave}
                 disabled={
-                  saving || insufficientFunds || sourceUnselected || noSources
+                  saving ||
+                  !isActiveSession ||
+                  insufficientFunds ||
+                  sourceUnselected ||
+                  noSources
                 }
                 title={
-                  noSources
-                    ? "No source of funds detected — add a budget source first"
-                    : sourceUnselected
-                      ? "Select a budget source to fund these expenses"
-                      : insufficientFunds
-                        ? "Cannot proceed — the selected budget source is insufficient"
-                        : undefined
+                  !isActiveSession
+                    ? "An active user account is required to save expenses"
+                    : noSources
+                      ? "No source of funds detected — add a budget source first"
+                      : sourceUnselected
+                        ? "Select a budget source to fund these expenses"
+                        : insufficientFunds
+                          ? "Cannot proceed — the selected budget source is insufficient"
+                          : undefined
                 }
               >
                 {saving ? (

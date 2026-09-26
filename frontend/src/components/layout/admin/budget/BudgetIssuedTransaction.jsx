@@ -11,8 +11,9 @@ import {
 import { PAYMENT_METHODS, STATUS } from "../../../../constants";
 import IssuedTransactionFilters from "./IssuedTransactionFilters";
 import IssuedTransactionTable from "./IssuedTransactionTable";
+import { formatMoney } from "../../../../lib/utils";
 
-const PAGE_SIZE = 100;
+const PAGE_SIZE = 50;
 
 /**
  * Dropdown predicate for the issued-transaction list — one source of truth so
@@ -192,6 +193,20 @@ const BudgetIssuedTransaction = () => {
     [filteredRows, currentPage],
   );
 
+  // Total of every row the filters let through (all pages, not just this one),
+  // skipping Cancelled issuances — `budget_issued_reference.status` stores
+  // 'cancel' for them, mirroring how the Budget Transaction tab totals its rows
+  // minus 'cancelled'.
+  const total = useMemo(
+    () =>
+      filteredRows.reduce(
+        (sum, r) =>
+          r.status === "cancel" ? sum : sum + (Number(r.amount) || 0),
+        0,
+      ),
+    [filteredRows],
+  );
+
   const rangeStart =
     filteredRows.length === 0 ? 0 : currentPage * PAGE_SIZE + 1;
   const rangeEnd = Math.min(filteredRows.length, (currentPage + 1) * PAGE_SIZE);
@@ -279,7 +294,12 @@ const BudgetIssuedTransaction = () => {
                 Showing {rangeStart}–{rangeEnd} of {filteredRows.length}{" "}
                 {filteredRows.length === 1 ? "transaction" : "transactions"}
               </p>
-
+              <p className="text-sm text-[var(--ink-muted)] sm:ml-auto sm:mr-6">
+                Total
+                <span className="ml-2 text-sm font-semibold text-[var(--accent-strong)] tabular-nums">
+                  {formatMoney(total)}
+                </span>
+              </p>
               {pageCount > 1 && (
                 <Pager
                   page={currentPage}

@@ -9,6 +9,12 @@ const toIntQty = (value, fallback = 1) => {
   return Math.max(0, Math.round(n));
 };
 
+// Money columns come back from pg as float8 SUM() results, and float math
+// (issued + abono − expenses) can leave noise like 399.99999999999994 behind.
+// Round to centavos so a fully-spent balance reads exactly 0 and the Add
+// Expenses funding check never trips on a rounding artifact.
+const toMoney = (value) => Math.round((Number(value) || 0) * 100) / 100;
+
 class Expenses {
   static CATEGORY_COLUMNS = "category_id, category_name, created_at";
 
@@ -237,6 +243,22 @@ class Expenses {
     return result.rows[0] ?? null;
   }
 
+  // Soft delete for the ledger: the row is kept and only its status moves.
+  // The employee "Delete expense" action parks the record back in 'draft'
+  // through here instead of removing it (see the expenses controller's
+  // `updateStatus`); `updated_at` is bumped so the change is traceable.
+  static async updateExpenseStatus(id, status) {
+    const result = await query(
+      `UPDATE expenses
+          SET status = $2, updated_at = NOW()
+        WHERE id = $1
+        RETURNING id, description, total_amount::float8 AS total_amount,
+                  status, image_url`,
+      [id, status],
+    );
+    return result.rows[0] ?? null;
+  }
+
   // How many expense rows still point at the same stored image. One scan can
   // back several lines (each line of a confirmed receipt carries the same
   // `image_url`), so the file may only be deleted once the last reference is
@@ -335,6 +357,13 @@ class Expenses {
               FROM expenses e
              WHERE e.reference_id = b.reference_id
                AND e.status != 'cancel'
+               -- Employee rows are tagged with their source too, but their
+               -- spend already left the reference as "issued" — counting it
+               -- again would double-subtract (see budget.model.js).
+               AND NOT EXISTS (
+                 SELECT 1 FROM users u
+                  WHERE u.user_id = e.user_id AND u.role = 'employee'
+               )
           ), 0)::float8 AS expenses
          FROM budget_reference b
         WHERE b.status = 'open'
@@ -359,25 +388,25 @@ class Expenses {
     });
   }
 
-static async expensesOverview({ from, to } = {}) {
-     const categories = await this.categoryList();
-     const gemini_model = await this.geminiModel();
-     const references = await this.budgetReference();
-     const where = [];
-     const params = [];
+  static async expensesOverview({ from, to } = {}) {
+    const categories = await this.categoryList();
+    const gemini_model = await this.geminiModel();
+    const references = await this.budgetReference();
+    const where = [];
+    const params = [];
 
-     if (from) {
-       params.push(from);
-       where.push(`e.expense_date >= $${params.length}::date`);
-     }
+    if (from) {
+      params.push(from);
+      where.push(`e.expense_date >= $${params.length}::date`);
+    }
 
-     if (to) {
-       params.push(to);
-       where.push(`e.expense_date <= $${params.length}::date`);
-     }
+    if (to) {
+      params.push(to);
+      where.push(`e.expense_date <= $${params.length}::date`);
+    }
 
-     const expenses = await query(
-       `SELECT
+    const expenses = await query(
+      `SELECT
            e.id,
            e.description,
            e.total_amount::float8 AS total_amount,
@@ -396,24 +425,32 @@ static async expensesOverview({ from, to } = {}) {
            e.user_id,
            u.name AS created_by,
            u.role AS created_by_role,
-           u.avatar_url AS created_by_avatar
+           u.avatar_url AS created_by_avatar,
+           br.label AS reference_label
         FROM expenses e
         LEFT JOIN category c ON c.category_id = e.category_id
         LEFT JOIN users u ON u.user_id = e.user_id
+        LEFT JOIN budget_reference br ON br.reference_id = e.reference_id
         ${where.length ? `WHERE ${where.join(" AND ")}` : ""}
         ORDER BY e.expense_date DESC, e.created_at DESC`,
-       params,
-     );
+      params,
+    );
 
+    // Spent = SUM(expenses.total_amount) for ADMIN rows only (cancelled lines
+    // excluded). Employee spend is drawn from the budget already handed to
+    // them as `issued`, so charging it here would count it twice — and
+    // `expenses.user_id` is NOT NULL, so the join always resolves a role.
     const stats = await query(
       `SELECT
-          COALESCE(SUM(total_amount), 0)::float8 AS total_expenses,
-          COALESCE(SUM(total_amount) FILTER (
-            WHERE expense_date >= date_trunc('month', CURRENT_DATE)
+          COALESCE(SUM(e.total_amount), 0)::float8 AS total_expenses,
+          COALESCE(SUM(e.total_amount) FILTER (
+            WHERE e.expense_date >= date_trunc('month', CURRENT_DATE)
           ), 0)::float8 AS this_month,
           COUNT(*)::int AS total_transactions
-       FROM expenses
-       WHERE status != 'cancel'`,
+       FROM expenses e
+       JOIN users u ON u.user_id = e.user_id
+       WHERE e.status != 'cancel'
+         AND u.role = 'admin'`,
       [],
     );
 
@@ -454,6 +491,12 @@ static async expensesOverview({ from, to } = {}) {
           COALESCE(SUM(e.total_amount), 0) AS amount
        FROM expenses e
        JOIN budget_reference br ON br.reference_id = e.reference_id
+       WHERE NOT EXISTS (
+         -- Employee rows are tagged now, but their spend already left the
+         -- reference as "issued" (see budgetReference above).
+         SELECT 1 FROM users u
+          WHERE u.user_id = e.user_id AND u.role = 'employee'
+       )
        GROUP BY br.reference_id, br.label, br.created_at
        ORDER BY br.created_at DESC`,
       [],
@@ -464,7 +507,11 @@ static async expensesOverview({ from, to } = {}) {
     const totalTransaction = await query(
       `SELECT COUNT(e.id)::int AS total
          FROM expenses e
-         JOIN budget_reference br ON br.reference_id = e.reference_id`,
+         JOIN budget_reference br ON br.reference_id = e.reference_id
+        WHERE NOT EXISTS (
+          SELECT 1 FROM users u
+           WHERE u.user_id = e.user_id AND u.role = 'employee'
+        )`,
       [],
     );
 
@@ -479,50 +526,172 @@ static async expensesOverview({ from, to } = {}) {
       (sum, row) => sum + Number(row.amount || 0),
       0,
     );
-    const totalExpenses = overviewExpenses.rows.reduce(
-      (sum, row) => sum + Number(row.amount || 0),
-      0,
+    // Spent (admin rows only) — the same figure the ledger footer and the
+    // Total Expenses headline add up to. Reducing `overviewExpenses` instead
+    // under-reported it: that breakdown INNER JOINs budget_reference, so an
+    // admin expense saved without a source of funds silently vanished from
+    // the My Balance card's Spent stat and broke allocated − issued − spent.
+    const totalExpenses = toMoney(s.total_expenses);
+
+    return {
+      categories,
+      references,
+      gemini_model,
+      expenses: expenses.rows,
+      overview: {
+        overviewBudget: overviewBudget.rows,
+        overviewIssuedBudget: overviewIssuedBudget.rows,
+        overviewExpenses: overviewExpenses.rows,
+        totalBudget,
+        totalIssued,
+        totalExpenses,
+        totalCategories: categories.length,
+        totalTransaction: totalTransaction.rows[0]?.total ?? 0,
+      },
+    };
+  }
+
+  // ── Employee source of funds ─────────────────────────────────────
+  // One entry per OPEN budget_issued_reference the employee holds, grouped by
+  // its budget_reference (top-ups stack extra budget_issued_reference rows on
+  // the same reference — grouping keeps `reference_id` unique so the Add
+  // Expenses picker can key on it) and ordered oldest issuance first.
+  //
+  // Employee expenses are tagged with the reference their balance came from,
+  // so a tagged row is charged straight to that source; rows saved untagged
+  // (legacy saves, or a reference the employee no longer holds) are split back
+  // over the sources oldest-funding-first: what was handed out first is spent
+  // first. SUM(balance) then tracks overview.totalBalance (sources bottom out
+  // at 0 instead of going negative, so an overspent pool still blocks new
+  // saves), which keeps the Add Expenses card and the employee dashboard
+  // agreeing on what is spendable. The admin's reference balance is untouched
+  // by this tagging — those sums skip employee rows (see budgetReference).
+  static async employeeReferenceList(userId) {
+    const open = await query(
+      `SELECT
+          bir.reference_id,
+          br.label,
+          br.created_at,
+          COALESCE(SUM(ib.amount), 0)::float8 AS issued
+         FROM budget_issued_reference bir
+         JOIN budget_reference br ON br.reference_id = bir.reference_id
+         LEFT JOIN issued_budget ib ON ib.issued_ref_id = bir.id
+        WHERE bir.user_id = $1 AND bir.status = 'open'
+        GROUP BY bir.reference_id, br.label, br.created_at
+        ORDER BY MIN(bir.created_at) ASC, br.created_at ASC`,
+      [userId],
     );
 
-      return {
-        categories,
-        references,
-        gemini_model,
-        expenses: expenses.rows,
-        overview: {
-          overviewBudget: overviewBudget.rows,
-          overviewIssuedBudget: overviewIssuedBudget.rows,
-          overviewExpenses: overviewExpenses.rows,
-          totalBudget,
-          totalIssued,
-          totalExpenses,
-          totalCategories: categories.length,
-          totalTransaction: totalTransaction.rows[0]?.total ?? 0,
-        },
-      };
+    const sources = open.rows.map((row) => ({
+      reference_id: row.reference_id,
+      label: row.label || "Issued budget",
+      created_at: row.created_at,
+      issued: toMoney(row.issued),
+      abono: 0,
+      expenses: 0,
+    }));
+
+    // No open issuance → nothing the employee can draw from; the Add Expenses
+    // form shows its "no remaining balance" prompt instead of a fake source.
+    if (sources.length === 0) return [];
+
+    const byId = new Map(
+      sources.map((source) => [source.reference_id, source]),
+    );
+
+    // Abono grouped by the budget reference it was booked against. Abono sitting
+    // on a reference without an open issuance still funds the employee, so it is
+    // credited to the oldest open source instead of silently disappearing.
+    const abono = await query(
+      `SELECT ea.reference_id,
+              COALESCE(SUM(ea.amount), 0)::float8 AS abono
+         FROM employee_abono ea
+        WHERE ea.user_id = $1
+        GROUP BY ea.reference_id`,
+      [userId],
+    );
+
+    let abonoLeft = 0;
+    for (const row of abono.rows) {
+      const amount = toMoney(row.abono);
+      const target = byId.get(row.reference_id);
+      if (target) target.abono = toMoney(target.abono + amount);
+      else abonoLeft = toMoney(abonoLeft + amount);
+    }
+    if (abonoLeft > 0) {
+      sources[0].abono = toMoney(sources[0].abono + abonoLeft);
     }
 
-    static async expensesOverviewEmployee({ from, to } = {}, userId) {
-      const categories = await this.categoryList();
-      const references = await this.budgetReference();
-      const where = [];
-      const params = [];
+    // The employee ledger grouped by reference: rows tagged with an open
+    // reference are charged to it directly, everything else (legacy saves that
+    // carry no tag, or a reference the employee no longer holds) is spread
+    // oldest-source-first, capped at what each source received so no source
+    // ever offers more cash than the pool holds. Grouping by reference_id also
+    // picks up the NULL bucket, i.e. the untagged ledger.
+    const spend = await query(
+      `SELECT e.reference_id,
+              COALESCE(SUM(e.total_amount), 0)::float8 AS expenses
+         FROM expenses e
+        WHERE e.user_id = $1 AND e.status != 'cancel'
+        GROUP BY e.reference_id`,
+      [userId],
+    );
 
-      params.push(userId);
-      where.push(`e.user_id = $${params.length}::uuid`);
+    let untagged = 0;
+    for (const row of spend.rows) {
+      const amount = toMoney(row.expenses);
+      const target = byId.get(row.reference_id);
+      if (target) target.expenses = toMoney(target.expenses + amount);
+      else untagged = toMoney(untagged + amount);
+    }
 
-      if (from) {
-        params.push(from);
-        where.push(`e.expense_date >= $${params.length}::date`);
-      }
+    for (const source of sources) {
+      if (untagged <= 0) break;
+      const received = toMoney(source.issued + source.abono);
+      const room = Math.max(0, toMoney(received - source.expenses));
+      const used = Math.min(room, untagged);
+      source.expenses = toMoney(source.expenses + used);
+      untagged = toMoney(untagged - used);
+    }
 
-      if (to) {
-        params.push(to);
-        where.push(`e.expense_date <= $${params.length}::date`);
-      }
+    return sources.map(({ issued, abono: abonoAmount, expenses, ...rest }) => {
+      const allocated = toMoney(issued + abonoAmount);
+      return {
+        ...rest,
+        // "Received" on the balance card = issued budget + abono. `issued` stays
+        // the raw issuance figure for the budget-mode readout.
+        allocated,
+        issued,
+        expenses,
+        // Employee sources spend `received − spent` — abono counts as received
+        // and nothing was ever allocated against this entry, so the admin formula
+        // (allocated − issued − expenses) does not apply. `balance` is always
+        // sent, so funding.js never falls back to that formula.
+        balance: toMoney(allocated - expenses),
+      };
+    });
+  }
 
-      const expenses = await query(
-        `SELECT
+  static async expensesOverviewEmployee({ from, to } = {}, userId) {
+    const categories = await this.categoryList();
+    const where = [];
+    const params = [];
+
+    params.push(userId);
+    where.push(`e.user_id = $${params.length}::uuid`);
+
+    if (from) {
+      params.push(from);
+      where.push(`e.expense_date >= $${params.length}::date`);
+    }
+
+    if (to) {
+      params.push(to);
+      where.push(`e.expense_date <= $${params.length}::date`);
+    }
+
+    const expenses = await query(
+      `SELECT
             e.id,
             e.description,
             e.total_amount::float8 AS total_amount,
@@ -549,11 +718,17 @@ static async expensesOverview({ from, to } = {}) {
          LEFT JOIN budget_reference br ON br.reference_id = e.reference_id
          ${where.length ? `WHERE ${where.join(" AND ")}` : ""}
          ORDER BY e.expense_date DESC, e.created_at DESC`,
-        params,
-      );
+      params,
+    );
 
-      const stats = await query(
-        `SELECT
+    // Employee-side figures count LIVE rows only: a soft-deleted row is parked
+    // in 'draft' (see the row actions) and a voided one sits in 'cancel', so
+    // neither may read as spent here. That keeps `totalExpenses` (and the
+    // derived `totalBalance`) in step with the paid-only ledger the page
+    // renders — drafts can later be restored by an admin, which brings them
+    // back into these sums.
+    const stats = await query(
+      `SELECT
             COALESCE(SUM(e.total_amount), 0)::float8 AS total_expenses,
             COALESCE(SUM(e.total_amount) FILTER (
               WHERE e.expense_date >= date_trunc('month', CURRENT_DATE)
@@ -571,31 +746,36 @@ static async expensesOverview({ from, to } = {}) {
               WHERE ea.user_id = $1
             ), 0)::float8 AS total_abono
          FROM expenses e
-         WHERE e.user_id = $1 AND e.status != 'cancel'`,
-        [userId],
-      );
+         WHERE e.user_id = $1 AND e.status = 'paid'`,
+      [userId],
+    );
 
-      const s = stats.rows[0] ?? {};
-      const totalBudget = Number(s.total_budget) || 0;
-      const totalExpenses = Number(s.total_expenses) || 0;
-      const totalAbono = Number(s.total_abono) || 0;
-      const totalBalance = totalBudget + totalAbono - totalExpenses;
+    const s = stats.rows[0] ?? {};
+    const totalBudget = toMoney(s.total_budget);
+    const totalExpenses = toMoney(s.total_expenses);
+    const totalAbono = toMoney(s.total_abono);
+    const totalBalance = toMoney(totalBudget + totalAbono - totalExpenses);
 
-      return {
-        categories,
-        references,
-        expenses: expenses.rows,
-        overview: {
-          totalBudget,
-          totalExpenses,
-          totalAbono,
-          totalBalance,
-          thisMonth: Number(s.this_month) || 0,
-          totalTransactions: Number(s.total_transactions) || 0,
-          totalCategories: categories.length,
-        },
-      };
-    }
+    // Real rows out of budget_issued_reference (see employeeReferenceList).
+    // The old hardcoded "lance" id was not a UUID and could not be
+    // traced back to the issuance actually funding the employee.
+    const references = await this.employeeReferenceList(userId);
+
+    return {
+      categories,
+      references,
+      expenses: expenses.rows,
+      overview: {
+        totalBudget,
+        totalExpenses,
+        totalAbono,
+        totalBalance,
+        thisMonth: toMoney(s.this_month),
+        totalTransactions: Number(s.total_transactions) || 0,
+        totalCategories: categories.length,
+      },
+    };
+  }
 }
 
 export default Expenses;

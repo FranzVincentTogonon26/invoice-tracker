@@ -52,6 +52,11 @@ const MiniStat = ({ icon: Icon, label, value, loading, iconClass, title }) => (
 
 const EmployeeOverview = () => {
   const { data, isLoading } = useEmployeeOverview();
+  // Server-side totals are already filtered to PAID expenses only (drafts and
+  // cancels never reach these figures) and rounded to centavos, so the hero's
+  // "Available balance" always reconciles with the paid-only transaction feed
+  // below. The `Number(...) || 0` guards here are just null-safe conversions:
+  // a missing/null field must read 0, never NaN.
   const totalBudget = Number(data?.totalBudget) || 0;
   const totalExpenses = Number(data?.totalExpenses) || 0;
   const totalAbono = Number(data?.totalAbono) || 0;

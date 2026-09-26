@@ -1,8 +1,17 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import {
+  useCallback,
+  useEffect,
+  useLayoutEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import { motion } from "framer-motion";
 import {
   CalendarOff,
   CalendarRange,
+  ChevronLeft,
+  ChevronRight,
   CircleAlert,
   CircleX,
   ClipboardList,
@@ -51,6 +60,7 @@ import ExpensesTable from "../../components/layout/admin/expenses/ExpensesTable"
 import ConfirmActionDialog from "../../components/layout/admin/expenses/ConfirmActionDialog";
 import ExpenseDetailsModal from "../../components/layout/admin/expenses/ExpenseDetailsModal";
 import ExpensesMobileFilters from "../../components/layout/admin/expenses/ExpensesMobileFilters";
+import { employeeListboxProps } from "../../components/layout/admin/expenses/EmployeeFilter";
 
 const container = {
   hidden: {},
@@ -76,6 +86,10 @@ const STATUS_OPTIONS = [
   { value: "cancel", label: "Cancelled" },
 ];
 
+const FILTER_GAP = 8;
+const MIN_FILTER_WIDTH = 150;
+const FILTER_KEYS = ["employee", "category", "method", "status"];
+
 const dayOf = (value) => {
   const parsed = toDate(value);
   return parsed ? startOfDay(parsed) : null;
@@ -91,16 +105,17 @@ const matchesDayRange = (value, start, end) => {
   return true;
 };
 
-/**
- * The ledger's dropdown + text filter predicate — one source of truth so the
- * table (desktop and mobile) and the mobile filter sheet's live "N results"
- * preview can never disagree about what matches.
- */
-const matchesLedgerFilters = (row, { category, method, status, query }) => {
+const matchesLedgerFilters = (
+  row,
+  { category, employee, method, status, query },
+) => {
+  if (employee && employee !== "all" && row.employeeId !== employee)
+    return false;
   if (category !== "all" && row.categoryId !== category) return false;
   if (method !== "all" && row.method !== method) return false;
   if (status !== "all" && row.status !== status) return false;
   if (!query) return true;
+
   return [row.description, row.category, row.employee, row.method]
     .filter(Boolean)
     .some((v) => String(v).toLowerCase().includes(query));
@@ -120,19 +135,23 @@ const countDays = (start, end) =>
 
 const shortRangeLabel = (range) => {
   if (!range?.start || !range?.end) return "";
+
   const withYear = range.start.getFullYear() !== range.end.getFullYear();
+
   const format = (day) =>
     day.toLocaleDateString("en-US", {
       month: "short",
       day: "numeric",
       ...(withYear ? { year: "numeric" } : {}),
     });
+
   return `${format(range.start)} - ${format(range.end)}`;
 };
 
 const buildRangeSeries = (range, rows, measure) => {
   const start = range?.start ? startOfDay(range.start) : null;
   const end = range?.end ? startOfDay(range.end) : null;
+
   if (!start || !end || end < start) return [];
 
   const days = countDays(start, end);
@@ -141,8 +160,11 @@ const buildRangeSeries = (range, rows, measure) => {
 
   for (const row of rows) {
     const day = rowDay(row);
+
     if (!day || day < start || day > end) continue;
+
     const bucket = Math.floor((countDays(start, day) - 1) / bucketDays);
+
     totals[bucket] += measure(row);
   }
 
@@ -152,48 +174,39 @@ const buildRangeSeries = (range, rows, measure) => {
 const rowsWindow = (rows) => {
   let start = null;
   let end = null;
+
   for (const row of rows) {
     const day = rowDay(row);
+
     if (!day) continue;
     if (!start || day < start) start = day;
     if (!end || day > end) end = day;
   }
+
   return start && end ? { start, end } : null;
 };
 
 const AdminExpenses = () => {
   const nav = useNavigate();
   const [dateRange, setDateRange] = useState(() => emptyRange());
-  // Fetch every expense up front: the overview cards must not react to the
-  // date range — the picker only narrows the table below (client-side).
+
   const { data, expenses, categories, references, isLoading, error, refetch } =
     useExpenses();
+
   const { remove } = useExpensesMutations();
 
   const [search, setSearch] = useState("");
   const [debouncedSearch, setDebouncedSearch] = useState("");
+  const [employee, setEmployee] = useState("all");
   const [category, setCategory] = useState("all");
   const [method, setMethod] = useState("all");
   const [status, setStatus] = useState("all");
   const [page, setPage] = useState(0);
-  // Mobile only: the inline dropdown row collapses into this bottom sheet
-  // below `lg` (the trigger button and the sheet are both `lg:hidden`).
   const [filtersOpen, setFiltersOpen] = useState(false);
-
-  // "View expense" row + the pending destructive confirmation. Each stays
-  // mounted after closing so the overlay's exit animation still has content —
-  // `viewOpen` / `confirmOpen` alone control visibility.
   const [viewRow, setViewRow] = useState(null);
   const [viewOpen, setViewOpen] = useState(false);
   const [confirmAction, setConfirmAction] = useState(null);
   const [confirmOpen, setConfirmOpen] = useState(false);
-
-  // "Source of funds" label for the View expense modal (the list only carries
-  // open references, so a row funded from a closed one shows no label).
-  const referenceLabels = useMemo(
-    () => new Map((references ?? []).map((r) => [r.reference_id, r.label])),
-    [references],
-  );
 
   const hasDateRange = Boolean(dateRange?.start && dateRange?.end);
 
@@ -202,23 +215,79 @@ const AdminExpenses = () => {
     return () => clearTimeout(timer);
   }, [search]);
 
+  const filtersRef = useRef(null);
+  const [filtersWidth, setFiltersWidth] = useState(0);
+  const [slideIndex, setSlideIndex] = useState(0);
+
+  useLayoutEffect(() => {
+    const el = filtersRef.current;
+    if (!el) return undefined;
+
+    const measure = () => {
+      const width = el.clientWidth;
+      if (width > 0) setFiltersWidth(width);
+    };
+
+    measure();
+    window.addEventListener("resize", measure);
+
+    let observer;
+
+    if (typeof ResizeObserver !== "undefined") {
+      observer = new ResizeObserver(measure);
+      observer.observe(el);
+    }
+
+    return () => {
+      window.removeEventListener("resize", measure);
+      observer?.disconnect();
+    };
+  }, []);
+
+  const filterCapacity = useMemo(() => {
+    if (filtersWidth <= 0) return FILTER_KEYS.length;
+
+    return Math.min(
+      FILTER_KEYS.length,
+      Math.max(
+        1,
+        Math.floor(
+          (filtersWidth + FILTER_GAP) / (MIN_FILTER_WIDTH + FILTER_GAP),
+        ),
+      ),
+    );
+  }, [filtersWidth]);
+
+  const filterItemWidth = useMemo(
+    () =>
+      filtersWidth <= 0
+        ? 0
+        : (filtersWidth - FILTER_GAP * (filterCapacity - 1)) / filterCapacity,
+    [filtersWidth, filterCapacity],
+  );
+
+  const slideMax = FILTER_KEYS.length - filterCapacity;
+  const slideAt = Math.min(Math.max(slideIndex, 0), Math.max(slideMax, 0));
+  const trackOffset = slideAt * (filterItemWidth + FILTER_GAP);
+  const showSlider = slideMax > 0;
+
+  const slidePrev = () => setSlideIndex(Math.max(slideAt - 1, 0));
+  const slideNext = () => setSlideIndex(Math.min(slideAt + 1, slideMax));
+
   const overview = data?.overview ?? {};
   const totalBudget = Number(overview.totalBudget ?? 0);
   const totalIssued = Number(overview.totalIssued ?? 0);
   const totalExpenses = Number(overview.totalExpenses ?? 0);
   const cashOnHand = totalBudget - (totalIssued + totalExpenses);
-
-  // Same cent-rounded depleted/overdrawn states as AdminBudget's My Balance
-  // card: anything formatting as ₱0.00 warns, anything below warns harder.
-  // Depleted only applies once there is an allocation to deplete.
   const isBalanceOverdrawn = cashOnHand < -0.004;
   const isBalanceDepleted =
     !isBalanceOverdrawn && Math.abs(cashOnHand) < 0.005 && totalBudget > 0;
 
-  // Overview source — all-time: the date range never touches the cards
-  // above, it only narrows the table further down.
   const activeExpenses = useMemo(
-    () => (expenses ?? []).filter((e) => e.status !== "cancel"),
+    () =>
+      (expenses ?? []).filter(
+        (e) => e.status !== "cancel" && e.created_by_role !== "employee",
+      ),
     [expenses],
   );
 
@@ -228,16 +297,16 @@ const AdminExpenses = () => {
     [activeExpenses],
   );
 
-  // Total Expenses headline = open budget issuances + recorded expenses — the
-  // exact money the My Balance card deducts from the allocation. `totalIssued`
-  // is the Total Issued Budget card's value, so the two cards always agree.
   const totalSpend = useMemo(
     () => totalIssued + activeTotal,
     [totalIssued, activeTotal],
   );
 
-  // Full expense ledger — rows straight from the expenses table only, so
-  // budget issuances never appear among the records below.
+  const referenceLabels = useMemo(
+    () => new Map((references ?? []).map((r) => [r.reference_id, r.label])),
+    [references],
+  );
+
   const allLedgerRows = useMemo(
     () =>
       (expenses ?? [])
@@ -249,6 +318,7 @@ const AdminExpenses = () => {
           category: e.category_name,
           categoryId: e.category_id,
           amount: Number(e.total_amount) || 0,
+          employeeId: e.user_id,
           employee: e.created_by,
           employeeRole: e.created_by_role,
           employeeAvatar: e.created_by_avatar,
@@ -256,6 +326,12 @@ const AdminExpenses = () => {
           status: e.status,
           notes: e.notes,
           referenceId: e.reference_id,
+          sourceOfFunds:
+            e.reference_label ||
+            (e.reference_id ? referenceLabels.get(e.reference_id) : "") ||
+            (e.created_by_role === "employee"
+              ? "Employee balance"
+              : "No source of funds"),
           receiptId: e.receipt_id,
           imageUrl: e.image_url,
           receiptDate: e.receipt_date,
@@ -263,20 +339,20 @@ const AdminExpenses = () => {
         .sort((a, b) => {
           const ta = new Date(a.timeDate ?? a.date ?? 0).getTime() || 0;
           const tb = new Date(b.timeDate ?? b.date ?? 0).getTime() || 0;
+
           return tb - ta;
         }),
-    [expenses],
+    [expenses, referenceLabels],
   );
 
-  // Rows behind the Total Expenses chart: non-cancelled expense records only.
-  // The headline itself still adds the open issuances from the overview (see
-  // totalSpend above), while the chart plots the expense ledger.
   const spendRows = useMemo(
-    () => allLedgerRows.filter((row) => row.status !== "cancel"),
+    () =>
+      allLedgerRows.filter(
+        (row) => row.status !== "cancel" && row.employeeRole !== "employee",
+      ),
     [allLedgerRows],
   );
 
-  // Table source — the only thing the date range filters.
   const ledgerRows = useMemo(
     () =>
       allLedgerRows.filter((r) =>
@@ -307,19 +383,22 @@ const AdminExpenses = () => {
   const paceDays = useMemo(() => {
     const start = spendWindow?.start ? startOfDay(spendWindow.start) : null;
     const end = spendWindow?.end ? startOfDay(spendWindow.end) : null;
+
     return start && end && end >= start ? countDays(start, end) : 0;
   }, [spendWindow]);
 
-  // Same measure as the headline, so the stat reconciles with it.
   const dailyAverage = paceDays > 0 ? totalSpend / paceDays : 0;
 
   const topCategory = useMemo(() => {
     const totals = new Map();
+
     for (const e of activeExpenses) {
       const key = e.category_name || "Uncategorized";
       totals.set(key, (totals.get(key) ?? 0) + (Number(e.total_amount) || 0));
     }
+
     const top = [...totals.entries()].sort((a, b) => b[1] - a[1])[0];
+
     return top ? top[0] : null;
   }, [activeExpenses]);
 
@@ -365,12 +444,15 @@ const AdminExpenses = () => {
   );
 
   const issuedSources = overview.overviewIssuedBudget;
+
   const issuedStats = useMemo(() => {
     const rows = issuedSources ?? [];
+
     const largest = rows.reduce(
       (max, row) => Math.max(max, Number(row.amount) || 0),
       0,
     );
+
     return [
       { key: "sources", label: "Budget Sources", value: rows.length },
       { key: "largest", label: "Largest", value: formatMoney(largest) },
@@ -379,6 +461,7 @@ const AdminExpenses = () => {
 
   const statusStats = useMemo(() => {
     const counts = new Map();
+
     for (const row of allLedgerRows) {
       const status = row.status || "draft";
       counts.set(status, (counts.get(status) ?? 0) + 1);
@@ -396,6 +479,7 @@ const AdminExpenses = () => {
         tone: "neutral",
         label: status,
       };
+
       return {
         key: status,
         label: meta.label,
@@ -416,6 +500,25 @@ const AdminExpenses = () => {
     [categories],
   );
 
+  const employeeOptions = useMemo(() => {
+    const seen = new Map();
+
+    for (const row of allLedgerRows) {
+      if (!row.employeeId || seen.has(row.employeeId)) continue;
+
+      seen.set(row.employeeId, {
+        value: row.employeeId,
+        label: row.employee || "Unknown",
+        avatar: row.employeeAvatar || "",
+      });
+    }
+
+    return [
+      { value: "all", label: "All Employee" },
+      ...[...seen.values()].sort((a, b) => a.label.localeCompare(b.label)),
+    ];
+  }, [allLedgerRows]);
+
   const methodOptions = useMemo(
     () => [{ value: "all", label: "All methods" }, ...PAYMENT_METHODS],
     [],
@@ -423,17 +526,22 @@ const AdminExpenses = () => {
 
   const filteredRows = useMemo(() => {
     const query = debouncedSearch.trim().toLowerCase();
-    return ledgerRows.filter((row) =>
-      matchesLedgerFilters(row, { category, method, status, query }),
-    );
-  }, [ledgerRows, category, method, status, debouncedSearch]);
 
-  // Live "N results" preview for the mobile filter sheet: it stages its own
-  // draft, so it asks the page how many rows that draft would return (date
-  // range and search included — exactly what the ledger would then show).
+    return ledgerRows.filter((row) =>
+      matchesLedgerFilters(row, {
+        category,
+        employee,
+        method,
+        status,
+        query,
+      }),
+    );
+  }, [ledgerRows, category, employee, method, status, debouncedSearch]);
+
   const countLedgerMatches = useCallback(
     (draft) => {
       const query = debouncedSearch.trim().toLowerCase();
+
       return ledgerRows.filter((row) =>
         matchesLedgerFilters(row, { ...draft, query }),
       ).length;
@@ -441,10 +549,22 @@ const AdminExpenses = () => {
     [ledgerRows, debouncedSearch],
   );
 
-  // The mobile sheet's choices, recapped as removable chips so a narrowed
-  // ledger never looks narrowed "for no reason" while the sheet is closed.
   const mobileFilterChips = useMemo(() => {
     const chips = [];
+
+    if (employee !== "all") {
+      chips.push({
+        key: "employee",
+        label:
+          employeeOptions.find((o) => o.value === employee)?.label ??
+          "Employee",
+        onClear: () => {
+          setEmployee("all");
+          setPage(0);
+        },
+      });
+    }
+
     if (category !== "all") {
       chips.push({
         key: "category",
@@ -457,6 +577,7 @@ const AdminExpenses = () => {
         },
       });
     }
+
     if (method !== "all") {
       chips.push({
         key: "method",
@@ -467,6 +588,7 @@ const AdminExpenses = () => {
         },
       });
     }
+
     if (status !== "all") {
       chips.push({
         key: "status",
@@ -478,16 +600,26 @@ const AdminExpenses = () => {
         },
       });
     }
-    return chips;
-  }, [category, categoryOptions, method, methodOptions, status]);
 
-  // The mobile sheet applies its staged draft in one go.
+    return chips;
+  }, [
+    category,
+    categoryOptions,
+    employee,
+    employeeOptions,
+    method,
+    methodOptions,
+    status,
+  ]);
+
   const applyMobileFilters = ({
     category: nextCategory,
+    employee: nextEmployee,
     method: nextMethod,
     status: nextStatus,
   }) => {
     setCategory(nextCategory);
+    setEmployee(nextEmployee);
     setMethod(nextMethod);
     setStatus(nextStatus);
     setPage(0);
@@ -505,12 +637,25 @@ const AdminExpenses = () => {
     [filteredRows, currentPage],
   );
 
+  const total = useMemo(
+    () =>
+      filteredRows.reduce(
+        (sum, r) =>
+          r.status === "cancel" || r.employeeRole === "employee"
+            ? sum
+            : sum + (Number(r.amount) || 0),
+        0,
+      ),
+    [filteredRows],
+  );
+
   const rangeStart =
     filteredRows.length === 0 ? 0 : currentPage * PAGE_SIZE + 1;
   const rangeEnd = Math.min(filteredRows.length, (currentPage + 1) * PAGE_SIZE);
 
   const hasActiveFilters =
     hasDateRange ||
+    employee !== "all" ||
     category !== "all" ||
     method !== "all" ||
     status !== "all" ||
@@ -518,6 +663,7 @@ const AdminExpenses = () => {
 
   const clearFilters = () => {
     setDateRange(emptyRange());
+    setEmployee("all");
     setCategory("all");
     setMethod("all");
     setStatus("all");
@@ -529,14 +675,11 @@ const AdminExpenses = () => {
     ? "Try a wider date range, a different category, or a different search term."
     : "Try a different category or search term.";
 
-  // "View expense" opens the read-only details modal for the picked row.
   const handleViewRow = (row) => {
     setViewRow(row);
     setViewOpen(true);
   };
 
-  // "Delete expense" never runs straight from the menu — it opens the
-  // confirmation dialog, and only its "yes" submits (see runConfirmedAction).
   const requestDelete = (row) => {
     setConfirmAction({ row });
     setConfirmOpen(true);
@@ -560,8 +703,6 @@ const AdminExpenses = () => {
     }
   };
 
-  // The row summary the confirmation shows, so the admin confirms exactly the
-  // record being deleted.
   const confirmSummary = confirmAction ? (
     <div className="mt-4 flex items-center gap-3 rounded-2xl border border-[var(--border)] bg-[var(--surface-2)]/60 px-4 py-3">
       <div className="min-w-0 flex-1">
@@ -572,17 +713,13 @@ const AdminExpenses = () => {
           {`${confirmAction.row.category || "Uncategorized"} · ${formatDate(confirmAction.row.date)}`}
         </p>
       </div>
+
       <span className="shrink-0 text-sm font-semibold tabular-nums text-[var(--ink)]">
         {formatMoney(confirmAction.row.amount)}
       </span>
     </div>
   ) : null;
 
-  // Search + date filter in one aligned row: the search field takes the free
-  // space (`flex-1`), the picker hugs its content. Below `sm` the picker
-  // collapses to its icon-only trigger via `compactOnMobile`; from `sm` up
-  // it shows the full range label. Mounted in both toolbars (mobile row +
-  // desktop row) — only one wrapper is displayed at a time.
   const searchField = (
     <div className="flex w-full items-center gap-2">
       <SearchInput
@@ -611,7 +748,7 @@ const AdminExpenses = () => {
           ) : null
         }
       />
-      {/* Icon-only trigger on mobile, full label from `sm` up */}
+
       <DateRangePicker
         value={dateRange}
         onChange={(r) => {
@@ -625,8 +762,6 @@ const AdminExpenses = () => {
     </div>
   );
 
-  // Accessible name for the mobile filter trigger — it announces how many
-  // dropdown filters the sheet currently has applied.
   const mobileFiltersLabel =
     mobileFilterChips.length > 0
       ? `Filter ledger — ${mobileFilterChips.length} ${
@@ -634,13 +769,77 @@ const AdminExpenses = () => {
         } active`
       : "Filter ledger";
 
+  const renderFilter = (key) => {
+    switch (key) {
+      case "employee":
+        return (
+          <Listbox
+            portal
+            options={employeeOptions}
+            value={employee}
+            onChange={(v) => {
+              setEmployee(v);
+              setPage(0);
+            }}
+            placeholder="All Employee"
+            {...employeeListboxProps("All Employee")}
+          />
+        );
+
+      case "category":
+        return (
+          <Listbox
+            portal
+            options={categoryOptions}
+            value={category}
+            onChange={(v) => {
+              setCategory(v);
+              setPage(0);
+            }}
+            placeholder="All categories"
+          />
+        );
+
+      case "method":
+        return (
+          <Listbox
+            portal
+            options={methodOptions}
+            value={method}
+            onChange={(v) => {
+              setMethod(v);
+              setPage(0);
+            }}
+            placeholder="All methods"
+          />
+        );
+
+      case "status":
+        return (
+          <Listbox
+            portal
+            options={STATUS_OPTIONS}
+            value={status}
+            onChange={(v) => {
+              setStatus(v);
+              setPage(0);
+            }}
+            placeholder="All status"
+          />
+        );
+
+      default:
+        return null;
+    }
+  };
+
   return (
     <div className="space-y-5 pb-2">
       <PageHeader
         title="Expenses"
         description="Track expenses against your budget"
         actions={
-          <div className="flex w-full flex-nowrap items-center gap-2 sm:w-auto justify-end">
+          <div className="flex w-full flex-nowrap items-center justify-end gap-2 sm:w-auto">
             <Button
               variant="accent"
               onClick={() => nav("/admin/expenses/add")}
@@ -728,18 +927,22 @@ const AdminExpenses = () => {
         </motion.div>
 
         <p className="px-1 text-xs text-[var(--ink-muted)]">
-          Money figures exclude cancelled lines · Total Expenses adds open
-          budget issuances to expenses · Transactions counts every expense row,
-          cancelled included · The overview cards above are always all-time —
+          Money figures — My Balance, Spent, Total Expenses, Avg / day and the
+          ledger footer total — count admin spend only: cancelled lines and
+          employee rows are excluded (employee spend is drawn from the budget
+          already issued to them) · Total Expenses adds open budget issuances to
+          expenses · Transactions counts every expense row, cancelled and
+          employee included · The overview cards above are always all-time —
           charts and Avg / day span the records from first to last, and the date
           range only filters the table below
         </p>
       </section>
 
-      <Card padding="lg" className="relative  rounded-3xl px-2 sm:px-6">
+      <Card padding="lg" className="relative rounded-3xl px-2 sm:px-6">
         <CardHeader>
           <div>
             <CardTitle className="text-lg">All Expenses</CardTitle>
+
             <CardDescription className="text-sm">
               <span className="inline-flex flex-wrap items-center gap-1.5">
                 {hasDateRange ? (
@@ -753,6 +956,7 @@ const AdminExpenses = () => {
                     All dates
                   </Badge>
                 )}
+
                 <span>
                   {hasDateRange
                     ? "· expenses in this range"
@@ -763,22 +967,9 @@ const AdminExpenses = () => {
           </div>
         </CardHeader>
 
-        {/* Ledger toolbar. Below `lg` the row keeps only the search plus a
-            filter button — the same three dropdowns then open in a bottom
-            sheet; from `lg` up the inline dropdown row is unchanged. */}
         <div className="mb-5 flex flex-col gap-3 lg:flex-row lg:items-center">
           <div className="flex items-center gap-2 lg:hidden">
             <div className="min-w-0 flex-1">{searchField}</div>
-
-            {/* <DateRangePicker
-              value={dateRange}
-              onChange={(r) => {
-                setDateRange(r);
-                setPage(0);
-              }}
-              placeholder="All dates"
-              align="end"
-            /> */}
 
             <IconButton
               type="button"
@@ -794,6 +985,7 @@ const AdminExpenses = () => {
               )}
             >
               <SlidersHorizontal size={16} aria-hidden />
+
               {mobileFilterChips.length > 0 && (
                 <span className="absolute -right-0.5 -top-0.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-[var(--accent)] px-1 text-[10px] font-semibold leading-none text-white ring-2 ring-[var(--surface)]">
                   {mobileFilterChips.length}
@@ -805,54 +997,69 @@ const AdminExpenses = () => {
           <div
             role="group"
             aria-label="Expense filters"
-            className="hidden lg:flex lg:flex-row lg:flex-wrap lg:items-center lg:gap-2"
+            className="hidden lg:flex lg:min-w-0 lg:flex-1 lg:flex-wrap lg:items-center lg:gap-2"
           >
-            <div className="w-full lg:w-[200px] lg:shrink-0">
-              <Listbox
-                options={categoryOptions}
-                value={category}
-                onChange={(v) => {
-                  setCategory(v);
-                  setPage(0);
+            {showSlider && (
+              <IconButton
+                type="button"
+                title="Show previous filters"
+                aria-label="Show previous filters"
+                aria-disabled={slideAt <= 0}
+                onClick={slidePrev}
+                disabled={slideAt <= 0}
+                className="h-10 w-10 shrink-0 disabled:pointer-events-none disabled:opacity-40"
+              >
+                <ChevronLeft size={18} aria-hidden="true" />
+              </IconButton>
+            )}
+
+            <div
+              ref={filtersRef}
+              className="relative min-w-0 flex-1 overflow-hidden"
+            >
+              <div
+                className="flex transition-transform duration-300 ease-out"
+                style={{
+                  gap: FILTER_GAP,
+                  width: `${
+                    FILTER_KEYS.length * filterItemWidth +
+                    (FILTER_KEYS.length - 1) * FILTER_GAP
+                  }px`,
+                  transform: `translateX(-${trackOffset}px)`,
                 }}
-                placeholder="All categories"
-              />
+              >
+                {FILTER_KEYS.map((key) => (
+                  <div key={key} className="min-w-0 flex-1">
+                    {renderFilter(key)}
+                  </div>
+                ))}
+              </div>
             </div>
-            <div className="w-full lg:w-[150px] lg:shrink-0">
-              <Listbox
-                options={methodOptions}
-                value={method}
-                onChange={(v) => {
-                  setMethod(v);
-                  setPage(0);
-                }}
-                placeholder="All methods"
-              />
-            </div>
-            <div className="w-full lg:w-[150px] lg:shrink-0">
-              <Listbox
-                options={STATUS_OPTIONS}
-                value={status}
-                onChange={(v) => {
-                  setStatus(v);
-                  setPage(0);
-                }}
-                placeholder="All status"
-              />
-            </div>
+
+            {showSlider && (
+              <IconButton
+                type="button"
+                title="Show more filters"
+                aria-label="Show more filters"
+                aria-disabled={slideAt >= slideMax}
+                onClick={slideNext}
+                disabled={slideAt >= slideMax}
+                className="h-10 w-10 shrink-0 disabled:pointer-events-none disabled:opacity-40"
+              >
+                <ChevronRight size={18} aria-hidden="true" />
+              </IconButton>
+            )}
           </div>
 
-          <div className="hidden lg:block lg:ml-auto lg:w-[650px] ">
+          <div className="hidden lg:ml-auto lg:block lg:w-[650px] lg:max-w-[45%] lg:min-w-[240px]">
             {searchField}
           </div>
         </div>
 
-        {/* Mobile-only recap of the sheet's choices: the applied dropdowns as
-            chips, each removable in one tap (renders nothing on `lg` up or when
-            nothing is set). */}
         <FilterChips
           chips={mobileFilterChips}
           onClearAll={() => {
+            setEmployee("all");
             setCategory("all");
             setMethod("all");
             setStatus("all");
@@ -892,6 +1099,7 @@ const AdminExpenses = () => {
               onView={handleViewRow}
               onDelete={requestDelete}
             />
+
             <div
               className={cn(
                 "mt-4 flex flex-col gap-3 border-t border-[var(--border)] pt-4 sm:flex-row sm:items-center",
@@ -901,6 +1109,7 @@ const AdminExpenses = () => {
                 Showing {rangeStart}–{rangeEnd} of {filteredRows.length}{" "}
                 {filteredRows.length === 1 ? "record" : "records"}
               </p>
+
               {pageCount > 1 && (
                 <div className="sm:ml-auto">
                   <Pager
@@ -910,22 +1119,22 @@ const AdminExpenses = () => {
                   />
                 </div>
               )}
+
+              <p className="text-sm text-[var(--ink-muted)] sm:ml-auto sm:mr-6">
+                Total
+                <span className="ml-2 text-sm font-semibold text-[var(--accent-strong)] tabular-nums">
+                  {formatMoney(total)}
+                </span>
+              </p>
             </div>
           </>
         )}
       </Card>
 
-      {/* Read-only expense recap + the confirmations behind the row actions.
-          Fixed/portal overlays, so they sit outside the page layout and stay
-          intact on mobile. */}
       <ExpenseDetailsModal
         open={viewOpen}
         expense={viewRow}
-        referenceLabel={
-          viewRow?.referenceId
-            ? (referenceLabels.get(viewRow.referenceId) ?? "")
-            : ""
-        }
+        referenceLabel={viewRow?.sourceOfFunds ?? ""}
         onClose={() => setViewOpen(false)}
       />
 
@@ -943,15 +1152,14 @@ const AdminExpenses = () => {
         onConfirm={runConfirmedAction}
       />
 
-      {/* Mobile-only filter sheet — the inline dropdown row's small-screen
-          counterpart (both the trigger and the sheet are `lg:hidden`, so
-          tablet/desktop keep the inline row untouched). */}
       <ExpensesMobileFilters
         open={filtersOpen}
         onClose={() => setFiltersOpen(false)}
+        employee={employee}
         category={category}
         method={method}
         status={status}
+        employeeOptions={employeeOptions}
         categoryOptions={categoryOptions}
         methodOptions={methodOptions}
         statusOptions={STATUS_OPTIONS}

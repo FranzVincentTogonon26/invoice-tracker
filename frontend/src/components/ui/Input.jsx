@@ -8,7 +8,7 @@ export const Input = forwardRef(
         ref={ref}
         type={type}
         className={cn(
-          "peer h-11 w-full appearance-none rounded-full border border-[var(--border)] bg-[var(--surface)] text-base text-[var(--ink)] placeholder:text-[var(--ink-muted)] outline-none transition-colors focus:border-[var(--accent)]/50 focus:ring-2 focus:ring-[var(--accent)]/15 disabled:opacity-50 sm:h-10 sm:text-sm",
+          "peer h-11 w-full appearance-none rounded-full border border-[var(--border)] bg-[var(--surface)]  text-[var(--ink)] placeholder:text-[var(--ink-muted)] outline-none transition-colors focus:border-[var(--accent)]/50 focus:ring-2 focus:ring-[var(--accent)]/15 disabled:opacity-50 sm:h-10 text-sm",
           "[appearance:textfield]",
           "[&::-webkit-inner-spin-button]:appearance-none",
           "[&::-webkit-outer-spin-button]:appearance-none",
@@ -38,7 +38,7 @@ export const TextArea = forwardRef(({ className, ...props }, ref) => (
     rows={3}
     ref={ref}
     className={cn(
-      "w-full rounded-2xl border border-[var(--border)] bg-[var(--surface)] px-4 py-3 text-base text-[var(--ink)] placeholder:text-[var(--ink-muted)] outline-none resize-y focus:border-[var(--accent)]/50 focus:ring-2 focus:ring-[var(--accent)]/15 sm:text-sm",
+      "w-full rounded-2xl  border border-[var(--border)] bg-[var(--surface)] px-4 py-3 text-base text-[var(--ink)] placeholder:text-[var(--ink-muted)] outline-none resize-y focus:border-[var(--accent)]/50 focus:ring-2 focus:ring-[var(--accent)]/15 text-sm ",
       className,
     )}
     {...props}

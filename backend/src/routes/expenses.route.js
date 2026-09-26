@@ -1,5 +1,6 @@
 import express from "express";
 import authMiddleware from "../middleware/auth.middleware.js";
+import requireEmployeeAccess from "../middleware/employee.middleware.js";
 import * as expensesController from "../controllers/expenses.controller.js";
 
 const router = express.Router();
@@ -7,7 +8,12 @@ const router = express.Router();
 // Protected Routes
 
 router.get("/", authMiddleware, expensesController.expenses);
-router.get("/employee", authMiddleware, expensesController.expensesEmployee);
+router.get(
+  "/employee",
+  authMiddleware,
+  requireEmployeeAccess,
+  expensesController.expensesEmployee,
+);
 router.post("/", authMiddleware, expensesController.create);
 
 // Declared before "/:id" so the literal "category" segment wins the match.
@@ -21,6 +27,10 @@ router.delete(
 // Placed before "/:id" so the literal "detail" segment never parses as the
 // validated uuid route below — express.Router matches top-down.
 router.get("/detail/:id", authMiddleware, expensesController.detail);
+
+// Employee ledger row action: "Delete expense" is a soft delete — the record
+// stays in the ledger and its status moves to 'draft' through this endpoint.
+router.patch("/:id/status", authMiddleware, expensesController.updateStatus);
 
 router.delete("/:id", authMiddleware, expensesController.remove);
 

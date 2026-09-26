@@ -214,3 +214,13 @@ export const createExpensesSchema = z
       (Boolean(data.qty) && Boolean(data.rate) && data.amount != null),
     { message: "Quantity, rate and amount are required" },
   );
+
+// Statuses one ledger row may be moved to without deleting it. The employee
+// ledger's "Delete expense" action uses this to soft-delete: the record stays
+// and only its status changes to 'draft' (see the expenses controller's
+// `updateStatus`). The enum mirrors the expenses.status CHECK constraint.
+export const updateExpenseStatusSchema = z.object({
+  status: z.enum(["paid", "draft", "cancel"], {
+    message: "Invalid expense status",
+  }),
+});

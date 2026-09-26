@@ -102,14 +102,19 @@ Same conventions as the Budget transaction tables.
 **Remaining-balance bar.** One shared `RemainingProgress` component drives both
 the desktop row and the mobile card:
 
-- `spent` = `employee.total_spent` (or `employee.spent`) when the API sends it,
-  otherwise the **`DEFAULT_TOTAL_SPENT = 1000`** placeholder; an employee with
-  nothing issued is treated as `0` spent so no row is falsely "over budget".
+- `spent` = `employee.total_spent` — `SUM(expenses.total_amount)` recorded
+  against the employee's `user_id` on `GET /employees` (PAID expenses only;
+  drafts and cancels are excluded). No placeholder values.
 - `remaining` = `issued − spent` (negative → `--danger` + "Over budget").
 - bar width = `remaining / issued × 100`, clamped 0–100 — the same formula, 0–100
-  ARIA semantics, `Number(x.toFixed(1))` rounding, accent-hero gradient and
-  `[0.16, 1, 0.3, 1]` / 0.7s / 0.2s-delay motion as the Budget page utilization
-  bar, so both screens read as one system.
+  ARIA semantics, `Number(x.toFixed(1))` rounding, and `[0.16, 1, 0.3, 1]` /
+  0.7s / 0.2s-delay motion as the Budget page utilization bar, so both screens
+  read as one system.
+- bar colour follows the theme AND the state: accent fill normally (light
+  gradient / bright theme-accent gradient + glow in dark), full success fill +
+  check when the budget is exactly exhausted (`spent === issued`), full danger
+  fill + alert icon when it is exceeded (`spent > issued`). The dark-mode track
+  is lightened so the empty portion stays visible against the dark surface.
 
 **Mobile** — stacked `EmployeeCard`s (rounded-2xl, border, shadow-card):
 avatar/name/status on top, an Issued · Spent · Remaining metric strip, the same
@@ -184,14 +189,14 @@ Notes:
   the full roster.
 - `issued_budget` = `SUM(issued_budget.amount)` joined through open
   `budget_issued_reference` rows for that user.
+- `total_spent` = `SUM(expenses.total_amount)` for that `user_id` where
+  `status = 'paid'` (drafts and cancels excluded — same rule as the employee
+  overview aggregates), so
+  the Total Spent column, the Remaining balance and the progress bar all read
+  live data from the expenses table.
 - `totalEmployeeIssued` = `SUM(issued_budget.amount)` joined through open
   `budget_issued_reference` rows — the total funding handed out to employees
   (NOT `allocated - issued`, which is the remaining/un-issued budget).
-- **`total_spent` is not part of the response yet.** The table therefore falls
-  back to `DEFAULT_TOTAL_SPENT = 1000` (see section 4) and picks up a real
-  `total_spent` / `spent` field automatically once `GET /employees` returns one
-  (e.g. `SUM(expenses.total_amount)` joined through the employee's
-  `budget_issued_reference` rows).
 
 ---
 

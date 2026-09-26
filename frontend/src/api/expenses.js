@@ -23,6 +23,11 @@ export const expensesApi = {
   // Removes one expense line.
   remove: (id) => apiClient.delete(`/expenses/${id}`).then((r) => r.data),
 
+  // Soft delete for the employee ledger: keeps the row and only flips its
+  // status — the row action's "Delete expense" parks it in 'draft'.
+  updateStatus: (id, status) =>
+    apiClient.patch(`/expenses/${id}/status`, { status }).then((r) => r.data),
+
   // Removes a category (expense lines using it fall back to uncategorized).
   removeCategory: (id) =>
     apiClient.delete(`/expenses/category/${id}`).then((r) => r.data),

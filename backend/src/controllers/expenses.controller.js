@@ -1,14 +1,46 @@
 import Expenses from "../models/expenses.model.js";
+import Budget from "../models/budget.model.js";
 import ApiError from "../utils/ApiError.js";
 import { validate } from "../utils/validate.js";
-import { createExpensesSchema } from "../validations/expenses.validation.js";
+import {
+  createExpensesSchema,
+  updateExpenseStatusSchema,
+} from "../validations/expenses.validation.js";
 import { deleteReceiptImage } from "../utils/receiptImage.js";
 
 const UUID_RE =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
+// Row-level access for the single-expense endpoints (detail / delete):
+// admins may touch any row; everyone else must be an *active employee* and
+// the owner of that row. A rejected caller gets the plain "not found" instead
+// of a 403 so the response never reveals that someone else's expense id
+// exists (and so an admin/employee token can't be swapped to read sideways).
+const canTouchRow = (req, expense) => {
+  if (req.user?.role === "admin") return true;
+  return (
+    req.user?.role === "employee" &&
+    req.user?.status === "active" &&
+    String(expense?.user_id ?? "") === String(req.user?.id ?? "")
+  );
+};
+
 export const expenses = async (req, res, next) => {
   try {
+    // authMiddleware already proved the caller is a real users row (the JWT's
+    // user_id exists) with status = 'active' — every branch below trusts
+    // `req.user` because of it. Employees only ever see their own ledger, and
+    // their source of funds is their own remaining balance (built in the
+    // model); admins keep the full budget-reference list (existing logic).
+    if (req.user.role === "employee") {
+      const { categories, expenses: rows, overview, references } =
+        await Expenses.expensesOverviewEmployee(req.query, req.user.id);
+      const gemini_model = await Expenses.geminiModel();
+      return res
+        .status(200)
+        .json({ expenses: rows, categories, overview, gemini_model, references });
+    }
+
     const {
       categories,
       expenses: rows,
@@ -73,11 +105,29 @@ export const create = async (req, res, next) => {
         .status(201)
         .json({ receipt, message: "Receipt scanned successfully." });
     }
+    // Tag the save with the picked source for both roles: admins tag the
+    // budget reference they spent from, employees tag the reference their
+    // remaining balance was issued from. An employee may only tag a reference
+    // they hold an open issuance for — anything else is dropped to NULL.
+    let referenceId = payload.reference_id ?? null;
+    if (req.user.role === "employee" && referenceId) {
+      const held = await Budget.employeeOpenIssuedReferences({
+        user_id: req.user.id,
+      });
+      if (!held.some((row) => row.reference_id === referenceId)) {
+        referenceId = null;
+      }
+    }
+
     const rows = await Expenses.createExpenses({
       items: payload.items,
       user_id: req.user.id,
       issued_ref_id: payload.issued_ref_id ?? null,
-      reference_id: payload.reference_id ?? null,
+      // authMiddleware guarantees req.user is an active users row. Employee
+      // spend is already subtracted from the reference via `issued`, so the
+      // admin-side sums exclude employee rows (see budget.model.js /
+      // expenses.model.js) to keep it from being charged twice.
+      reference_id: referenceId,
       receipts: payload.receipts ?? [],
       image_url: payload.image_url ?? null,
       receipt_date: payload.receipt_date ?? null,
@@ -114,7 +164,7 @@ export const detail = async (req, res, next) => {
       throw ApiError.badRequest("Invalid expense id", "VALIDATION_ERROR");
 
     const expense = await Expenses.findExpenseById(id);
-    if (!expense)
+    if (!expense || !canTouchRow(req, expense))
       throw ApiError.notFound("Expense not found", "EXPENSE_NOT_FOUND");
 
     // The scanned lines of the receipt this expense was saved from (empty when
@@ -138,6 +188,14 @@ export const remove = async (req, res, next) => {
     const { id } = req.params;
     if (!UUID_RE.test(id || ""))
       throw ApiError.badRequest("Invalid expense id", "VALIDATION_ERROR");
+
+    // Ownership first: an employee may only delete their own row (admins keep
+    // the full ledger), and a stranger sees "not found" — never a 403 that
+    // would confirm the id exists.
+    const existing = await Expenses.findExpenseById(id);
+    if (!existing || !canTouchRow(req, existing))
+      throw ApiError.notFound("Expense not found", "EXPENSE_NOT_FOUND");
+
     const expense = await Expenses.removeExpense(id);
     if (!expense)
       throw ApiError.notFound("Expense not found", "EXPENSE_NOT_FOUND");
@@ -155,6 +213,38 @@ export const remove = async (req, res, next) => {
     return res
       .status(200)
       .json({ expense, message: "Expense removed successfully." });
+  } catch (err) {
+    next(err);
+  }
+};
+
+// Soft delete / status move: the row is kept and only its status changes. The
+// employee ledger uses this for its "Delete expense" action — parking the
+// record in 'draft' instead of removing it — so the stored receipt file is
+// deliberately left alone here: the row (and its image) remain in the ledger.
+export const updateStatus = async (req, res, next) => {
+  try {
+    const { id } = req.params;
+    if (!UUID_RE.test(id || ""))
+      throw ApiError.badRequest("Invalid expense id", "VALIDATION_ERROR");
+
+    const payload = validate(updateExpenseStatusSchema, req.body);
+
+    // Same ownership rule as detail / remove: an employee may only touch their
+    // own row (admins keep the full ledger), and a stranger sees "not found" —
+    // never a 403 that would confirm the id exists.
+    const existing = await Expenses.findExpenseById(id);
+    if (!existing || !canTouchRow(req, existing))
+      throw ApiError.notFound("Expense not found", "EXPENSE_NOT_FOUND");
+
+    const expense = await Expenses.updateExpenseStatus(id, payload.status);
+    if (!expense)
+      throw ApiError.notFound("Expense not found", "EXPENSE_NOT_FOUND");
+
+    return res.status(200).json({
+      expense,
+      message: `Expense status updated to ${payload.status}.`,
+    });
   } catch (err) {
     next(err);
   }

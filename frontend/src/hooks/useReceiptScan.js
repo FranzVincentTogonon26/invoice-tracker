@@ -10,7 +10,11 @@
 import { useCallback, useRef, useState } from "react";
 import { aiApi } from "../api/ai";
 import { useAuth } from "../context/AuthContext";
-import { MAX_RECEIPT_BYTES, MAX_RECEIPT_LABEL } from "../constants";
+import {
+  MAX_RECEIPT_BYTES,
+  MAX_RECEIPT_LABEL,
+  USER_ROLES,
+} from "../constants";
 
 const ACCEPTED_MIME = new Set([
   "image/png",
@@ -54,20 +58,28 @@ const normalizeParsedReceipt = (res) => {
   };
 };
 
+// Scan gate mirrored from the backend's authMiddleware on
+// POST /ai/receipt-parse: that route requires a real users row (user_id
+// exists) with status "active" and carries NO requireAdminAccess step, so an
+// admin and an employee scan alike. Checked up front for instant feedback
+// instead of a late 401/403 from the API.
+const canScan = (user) =>
+  Boolean(user?.user_id) &&
+  user?.status === "active" &&
+  (user?.role === USER_ROLES.ADMIN || user?.role === USER_ROLES.EMPLOYEE);
+
 export const useReceiptScan = ({ onParsed, onError }) => {
   const { user } = useAuth();
   const [loading, setLoading] = useState(false);
   const [err, setErr] = useState("");
   const busyRef = useRef(false);
 
-  // Scanning is admin-only on the backend (authMiddleware rejects any user
-  // whose status isn't "active", then requireAdminAccess). Mirror it here so
-  // inactive/pending users get instant feedback instead of a late 403.
   const scanFile = useCallback(
     async (file) => {
       if (!file || busyRef.current) return false;
-      if (!(user?.role === "admin" && user?.status === "active")) {
-        const message = "Only active admins can scan receipts.";
+      if (!canScan(user)) {
+        const message =
+          "Only active admin and employee accounts can scan receipts.";
         setErr(message);
         onError?.(message);
         return false;

@@ -1,9 +1,22 @@
 import express from "express";
 import authMiddleware from "../middleware/auth.middleware.js";
 import requireAdminAccess from "../middleware/admin.middleware.js";
+import requireEmployeeAccess from "../middleware/employee.middleware.js";
 import * as budgetController from "../controllers/budget.controller.js";
 
 const router = express.Router();
+
+// Employee budget page — the signed-in employee's own issuances + balance
+// overview. Stacks authMiddleware (valid token, real user, status=active) and
+// requireEmployeeAccess (role=employee AND status=active), so a suspended or
+// non-employee token is rejected before the handler runs. Scoped to
+// `req.user.id` inside the model — no client-supplied user id.
+router.get(
+  "/employee",
+  authMiddleware,
+  requireEmployeeAccess,
+  budgetController.budgetEmployee,
+);
 
 // Protected Routes
 router.get(

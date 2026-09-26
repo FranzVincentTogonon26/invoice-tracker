@@ -81,19 +81,34 @@
 }
 
 /* Remaining-balance progress fill (Employees table/cards).
-   Light mode: accent gradient normally, solid success + glow at 100%.
-   Dark mode: solid white + white glow normally (high contrast on the dark
-   track), success green + glow kept at 100% since it already reads well. */
+   Light mode: accent gradient normally, solid success + glow once the budget
+   is fully spent, solid danger + glow when it is exceeded.
+   Dark mode: bright theme-accent gradient + soft glow (the dark --accent-hero
+   tones are too close to the dark track to read), while the success / danger
+   tiers keep their bright dark-mode tokens so the state stays identifiable. */
 .remaining-fill {
   background: linear-gradient(90deg, var(--accent-hero-2), var(--accent-hero));
+}
+[data-theme="dark"] .remaining-fill:not(.is-full):not(.is-over) {
+  background: linear-gradient(90deg, var(--accent), var(--accent-strong));
+  box-shadow: 0 0 6px 1px rgba(45, 212, 191, 0.5);
 }
 .remaining-fill.is-full {
   background: var(--success);
   box-shadow: 0 0 6px 1px var(--success);
 }
-[data-theme="dark"] .remaining-fill:not(.is-full) {
-  background: #ffffff;
-  box-shadow: 0 0 6px 1px rgba(255, 255, 255, 0.45);
+.remaining-fill.is-over {
+  background: var(--danger);
+  box-shadow: 0 0 6px 1px var(--danger);
+}
+
+/* Track contrast for the remaining bar in dark mode — `--surface-2` plus the
+   7%-white border ring is almost the same value as the page background, so
+   the empty portion of the bar could not be told apart. Lighten the track
+   and lift the inset ring so the measured portion stays clearly visible. */
+[data-theme="dark"] .remaining-track {
+  background: rgba(255, 255, 255, 0.08);
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.16);
 }
 
 html,

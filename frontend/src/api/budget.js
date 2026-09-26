@@ -2,6 +2,12 @@ import { apiClient } from "./client";
 
 export const budgetsApi = {
   // ── Real API ──
+  // Employee budget page — the signed-in employee's own issuances
+  // (issued_budget through their budget_issued_reference) + balance overview.
+  // The server scopes the rows to the token's user_id; `params` only carries
+  // the optional `search` term.
+  employee: (params = {}) =>
+    apiClient.get("/budgets/employee", { params }).then((r) => r.data),
   list: (params = {}) =>
     apiClient.get("/budgets", { params }).then((r) => r.data),
   budgetTransaction: (params = {}) =>

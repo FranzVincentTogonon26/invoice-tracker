@@ -347,9 +347,7 @@ const IssuedTransactionFilters = ({
         Trigger={FilterTrigger}
         Option={FilterOption}
         onApply={(draft) =>
-          FILTER_DROPDOWNS.forEach(({ key }) =>
-            onFilterChange(key, draft[key]),
-          )
+          FILTER_DROPDOWNS.forEach(({ key }) => onFilterChange(key, draft[key]))
         }
         onClearAll={() => {
           FILTER_DROPDOWNS.forEach(({ key }) => onFilterChange(key, "all"));

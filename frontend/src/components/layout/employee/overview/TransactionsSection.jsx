@@ -62,7 +62,7 @@ const MethodBadge = ({ method, className }) => {
   return (
     <Badge
       tone={config.tone}
-      className={cn("shrink-0 px-1.5 py-0.5 text-[10px]", className)}
+      className={cn("shrink-0 px-2 py-1 text-[12px]", className)}
     >
       <BadgeIcon size={11} aria-hidden />
       {methodLabel(method)}
@@ -91,7 +91,7 @@ const TYPE_CONFIG = {
   },
 };
 
-const PAGE_SIZE = 10;
+const PAGE_SIZE = 50;
 const COLUMN_WIDTHS = ["16%", "28%", "18%", "16%", "22%"];
 
 export const TransactionsSection = ({
@@ -115,12 +115,21 @@ export const TransactionsSection = ({
     return () => clearTimeout(timer);
   }, [search]);
 
+  // The feed merges three tables, so never trust the incoming order: newest
+  // record first — by when it was ADDED (`created_at`), falling back to the
+  // displayed date. An expense booked for an older date still belongs on top
+  // when it was entered today.
+  const sortedTransactions = useMemo(() => {
+    const addedAt = (tx) => toDate(tx.created_at ?? tx.date)?.getTime() ?? 0;
+    return [...transactions].sort((a, b) => addedAt(b) - addedAt(a));
+  }, [transactions]);
+
   const filteredTransactions = useMemo(() => {
     const q = debouncedSearch.trim().toLowerCase();
     const { start, end } = dateRange ?? {};
     const inRange = (tx) => matchesDayRange(tx.date, start, end);
-    if (!q) return transactions.filter(inRange);
-    return transactions.filter((tx) => {
+    if (!q) return sortedTransactions.filter(inRange);
+    return sortedTransactions.filter((tx) => {
       if (!inRange(tx)) return false;
       const typeLabel = TYPE_CONFIG[tx.kind]?.label?.toLowerCase() || "";
       const desc = (tx.description || "").toLowerCase();
@@ -140,7 +149,7 @@ export const TransactionsSection = ({
         amountStr.includes(q)
       );
     });
-  }, [transactions, debouncedSearch, dateRange]);
+  }, [sortedTransactions, debouncedSearch, dateRange]);
 
   const pageCount = Math.max(
     1,
@@ -154,6 +163,14 @@ export const TransactionsSection = ({
         (currentPage + 1) * PAGE_SIZE,
       ),
     [filteredTransactions, currentPage],
+  );
+
+  // "Showing X–Y of N" range for the pagination footer.
+  const rangeStart =
+    filteredTransactions.length === 0 ? 0 : currentPage * PAGE_SIZE + 1;
+  const rangeEnd = Math.min(
+    (currentPage + 1) * PAGE_SIZE,
+    filteredTransactions.length,
   );
   return (
     <Card className="overflow-hidden">
@@ -388,7 +405,6 @@ export const TransactionsSection = ({
         ) : (
           pageRows.map((tx) => {
             const meta = TYPE_CONFIG[tx.kind] ?? TYPE_CONFIG.expense;
-            const Icon = meta.icon;
             const isNegative = tx.kind === "expense";
             const amountColor = isNegative
               ? "text-[var(--danger)]"
@@ -403,14 +419,6 @@ export const TransactionsSection = ({
               >
                 {/* Left: Icon & Details matching requested mobile structure */}
                 <div className="flex items-center gap-3 min-w-0">
-                  <span
-                    className={cn(
-                      "flex h-8 w-8 shrink-0 items-center justify-center rounded-xl",
-                      meta.iconWrapperClass,
-                    )}
-                  >
-                    <Icon size={14} />
-                  </span>
                   <div className="min-w-0">
                     <p className="truncate text-xs font-semibold leading-none text-[var(--ink)]">
                       {tx.description || meta.label}
@@ -429,7 +437,9 @@ export const TransactionsSection = ({
                       <span aria-hidden className="shrink-0 opacity-40">
                         |
                       </span>
-                      <MethodBadge method={tx.method} />
+                      <span className="truncate text-[10px] type-eyebrow">
+                        {tx.method}
+                      </span>
                     </p>
                   </div>
                 </div>
@@ -438,7 +448,7 @@ export const TransactionsSection = ({
                 <div className="text-right shrink-0">
                   <p
                     className={cn(
-                      "font-display text-base font-semibold tabular-nums",
+                      "font-display text-sm font-semibold tabular-nums",
                       amountColor,
                     )}
                   >
@@ -453,22 +463,16 @@ export const TransactionsSection = ({
         )}
       </div>
 
-      {/* Pagination */}
+      {/* Pagination — footer strip under both the table and the mobile cards:
+          count on the left, pager on the right (stacked and centred on
+          mobile), matching the footer used by the other tables in the app. */}
       {!isLoading && filteredTransactions.length > PAGE_SIZE && (
-        <div className="mt-4 flex flex-col gap-2 border-t border-[var(--border)] pt-4 sm:flex-row sm:items-center sm:justify-between">
-          <p className="text-xs text-[var(--ink-muted)] tabular-nums">
-            Showing {currentPage * PAGE_SIZE + 1}–
-            {Math.min(
-              (currentPage + 1) * PAGE_SIZE,
-              filteredTransactions.length,
-            )}{" "}
-            of {filteredTransactions.length} transactions
+        <div className="mt-4 flex flex-col items-center gap-3 border-t border-[var(--border)] pt-4 sm:flex-row sm:items-center sm:justify-between">
+          <p className="text-xs tabular-nums text-[var(--ink-muted)]">
+            Showing {rangeStart}–{rangeEnd} of {filteredTransactions.length}{" "}
+            transactions
           </p>
-          <Pager
-            page={currentPage}
-            pageCount={pageCount}
-            onPageChange={setPage}
-          />
+          <Pager page={currentPage} pageCount={pageCount} onChange={setPage} />
         </div>
       )}
     </Card>

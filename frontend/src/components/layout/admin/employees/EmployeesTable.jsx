@@ -4,12 +4,6 @@ import { Badge } from "../../../ui/Badge";
 import { cn, formatDate, formatMoney, formatTime } from "../../../../lib/utils";
 import EmployeeActions from "./EmployeeActions";
 
-// Placeholder spend amount used while the employees API has no spend
-// aggregate yet. Rows read `employee.total_spent` (or `employee.spent`) as
-// soon as the backend sends it and only fall back to this constant when the
-// field is missing, so the column never renders an empty cell.
-const DEFAULT_TOTAL_SPENT = 1000;
-
 // Column proportions — Employee gets the most space because it anchors the
 // row (avatar + name + email), "Remaining" has to fit the progress bar and its
 // caption, and Actions keeps room for the status button + delete trigger.
@@ -65,22 +59,18 @@ export function EmployeeStatusBadge({ status, className }) {
  * by the desktop table and the mobile cards so both always agree.
  *
  *   issued    → SUM(issued_budget.amount) handed out to the employee
- *   spent     → the API's `total_spent` when present, otherwise the
- *               DEFAULT_TOTAL_SPENT placeholder (never `undefined`)
+ *               (`issued_budget` in the API response)
+ *   spent     → SUM(expenses.total_amount) of PAID expenses recorded against
+ *               the employee's `user_id` (`total_spent` in the API response;
+ *               drafts and cancels are excluded server-side, matching the
+ *               employee overview aggregates)
  *   remaining → issued budget minus total spent (negative = over-spent)
  *   share     → remaining balance as a share of the issued budget, clamped to
  *               0–100 exactly like the Budget page utilization bar
  */
 function budgetBreakdown(employee) {
   const issued = Math.max(0, Number(employee.issued_budget) || 0);
-  // Employees with nothing issued have spent nothing, so the placeholder only
-  // applies once a budget has actually been handed to them (otherwise every
-  // zero-budget row would read as over budget).
-  const fallbackSpent = issued > 0 ? DEFAULT_TOTAL_SPENT : 0;
-  const spent = Math.max(
-    0,
-    Number(employee.total_spent ?? employee.spent ?? fallbackSpent) || 0,
-  );
+  const spent = Math.max(0, Number(employee.total_spent) || 0);
   const remaining = issued - spent;
   const share =
     issued > 0 ? Math.min(100, Math.max(0, (remaining / issued) * 100)) : 0;
@@ -93,24 +83,30 @@ function budgetBreakdown(employee) {
  * easing curve, duration and delay as the Budget page's "Share of budget
  * already issued" bar, so both screens read as one system.
  *
- * Presentation-only additions: a slimmer track (h-1.5) with an inset ring,
- * and a success-tinted fill + subtle glow once the bar reaches 100%.
+ * Presentation-only additions: a slimmer track (h-1) with an inset ring, and
+ * theme-aware fill colours driven by the REAL balance:
+ *   - normal      → accent fill (light gradient / dark bright-accent + glow)
+ *   - exhausted   → full success fill + check once spent === issued
+ *   - over budget → full danger fill + alert icon once spent > issued
  *
- * Special case: when the issued budget equals the total spent
- * (issued > 0 && remaining === 0) the bar renders at 100% / full-state, because
- * there is literally no remaining balance left — not because there is nothing
- * to track. This keeps the bar honest for a 1000 − 1000 = 0 row without changing
- * the `remaining = issued − spent` formula anywhere.
+ * Special cases:
+ *   - issued === 0 → empty track (nothing to measure a balance against).
+ *   - spent === issued (remaining === 0) → the bar renders at 100% / full
+ *     success state, because the budget has been fully drawn down — not
+ *     because there is nothing to track.
+ *   - spent > issued → the bar pins to 100% in the danger tier so an
+ *     over-spent row can never read as a green "success" check.
  */
-function RemainingProgress({ remaining, issued, share, label }) {
+function RemainingProgress({ remaining, issued, share, overSpent = false, label }) {
   // The bar has no issue to track against (issued === 0) → empty track.
   const noIssued = issued <= 0;
-  // Fully spent: issued budget equals the total spent, but there is still an
-  // issue to measure against.
-  const fullySpent = !noIssued && remaining <= 0;
+  // Spent more than issued → danger tier (no success check).
+  const isOver = !noIssued && overSpent;
+  // Issued budget equals the total spent, but there is still an issue to
+  // measure against → success tier.
+  const fullySpent = !noIssued && !isOver && remaining <= 0;
   // What the bar visually shows and reports via ARIA.
-  const displayed = noIssued ? 0 : fullySpent ? 100 : Number(share);
-  const isFull = displayed >= 100;
+  const displayed = noIssued ? 0 : isOver || fullySpent ? 100 : Number(share);
 
   return (
     <div className="flex items-center gap-1.5">
@@ -123,11 +119,13 @@ function RemainingProgress({ remaining, issued, share, label }) {
         aria-valuetext={
           noIssued
             ? "No issued budget tracked"
-            : fullySpent
-              ? "Budget fully spent"
-              : `${displayed}% remaining`
+            : isOver
+              ? "Budget exceeded"
+              : fullySpent
+                ? "Budget fully spent"
+                : `${displayed}% remaining`
         }
-        className="h-1 flex-1 overflow-hidden rounded-full bg-[var(--surface-2)] ring-1 ring-inset ring-[var(--border)]"
+        className="remaining-track h-1 flex-1 overflow-hidden rounded-full bg-[var(--surface-2)] ring-1 ring-inset ring-[var(--border)]"
       >
         <motion.div
           initial={{ width: 0 }}
@@ -139,11 +137,22 @@ function RemainingProgress({ remaining, issued, share, label }) {
           }}
           className={cn(
             "remaining-fill h-full rounded-full",
-            isFull && "is-full",
+            isOver && "is-over",
+            fullySpent && "is-full",
           )}
         />
       </div>
-      {isFull && (
+      {isOver && (
+        <span className="flex h-4 w-4 shrink-0 items-center justify-center rounded-full bg-[var(--danger)]/12">
+          <AlertCircle
+            size={10}
+            strokeWidth={3}
+            aria-hidden
+            className="text-[var(--danger)]"
+          />
+        </span>
+      )}
+      {fullySpent && (
         <span className="flex h-4 w-4 shrink-0 items-center justify-center rounded-full bg-[var(--success)]/12">
           <Check
             size={10}
@@ -158,9 +167,10 @@ function RemainingProgress({ remaining, issued, share, label }) {
 }
 
 /**
- * Compact percentage pill shown above the bar. Success tone only at 100% left,
- * danger tone only when the employee overspent, success tone when fully spent
- * (issued === spent) with "Fully spent" label — accent in between.
+ * Compact percentage pill shown above the bar. Tone follows the real balance:
+ * danger with "Over budget" when the employee spent more than issued, success
+ * with "Fully spent" when the budget is exactly exhausted (issued === spent),
+ * accent with "N% left" (or "100% left") otherwise.
  */
 function SharePill({ remaining, issued, share, overSpent, className }) {
   // Fully spent: there is an issued budget to compare against, and nothing
@@ -187,11 +197,13 @@ function SharePill({ remaining, issued, share, overSpent, className }) {
       ) : fullySpent ? (
         <Check size={10} aria-hidden />
       ) : null}
-      {fullySpent
-        ? "Fully spent"
-        : share >= 100
-          ? "100% left"
-          : `${Number(share)}% left`}
+      {overSpent
+        ? "Over budget"
+        : fullySpent
+          ? "Fully spent"
+          : share >= 100
+            ? "100% left"
+            : `${Number(share)}% left`}
     </span>
   );
 }
@@ -239,7 +251,6 @@ function EmployeeRow({ employee, pending, onAction }) {
         </p>
       </td>
 
-      {/* Total Spent — API `total_spent` when present, else the 1,000 default */}
       <td className="px-4 py-4 text-right align-middle">
         <p className="text-sm font-semibold tabular-nums text-[var(--ink)]">
           {formatMoney(spent)}
@@ -252,7 +263,6 @@ function EmployeeRow({ employee, pending, onAction }) {
         )}
       </td>
 
-      {/* Remaining — issued budget minus total spent, with the animated bar */}
       <td className="px-4 py-4 align-middle">
         <div className="flex items-baseline justify-between gap-2">
           <p
@@ -275,6 +285,7 @@ function EmployeeRow({ employee, pending, onAction }) {
             remaining={remaining}
             issued={issued}
             share={share}
+            overSpent={overSpent}
             label={`Remaining balance for ${employee.name ?? "employee"}`}
           />
         </div>
@@ -373,6 +384,7 @@ function EmployeeCard({ employee, pending, onAction }) {
           share={share}
           remaining={remaining}
           issued={issued}
+          overSpent={overSpent}
           label={`Remaining balance for ${employee.name ?? "employee"}`}
         />
       </div>

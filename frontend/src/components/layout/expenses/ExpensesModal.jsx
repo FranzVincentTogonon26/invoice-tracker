@@ -371,11 +371,11 @@ const ExpensesModal = ({
                     {isScanMode && scanning && (
                       <span className="inline-flex items-center gap-1.5 rounded-full bg-[var(--accent-soft)] px-2.5 py-1 text-xs font-semibold uppercase tracking-widest text-[var(--accent-strong)]">
                         <Loader2 size={11} className="animate-spin" />
-                        Scanning�
+                        Scanning..
                       </span>
                     )}
                   </div>
-                  <p className="mt-1 text-sm leading-snug text-[var(--ink-muted)]">
+                  <p className="mt-1 lg:text-sm text-xs leading-snug text-[var(--ink-muted)]">
                     {copy.description}
                   </p>
                 </div>

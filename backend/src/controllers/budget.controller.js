@@ -1,5 +1,6 @@
 import Budget from "../models/budget.model.js";
 import Employee from "../models/employee.model.js";
+import User from "../models/user.model.js";
 import ApiError from "../utils/ApiError.js";
 import { validate } from "../utils/validate.js";
 import { createbudgetSchema } from "../validations/budget.validation.js";
@@ -29,6 +30,34 @@ const issuedConflictMessage = (conflict) => {
     `To avoid conflict on the issued budget, only one budget reference is allowed per employee — ` +
     `please reimburse the existing issued budget (${source}) first before issuing a new budget.`
   );
+};
+
+// Employee budget page — the signed-in employee's own issuances
+// (`issued_budget` through their `budget_issued_reference`) plus the balance
+// overview. Scope ALWAYS comes from the token (`req.user.id`), never from the
+// query string, so one employee can never read another's budget. The route
+// stacks authMiddleware + requireEmployeeAccess (both reject non-active
+// accounts); the user row is re-checked here as well so a suspended account
+// is cut off even if its status flipped after the token was minted.
+export const budgetEmployee = async (req, res, next) => {
+  try {
+    const user = await User.findUserById(req.user.id);
+    if (!user) throw ApiError.notFound("User not found", "USER_NOT_FOUND");
+    if (user.status !== "active") {
+      throw ApiError.forbidden(
+        "Your account is not active. Please contact an administrator.",
+        "ACCOUNT_NOT_ACTIVE",
+      );
+    }
+
+    const { overview, transactions } = await Budget.employeeBudget(
+      user.user_id,
+      req.query,
+    );
+    return res.status(200).json({ overview, transactions });
+  } catch (err) {
+    next(err);
+  }
 };
 
 export const create = async (req, res, next) => {
