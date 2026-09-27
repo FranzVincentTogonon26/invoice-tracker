@@ -306,7 +306,7 @@ function LedgerRow({ row, removePending, onView, onDelete }) {
               ? EMPLOYEE_SOURCE_LABEL
               : row.sourceOfFunds
           }
-          tone={row.employeeRole === "employee" ? "warning" : undefined}
+          tone={row.employeeRole === "employee" ? "neutral" : undefined}
         />
       </td>
 

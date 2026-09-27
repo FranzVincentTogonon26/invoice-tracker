@@ -3,7 +3,6 @@ import { createPortal } from "react-dom";
 import { AnimatePresence, motion } from "framer-motion";
 import {
   Banknote,
-  CalendarDays,
   CreditCard,
   Eye,
   Landmark,
@@ -209,7 +208,7 @@ function TransactionSheet({ row, onClose }) {
     return () => window.removeEventListener("keydown", onKeyDown, true);
   }, [row, close]);
 
-  useLockBody(Boolean(row));
+
 
   const title = row?.description || "Issued budget";
 

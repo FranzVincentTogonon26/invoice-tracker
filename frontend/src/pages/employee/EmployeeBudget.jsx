@@ -58,8 +58,8 @@ const EmployeeBudget = () => {
   return (
     <div className="space-y-4 sm:space-y-5">
       <PageHeader
-        title="Expenses"
-        description="Track expenses against your budget"
+        title="Budget"
+        description="Track your budget and spending."
         actions={
           <div className="flex w-full flex-nowrap items-center gap-2 sm:w-auto justify-end">
             <Button

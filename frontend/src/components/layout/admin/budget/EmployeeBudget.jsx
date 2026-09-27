@@ -151,17 +151,17 @@ const EmployeeBudget = ({ employeeIssuedBudget = [], isLoading, onOpen }) => {
                 <div className="flex items-center gap-3">
                   <div
                     className={cn(
-                      "flex shrink-0 select-none items-center justify-center rounded-2xl bg-[var(--accent-soft)] font-semibold text-[var(--accent-strong)] ring-1 ring-[var(--accent)]/15 transition-transform duration-200 group-hover/row:scale-105",
-                      hasMultipleRefs ? "h-10 w-10 text-sm" : "h-9 w-9 text-sm",
+                      "flex shrink-0 select-none items-center justify-center rounded-full bg-[var(--accent-soft)] font-semibold text-[var(--accent-strong)] ring-1 ring-[var(--accent)]/15 transition-transform duration-200 group-hover/row:scale-105",
+                      hasMultipleRefs ? "h-9 w-9 text-sm" : "h-9 w-9 text-sm",
                     )}
                   >
                     {group.name?.[0]?.toUpperCase() || "?"}
                   </div>
                   <div className="min-w-0 flex-1">
-                    <p className="truncate text-base font-semibold text-[var(--ink)]">
+                    <p className="truncate text-sm font-semibold text-[var(--ink)]">
                       {group.name}
                     </p>
-                    <p className="mt-0.5 truncate text-sm text-[var(--ink-muted)]">
+                    <p className="mt-0.5 truncate text-xs text-[var(--ink-muted)]">
                       <span className="tabular-nums">
                         {group.budgets.length}{" "}
                         {group.budgets.length === 1 ? "budget" : "budgets"} ·{" "}
@@ -179,7 +179,7 @@ const EmployeeBudget = ({ employeeIssuedBudget = [], isLoading, onOpen }) => {
                       )}
                     </p>
                   </div>
-                  <span className="hidden shrink-0 items-center gap-1 rounded-full bg-[var(--surface-2)] px-2.5 py-1 text-xs font-semibold text-[var(--ink-muted)] sm:inline-flex">
+                  <span className="hidden shrink-0 items-center gap-1 rounded-full bg-[var(--surface-2)] px-2.5 py-1 text-xs  text-[var(--ink-muted)] sm:inline-flex">
                     Latest {formatDate(singleRef?.recent_date)}
                   </span>
                   <span className="shrink-0 font-display text-base font-semibold text-[var(--ink)] tabular-nums transition-colors duration-200 group-hover/row:text-[var(--accent-strong)]">

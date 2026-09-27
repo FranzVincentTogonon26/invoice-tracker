@@ -128,6 +128,11 @@ CREATE TABLE IF NOT EXISTS issued_budget (
     amount        DECIMAL(12,2) NOT NULL,
     description   TEXT NOT NULL,
     method        VARCHAR(255) NOT NULL,
+    receipt_id    UUID
+                  REFERENCES receipt(id)
+                  ON DELETE SET NULL,
+    image_url     TEXT,
+    receipt_date  TIMESTAMPTZ,
     notes         TEXT,
     isMark        BOOLEAN NOT NULL DEFAULT FALSE,
     created_at    TIMESTAMPTZ NOT NULL DEFAULT NOW(),
@@ -222,6 +227,8 @@ CREATE TABLE IF NOT EXISTS expenses (
                    REFERENCES users(user_id)
                    ON DELETE CASCADE,
     description    TEXT NOT NULL,
+    flag           INTEGER NOT NULL DEFAULT 0
+                   CHECK (flag IN (0, 1)),
     category_id    UUID
                    REFERENCES category(category_id)
                    ON DELETE SET NULL,

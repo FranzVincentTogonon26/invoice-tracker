@@ -7,13 +7,14 @@ import {
 // Column proportions from the design spec — Employee gets the most space
 // because it anchors the row. Percentages sum to 100% so `table-fixed` never
 // overflows the scroll container (sizing verified against the 960px min-width).
-const COLUMN_WIDTHS = ["13%", "10%", "8%", "6%", "7%", "10%", "7%", "6%", "5%"];
+const COLUMN_WIDTHS = ["13%", "10%", "6%", "8%", "7%", "10%", "7%", "6%", "5%"];
 
 const HEADERS = [
   { label: "Employee" },
   { label: "Description" },
-  { label: "Source" },
+
   { label: "Amount", align: "right" },
+  { label: "Source", align: "left" },
   { label: "Method" },
   { label: "Notes" },
   { label: "Date Issued" },

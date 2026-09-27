@@ -2,7 +2,7 @@ import { Badge, StatusBadge } from "../../../ui/Badge";
 import { MethodIcon } from "../../../ui/Select";
 import { cn, formatDate, formatMoney, formatTime } from "../../../../lib/utils";
 import { ApproverCell } from "./ApproverCell";
-import { PaymentMethod, methodLabel } from "./PaymentMethod";
+import { methodLabel } from "./PaymentMethod";
 import { TransactionActions } from "./TransactionActions";
 
 /**
@@ -25,12 +25,12 @@ export function TransactionRow({
           aria-hidden
           className="absolute inset-y-3 left-0 w-0.5 rounded-full bg-[var(--accent-strong)] opacity-0 transition-opacity duration-150 group-hover:opacity-100"
         />
-        <p className="text-base font-semibold leading-snug text-[var(--ink)]">
+        <p className="text-sm font-semibold leading-snug text-[var(--ink)]">
           {t.description}
         </p>
 
         {t.label && (
-          <p className="mt-1 flex items-center gap-1.5 text-sm text-[var(--ink-muted)]">
+          <p className="mt-1 flex items-center gap-1.5 text-xs text-[var(--ink-muted)]">
             <span className="min-w-0 truncate capitalize">{t.label}</span>
           </p>
         )}
@@ -45,8 +45,11 @@ export function TransactionRow({
 
       {/* Payment Method */}
       <td className="px-4 py-3.5 align-middle">
-        <Badge tone="neutral" className="capitalize">
-          <PaymentMethod method={t.method} />
+        <Badge
+          tone="accent"
+          className="max-w-full capitalize  truncate text-xs"
+        >
+          {t.method}
         </Badge>
       </td>
 

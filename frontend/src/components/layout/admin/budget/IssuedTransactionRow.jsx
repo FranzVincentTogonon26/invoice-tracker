@@ -2,7 +2,7 @@ import { HandCoins } from "lucide-react";
 import { Badge, StatusBadge } from "../../../ui/Badge";
 import { MethodIcon } from "../../../ui/Select";
 import { cn, formatDate, formatMoney, formatTime } from "../../../../lib/utils";
-import { PaymentMethod, methodLabel } from "./PaymentMethod";
+import { methodLabel } from "./PaymentMethod";
 import { IssuedTransactionActions } from "./IssuedTransactionActions";
 
 /* ── Cell building blocks ────────────────────────────────────────────────── */
@@ -29,7 +29,7 @@ export function EmployeeCell({ name, role, avatarUrl, size = "md" }) {
           alt=""
           className={cn(
             "shrink-0 rounded-full object-cover ring-1 ring-[var(--border)]",
-            compact ? "h-8 w-8" : "h-9 w-9",
+            compact ? "h-8 w-8" : "h-8 w-8",
           )}
         />
       ) : (
@@ -37,7 +37,7 @@ export function EmployeeCell({ name, role, avatarUrl, size = "md" }) {
           aria-hidden
           className={cn(
             "flex shrink-0 items-center justify-center rounded-full bg-[var(--accent-soft)] font-semibold text-[var(--accent-strong)]",
-            compact ? "h-8 w-8 text-xs" : "h-10 w-10 text-sm",
+            compact ? "h-8 w-8 text-xs" : "h-9 w-9 text-sm",
           )}
         >
           {initialsOf(name) || "?"}
@@ -47,7 +47,7 @@ export function EmployeeCell({ name, role, avatarUrl, size = "md" }) {
         <p
           className={cn(
             "truncate font-semibold leading-tight text-[var(--ink)]",
-            compact ? "text-sm" : "text-base",
+            compact ? "text-sm" : "text-sm",
           )}
         >
           {name || "Unknown"}
@@ -55,7 +55,7 @@ export function EmployeeCell({ name, role, avatarUrl, size = "md" }) {
         <p
           className={cn(
             "mt-0.5 truncate capitalize text-[var(--ink-muted)]",
-            compact ? "text-xs" : "text-sm",
+            compact ? "text-xs" : "text-xs",
           )}
         >
           {/* users.role is CHECK-constrained to 'admin' | 'employee' */}
@@ -68,11 +68,11 @@ export function EmployeeCell({ name, role, avatarUrl, size = "md" }) {
 
 function NotesCell({ notes }) {
   if (!notes)
-    return <span className="text-[13px] text-[var(--ink-muted)]">—</span>;
+    return <span className="text-[12px] text-[var(--ink-muted)]">—</span>;
   return (
     <p
       title={notes}
-      className="line-clamp-2 whitespace-normal break-words text-[13px] leading-relaxed text-[var(--ink-muted)]"
+      className="line-clamp-2 whitespace-normal break-words text-[12px] leading-relaxed text-[var(--ink-muted)]"
     >
       {notes}
     </p>
@@ -118,19 +118,22 @@ export function IssuedTransactionRow({ transaction: t, onAction }) {
           {t.description}
         </p>
       </td>
-      <td className="px-4 py-3.5 align-middle">
-        <span className="text-sm leading-snug text-[var(--ink)]">
-          {t.source_of_funds}
-        </span>
-      </td>
       <td className="px-4 py-3.5 text-right align-middle">
         <span className="text-sm font-semibold tabular-nums text-[var(--ink)]">
           {formatMoney(t.amount)}
         </span>
       </td>
       <td className="px-4 py-3.5 align-middle">
-        <Badge tone="neutral" className="max-w-full">
-          <PaymentMethod method={t.method} />
+        <Badge tone="neutral" className="max-w-full  truncate text-xs">
+          {t.source_of_funds}
+        </Badge>
+      </td>
+      <td className="px-4 py-3.5 align-middle">
+        <Badge
+          tone="accent"
+          className="max-w-full capitalize  truncate text-xs"
+        >
+          {t.method}
         </Badge>
       </td>
       <td className="px-4 py-3.5 align-middle">

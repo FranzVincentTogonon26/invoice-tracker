@@ -48,7 +48,7 @@ const CategoryPanel = ({
         <thead>
           <tr className="sticky top-0 z-10 bg-[var(--surface-2)] type-eyebrow text-[var(--ink-muted)]">
             <th className="px-4 py-2.5 text-left font-semibold">Category</th>
-            <th className="px-4 py-2.5 text-right font-semibold">
+            <th className="px-4 py-2.5 truncate text-right font-semibold">
               Date Created
             </th>
             <th className="px-4 py-2.5 text-right font-semibold" />
@@ -62,18 +62,15 @@ const CategoryPanel = ({
             >
               <td
                 title={category.category_name}
-                className="max-w-[240px] truncate px-4 py-2 text-sm font-semibold text-[var(--ink)]"
+                className="max-w-[240px] truncate px-4 py-2 lg:text-sm text-xs font-semibold text-[var(--ink)]"
               >
                 {category.category_name ?? "—"}
               </td>
-              <td className="px-4 py-2 text-right text-sm text-[var(--ink-muted)] whitespace-nowrap">
+              <td className="px-4 py-2 text-right lg:text-sm text-xs text-[var(--ink-muted)] whitespace-nowrap">
                 {formatDate(category.created_at)}
               </td>
               <td className="px-4 py-2 text-right whitespace-nowrap">
                 {category.expense_count > 0 ? (
-                  // Category is referenced by expense rows — deletion would
-                  // orphan those rows (ON DELETE SET NULL), so the delete
-                  // action is replaced with an in-use check.
                   <span
                     title={`Used by ${category.expense_count} ${
                       category.expense_count === 1 ? "expense" : "expenses"

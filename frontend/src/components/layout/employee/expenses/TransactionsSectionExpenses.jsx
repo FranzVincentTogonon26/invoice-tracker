@@ -31,16 +31,18 @@ import {
   formatDateRange,
   formatMoney,
   formatTime,
+  isSameDay,
   matchesDayRange,
   methodLabel,
+  startOfDay,
   toDate,
+  addDays,
 } from "../../../../lib/utils";
 import DateRangePicker from "../../../ui/DateRangePicker";
 import ConfirmActionDialog from "../../admin/expenses/ConfirmActionDialog";
 import { ExpenseStatusBadge } from "../../admin/expenses/ExpensesTable";
 import EmployeeExpenseDetailsModal from "./EmployeeExpenseDetailsModal";
 import { useExpensesMutations } from "../../../../hooks/useExpenses";
-import { useLockBody } from "../../../../hooks/useLockBody";
 
 const formatShortDate = (value) => {
   const parsed = toDate(value);
@@ -95,6 +97,32 @@ const isSheetActionable = (row) => row?.kind === "expense";
 // receipt record or carries a stored receipt file URL (image or PDF).
 const hasSheetReceipt = (row) => Boolean(row?.receiptId || row?.imageUrl);
 const PAGE_SIZE = 50;
+
+function getDateGroupLabel(date) {
+  const txDate = startOfDay(toDate(date));
+  const today = startOfDay(new Date());
+  const yesterday = addDays(today, -1);
+
+  if (isSameDay(txDate, today)) return "Today";
+  if (isSameDay(txDate, yesterday)) return "Yesterday";
+  return "Last days";
+}
+
+function groupTransactionsByDate(rows) {
+  const groups = new Map();
+  const groupOrder = ["Today", "Yesterday", "Last days"];
+
+  for (const tx of rows) {
+    const label = getDateGroupLabel(tx.date);
+    if (!groups.has(label)) groups.set(label, []);
+    groups.get(label).push(tx);
+  }
+
+  return groupOrder
+    .filter((label) => groups.has(label) && groups.get(label).length > 0)
+    .map((label) => ({ label, transactions: groups.get(label) }));
+}
+
 const COLUMN_WIDTHS = ["16%", "28%", "18%", "16%", "22%", "5%"];
 
 function TransactionCard({ tx, meta, disabled, onOpen }) {
@@ -760,7 +788,7 @@ export const TransactionsSectionExpenses = ({
         )}
       </div>
 
-      <div className="block md:hidden mt-4 space-y-2.5">
+      <div className="block md:hidden mt-4 space-y-4">
         {isLoading ? (
           <div className="space-y-2.5">
             {[1, 2, 3].map((i) => (
@@ -799,22 +827,34 @@ export const TransactionsSectionExpenses = ({
                     : "No transactions recorded yet."
             }
           />
-        ) : (
-          pageRows.map((tx) => {
-            const meta = TYPE_CONFIG[tx.kind] ?? TYPE_CONFIG.expense;
+        ) : (() => {
+          const dateGroups = groupTransactionsByDate(pageRows);
+          return (
+            <>
+              {dateGroups.map(({ label, transactions }) => (
+                <div key={label} className="space-y-2.5">
+                  <h4 className="px-1 text-[11px] font-semibold uppercase tracking-wider text-[var(--ink-muted)]">
+                    {label}
+                  </h4>
+                  {transactions.map((tx) => {
+                    const meta = TYPE_CONFIG[tx.kind] ?? TYPE_CONFIG.expense;
 
-            return (
-              <TransactionCard
-                key={`${tx.kind}-${tx.id}`}
-                tx={tx}
-                meta={meta}
-                disabled={confirmPending}
-                onOpen={() => setSheetRow(tx)}
-                onDelete={() => setDeleteRow(tx)}
-              />
-            );
-          })
-        )}
+                    return (
+                      <TransactionCard
+                        key={`${tx.kind}-${tx.id}`}
+                        tx={tx}
+                        meta={meta}
+                        disabled={confirmPending}
+                        onOpen={() => setSheetRow(tx)}
+                        onDelete={() => setDeleteRow(tx)}
+                      />
+                    );
+                  })}
+                </div>
+              ))}
+            </>
+          );
+        })()}
       </div>
 
       {!isLoading && filteredTransactions.length > PAGE_SIZE && (

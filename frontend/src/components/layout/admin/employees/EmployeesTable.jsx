@@ -97,7 +97,13 @@ function budgetBreakdown(employee) {
  *   - spent > issued → the bar pins to 100% in the danger tier so an
  *     over-spent row can never read as a green "success" check.
  */
-function RemainingProgress({ remaining, issued, share, overSpent = false, label }) {
+function RemainingProgress({
+  remaining,
+  issued,
+  share,
+  overSpent = false,
+  label,
+}) {
   // The bar has no issue to track against (issued === 0) → empty track.
   const noIssued = issued <= 0;
   // Spent more than issued → danger tier (no success check).
@@ -246,17 +252,17 @@ function EmployeeRow({ employee, pending, onAction }) {
 
       {/* Issued Budget */}
       <td className="px-4 py-4 text-right align-middle">
-        <p className="text-sm font-semibold tabular-nums text-[var(--ink)]">
+        <p className="text-sm font-medium tabular-nums text-[var(--ink)]">
           {formatMoney(issued)}
         </p>
       </td>
 
       <td className="px-4 py-4 text-right align-middle">
-        <p className="text-sm font-semibold tabular-nums text-[var(--ink)]">
+        <p className="text-sm font-medium tabular-nums text-[var(--ink)]">
           {formatMoney(spent)}
         </p>
         {overSpent && (
-          <span className="mt-1 inline-flex items-center gap-1 rounded-full bg-[var(--danger)]/12 px-2 py-0.5 text-xs font-semibold leading-none text-[var(--danger)]">
+          <span className="mt-1 inline-flex items-center gap-1 rounded-full bg-[var(--danger)]/12 px-2 py-0.5 text-xs font-medium leading-none text-[var(--danger)]">
             <AlertCircle size={10} aria-hidden />
             Over budget
           </span>
@@ -267,7 +273,7 @@ function EmployeeRow({ employee, pending, onAction }) {
         <div className="flex items-baseline justify-between gap-2">
           <p
             className={cn(
-              "text-sm font-semibold tabular-nums",
+              "text-sm font-medium tabular-nums",
               overSpent ? "text-[var(--danger)]" : "text-[var(--ink)]",
             )}
           >
@@ -302,7 +308,7 @@ function EmployeeRow({ employee, pending, onAction }) {
       <td className="px-4 py-4 align-middle">
         {employee.created_at ? (
           <div>
-            <p className="text-sm font-medium leading-none tabular-nums text-[var(--ink)]">
+            <p className="text-sm leading-none tabular-nums text-[var(--ink)]">
               {formatDate(employee.created_at)}
             </p>
             <p className="mt-1 text-xs leading-none text-[var(--ink-muted)]">

@@ -24,9 +24,12 @@ import {
   formatDateRange,
   formatMoney,
   formatTime,
+  isSameDay,
   matchesDayRange,
   methodLabel,
+  startOfDay,
   toDate,
+  addDays,
 } from "../../../../lib/utils";
 import DateRangePicker from "../../../ui/DateRangePicker";
 
@@ -92,6 +95,31 @@ const TYPE_CONFIG = {
 };
 
 const PAGE_SIZE = 50;
+
+function getDateGroupLabel(date) {
+  const txDate = startOfDay(toDate(date));
+  const today = startOfDay(new Date());
+  const yesterday = addDays(today, -1);
+
+  if (isSameDay(txDate, today)) return "Today";
+  if (isSameDay(txDate, yesterday)) return "Yesterday";
+  return "Last days";
+}
+
+function groupTransactionsByDate(rows) {
+  const groups = new Map();
+  const groupOrder = ["Today", "Yesterday", "Last days"];
+
+  for (const tx of rows) {
+    const label = getDateGroupLabel(tx.date);
+    if (!groups.has(label)) groups.set(label, []);
+    groups.get(label).push(tx);
+  }
+
+  return groupOrder
+    .filter((label) => groups.has(label) && groups.get(label).length > 0)
+    .map((label) => ({ label, transactions: groups.get(label) }));
+}
 const COLUMN_WIDTHS = ["16%", "28%", "18%", "16%", "22%"];
 
 export const TransactionsSection = ({
@@ -363,7 +391,7 @@ export const TransactionsSection = ({
         )}
       </div>
       {/* ── CONTENT: MOBILE CARDS VIEW ── */}
-      <div className="block md:hidden mt-4 space-y-2.5">
+      <div className="block md:hidden mt-4 space-y-4">
         {isLoading ? (
           <div className="space-y-2.5">
             {[1, 2, 3].map((i) => (
@@ -402,65 +430,77 @@ export const TransactionsSection = ({
                     : "No transactions recorded yet."
             }
           />
-        ) : (
-          pageRows.map((tx) => {
-            const meta = TYPE_CONFIG[tx.kind] ?? TYPE_CONFIG.expense;
-            const isNegative = tx.kind === "expense";
-            const amountColor = isNegative
-              ? "text-[var(--danger)]"
-              : tx.kind === "issued"
-                ? "text-[var(--accent-strong)]"
-                : "text-[var(--ink)]";
+        ) : (() => {
+          const dateGroups = groupTransactionsByDate(pageRows);
+          return (
+            <>
+              {dateGroups.map(({ label, transactions }) => (
+                <div key={label} className="space-y-2.5">
+                  <h4 className="px-1 text-[11px] font-semibold uppercase tracking-wider text-[var(--ink-muted)]">
+                    {label}
+                  </h4>
+                  {transactions.map((tx) => {
+                    const meta = TYPE_CONFIG[tx.kind] ?? TYPE_CONFIG.expense;
+                    const isNegative = tx.kind === "expense";
+                    const amountColor = isNegative
+                      ? "text-[var(--danger)]"
+                      : tx.kind === "issued"
+                        ? "text-[var(--accent-strong)]"
+                        : "text-[var(--ink)]";
 
-            return (
-              <div
-                key={`${tx.kind}-${tx.id}`}
-                className="flex items-center justify-between gap-3 rounded-2xl border border-[var(--border)] bg-[var(--surface-2)]/60 px-3.5 py-3.5 transition-shadow hover:shadow-card"
-              >
-                {/* Left: Icon & Details matching requested mobile structure */}
-                <div className="flex items-center gap-3 min-w-0">
-                  <div className="min-w-0">
-                    <p className="truncate text-xs font-semibold leading-none text-[var(--ink)]">
-                      {tx.description || meta.label}
-                    </p>
-                    {/* Meta row: type · short date · method badge */}
-                    <p className="mt-1.5 flex min-w-0 items-center gap-1.5 text-[11px] font-medium leading-none text-[var(--ink-muted)]">
-                      <span className="shrink-0">
-                        {TYPE_LABEL_SHORT[tx.kind] ?? meta.label}
-                      </span>
-                      <span aria-hidden className="shrink-0 opacity-40">
-                        |
-                      </span>
-                      <span className="shrink-0 tabular-nums">
-                        {formatShortDate(tx.date)}
-                      </span>
-                      <span aria-hidden className="shrink-0 opacity-40">
-                        |
-                      </span>
-                      <span className="truncate text-[10px] type-eyebrow">
-                        {tx.method}
-                      </span>
-                    </p>
-                  </div>
-                </div>
+                    return (
+                      <div
+                        key={`${tx.kind}-${tx.id}`}
+                        className="flex items-center justify-between gap-3 rounded-2xl border border-[var(--border)] bg-[var(--surface-2)]/60 px-3.5 py-3.5 transition-shadow hover:shadow-card"
+                      >
+                        {/* Left: Icon & Details matching requested mobile structure */}
+                        <div className="flex items-center gap-3 min-w-0">
+                          <div className="min-w-0">
+                            <p className="truncate text-xs font-semibold leading-none text-[var(--ink)]">
+                              {tx.description || meta.label}
+                            </p>
+                            {/* Meta row: type · short date · method badge */}
+                            <p className="mt-1.5 flex min-w-0 items-center gap-1.5 text-[11px] font-medium leading-none text-[var(--ink-muted)]">
+                              <span className="shrink-0">
+                                {TYPE_LABEL_SHORT[tx.kind] ?? meta.label}
+                              </span>
+                              <span aria-hidden className="shrink-0 opacity-40">
+                                |
+                              </span>
+                              <span className="shrink-0 tabular-nums">
+                                {formatShortDate(tx.date)}
+                              </span>
+                              <span aria-hidden className="shrink-0 opacity-40">
+                                |
+                              </span>
+                              <span className="truncate text-[10px] type-eyebrow">
+                                {tx.method}
+                              </span>
+                            </p>
+                          </div>
+                        </div>
 
-                {/* Right: Amount & Status */}
-                <div className="text-right shrink-0">
-                  <p
-                    className={cn(
-                      "font-display text-sm font-semibold tabular-nums",
-                      amountColor,
-                    )}
-                  >
-                    {isNegative
-                      ? `-${formatMoney(tx.amount)}`
-                      : `+${formatMoney(tx.amount)}`}
-                  </p>
+                        {/* Right: Amount & Status */}
+                        <div className="text-right shrink-0">
+                          <p
+                            className={cn(
+                              "font-display text-sm font-semibold tabular-nums",
+                              amountColor,
+                            )}
+                          >
+                            {isNegative
+                              ? `-${formatMoney(tx.amount)}`
+                              : `+${formatMoney(tx.amount)}`}
+                          </p>
+                        </div>
+                      </div>
+                    );
+                  })}
                 </div>
-              </div>
-            );
-          })
-        )}
+              ))}
+            </>
+          );
+        })()}
       </div>
 
       {/* Pagination — footer strip under both the table and the mobile cards:
