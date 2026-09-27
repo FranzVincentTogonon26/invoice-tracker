@@ -30,19 +30,6 @@ import {
   toDate,
 } from "../../../../lib/utils";
 import DateRangePicker from "../../../ui/DateRangePicker";
-import { useLockBody } from "../../../../hooks/useLockBody";
-
-/**
- * Employee "My Budget" ledger — every `issued_budget` row the employee
- * received (joined through their own `budget_issued_reference`), scoped
- * server-side to the signed-in user. Read-only: issuing/cancelling budgets
- * stays an admin action, so rows only open the details sheet/modal — no
- * delete actions anywhere in this section.
- *
- * UI mirrors TransactionsSectionExpenses: same mobile card → bottom-sheet
- * slide-up, desktop table → centered details modal, same search, date range
- * and pager.
- */
 
 const formatShortDate = (value) => {
   const parsed = toDate(value);
@@ -304,8 +291,6 @@ function BudgetDetailsModal({ row, onClose }) {
     window.addEventListener("keydown", onKeyDown, true);
     return () => window.removeEventListener("keydown", onKeyDown, true);
   }, [row, close]);
-
-  useLockBody(Boolean(row));
 
   const title = row?.description || "Issued budget";
 

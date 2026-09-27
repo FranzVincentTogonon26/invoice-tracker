@@ -3,7 +3,6 @@ import { createPortal } from "react-dom";
 import { AnimatePresence, motion } from "framer-motion";
 import {
   AlertCircle,
-  CalendarDays,
   ChevronDown,
   Eye,
   ImageOff,
@@ -13,14 +12,8 @@ import {
 } from "lucide-react";
 import { Badge } from "../../../ui/Badge";
 import { Button } from "../../../ui/Button";
-import { MethodIcon } from "../../../ui/Select";
 import { useExpenseDetail } from "../../../../hooks/useExpenses";
-import {
-  formatDate,
-  formatMoney,
-  formatTime,
-  methodLabel,
-} from "../../../../lib/utils";
+import { formatDate, formatMoney, formatTime } from "../../../../lib/utils";
 import { isReceiptPdf, openReceiptFile } from "../../../../lib/receiptMedia";
 
 const DIALOG_EASE = [0.16, 1, 0.3, 1];
@@ -41,22 +34,6 @@ const formatQty = (value) => {
   return Number.isInteger(n) ? String(n) : String(Math.round(n * 100) / 100);
 };
 
-// One compact pill — the whole meta row, no labelled key/value wall.
-const MetaPill = ({ icon, children }) => (
-  <span className="inline-flex max-w-full items-center gap-1.5 rounded-full border border-[var(--border)] bg-[var(--surface)] px-3 py-1.5 text-xs font-medium text-[var(--ink-muted)]">
-    <span className="flex shrink-0 items-center">{icon}</span>
-    <span className="truncate">{children}</span>
-  </span>
-);
-
-/**
- * Employee "View expense" dialog — the lean counterpart of the admin details
- * modal: the recorded figures plus the receipt, and nothing else (no filed-by
- * row, no insights: the row already belongs to the person reading it).
- *
- * The receipt itemized lines sit behind a toggle so the default view stays
- * short instead of pushing the recorded details below the fold.
- */
 const EmployeeExpenseDetailsModal = ({ open, expense, onClose }) => {
   const titleId = useId();
   const itemsRegionId = useId();
@@ -182,40 +159,31 @@ const EmployeeExpenseDetailsModal = ({ open, expense, onClose }) => {
                 <section className="rounded-3xl border border-[var(--border)] bg-[var(--surface-2)]/50 p-4">
                   <div className="flex items-start justify-between gap-4">
                     <div className="min-w-0 flex-1">
-                      <p className="break-words text-sm font-semibold leading-snug text-[var(--ink)]">
+                      <p className="break-words text-sm leading-snug text-[var(--ink)]">
                         {row?.description || "Untitled expense"}
                       </p>
-                      <div className="mt-2 flex flex-wrap items-center gap-2">
-                        <Badge tone={status.tone} className="gap-1.5">
-                          <span className="h-1.5 w-1.5 rounded-full bg-current opacity-80" />
-                          {status.label}
-                        </Badge>
-                        {row?.category && (
-                          <Badge tone="accent" className="max-w-full">
-                            <span className="truncate">{row.category}</span>
-                          </Badge>
-                        )}
-                        <MetaPill icon={<CalendarDays size={13} aria-hidden />}>
-                          {formatDate(row?.date)}
-                        </MetaPill>
-                      </div>
                     </div>
                     <div className="shrink-0 text-right space-y-0.5">
                       <p className="sr-only">Amount</p>
                       <p className="font-display text-2xl font-semibold leading-none tracking-tight tabular-nums text-[var(--ink)]">
                         {formatMoney(toNumber(row?.amount))}
                       </p>
-                      <MetaPill
-                        icon={
-                          <MethodIcon
-                            method={row?.method}
-                            className="h-3.5 w-3.5"
-                          />
-                        }
-                      >
-                        {methodLabel(row?.method)}
-                      </MetaPill>
                     </div>
+                  </div>
+
+                  <div className="mt-2 flex flex-wrap items-center gap-2">
+                    <Badge tone={status.tone} className="gap-1.5">
+                      <span className="h-1.5 w-1.5 rounded-full bg-current opacity-80" />
+                      {status.label}
+                    </Badge>
+                    {row?.category && (
+                      <Badge tone="accent" className="max-w-full">
+                        <span className="truncate">{row.category}</span>
+                      </Badge>
+                    )}
+                    <Badge tone="neutral" className="max-w-full">
+                      <span className="truncate capitalize">{row?.method}</span>
+                    </Badge>
                   </div>
 
                   {row?.notes && (

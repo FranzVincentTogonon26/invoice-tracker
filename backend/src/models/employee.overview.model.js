@@ -110,7 +110,7 @@ class EmployeeOverview {
           e.status,
           br.label AS reference_label,
           e.reference_id,
-          COALESCE(e.expense_date::timestamptz, e.created_at) AS date,
+          e.created_at AS date,
           e.created_at AS created_at
         FROM expenses e
         LEFT JOIN category c ON c.category_id = e.category_id

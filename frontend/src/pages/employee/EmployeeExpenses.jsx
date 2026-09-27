@@ -6,6 +6,7 @@ import TransactionsSectionExpenses from "../../components/layout/employee/expens
 import { Button } from "../../components/ui/Button";
 import { useNavigate } from "react-router-dom";
 import { useEmployeeExpenses } from "../../hooks/useEmployeeExpenses";
+import { useState, useMemo, useCallback } from "react";
 
 const grid = {
   hidden: {},
@@ -46,6 +47,31 @@ const MiniStat = ({ icon: Icon, label, value, loading, iconClass, title }) => (
   </div>
 );
 
+// Maps an expense row from the API into the shape the ledger renders.
+// Kept in one place so local state and server sync stay identical.
+const toTransaction = (exp) => ({
+  kind: "expense",
+  id: exp.id,
+  description: exp.description,
+  date: exp.expense_date,
+  timeDate: exp.created_at,
+  amount: Number(exp.total_amount) || 0,
+  method: exp.payment_method,
+  status: exp.status,
+  reference_label: exp.reference_label || "",
+  notes: exp.notes || "",
+  category: exp.category_name || "",
+  category_name: exp.category_name,
+  // Everything the View expense modal needs: receipt (image + line items
+  // are fetched by id) and the source-of-funds label.
+  receiptId: exp.receipt_id,
+  imageUrl: exp.image_url || "",
+  sourceOfFunds: exp.reference_label || "",
+  employee: exp.created_by,
+  employeeRole: exp.created_by_role,
+  employeeAvatar: exp.created_by_avatar,
+});
+
 const EmployeeExpenses = () => {
   const nav = useNavigate();
   const { data, isLoading } = useEmployeeExpenses();
@@ -53,40 +79,42 @@ const EmployeeExpenses = () => {
   const totalExpenses = Number(data?.overview?.totalExpenses) || 0;
   const totalTransactions = Number(data?.overview?.totalTransactions) || 0;
   const totalBalance = Number(data?.overview?.totalBalance) || 0;
-  const expenses = data?.expenses ?? [];
 
-  // The ledger below lists live rows only: soft-deleted rows are parked in
-  // 'draft' by the row actions (and cancelled ones are voided), so both keep
-  // their database record but must not show up as normal expenses here.
-  const paidExpenses = expenses.filter((exp) => exp.status === "paid");
+  // The ledger lists live rows only: soft-deleted rows are parked in 'draft'
+  // by the row actions (and cancelled ones are voided), so both keep their
+  // database record but must not show up as normal expenses here.
+  const paidExpenses = useMemo(
+    () => (data?.expenses ?? []).filter((exp) => exp.status === "paid"),
+    [data?.expenses],
+  );
 
-  const transactions = paidExpenses.map((exp) => ({
-    kind: "expense",
-    id: exp.id,
-    description: exp.description,
-    date: exp.expense_date,
-    timeDate: exp.created_at,
-    amount: Number(exp.total_amount) || 0,
-    method: exp.payment_method,
-    status: exp.status,
-    reference_label: exp.reference_label || "",
-    notes: exp.notes || "",
-    category: exp.category_name || "",
-    category_name: exp.category_name,
-    // Everything the View expense modal needs: receipt (image + line items
-    // are fetched by id) and the source-of-funds label.
-    receiptId: exp.receipt_id,
-    imageUrl: exp.image_url || "",
-    sourceOfFunds: exp.reference_label || "",
-    employee: exp.created_by,
-    employeeRole: exp.created_by_role,
-    employeeAvatar: exp.created_by_avatar,
-  }));
+  const serverTransactions = useMemo(
+    () => paidExpenses.map(toTransaction),
+    [paidExpenses],
+  );
+
+  // Inline edits made from the transaction sheet, keyed by row id. They are
+  // overlaid on the server rows below so edits survive refetches, and rows the
+  // server no longer returns (deleted ones) drop out automatically.
+  const [localEdits, setLocalEdits] = useState({});
+
+  const transactions = useMemo(
+    () =>
+      serverTransactions.map((tx) =>
+        localEdits[tx.id] ? { ...tx, ...localEdits[tx.id] } : tx,
+      ),
+    [serverTransactions, localEdits],
+  );
 
   const isOverdrawn = totalBalance < -0.004;
   const StatusIcon = isOverdrawn ? CircleX : CircleAlert;
   const showStatus =
     !isLoading && (isOverdrawn || Math.abs(totalBalance) < 0.005);
+
+  // Handle transaction updates from the sheet (e.g., description edits)
+  const handleTransactionUpdate = useCallback((updatedTx) => {
+    setLocalEdits((prev) => ({ ...prev, [updatedTx.id]: updatedTx }));
+  }, []);
 
   return (
     <div className="space-y-4 sm:space-y-5">
@@ -203,6 +231,7 @@ const EmployeeExpenses = () => {
         <TransactionsSectionExpenses
           transactions={transactions}
           isLoading={isLoading}
+          onTransactionUpdate={handleTransactionUpdate}
         />
       </motion.div>
     </div>

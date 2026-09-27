@@ -28,6 +28,10 @@ export const expensesApi = {
   updateStatus: (id, status) =>
     apiClient.patch(`/expenses/${id}/status`, { status }).then((r) => r.data),
 
+  // Update expense description (inline editing)
+  updateDescription: (id, description) =>
+    apiClient.patch(`/expenses/${id}/description`, { description }).then((r) => r.data),
+
   // Removes a category (expense lines using it fall back to uncategorized).
   removeCategory: (id) =>
     apiClient.delete(`/expenses/category/${id}`).then((r) => r.data),

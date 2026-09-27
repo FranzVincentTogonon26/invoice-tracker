@@ -144,11 +144,10 @@ export const TransactionsSection = ({
   }, [search]);
 
   // The feed merges three tables, so never trust the incoming order: newest
-  // record first — by when it was ADDED (`created_at`), falling back to the
-  // displayed date. An expense booked for an older date still belongs on top
-  // when it was entered today.
+  // record first — by when it was ADDED (`created_at`). An expense booked for
+  // an older date still belongs on top when it was entered today.
   const sortedTransactions = useMemo(() => {
-    const addedAt = (tx) => toDate(tx.created_at ?? tx.date)?.getTime() ?? 0;
+    const addedAt = (tx) => toDate(tx.created_at)?.getTime() ?? 0;
     return [...transactions].sort((a, b) => addedAt(b) - addedAt(a));
   }, [transactions]);
 

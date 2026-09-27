@@ -5,6 +5,7 @@ import { validate } from "../utils/validate.js";
 import {
   createExpensesSchema,
   updateExpenseStatusSchema,
+  updateExpenseDescriptionSchema,
 } from "../validations/expenses.validation.js";
 import { deleteReceiptImage } from "../utils/receiptImage.js";
 
@@ -244,6 +245,35 @@ export const updateStatus = async (req, res, next) => {
     return res.status(200).json({
       expense,
       message: `Expense status updated to ${payload.status}.`,
+    });
+  } catch (err) {
+    next(err);
+  }
+};
+
+// Update expense description (inline editing from transaction sheet)
+export const updateDescription = async (req, res, next) => {
+  try {
+    const { id } = req.params;
+    if (!UUID_RE.test(id || ""))
+      throw ApiError.badRequest("Invalid expense id", "VALIDATION_ERROR");
+
+    const payload = validate(updateExpenseDescriptionSchema, req.body);
+
+    // Same ownership rule as detail / remove: an employee may only touch their
+    // own row (admins keep the full ledger), and a stranger sees "not found" —
+    // never a 403 that would confirm the id exists.
+    const existing = await Expenses.findExpenseById(id);
+    if (!existing || !canTouchRow(req, existing))
+      throw ApiError.notFound("Expense not found", "EXPENSE_NOT_FOUND");
+
+    const expense = await Expenses.updateExpenseDescription(id, payload.description);
+    if (!expense)
+      throw ApiError.notFound("Expense not found", "EXPENSE_NOT_FOUND");
+
+    return res.status(200).json({
+      expense,
+      message: "Description updated.",
     });
   } catch (err) {
     next(err);

@@ -32,6 +32,9 @@ router.get("/detail/:id", authMiddleware, expensesController.detail);
 // stays in the ledger and its status moves to 'draft' through this endpoint.
 router.patch("/:id/status", authMiddleware, expensesController.updateStatus);
 
+// Update expense description (inline editing from transaction sheet)
+router.patch("/:id/description", authMiddleware, expensesController.updateDescription);
+
 router.delete("/:id", authMiddleware, expensesController.remove);
 
 export default router;

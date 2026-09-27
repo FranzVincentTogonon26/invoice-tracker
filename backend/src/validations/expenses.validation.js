@@ -224,3 +224,12 @@ export const updateExpenseStatusSchema = z.object({
     message: "Invalid expense status",
   }),
 });
+
+// Description update for inline editing in the transaction sheet
+export const updateExpenseDescriptionSchema = z.object({
+  description: z
+    .string({ error: "Description is required" })
+    .trim()
+    .min(2, { message: "Description must be at least 2 characters" })
+    .max(200, { message: "Description is too long" }),
+});

@@ -18,7 +18,12 @@ import { Badge } from "../../../ui/Badge";
 import { Button } from "../../../ui/Button";
 import { MethodIcon } from "../../../ui/Select";
 import { useExpenseDetail } from "../../../../hooks/useExpenses";
-import { formatDate, formatMoney, formatTime, methodLabel } from "../../../../lib/utils";
+import {
+  formatDate,
+  formatMoney,
+  formatTime,
+  methodLabel,
+} from "../../../../lib/utils";
 import { isReceiptPdf, openReceiptFile } from "../../../../lib/receiptMedia";
 import { ExpenseStatusBadge } from "./ExpensesTable";
 

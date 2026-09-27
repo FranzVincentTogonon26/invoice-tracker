@@ -43,6 +43,7 @@ import ConfirmActionDialog from "../../admin/expenses/ConfirmActionDialog";
 import { ExpenseStatusBadge } from "../../admin/expenses/ExpensesTable";
 import EmployeeExpenseDetailsModal from "./EmployeeExpenseDetailsModal";
 import { useExpensesMutations } from "../../../../hooks/useExpenses";
+import { expensesApi } from "../../../../api/expenses";
 
 const formatShortDate = (value) => {
   const parsed = toDate(value);
@@ -185,7 +186,14 @@ function TransactionCard({ tx, meta, disabled, onOpen }) {
   );
 }
 
-function TransactionSheet({ row, pending, onClose, onView, onDelete }) {
+function TransactionSheet({
+  row,
+  pending,
+  onClose,
+  onView,
+  onDelete,
+  onUpdate,
+}) {
   const sheetRef = useRef(null);
   const actionable = isSheetActionable(row);
   const meta = TYPE_CONFIG[row?.kind] ?? TYPE_CONFIG.expense;
@@ -256,6 +264,7 @@ function TransactionSheet({ row, pending, onClose, onView, onDelete }) {
               close={close}
               onView={onView}
               onDelete={onDelete}
+              onUpdate={onUpdate}
             />
           </motion.div>
         </motion.div>
@@ -276,7 +285,64 @@ function TransactionSheetBody({
   close,
   onView,
   onDelete,
+  onUpdate,
 }) {
+  const [isEditing, setIsEditing] = useState(false);
+  const [description, setDescription] = useState(title || "");
+  const textareaRef = useRef(null);
+
+  // Sync description state when title prop changes (e.g., parent updates sheetRow)
+  useEffect(() => {
+    if (!isEditing) {
+      setDescription(title || "");
+    }
+  }, [title, isEditing]);
+
+  const handleSave = useCallback(async () => {
+    const trimmed = description.trim();
+    if (!trimmed || trimmed === title) {
+      setIsEditing(false);
+      return;
+    }
+
+    try {
+      await expensesApi.updateDescription(row.id, trimmed);
+      toast.success("Description updated");
+      // Update the parent's sheetRow state
+      onUpdate?.({ ...row, description: trimmed });
+      setIsEditing(false);
+    } catch (err) {
+      toast.error(err?.message || "Failed to update description");
+      setDescription(title);
+      setIsEditing(false);
+    }
+  }, [row.id, description, title, onUpdate]);
+
+  const handleBlur = useCallback(() => {
+    handleSave();
+  }, [handleSave]);
+
+  const handleKeyDown = useCallback(
+    (e) => {
+      if (e.key === "Enter" && !e.shiftKey) {
+        e.preventDefault();
+        handleSave();
+      } else if (e.key === "Escape") {
+        setDescription(title);
+        setIsEditing(false);
+      }
+    },
+    [title, handleSave],
+  );
+
+  const handleDoubleClick = useCallback(() => {
+    if (actionable && !pending) {
+      setIsEditing(true);
+      // Focus textarea after render
+      setTimeout(() => textareaRef.current?.focus(), 0);
+    }
+  }, [actionable, pending]);
+
   return (
     <>
       <div
@@ -295,7 +361,7 @@ function TransactionSheetBody({
         </span>
         <div className="min-w-0 flex-1">
           <p className="truncate font-display text-base font-semibold tracking-tight text-[var(--ink)]">
-            {title}
+            Expense details
           </p>
           <p className="mt-0.5 truncate text-xs tabular-nums text-[var(--ink-muted)]">
             {formatDate(row.date)}
@@ -312,27 +378,59 @@ function TransactionSheetBody({
         </button>
       </div>
       <div className="mt-4 space-y-3">
-        <div className="flex items-center justify-between gap-3 rounded-2xl border border-[var(--border)] bg-[var(--surface-2)]/60 px-4 py-3.5">
-          <div className="min-w-0">
-            <p className="type-eyebrow text-[var(--ink-muted)]">Amount</p>
-            <p className="mt-1 font-display text-2xl font-semibold leading-none tracking-tight tabular-nums text-[var(--ink)]">
-              {formatMoney(row.amount)}
-            </p>
-            <p className="mt-1.5 truncate text-xs text-[var(--ink-muted)]">
-              {[row.category, methodLabel(row.method)]
-                .filter(Boolean)
-                .join(" · ")}
-            </p>
+        <div className="space-y-2 rounded-2xl border border-[var(--border)] bg-[var(--surface-2)]/60 px-4 py-3.5">
+          <div className="border-b border-[var(--border)] py-3">
+            <p className="type-eyebrow text-[var(--ink-muted)]">Description</p>
+            {isEditing ? (
+              <textarea
+                ref={textareaRef}
+                value={description}
+                onChange={(e) => setDescription(e.target.value)}
+                onBlur={handleBlur}
+                onKeyDown={handleKeyDown}
+                autoFocus
+                rows={2}
+                className="mt-1.5 w-full min-h-[44px] rounded-lg border border-[var(--accent)] bg-[var(--surface)] px-3 py-2 text-sm text-[var(--ink)] placeholder-[var(--ink-muted)] focus:outline-none focus:ring-2 focus:ring-[var(--accent)]/30 resize-none"
+                placeholder="Enter description"
+              />
+            ) : (
+              <p
+                onDoubleClick={handleDoubleClick}
+                onTouchEnd={(e) => {
+                  // Handle double tap on mobile
+                  const now = Date.now();
+                  if (
+                    e.target.dataset.lastTap &&
+                    now - e.target.dataset.lastTap < 300
+                  ) {
+                    handleDoubleClick();
+                  }
+                  e.target.dataset.lastTap = now;
+                }}
+                className={cn(
+                  "mt-1.5 text-sm text-[var(--ink)]",
+                  actionable && !pending && "cursor-pointer hover:underline",
+                )}
+              >
+                {title || "—"}
+              </p>
+            )}
           </div>
-          {row.status && row.status !== "paid" && (
+          <div className="flex gap-3 items-center justify-between pt-3">
+            <div className="min-w-0">
+              <p className="type-eyebrow text-[var(--ink-muted)]">Amount</p>
+              <p className="mt-1 font-display text-2xl font-semibold leading-none tracking-tight tabular-nums text-[var(--ink)]">
+                {formatMoney(row.amount)}
+              </p>
+              <p className="mt-1.5 truncate text-xs text-[var(--ink-muted)]">
+                {[row.category, methodLabel(row.method)]
+                  .filter(Boolean)
+                  .join(" · ")}
+              </p>
+            </div>
             <ExpenseStatusBadge status={row.status} className="shrink-0" />
-          )}
+          </div>
         </div>
-        {row.notes && (
-          <p className="rounded-2xl border-l-2 border-[var(--accent)]/40 bg-[var(--surface-2)]/50 px-4 py-3 text-sm italic leading-relaxed text-[var(--ink-muted)]">
-            {row.notes}
-          </p>
-        )}
       </div>
       {actionable && (
         <div className="mt-4 space-y-2">
@@ -498,6 +596,7 @@ function RowActions({ row, pending, onView, onDelete }) {
 export const TransactionsSectionExpenses = ({
   transactions = [],
   isLoading = false,
+  onTransactionUpdate,
 }) => {
   const [search, setSearch] = useState("");
   const [debouncedSearch, setDebouncedSearch] = useState("");
@@ -827,34 +926,36 @@ export const TransactionsSectionExpenses = ({
                     : "No transactions recorded yet."
             }
           />
-        ) : (() => {
-          const dateGroups = groupTransactionsByDate(pageRows);
-          return (
-            <>
-              {dateGroups.map(({ label, transactions }) => (
-                <div key={label} className="space-y-2.5">
-                  <h4 className="px-1 text-[11px] font-semibold uppercase tracking-wider text-[var(--ink-muted)]">
-                    {label}
-                  </h4>
-                  {transactions.map((tx) => {
-                    const meta = TYPE_CONFIG[tx.kind] ?? TYPE_CONFIG.expense;
+        ) : (
+          (() => {
+            const dateGroups = groupTransactionsByDate(pageRows);
+            return (
+              <>
+                {dateGroups.map(({ label, transactions }) => (
+                  <div key={label} className="space-y-2.5">
+                    <h4 className="px-1 text-[11px] font-semibold uppercase tracking-wider text-[var(--ink-muted)]">
+                      {label}
+                    </h4>
+                    {transactions.map((tx) => {
+                      const meta = TYPE_CONFIG[tx.kind] ?? TYPE_CONFIG.expense;
 
-                    return (
-                      <TransactionCard
-                        key={`${tx.kind}-${tx.id}`}
-                        tx={tx}
-                        meta={meta}
-                        disabled={confirmPending}
-                        onOpen={() => setSheetRow(tx)}
-                        onDelete={() => setDeleteRow(tx)}
-                      />
-                    );
-                  })}
-                </div>
-              ))}
-            </>
-          );
-        })()}
+                      return (
+                        <TransactionCard
+                          key={`${tx.kind}-${tx.id}`}
+                          tx={tx}
+                          meta={meta}
+                          disabled={confirmPending}
+                          onOpen={() => setSheetRow(tx)}
+                          onDelete={() => setDeleteRow(tx)}
+                        />
+                      );
+                    })}
+                  </div>
+                ))}
+              </>
+            );
+          })()
+        )}
       </div>
 
       {!isLoading && filteredTransactions.length > PAGE_SIZE && (
@@ -879,6 +980,11 @@ export const TransactionsSectionExpenses = ({
         onClose={() => setSheetRow(null)}
         onView={setViewRow}
         onDelete={setDeleteRow}
+        onUpdate={(updatedRow) => {
+          setSheetRow(updatedRow);
+          // Let the page replace its local row so the ledger reflects the edit
+          onTransactionUpdate?.(updatedRow);
+        }}
       />
 
       <ConfirmActionDialog

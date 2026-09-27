@@ -243,10 +243,10 @@ class Expenses {
     return result.rows[0] ?? null;
   }
 
-  // Soft delete for the ledger: the row is kept and only its status moves.
-  // The employee "Delete expense" action parks the record back in 'draft'
-  // through here instead of removing it (see the expenses controller's
-  // `updateStatus`); `updated_at` is bumped so the change is traceable.
+// Soft delete for the ledger: the row is kept and only its status moves.
+// The employee "Delete expense" action parks the record back in 'draft'
+// through here instead of removing it (see the expenses controller's
+// `updateStatus`); `updated_at` is bumped so the change is traceable.
   static async updateExpenseStatus(id, status) {
     const result = await query(
       `UPDATE expenses
@@ -255,6 +255,19 @@ class Expenses {
         RETURNING id, description, total_amount::float8 AS total_amount,
                   status, image_url`,
       [id, status],
+    );
+    return result.rows[0] ?? null;
+  }
+
+  // Update expense description (for inline editing)
+  static async updateExpenseDescription(id, description) {
+    const result = await query(
+      `UPDATE expenses
+          SET description = $2, updated_at = NOW()
+        WHERE id = $1
+        RETURNING id, description, total_amount::float8 AS total_amount,
+                  status, image_url`,
+      [id, description],
     );
     return result.rows[0] ?? null;
   }
@@ -695,7 +708,7 @@ class Expenses {
             e.id,
             e.description,
             e.total_amount::float8 AS total_amount,
-            e.expense_date::text AS expense_date,
+            e.created_at::text AS expense_date,
             e.payment_method,
             e.status,
             e.notes,
@@ -717,7 +730,7 @@ class Expenses {
          LEFT JOIN users u ON u.user_id = e.user_id
          LEFT JOIN budget_reference br ON br.reference_id = e.reference_id
          ${where.length ? `WHERE ${where.join(" AND ")}` : ""}
-         ORDER BY e.expense_date DESC, e.created_at DESC`,
+         ORDER BY e.created_at DESC`,
       params,
     );
 
