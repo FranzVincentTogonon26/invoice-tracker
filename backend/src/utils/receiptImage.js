@@ -1,15 +1,17 @@
-// Scanned receipts are persisted here instead of inside the browser.
+// Receipt images handed in with an expense are persisted here instead of
+// inside the browser.
 //
-// The "Confirm Receipt" flow parks the scanned draft (lines, totals, image) in
-// localStorage until the Add Expenses form is saved. A multi-megabyte photo
-// becomes a ~1.33× bigger base64 data URL, which blows the ~5MB localStorage
-// quota — and the draft used to be saved without its image, so
-// `expenses.image_url` never received the attachment.
+// The "Confirm Receipt" flow parks the scanned draft (lines, totals, vendor)
+// in localStorage until the Add Expenses form is saved — the image itself is
+// held in memory and only reaches the server once "Save expenses" uploads the
+// batch (`POST /expenses/receipt-images`), so a dropped-but-discarded receipt
+// never leaves a file behind. A multi-megabyte photo converted to a base64
+// data URL would blow the ~5MB localStorage quota, so the draft only ever
+// carries this file's public URL.
 //
-// Storing the upload on disk keeps the draft tiny: it carries only this file's
-// public URL. Files live in `<backend>/uploads/receipts` and `app.js` serves
-// them read-only at `/api/uploads/...` — the same `/api` origin the frontend
-// already proxies for every other call.
+// Files live in `<backend>/uploads/receipts` and `app.js` serves them read-only
+// at `/api/uploads/...` — the same `/api` origin the frontend already proxies
+// for every other call.
 import { randomUUID } from "node:crypto";
 import fs from "node:fs/promises";
 import path from "node:path";
@@ -52,11 +54,12 @@ const extensionFor = (mimeType, originalName) => {
 };
 
 /**
- * Writes one scanned upload to disk and returns the public URL that
+ * Writes one held receipt file to disk and returns the public URL that
  * `expenses.image_url` should store (`/api/uploads/receipts/<uuid>.<ext>`).
  *
- * Throws a 500 ApiError when the file cannot be stored: the scan fails instead
- * of continuing without the attachment the admin asked to keep.
+ * Throws a 500 ApiError when the file cannot be stored — the calling request
+ * fails instead of continuing without the attachment the admin asked to keep
+ * (the batch controller rolls back every file it already wrote).
  */
 export const saveReceiptImage = async ({ buffer, mimeType, originalName }) => {
   const fileName = `${randomUUID()}.${extensionFor(mimeType, originalName)}`;
@@ -75,8 +78,9 @@ export const saveReceiptImage = async ({ buffer, mimeType, originalName }) => {
 };
 
 /**
- * Removes a file saved by `saveReceiptImage` (used when the scan that stored it
- * failed). Only URLs minted here are accepted, so a stray value can never make
+ * Removes a file saved by `saveReceiptImage` (used when a save-time batch
+ * upload fails halfway, and when the last expense row pointing at it is
+ * deleted). Only URLs minted here are accepted, so a stray value can never make
  * the API delete something else out of the uploads folder.
  */
 export const deleteReceiptImage = async (publicUrl) => {

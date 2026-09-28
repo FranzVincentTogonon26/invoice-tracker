@@ -7,7 +7,7 @@ import {
   updateExpenseStatusSchema,
   updateExpenseDescriptionSchema,
 } from "../validations/expenses.validation.js";
-import { deleteReceiptImage } from "../utils/receiptImage.js";
+import { deleteReceiptImage, saveReceiptImage } from "../utils/receiptImage.js";
 
 const UUID_RE =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -150,6 +150,38 @@ export const create = async (req, res, next) => {
       message: `${rows.length} expense line${rows.length === 1 ? "" : "s"} saved.`,
     });
   } catch (err) {
+    next(err);
+  }
+};
+
+// POST /expenses/receipt-images — the deferred half of the scan flow. The
+// browser parks every picked receipt in memory while the admin reviews the
+// form; this endpoint is called ONCE on "Save expenses" with every held file
+// (`files[]`), so nothing is written to `uploads/receipts` before that
+// confirmation and no scan can leave an orphan behind when the form is
+// discarded. Each file is stored through `saveReceiptImage` and the response
+// mirrors the multipart order (`images[i]` belongs to `files[i]`), which lets
+// the client zip every URL back onto its own expense line. If any write
+// fails, the files already stored in this batch are removed again so a failed
+// save never leaves a partial set behind.
+export const uploadReceiptImages = async (req, res, next) => {
+  const stored = [];
+  try {
+    const images = [];
+
+    for (const file of req.files) {
+      const image_url = await saveReceiptImage({
+        buffer: file.buffer,
+        mimeType: file.mimetype,
+        originalName: file.originalname,
+      });
+      stored.push(image_url);
+      images.push({ file_name: file.originalname ?? "", image_url });
+    }
+
+    return res.status(201).json({ images });
+  } catch (err) {
+    await Promise.all(stored.map((url) => deleteReceiptImage(url)));
     next(err);
   }
 };
@@ -334,6 +366,37 @@ export const markEmployeePaid = async (req, res, next) => {
       `Only a draft expense can be moved back to paid (current status: ${existing.status}).`,
       "EXPENSE_NOT_DRAFT",
     );
+  } catch (err) {
+    next(err);
+  }
+};
+
+// Admin approval for a flagged expense ("Approve flag" inside the
+// flaggedNotice of the View expense modal): clears `expenses.flag` back to 0.
+// Idempotent — an already-cleared row still answers 200 so a double click or a
+// stale table never surfaces as an error.
+export const clearFlag = async (req, res, next) => {
+  try {
+    const { id } = req.params;
+    if (!UUID_RE.test(id || ""))
+      throw ApiError.badRequest("Invalid expense id", "VALIDATION_ERROR");
+
+    const existing = await Expenses.findExpenseById(id);
+    if (!existing)
+      throw ApiError.notFound("Expense not found", "EXPENSE_NOT_FOUND");
+
+    if (Number(existing.flag) !== 1) {
+      return res.status(200).json({
+        expense: { id: existing.id, flag: 0 },
+        message: "Flag already cleared.",
+      });
+    }
+
+    const expense = await Expenses.clearExpenseFlag(id);
+    return res.status(200).json({
+      expense,
+      message: "Flag approved and cleared.",
+    });
   } catch (err) {
     next(err);
   }

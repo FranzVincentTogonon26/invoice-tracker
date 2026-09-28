@@ -58,6 +58,12 @@ const toTransaction = (exp) => ({
   amount: Number(exp.total_amount) || 0,
   method: exp.payment_method,
   status: exp.status,
+  // Backdated marker set by the backend (`expenses.flag = 1` when an
+  // employee line is dated before their first issued budget). Exposed as
+  // both `flag` (raw) and `flagged` (boolean) so the ledger can highlight
+  // the row with a warning tone.
+  flag: Number(exp.flag) || 0,
+  flagged: Number(exp.flag) === 1,
   reference_label: exp.reference_label || "",
   notes: exp.notes || "",
   category: exp.category_name || "",

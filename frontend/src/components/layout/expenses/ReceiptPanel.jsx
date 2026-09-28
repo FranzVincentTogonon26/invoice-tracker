@@ -51,8 +51,12 @@ const ReceiptPanel = ({
   onRemoveItem,
   onAddItem,
 }) => {
+  // The preview card only replaces the dropzone once a file has actually been
+  // picked (held locally — the scan stores nothing server-side). A failed scan
+  // reverts the panel to the dropzone so the receipt can be re-scanned; the
+  // error shows in the shared alert box.
   const attachment =
-    receipt.imageUrl && !scanFailed ? (
+    receipt.localPreviewUrl && !scanFailed ? (
       <ReceiptPreview
         receipt={receipt}
         scanning={scanning}

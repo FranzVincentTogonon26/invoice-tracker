@@ -3,7 +3,6 @@ import ApiError from "../utils/ApiError.js";
 import { validate } from "../utils/validate.js";
 import { expenseSuggestSchema } from "../validations/ai.validation.js";
 import * as Service from "../services/geminiService.js";
-import { deleteReceiptImage, saveReceiptImage } from "../utils/receiptImage.js";
 
 // The model the admin picked in the scan panel's "Source" dropdown — the
 // browser keeps it in localStorage ("gemini_model") and sends it on every AI
@@ -11,18 +10,15 @@ import { deleteReceiptImage, saveReceiptImage } from "../utils/receiptImage.js";
 // env/built-in default when the header is missing or malformed.
 const requestedModel = (req) => req.get("x-gemini-model");
 
+// POST /ai/receipt-parse — PARSE ONLY: the upload is held in memory by multer
+// (middleware/upload.js uses memoryStorage) and never written to disk here.
+// The receipt image is only stored when the Add Expenses form is actually
+// saved (`POST /expenses/receipt-images` uploads every held file at once), so
+// a dropped-but-discarded receipt can no longer leave an orphan file behind
+// in `uploads/receipts`, and nothing lands in that folder before the admin
+// confirms "Save expenses".
 export const extractReceipt = async (req, res, next) => {
-  let imageUrl = "";
   try {
-    // Store the upload before asking Gemini: the file is what
-    // `expenses.image_url` will point at, so a storage failure has to fail the
-    // scan (there would be nothing to fall back to).
-    imageUrl = await saveReceiptImage({
-      buffer: req.file.buffer,
-      mimeType: req.file.mimetype,
-      originalName: req.file.originalname,
-    });
-
     const data = await Service.generateReceipt({
       buffer: req.file.buffer,
       mimeType: req.file.mimetype,
@@ -32,18 +28,12 @@ export const extractReceipt = async (req, res, next) => {
     return res.status(200).json({
       data: {
         ...data,
-        // Public URL of the stored scan — the draft carries this short string
-        // through localStorage and the Add Expenses save writes it onto
-        // `expenses.image_url`, so photo size never touches the quota again.
-        image_url: imageUrl,
         // Fallback label for the draft. The browser knows the picked file's
         // real name and prefers its own copy when it has one.
         file_name: req.file.originalname ?? "",
       },
     });
   } catch (err) {
-    // Don't leave the just-stored file behind when the parse failed.
-    if (imageUrl) await deleteReceiptImage(imageUrl);
     next(err);
   }
 };

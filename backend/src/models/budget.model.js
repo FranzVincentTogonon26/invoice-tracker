@@ -1,4 +1,4 @@
-import { query } from "../config/db.js";
+import { query, withTransaction } from "../config/db.js";
 
 class Budget {
   // Budget Overview
@@ -122,6 +122,116 @@ class Budget {
     return result.rows[0];
   }
 
+  // Finds the reusable parent row for an issuance: the OPEN
+  // `budget_issued_reference` for this exact employee + budget source, if one
+  // exists. Same-reference top-ups reuse it so repeated issues never stack up
+  // duplicate parent rows. Returns null when there is nothing to reuse (no row
+  // yet, or only closed/cancelled rows) so the caller inserts a fresh parent.
+  static async findOpenIssuedReference({ reference_id, user_id }) {
+    const result = await query(
+      `SELECT *
+         FROM budget_issued_reference
+        WHERE user_id = $1
+          AND reference_id = $2
+          AND status = 'open'
+        ORDER BY created_at DESC
+        LIMIT 1`,
+      [user_id, reference_id],
+    );
+    return result.rows[0] ?? null;
+  }
+
+  // Atomically issues a budget to an employee without duplicating the parent
+  // row: reuses the OPEN `budget_issued_reference` for this
+  // (user_id, reference_id) pair when one exists, otherwise inserts it, then
+  // inserts the `issued_budget` child row. The whole pair runs in ONE
+  // transaction so a failed child insert can never orphan a parent row; the
+  // re-select is locked (FOR UPDATE) and a partial unique index (migration
+  // 003) plus the 23505-catch below keep two concurrent submits from both
+  // inserting. Resolves `{ issuedReference, issuedBudget, reused }`.
+  static async issueBudgetToEmployee({
+    reference_id,
+    user_id,
+    amount,
+    description,
+    method,
+    note,
+  }) {
+    return withTransaction(async (client) => {
+      const q = (text, params) => client.query(text, params);
+
+      let issuedReference =
+        (
+          await q(
+            `SELECT *
+               FROM budget_issued_reference
+              WHERE user_id = $1
+                AND reference_id = $2
+                AND status = 'open'
+              ORDER BY created_at DESC
+              LIMIT 1
+              FOR UPDATE`,
+            [user_id, reference_id],
+          )
+        ).rows[0] ?? null;
+      let reused = Boolean(issuedReference);
+
+      if (!issuedReference) {
+        try {
+          issuedReference = (
+            await q(
+              `INSERT INTO budget_issued_reference
+                 (reference_id, user_id, date_cut_off)
+               VALUES
+                 ($1, $2, NOW() + INTERVAL '1 month')
+               RETURNING *`,
+              [reference_id, user_id],
+            )
+          ).rows[0] ?? null;
+        } catch (err) {
+          // Race lost: a concurrent submit inserted the OPEN row first and the
+          // partial unique index (migration 003) rejected this insert with
+          // 23505. Re-select the winner instead of failing. Any other error
+          // (e.g. bad FK) still throws and rolls the transaction back.
+          // On DBs that haven't run migration 003 yet there is no index to
+          // collide with, so this branch simply never triggers — plain INSERT
+          // (no ON CONFLICT clause) keeps working everywhere.
+          if (err?.code !== "23505") throw err;
+          issuedReference =
+            (
+              await q(
+                `SELECT *
+                   FROM budget_issued_reference
+                  WHERE user_id = $1
+                    AND reference_id = $2
+                    AND status = 'open'
+                  ORDER BY created_at DESC
+                  LIMIT 1`,
+                [user_id, reference_id],
+              )
+            ).rows[0] ?? null;
+          reused = true;
+        }
+
+        if (!issuedReference)
+          throw new Error("Could not resolve issued budget reference.");
+      }
+
+      const issuedBudget = (
+        await q(
+          `INSERT INTO issued_budget
+             (issued_ref_id, amount, description, method, notes)
+           VALUES
+             ($1, $2, $3, $4, $5)
+           RETURNING *`,
+          [issuedReference.id, amount, description, method, note],
+        )
+      ).rows[0];
+
+      return { issuedReference, issuedBudget, reused };
+    });
+  }
+
   // Create Issued Budget
   static async createIssuedBudget({
     issuedRefBudget,
@@ -141,28 +251,38 @@ class Budget {
     return result.rows[0];
   }
 
+  // Budget page — the "Employees" tab cards (AdminBudget > EmployeeBudget.jsx).
+  // ONE ROW PER `issued_budget` TRANSACTION, reached through its parent via
+  // `issued_budget.issued_ref_id = budget_issued_reference.id` — NOT one row
+  // per `budget_issued_reference` parent. A same-source top-up reuses the
+  // employee's OPEN parent row (migration 003), so counting parents showed
+  // "1 budget" for an employee who had actually received 2+ issuances:
+  // `group.budgets.length` in the card is the length of this row list.
+  // Rows stay scoped to OPEN parents (money the employee currently holds) and
+  // carry the source label so the card can group per reference. `total_amount`
+  // is the single transaction's amount (the card sums it per label group) and
+  // `recent_date` is the transaction's own date — the card keeps the MAX of
+  // the rows it received, which equals the old MAX(i.created_at).
   static async employeesWithBudget() {
     const result = await query(
       `SELECT
+          ib.id AS issued_budget_id,
           bir.id AS issued_ref_id,
           bir.user_id,
           u.name,
           br.reference_id,
           br.label,
-          COUNT(i.id)::int AS total_budget_issued,
-          COALESCE(SUM(i.amount), 0) AS total_amount,
-          MAX(i.created_at) AS recent_date
+          ib.amount::float8 AS total_amount,
+          ib.created_at AS recent_date
        FROM budget_issued_reference bir
           LEFT JOIN users u
           ON bir.user_id = u.user_id
           LEFT JOIN budget_reference br
           ON br.reference_id = bir.reference_id
-          LEFT JOIN issued_budget i
-          ON i.issued_ref_id = bir.id
+          JOIN issued_budget ib
+          ON ib.issued_ref_id = bir.id
        WHERE bir.status = 'open'
-       GROUP BY bir.id, bir.user_id, u.user_id, u.name,
-                br.reference_id, br.label
-       ORDER BY u.name ASC, bir.created_at DESC`,
+       ORDER BY u.name ASC, ib.created_at DESC`,
       [],
     );
 

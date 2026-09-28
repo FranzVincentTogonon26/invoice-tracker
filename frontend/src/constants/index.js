@@ -46,9 +46,9 @@ export const STATUS = {
 export const ERROR_VISIBLE_MS = 5000;
 
 // Max receipt upload size — kept in sync with the backend multer limit
-// (middleware/upload.js, 10MB). The scan stores the file server-side and the
-// draft only carries its URL, so this cap is about what the AI can read, not
-// about what fits in localStorage.
+// (middleware/upload.js, 10MB). Files only reach the server when the Add
+// Expenses form is saved (deferred batch upload), so this cap is about what
+// the AI can read, not about what fits in localStorage.
 export const MAX_RECEIPT_BYTES = 10 * 1024 * 1024;
 export const MAX_RECEIPT_LABEL = "10MB";
 
@@ -67,7 +67,14 @@ export const MODAL_COPY = {
   },
 };
 
+// Scan-panel state. `file`/`localPreviewUrl` hold the picked receipt locally
+// (nothing is uploaded yet): `file` is what "Save expenses" later ships to
+// `POST /expenses/receipt-images`, and `localPreviewUrl` is the object URL
+// that previews it. `imageUrl` stays for legacy drafts that carry an
+// already-stored server URL.
 export const blankReceipt = () => ({
+  file: null,
+  localPreviewUrl: "",
   imageUrl: "",
   fileName: "",
   description: "",

@@ -43,6 +43,11 @@ import {
   readPendingReceipt,
   removePendingReceipt,
 } from "../../../lib/receiptDraft";
+import {
+  clearReceiptFiles,
+  getReceiptFile,
+  removeReceiptFile,
+} from "../../../lib/receiptFiles";
 import ConfirmRemoveItemDialog from "./ConfirmRemoveItemDialog";
 import ExpensesModal from "./ExpensesModal";
 import ReceiptDraftModal from "./ReceiptDraftModal";
@@ -213,13 +218,18 @@ const AddExpenses = () => {
   const pendingRemoveRef = useRef(null);
   const removeTriggerRef = useRef(null);
   const addLineRef = useRef(null);
+  // Receipt files are uploaded only on save (deferred batch upload). If the
+  // save fails after the upload succeeded, the stored URLs are kept here so a
+  // retry reuses them instead of writing the same file to `uploads/receipts`
+  // a second time.
+  const uploadedReceiptUrlsRef = useRef(new Map());
   const {
     categories,
     references,
     firstIssuedAt,
     isLoading: referencesLoading,
   } = useExpenses();
-  const { create } = useExpensesMutations();
+  const { create, uploadReceiptImages } = useExpensesMutations();
 
   const isActiveSession = Boolean(user?.user_id && user?.status === "active");
   const isEmployee = user?.role === USER_ROLES.EMPLOYEE;
@@ -246,7 +256,10 @@ const AddExpenses = () => {
   );
 
   const items = form.items;
-  const saving = create.isPending;
+  // The button must also read "saving" while the deferred receipt upload runs
+  // (it fires just before the create request), so a double submit can't push
+  // the same files twice.
+  const saving = create.isPending || uploadReceiptImages.isPending;
   const { loading: suggesting, suggest } = useExpenseSuggestion({
     onError: (message) => toast.error(message),
   });
@@ -290,7 +303,12 @@ const AddExpenses = () => {
 
   const removeItem = (index) => {
     const removed = items[index];
-    if (removed?.receiptId) removePendingReceipt(removed.receiptId);
+    if (removed?.receiptId) {
+      removePendingReceipt(removed.receiptId);
+      // The held file dies with its line — the save only uploads receipts that
+      // are still attached to a row.
+      removeReceiptFile(removed.receiptId);
+    }
     setForm((f) => {
       const next = f.items.filter((_, i) => i !== index);
       return { ...f, items: next.length ? next : [blankItem()] };
@@ -548,6 +566,37 @@ const AddExpenses = () => {
         });
       }
 
+      // Deferred receipt upload — the whole point of holding the files: nothing
+      // was sent while receipts were picked, so every file this form still
+      // holds goes up in ONE request now that the save is confirmed, and only
+      // then does a file land in `uploads/receipts`. `uploadedReceiptUrlsRef`
+      // carries the URLs of an earlier failed attempt so a retry never stores
+      // the same file twice.
+      const heldFiles = [];
+      for (const item of touched) {
+        if (!item.receiptId) continue;
+        if (heldFiles.some((held) => held.receiptId === item.receiptId))
+          continue;
+        const file = getReceiptFile(item.receiptId);
+        if (file) heldFiles.push({ receiptId: item.receiptId, file });
+      }
+
+      const toUpload = heldFiles.filter(
+        (held) => !uploadedReceiptUrlsRef.current.has(held.receiptId),
+      );
+
+      if (toUpload.length > 0) {
+        const images = await uploadReceiptImages.mutateAsync(
+          toUpload.map((held) => held.file),
+        );
+        // The response mirrors the multipart order: images[i] belongs to the
+        // file at toUpload[i].
+        toUpload.forEach((held, i) => {
+          const url = images[i]?.image_url;
+          if (url) uploadedReceiptUrlsRef.current.set(held.receiptId, url);
+        });
+      }
+
       await create.mutateAsync({
         type: "expense",
         reference_id: selectedReferenceId || undefined,
@@ -556,13 +605,19 @@ const AddExpenses = () => {
           const draft = drafts.get(item.receiptId);
           return toPayload(item, {
             receiptId: item.receiptLocal && !draft ? undefined : item.receiptId,
-            imageUrl: draft?.imageUrl || item.receiptUrl || undefined,
+            imageUrl:
+              uploadedReceiptUrlsRef.current.get(item.receiptId) ||
+              draft?.imageUrl ||
+              item.receiptUrl ||
+              undefined,
             receiptDate: draft?.date || (item.dateLocked ? item.date : ""),
           });
         }),
       });
 
       clearPendingReceipts();
+      clearReceiptFiles();
+      uploadedReceiptUrlsRef.current.clear();
       const flaggedCount = touchedIndexes.filter((index) =>
         backdatedLines.includes(index),
       ).length;
@@ -1104,6 +1159,10 @@ const AddExpenses = () => {
                 type="button"
                 onClick={() => {
                   clearPendingReceipts();
+                  // Discarding the form drops the held files too — nothing was
+                  // uploaded, so there is nothing to clean up server-side.
+                  clearReceiptFiles();
+                  uploadedReceiptUrlsRef.current.clear();
                   nav(-1);
                 }}
                 disabled={saving}

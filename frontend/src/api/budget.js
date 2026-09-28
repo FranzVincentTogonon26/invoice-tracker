@@ -20,7 +20,7 @@ export const budgetsApi = {
   create: (payload) =>
     apiClient
       .post("/budgets", payload)
-      .then((r) => r.data.budget ?? r.data.issuedEmployee),
+      .then((r) => r.data.budget ?? r.data.issuedBudget ?? r.data),
   // Deletes a budget reference row (hard delete, cascades to dependent rows)
   removeReference: (referenceId) =>
     apiClient.delete(`/budgets/${referenceId}`).then((r) => r.data),

@@ -1,7 +1,9 @@
 import { Trash2 } from "lucide-react";
 
-// Attached-receipt preview card shown once an image is on the receipt state.
-// The remove button asks for confirmation when the scan already filled data.
+// Attached-receipt preview card shown once a file has been picked. The image
+// renders from the local object URL (`receipt.localPreviewUrl`) — the upload
+// itself waits for "Save expenses" — and the remove button asks for
+// confirmation when the scan already filled data.
 const ReceiptPreview = ({
   receipt,
   scanning,
@@ -11,7 +13,7 @@ const ReceiptPreview = ({
 }) => (
   <div className="flex w-full items-center gap-2.5 rounded-2xl border border-[var(--border)] bg-[var(--surface-2)]/40 px-3 py-2.5 sm:gap-3 sm:px-3 sm:py-3 lg:rounded-3xl lg:gap-3 lg:px-4 lg:py-3">
     <img
-      src={receipt.imageUrl}
+      src={receipt.localPreviewUrl}
       alt="Receipt preview"
       className="h-14 w-11 shrink-0 rounded-xl border border-[var(--border)] bg-white object-cover shadow-card sm:h-16 sm:w-14 lg:h-20 lg:w-16 lg:rounded-2xl"
     />

@@ -90,6 +90,7 @@ class EmployeeOverview {
           bir.status,
           br.label AS reference_label,
           bir.reference_id,
+          0 AS flag,
           ib.created_at AS date,
           ib.created_at AS created_at
         FROM issued_budget ib
@@ -110,6 +111,7 @@ class EmployeeOverview {
           e.status,
           br.label AS reference_label,
           e.reference_id,
+          e.flag AS flag,
           e.created_at AS date,
           e.created_at AS created_at
         FROM expenses e
@@ -130,6 +132,7 @@ class EmployeeOverview {
           ea.status,
           br.label AS reference_label,
           ea.reference_id,
+          0 AS flag,
           ea.created_at AS date,
           ea.created_at AS created_at
         FROM employee_abono ea

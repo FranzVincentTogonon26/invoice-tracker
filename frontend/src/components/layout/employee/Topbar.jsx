@@ -3,7 +3,6 @@ import { IconButton } from "@/components/ui/IconButton";
 import { UserHeader } from "@/components/ui/UserHeader";
 import { useTheme } from "@/context/ThemeContext";
 import { useAuth } from "@/context/AuthContext";
-import { NotificationsPopover } from "../../ui/NotificationsPopover";
 
 export function Topbar() {
   const { theme, toggle } = useTheme();
@@ -18,9 +17,7 @@ export function Topbar() {
         <IconButton onClick={toggle} title="Toggle theme">
           {theme === "light" ? <Moon size={16} /> : <Sun size={16} />}
         </IconButton>
-        <NotificationsPopover />
       </div>
     </header>
   );
 }
-

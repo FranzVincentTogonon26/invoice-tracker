@@ -375,32 +375,50 @@ class Expenses {
   static async findExpenseById(id) {
     const result = await query(
       `SELECT
-          e.id,
-          e.description,
-          e.total_amount::float8 AS total_amount,
-          e.expense_date::text AS expense_date,
-          e.payment_method,
-          e.status,
-          e.notes,
-          e.created_at,
-          e.category_id,
-          c.category_name,
-          e.receipt_id,
-          e.image_url,
-          e.receipt_date,
-          e.reference_id,
-          e.issued_ref_id,
-          e.user_id,
-          u.name AS created_by,
-          u.role AS created_by_role,
-          u.avatar_url AS created_by_avatar,
-          br.label AS reference_label
+           e.id,
+           e.description,
+           e.total_amount::float8 AS total_amount,
+           e.expense_date::text AS expense_date,
+           e.payment_method,
+           e.status,
+           e.flag,
+           e.notes,
+           e.created_at,
+           e.category_id,
+           c.category_name,
+           e.receipt_id,
+           e.image_url,
+           e.receipt_date,
+           e.reference_id,
+           e.issued_ref_id,
+           e.user_id,
+           u.name AS created_by,
+           u.role AS created_by_role,
+           u.avatar_url AS created_by_avatar,
+           br.label AS reference_label
        FROM expenses e
        LEFT JOIN category c ON c.category_id = e.category_id
        LEFT JOIN users u ON u.user_id = e.user_id
        LEFT JOIN budget_reference br ON br.reference_id = e.reference_id
        WHERE e.id = $1::uuid
        LIMIT 1`,
+      [id],
+    );
+    return result.rows[0] ?? null;
+  }
+
+  // Admin approval for a flagged expense: clears the backdated marker
+  // (`expenses.flag = 1` set by createExpenses for an employee line dated
+  // before their first budget issuance). Guarded to only touch flagged rows
+  // so an already-cleared expense returns null and the controller can answer
+  // idempotently. Admin-only at the route layer.
+  static async clearExpenseFlag(id) {
+    const result = await query(
+      `UPDATE expenses
+          SET flag = 0, updated_at = NOW()
+        WHERE id = $1::uuid
+          AND flag = 1
+        RETURNING id, flag`,
       [id],
     );
     return result.rows[0] ?? null;
@@ -800,6 +818,7 @@ class Expenses {
             e.created_at::text AS expense_date,
             e.payment_method,
             e.status,
+            e.flag,
             e.notes,
             e.created_at,
             e.category_id,

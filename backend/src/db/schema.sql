@@ -397,6 +397,16 @@ CREATE INDEX IF NOT EXISTS idx_budget_issued_reference_date_cut_off
 CREATE INDEX IF NOT EXISTS idx_budget_issued_reference_date_forwarded
     ON budget_issued_reference(date_forwarded);
 
+-- At most ONE open issuance per employee per budget source. Repeated issues
+-- to the same employee from the same source reuse that row (see
+-- `Budget.issueBudgetToEmployee`) instead of stacking duplicate parents.
+-- Closed/cancelled rows are excluded so re-issuing after a cancel/close can
+-- still open a fresh row. Migration 003 backfills this onto existing DBs
+-- (merging duplicates first).
+CREATE UNIQUE INDEX IF NOT EXISTS uq_budget_issued_reference_open_user_reference
+    ON budget_issued_reference(user_id, reference_id)
+    WHERE status = 'open';
+
 
 -- ------------------------------------------------------------
 -- ISSUED BUDGET INDEXES

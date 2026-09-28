@@ -189,6 +189,13 @@ Notes:
   the full roster.
 - `issued_budget` = `SUM(issued_budget.amount)` joined through open
   `budget_issued_reference` rows for that user.
+- `issued_references` = `COUNT(issued_budget rows)` reached through the
+  employee's `budget_issued_reference` parents
+  (`issued_budget.issued_ref_id → budget_issued_reference.id`) — the number of
+  issuance TRANSACTIONS the Transactions column shows, NOT the number of
+  parent reference rows. Repeated same-source top-ups reuse one OPEN parent
+  row (migration 003), so counting parents undercounted multi-issuance
+  employees.
 - `total_spent` = `SUM(expenses.total_amount)` for that `user_id` where
   `status = 'paid'` (drafts and cancels excluded — same rule as the employee
   overview aggregates), so

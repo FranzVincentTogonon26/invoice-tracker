@@ -1,4 +1,4 @@
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import {
   CalendarDays,
@@ -13,6 +13,7 @@ import { Badge } from "../../ui/Badge";
 import { Button } from "../../ui/Button";
 import { formatDate, formatMoney } from "../../../lib/utils";
 import { openReceiptFile } from "../../../lib/receiptMedia";
+import { getReceiptFile } from "../../../lib/receiptFiles";
 
 const MetaRow = ({ label, value, Icon }) => (
   <div className="flex items-start justify-between gap-4 py-2">
@@ -30,10 +31,13 @@ const MetaRow = ({ label, value, Icon }) => (
 
 // "View Receipt" for a confirmed scan: the temporary draft parked in
 // localStorage is rendered as a read-only recap — vendor, date, the scanned
-// lines (description / qty / rate / amount) and the grand total, plus the
-// scanned image (stored on the server during the scan, linked as a URL).
+// lines (description / qty / rate / amount) and the grand total. The image is
+// still held in the browser (the upload is deferred until "Save expenses"), so
+// it previews through a temporary object URL built from the file registry;
+// a legacy draft that already carries a stored server URL keeps using that.
 const ReceiptDraftModal = ({ open, receipt, onClose }) => {
   const items = receipt?.items ?? [];
+  const [localPreviewUrl, setLocalPreviewUrl] = useState("");
   const itemsTotal = items.reduce(
     (sum, item) => sum + (Number(item.amount) || 0),
     0,
@@ -54,6 +58,29 @@ const ReceiptDraftModal = ({ open, receipt, onClose }) => {
     window.addEventListener("keydown", onKeyDown, true);
     return () => window.removeEventListener("keydown", onKeyDown, true);
   }, [open, onClose]);
+
+  // Build (and tear down) the object URL for the draft's held file — only when
+  // the draft carries no stored URL of its own. Revoked on close/replace so
+  // the blob is never leaked.
+  useEffect(() => {
+    if (!open || receipt?.imageUrl) {
+      setLocalPreviewUrl("");
+      return undefined;
+    }
+
+    const file = receipt?.receiptId ? getReceiptFile(receipt.receiptId) : null;
+    if (!file) {
+      setLocalPreviewUrl("");
+      return undefined;
+    }
+
+    const url = URL.createObjectURL(file);
+    setLocalPreviewUrl(url);
+    return () => URL.revokeObjectURL(url);
+  }, [open, receipt]);
+
+  // Stored URL first (legacy draft), then the held file's object URL.
+  const previewUrl = receipt?.imageUrl || localPreviewUrl;
 
   return (
     <AnimatePresence>
@@ -195,12 +222,12 @@ const ReceiptDraftModal = ({ open, receipt, onClose }) => {
                 </div>
               </div>
 
-              {/* ── Attachment (stored on the server during the scan) ── */}
+              {/* ── Attachment (held locally until the expense is saved) ── */}
               <div className="mt-3 flex items-center gap-3 rounded-2xl border border-dashed border-[var(--border)] bg-[var(--surface)]/70 px-3.5 py-3">
-                {receipt?.imageUrl ? (
+                {previewUrl ? (
                   <>
                     <img
-                      src={receipt.imageUrl}
+                      src={previewUrl}
                       alt="Scanned receipt"
                       className="h-16 w-12 shrink-0 rounded-xl border border-[var(--border)] bg-white object-cover"
                     />
@@ -209,14 +236,16 @@ const ReceiptDraftModal = ({ open, receipt, onClose }) => {
                         {receipt?.fileName || "Receipt image"}
                       </p>
                       <p className="text-xs text-[var(--ink-muted)]">
-                        Uploaded with this receipt
+                        {receipt?.imageUrl
+                          ? "Uploaded with this receipt"
+                          : "Uploads when you save expenses"}
                       </p>
                     </div>
                     <Button
                       variant="soft"
                       size="sm"
                       type="button"
-                      onClick={() => openReceiptFile(receipt.imageUrl)}
+                      onClick={() => openReceiptFile(previewUrl)}
                     >
                       <Eye size={13} />
                       Open image

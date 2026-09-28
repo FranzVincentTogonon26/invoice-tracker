@@ -75,6 +75,13 @@ export function useExpensesMutations() {
       mutationFn: expensesApi.create,
       onSuccess: invalidate,
     }),
+    // Deferred receipt upload (Add Expenses "Save expenses"): every receipt
+    // file the form still holds goes up in ONE request, so the images reach
+    // `uploads/receipts` only after the save is confirmed. No cache work here
+    // — the response is just URLs consumed by the save that calls this.
+    uploadReceiptImages: useMutation({
+      mutationFn: expensesApi.uploadReceiptImages,
+    }),
     remove: useMutation({
       mutationFn: expensesApi.remove,
       onSuccess: invalidate,
@@ -97,6 +104,13 @@ export function useExpensesMutations() {
     // employee's balance again.
     markEmployeePaid: useMutation({
       mutationFn: expensesApi.markEmployeePaid,
+      onSuccess: invalidate,
+    }),
+    // Admin approval for a flagged expense ("Approve flag" inside the
+    // flaggedNotice): clears `expenses.flag` back to 0 — the red notice
+    // unmounts once the ledger refetches.
+    clearFlag: useMutation({
+      mutationFn: expensesApi.clearFlag,
       onSuccess: invalidate,
     }),
     // Deletes a category (UNIQUE-style feedback comes back as a 409).

@@ -6,12 +6,14 @@
 // real `receipt` row is only created when the form is saved, which keeps
 // `expenses.receipt_id` free of ids that don't exist yet.
 //
-// The image no longer travels through localStorage: the scan stores the upload
-// on the server (`POST /ai/receipt-parse` → `image_url`) and the draft carries
-// only that short URL — which is exactly what `expenses.image_url` ends up
-// storing when the form is saved. `savePendingReceipt` still degrades
-// gracefully when the quota is full of something else: it prunes older drafts'
-// image links first and only drops the new draft's own link as a last resort.
+// The IMAGE is deferred too: the scan is parse-only, so a confirmed draft
+// carries no URL — the picked File lives in memory (`lib/receiptFiles.js`,
+// keyed by `receiptId`) until "Save expenses" uploads every held file in one
+// request and hands each line its `/api/uploads/receipts/<file>` URL. The
+// `imageUrl` field below therefore only survives on LEGACY drafts from the
+// older server-stored-scan flow (their files are already on the server);
+// `savePendingReceipt` still prunes those links first when the quota is full,
+// and only a draft without any link is ever written as a last resort.
 
 const STORAGE_KEY = "invoice-tracker.pending-receipts";
 const MAX_DRAFTS = 10;
@@ -112,10 +114,12 @@ export const readPendingReceipt = (receiptId) =>
  * Persists a draft (newest first, capped) and returns
  * `{ draft, persisted, imageDropped }`.
  *
- * The image now rides as a short server URL, so the full write almost always
- * fits. When the quota is genuinely exhausted it is spent on *older* drafts'
- * image links first — the freshly confirmed scan keeps its image — and only a
- * last-resort retry drops the new draft's own link, reporting `imageDropped`.
+ * New drafts carry no image link (the file waits in memory for the save), so
+ * the full write virtually always fits. A legacy draft — one parked by the
+ * older flow with a stored server URL — is still handled: when the quota is
+ * exhausted it is spent on *older* drafts' links first (their files stay on
+ * the server), and only a last-resort retry drops the new draft's own link,
+ * reporting `imageDropped`.
  */
 export const savePendingReceipt = (draft) => {
   if (!draft?.receiptId) return { draft, persisted: false, imageDropped: false };

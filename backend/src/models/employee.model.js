@@ -79,6 +79,13 @@ class Employee {
   //   reads as spent (same rule as the employee overview aggregates). The UI
   //   uses the pair to show funding handed out vs. funding consumed and derive
   //   the real remaining balance.
+  //   `issued_references` (the table's "Transactions" column) counts the
+  //   employee's `issued_budget` rows — the real issuance transactions,
+  //   wired through their parents via
+  //   `issued_budget.issued_ref_id = budget_issued_reference.id` — and NOT the
+  //   parent `budget_issued_reference` rows themselves: repeated same-source
+  //   top-ups reuse one OPEN parent (migration 003), so counting parents
+  //   undercounted every multi-issuance employee (2 issuances read as 1).
   static async employeeList({ search, status } = {}) {
     const where = [];
     const params = [];
@@ -122,7 +129,8 @@ class Employee {
           ), 0)::float8 AS total_spent,
           (
             SELECT COUNT(*)
-            FROM budget_issued_reference bir2
+            FROM issued_budget ib2
+            JOIN budget_issued_reference bir2 ON ib2.issued_ref_id = bir2.id
             WHERE bir2.user_id = u.user_id
           )::int AS issued_references
        FROM users u

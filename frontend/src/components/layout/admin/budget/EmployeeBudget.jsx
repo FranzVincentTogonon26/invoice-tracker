@@ -6,6 +6,10 @@ import { Badge } from "../../../ui/Badge";
 import { cn, formatDate, formatMoney } from "../../../../lib/utils";
 
 const EmployeeBudget = ({ employeeIssuedBudget = [], isLoading, onOpen }) => {
+  // Backend `employeesWithBudget()` returns ONE ROW PER `issued_budget`
+  // transaction (wired through `budget_issued_reference`), so
+  // `group.budgets.length` below counts real issuances — not the reused
+  // parent reference rows (same-source top-ups share one OPEN parent).
   const groups = useMemo(
     () =>
       employeeIssuedBudget.reduce((acc, row) => {

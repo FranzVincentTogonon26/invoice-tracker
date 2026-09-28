@@ -99,20 +99,26 @@ export const create = async (req, res, next) => {
           "EMPLOYEE_ISSUED_CONFLICT",
         );
 
-      const issuedReferenceBudget = await Budget.createIssuedReferenceBudget({
+      // Dedup-aware issuance: reuses the OPEN `budget_issued_reference` row
+      // for this (employeeId, reference_id) pair when one already exists and
+      // only inserts a fresh parent row when there is none yet — repeated
+      // issues to the same employee from the same source never stack up
+      // duplicate parent rows. Both writes run in one transaction.
+      const { issuedBudget, reused } = await Budget.issueBudgetToEmployee({
         reference_id: reference_id,
         user_id: employeeId,
-      });
-
-      await Budget.createIssuedBudget({
-        issuedRefBudget: issuedReferenceBudget.id,
         amount: parsedAmount,
         description: String(description).trim(),
         method,
         note: note || null,
       });
 
-      return res.status(201).json({ message: "Issued Budget Successfully" });
+      return res.status(201).json({
+        message: reused
+          ? "Budget issued successfully (added to the employee's existing issuance for this source)."
+          : "Issued Budget Successfully",
+        issuedBudget,
+      });
     }
     if (type === "addBudget") {
       const newBudget = await Budget.createBudget({

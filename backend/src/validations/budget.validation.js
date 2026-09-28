@@ -71,6 +71,13 @@ export const createbudgetSchema = z
     message: "Budget reference is required",
     path: ["reference_id"],
   })
+  // issuedBudget also needs a source of funds — without it the issuance would
+  // fail on the NOT NULL `budget_issued_reference.reference_id` column with a
+  // raw 500 instead of a friendly validation message.
+  .refine((data) => data.type !== "issuedBudget" || Boolean(data.reference_id), {
+    message: "Budget reference is required",
+    path: ["reference_id"],
+  })
   .refine((data) => data.type !== "addBudgetReference" || Boolean(data.label), {
     message: "Reference label is required",
     path: ["label"],

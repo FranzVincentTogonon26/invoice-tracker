@@ -478,8 +478,10 @@ const BudgetModal = ({
   const amountLocked = !form.reference_id;
 
   const validate = () => {
-    if (isAddBudget && !form.reference_id)
-      return "Please select a budget reference first.";
+    // Both flows need a source of funds — the issuedBudget branch previously
+    // only required it for addBudget, so an issue with no reference slipped
+    // past the form and died on the DB NOT NULL column as a raw 500.
+    if (!form.reference_id) return "Please select a budget reference first.";
     if (!form.employee && !isAddBudget)
       return "Please select an employee first.";
     // Restriction guard — the selected employee still has an open issuance
@@ -511,6 +513,7 @@ const BudgetModal = ({
 
   async function onSubmit(e) {
     e.preventDefault();
+    if (saving) return;
     setErr("");
 
     const validationError = validate();

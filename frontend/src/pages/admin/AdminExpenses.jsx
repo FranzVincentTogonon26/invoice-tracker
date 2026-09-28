@@ -398,10 +398,16 @@ const AdminExpenses = () => {
     [allLedgerRows],
   );
 
+  // The date-range picker filters on the date the TABLE shows: `timeDate`
+  // (`expenses.created_at`) — the same value ExpensesTable renders in its Date
+  // column and the same one `allLedgerRows` sorts by. Filtering on `date`
+  // (the `expense_date` tag) hid rows whose VISIBLE date sat inside the picked
+  // range whenever the two differed (e.g. a line saved today carrying a
+  // backdated expense_date). `?? r.date` mirrors the sort's fallback.
   const ledgerRows = useMemo(
     () =>
       allLedgerRows.filter((r) =>
-        matchesDayRange(r.date, dateRange?.start, dateRange?.end),
+        matchesDayRange(r.timeDate ?? r.date, dateRange?.start, dateRange?.end),
       ),
     [allLedgerRows, dateRange],
   );
@@ -1227,6 +1233,11 @@ const AdminExpenses = () => {
         expense={viewRow}
         referenceLabel={viewRow?.sourceOfFunds ?? ""}
         onClose={() => setViewOpen(false)}
+        onFlagCleared={(id) =>
+          setViewRow((prev) =>
+            prev && prev.id === id ? { ...prev, flagged: false } : prev,
+          )
+        }
       />
 
       <ConfirmActionDialog

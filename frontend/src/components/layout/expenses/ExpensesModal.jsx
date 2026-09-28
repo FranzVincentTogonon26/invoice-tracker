@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import { AlertTriangle, Loader2, X } from "lucide-react";
 import toast from "react-hot-toast";
@@ -10,6 +10,7 @@ import {
   buildReceiptDraft,
   savePendingReceipt,
 } from "../../../lib/receiptDraft";
+import { registerReceiptFile } from "../../../lib/receiptFiles";
 import {
   ERROR_VISIBLE_MS,
   MAX_RECEIPT_BYTES,
@@ -45,7 +46,22 @@ const ExpensesModal = ({
   const [confirmClear, setConfirmClear] = useState(false);
   const busy = adding || deletingId !== null || saving;
 
+  // Object URL for the picked receipt file. The file is only held in the
+  // browser until "Save expenses" (deferred batch upload), so this URL is the
+  // only thing that keeps the preview alive — it is revoked whenever the
+  // receipt is replaced, cleared, or the modal unmounts.
+  const previewUrlRef = useRef("");
+  const releasePreview = useCallback(() => {
+    if (previewUrlRef.current) {
+      URL.revokeObjectURL(previewUrlRef.current);
+      previewUrlRef.current = "";
+    }
+  }, []);
+
+  useEffect(() => releasePreview, [releasePreview]);
+
   const hasReceiptData =
+    Boolean(receipt.localPreviewUrl) ||
     Boolean(receipt.imageUrl) ||
     Boolean(receipt.fileName) ||
     Boolean(receipt.vendor) ||
@@ -54,7 +70,10 @@ const ExpensesModal = ({
     Number(receipt.total) > 0 ||
     (receipt.items ?? []).length > 0;
 
-  const hasReceiptImage = Boolean(receipt.imageUrl);
+  // A picked-but-not-yet-uploaded file — what enables "Confirm Receipt". The
+  // scan stores nothing server-side, so the local pick (not a URL) is the
+  // signal that a receipt is attached.
+  const hasReceiptImage = Boolean(receipt.localPreviewUrl);
 
   const itemsTotal = (receipt.items ?? []).reduce(
     (sum, item) =>
@@ -96,7 +115,6 @@ const ExpensesModal = ({
       currency: parsed.currency || "",
       total: parsed.total || 0,
       suggestedCategory: parsed.suggested_category || "",
-      imageUrl: parsed.imageUrl || "",
       fileName: r.fileName || parsed.fileName,
     }));
 
@@ -114,6 +132,14 @@ const ExpensesModal = ({
     scanFile,
   } = useReceiptScan({ onParsed: handleParsed, onError: handleScanError });
 
+  // Full receipt reset (scan state + errors + the local preview URL).
+  const clearReceipt = useCallback(() => {
+    releasePreview();
+    setScanErr("");
+    setErr("");
+    setReceipt(blankReceipt());
+  }, [releasePreview]);
+
   const hasScannedContent = scanning || (hasReceiptData && !scanErr);
   const scanFailed = Boolean(scanErr);
 
@@ -127,6 +153,7 @@ const ExpensesModal = ({
     setAdding(false);
     setDeletingId(null);
     setSaving(false);
+    releasePreview();
     setReceipt(blankReceipt());
     setConfirmClear(false);
   }
@@ -192,10 +219,21 @@ const ExpensesModal = ({
         return;
       }
 
-      setReceipt((r) => ({ ...r, fileName: file.name }));
+      // Hold the file locally — nothing reaches the server yet. The object URL
+      // previews it and the File itself is what "Save expenses" ships to the
+      // deferred batch upload once this receipt is confirmed.
+      releasePreview();
+      const localPreviewUrl = URL.createObjectURL(file);
+      previewUrlRef.current = localPreviewUrl;
+      setReceipt((r) => ({
+        ...r,
+        file,
+        localPreviewUrl,
+        fileName: file.name,
+      }));
       scanFile(file);
     },
-    [scanFile, setScanErr],
+    [scanFile, setScanErr, releasePreview],
   );
 
   const handleItemChange = useCallback((index, patch) => {
@@ -228,20 +266,18 @@ const ExpensesModal = ({
   }, []);
 
   const handleConfirmClear = useCallback(() => {
-    setScanErr("");
-    setErr("");
-    setReceipt(blankReceipt());
+    clearReceipt();
     setConfirmClear(false);
     toast.success("Scanned receipt cleared.");
-  }, [setScanErr]);
+  }, [clearReceipt]);
 
   const handleRequestRemoveReceipt = useCallback(() => {
     if (hasReceiptData) {
       setConfirmClear(true);
     } else {
-      setReceipt(blankReceipt());
+      clearReceipt();
     }
-  }, [hasReceiptData]);
+  }, [hasReceiptData, clearReceipt]);
 
   const handleConfirmReceipt = async (e) => {
     e.preventDefault();
@@ -266,8 +302,13 @@ const ExpensesModal = ({
         buildReceiptDraft({ ...receipt, items }),
       );
 
+      // Park the picked file under the draft id — the deferred batch upload
+      // finds it from this key when "Save expenses" runs. The draft itself
+      // only stores text, so the bytes never touch localStorage.
+      if (receipt.file) registerReceiptFile(draft.receiptId, receipt.file);
+
       onReceiptConfirmed(draft);
-      setReceipt(blankReceipt());
+      clearReceipt();
       onClose?.();
 
       if (isBackdatedDate?.(draft.date)) {
@@ -434,7 +475,7 @@ const ExpensesModal = ({
                     onSubmit={handleConfirmReceipt}
                     onFilePicked={handleFilePicked}
                     onRemoveRequest={handleRequestRemoveReceipt}
-                    onClearReceipt={() => setReceipt(blankReceipt())}
+                    onClearReceipt={clearReceipt}
                     onItemChange={handleItemChange}
                     onRemoveItem={handleRemoveItem}
                     onAddItem={handleAddItem}

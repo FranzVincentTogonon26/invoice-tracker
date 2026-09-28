@@ -3,11 +3,8 @@ import { createPortal } from "react-dom";
 import { AnimatePresence, motion } from "framer-motion";
 import toast from "react-hot-toast";
 import {
-  Banknote,
-  CreditCard,
   Eye,
   Flag,
-  Landmark,
   Layers,
   Search,
   Trash2,
@@ -16,7 +13,6 @@ import {
   Wallet,
   ReceiptText,
   HandCoins,
-  Wallet as MethodWalletIcon,
   EllipsisVertical,
 } from "lucide-react";
 import { Card } from "../../../ui/Card";
@@ -41,10 +37,11 @@ import {
 } from "../../../../lib/utils";
 import DateRangePicker from "../../../ui/DateRangePicker";
 import ConfirmActionDialog from "../../admin/expenses/ConfirmActionDialog";
-import { ExpenseStatusBadge } from "../../admin/expenses/ExpensesTable";
-import EmployeeExpenseDetailsModal from "./EmployeeExpenseDetailsModal";
-import { useExpensesMutations } from "../../../../hooks/useExpenses";
-import { expensesApi } from "../../../../api/expenses";
+import { AbonoStatusBadge } from "./AbonoStatusBadge";
+import EmployeeAbonoDetailsModal from "./EmployeeAbonoDetailsModal";
+
+import { useAbonoMutations } from "../../../../hooks/useAbono";
+import { abonoApi } from "../../../../api/abono";
 
 const formatShortDate = (value) => {
   const parsed = toDate(value);
@@ -52,26 +49,11 @@ const formatShortDate = (value) => {
   return parsed.toLocaleDateString("en-GB", { day: "numeric", month: "short" });
 };
 
-const METHOD_BADGE = {
-  cash: { tone: "success", icon: Banknote },
-  bank_transfer: { tone: "accent", icon: Landmark },
-  e_wallet: { tone: "warning", icon: MethodWalletIcon },
-};
+const SHEET_EASE = [0.16, 1, 0.3, 1];
 
-const MethodBadge = ({ method, className }) => {
-  const config = METHOD_BADGE[method] ?? { tone: "neutral", icon: CreditCard };
-  const BadgeIcon = config.icon;
-  return (
-    <Badge
-      tone={config.tone}
-      className={cn("shrink-0 px-2 py-1 text-[12px]", className)}
-    >
-      <BadgeIcon size={16} aria-hidden />
-      {methodLabel(method)}
-    </Badge>
-  );
-};
-
+// Row types this ledger can render. The Abono page only feeds `abono` rows —
+// issued/expense entries are kept so the copied table/sheet structure never
+// renders an undefined meta if a row of another kind slips in.
 const TYPE_CONFIG = {
   issued: {
     label: "Received",
@@ -93,17 +75,9 @@ const TYPE_CONFIG = {
   },
 };
 
-const SHEET_EASE = [0.16, 1, 0.3, 1];
-const isSheetActionable = (row) => row?.kind === "expense";
-// Mirrors EmployeeExpenseDetailsModal: a receipt exists when the row links a
-// receipt record or carries a stored receipt file URL (image or PDF).
-const hasSheetReceipt = (row) => Boolean(row?.receiptId || row?.imageUrl);
-// `expenses.flag = 1` means the backend saved this employee line as backdated
-// (dated before the first budget issued to them). Accepts both the raw `flag`
-// column and the mapped `flagged` boolean so desktop + mobile render from any
-// shape the ledger passes in.
-const isFlagged = (row) =>
-  row?.flagged === true || Number(row?.flag) === 1;
+const isSheetActionable = (row) => row?.kind === "abono";
+// Only expense rows are backdated-flagged — abono always arrives flag-less.
+const isFlagged = (row) => row?.flagged === true || Number(row?.flag) === 1;
 const PAGE_SIZE = 50;
 
 function getDateGroupLabel(date) {
@@ -131,12 +105,12 @@ function groupTransactionsByDate(rows) {
     .map((label) => ({ label, transactions: groups.get(label) }));
 }
 
-const COLUMN_WIDTHS = ["16%", "28%", "18%", "16%", "22%", "5%"];
+// Five columns: Date, Description, Status, Amount, Actions.
+const COLUMN_WIDTHS = ["18%", "34%", "16%", "18%", "14%"];
 
 function TransactionCard({ tx, meta, disabled, onOpen }) {
   const actionable = isSheetActionable(tx);
   const Icon = meta.icon;
-  const flagged = isFlagged(tx);
 
   return (
     <div
@@ -156,25 +130,14 @@ function TransactionCard({ tx, meta, disabled, onOpen }) {
       className={cn(
         "relative flex items-center justify-between gap-3 overflow-hidden rounded-2xl border border-[var(--border)] bg-[var(--surface-2)]/60 px-2.5 py-3 transition-shadow hover:shadow-card",
         actionable && !disabled && "cursor-pointer active:scale-[0.99]",
-        flagged &&
-          "border-[var(--warning)]/50 bg-[var(--warning)]/[0.08] ring-1 ring-inset ring-[var(--warning)]/25",
       )}
     >
-      <span
-        aria-hidden
-        className={cn(
-          "absolute inset-y-0 left-0 w-1",
-          flagged ? "bg-[var(--warning)]" : "bg-transparent",
-        )}
-      />
+      <span aria-hidden className={cn("absolute inset-y-0 left-0 w-1")} />
       <div className="flex min-w-0 flex-1 items-center gap-3">
         <span
           aria-hidden
           className={cn(
             "flex h-10 w-10 shrink-0 items-center justify-center rounded-xl",
-            flagged
-              ? "bg-[var(--warning)]/15 text-[var(--warning)]"
-              : meta.iconWrapperClass,
           )}
         >
           <Icon size={18} />
@@ -184,16 +147,6 @@ function TransactionCard({ tx, meta, disabled, onOpen }) {
             <span className="min-w-0 truncate">
               {tx.description || meta.label}
             </span>
-            {flagged && (
-              <Badge
-                tone="warning"
-                className="shrink-0 gap-1 px-1.5 py-0.5 text-[10px]"
-                title="Flagged — dated before the first budget issued to you"
-              >
-                <Flag size={10} aria-hidden className="shrink-0" />
-                Flagged
-              </Badge>
-            )}
           </p>
           <span className="mt-1.5 flex min-w-0 items-center gap-1.5 text-[11px] font-medium leading-none text-[var(--ink-muted)]">
             <span className="shrink-0 tabular-nums">
@@ -227,8 +180,10 @@ function TransactionSheet({
 }) {
   const sheetRef = useRef(null);
   const actionable = isSheetActionable(row);
-  const meta = TYPE_CONFIG[row?.kind] ?? TYPE_CONFIG.expense;
+  const meta = TYPE_CONFIG[row?.kind] ?? TYPE_CONFIG.abono;
   const Icon = meta.icon;
+  const title = row?.description || meta.label || "Abono";
+
   const close = useCallback(() => {
     if (pending) return;
     onClose?.();
@@ -245,13 +200,11 @@ function TransactionSheet({
     return () => window.removeEventListener("keydown", onKeyDown, true);
   }, [row, close]);
 
-  const title = row?.description || meta.label || "Transaction";
-
   return createPortal(
     <AnimatePresence>
       {row && (
         <motion.div
-          key="expense-sheet"
+          key="abono-sheet"
           className="fixed inset-0 z-[70] flex flex-col justify-end md:hidden"
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
@@ -290,7 +243,6 @@ function TransactionSheet({
               Icon={Icon}
               title={title}
               actionable={actionable}
-              hasReceipt={hasSheetReceipt(row)}
               pending={pending}
               close={close}
               onView={onView}
@@ -311,43 +263,38 @@ function TransactionSheetBody({
   Icon,
   title,
   actionable,
-  hasReceipt,
   pending,
   close,
   onView,
   onDelete,
   onUpdate,
 }) {
-  const [isEditing, setIsEditing] = useState(false);
-  const [description, setDescription] = useState(title || "");
+  // Non-null only while the description is being edited — the displayed text
+  // derives from `title` (the row) otherwise, so an updated row always shows
+  // through without a sync effect (react-hooks/set-state-in-effect).
+  const [draft, setDraft] = useState(null);
+  const isEditing = draft !== null;
+  const description = draft ?? title ?? "";
   const textareaRef = useRef(null);
-
-  // Sync description state when title prop changes (e.g., parent updates sheetRow)
-  useEffect(() => {
-    if (!isEditing) {
-      setDescription(title || "");
-    }
-  }, [title, isEditing]);
 
   const handleSave = useCallback(async () => {
     const trimmed = description.trim();
     if (!trimmed || trimmed === title) {
-      setIsEditing(false);
+      setDraft(null);
       return;
     }
 
     try {
-      await expensesApi.updateDescription(row.id, trimmed);
+      await abonoApi.updateDescription(row.id, trimmed);
       toast.success("Description updated");
       // Update the parent's sheetRow state
       onUpdate?.({ ...row, description: trimmed });
-      setIsEditing(false);
+      setDraft(null);
     } catch (err) {
       toast.error(err?.message || "Failed to update description");
-      setDescription(title);
-      setIsEditing(false);
+      setDraft(null);
     }
-  }, [row.id, description, title, onUpdate]);
+  }, [row, description, title, onUpdate]);
 
   const handleBlur = useCallback(() => {
     handleSave();
@@ -359,20 +306,19 @@ function TransactionSheetBody({
         e.preventDefault();
         handleSave();
       } else if (e.key === "Escape") {
-        setDescription(title);
-        setIsEditing(false);
+        setDraft(null);
       }
     },
-    [title, handleSave],
+    [handleSave],
   );
 
   const handleDoubleClick = useCallback(() => {
     if (actionable && !pending) {
-      setIsEditing(true);
+      setDraft(title || "");
       // Focus textarea after render
       setTimeout(() => textareaRef.current?.focus(), 0);
     }
-  }, [actionable, pending]);
+  }, [actionable, pending, title]);
 
   return (
     <>
@@ -392,7 +338,7 @@ function TransactionSheetBody({
         </span>
         <div className="min-w-0 flex-1">
           <p className="truncate font-display text-base font-semibold tracking-tight text-[var(--ink)]">
-            Expense details
+            Abono details
           </p>
           <p className="mt-0.5 truncate text-xs tabular-nums text-[var(--ink-muted)]">
             {formatDate(row.date)}
@@ -409,27 +355,6 @@ function TransactionSheetBody({
         </button>
       </div>
       <div className="mt-4 space-y-3">
-        {isFlagged(row) && (
-          <div
-            role="note"
-            className="flex items-start gap-2.5 rounded-2xl border border-[var(--warning)]/40 bg-[var(--warning)]/[0.1] px-4 py-3"
-          >
-            <Flag
-              size={14}
-              aria-hidden
-              className="mt-0.5 shrink-0 text-[var(--warning)]"
-            />
-            <div className="min-w-0">
-              <p className="text-xs font-bold text-[var(--warning)]">
-                Flagged for review
-              </p>
-              <p className="mt-0.5 text-xs leading-relaxed text-[var(--warning)]/90">
-                Dated before the first budget issued to you — an admin needs
-                to approve it.
-              </p>
-            </div>
-          </div>
-        )}
         <div className="space-y-2 rounded-2xl border border-[var(--border)] bg-[var(--surface-2)]/60 px-4 py-3.5">
           <div className="border-b border-[var(--border)] py-3">
             <p className="type-eyebrow text-[var(--ink-muted)]">Description</p>
@@ -437,7 +362,7 @@ function TransactionSheetBody({
               <textarea
                 ref={textareaRef}
                 value={description}
-                onChange={(e) => setDescription(e.target.value)}
+                onChange={(e) => setDraft(e.target.value)}
                 onBlur={handleBlur}
                 onKeyDown={handleKeyDown}
                 autoFocus
@@ -480,26 +405,24 @@ function TransactionSheetBody({
                   .join(" · ")}
               </p>
             </div>
-            <ExpenseStatusBadge status={row.status} className="shrink-0" />
+            <AbonoStatusBadge status={row.status} className="shrink-0" />
           </div>
         </div>
       </div>
       {actionable && (
         <div className="mt-4 space-y-2">
-          {hasReceipt ? (
-            <Button
-              type="button"
-              variant="accent"
-              className="w-full"
-              onClick={() => {
-                close();
-                onView?.(row);
-              }}
-            >
-              <Eye size={15} aria-hidden />
-              View details & receipt
-            </Button>
-          ) : null}
+          <Button
+            type="button"
+            variant="accent"
+            className="w-full"
+            onClick={() => {
+              close();
+              onView?.(row);
+            }}
+          >
+            <Eye size={15} aria-hidden />
+            View abono details
+          </Button>
           <Button
             type="button"
             variant="outline"
@@ -508,7 +431,7 @@ function TransactionSheetBody({
             onClick={() => onDelete?.(row)}
           >
             <Trash2 size={15} aria-hidden />
-            Delete expense
+            Delete abono
           </Button>
         </div>
       )}
@@ -564,14 +487,14 @@ function RowActions({ row, pending, onView, onDelete }) {
   const items = [
     {
       key: "view",
-      label: "View expense",
+      label: "View abono",
       Icon: Eye,
       danger: false,
       onSelect: () => onView?.(row),
     },
     {
       key: "delete",
-      label: "Delete expense",
+      label: "Delete abono",
       Icon: Trash2,
       danger: true,
       onSelect: () => onDelete?.(row),
@@ -603,7 +526,7 @@ function RowActions({ row, pending, onView, onDelete }) {
         onClick={() => (open ? setOpen(false) : openMenu())}
         aria-haspopup="menu"
         aria-expanded={open}
-        aria-label={`Actions for ${row?.description || "expense"}`}
+        aria-label={`Actions for ${row?.description || "abono"}`}
         disabled={pending}
         className="inline-flex h-8 w-8 items-center justify-center rounded-full text-[var(--ink-muted)] transition-colors hover:bg-[var(--surface-2)] hover:text-[var(--ink)] disabled:pointer-events-none disabled:opacity-40"
       >
@@ -645,7 +568,7 @@ function RowActions({ row, pending, onView, onDelete }) {
   );
 }
 
-export const TransactionsSectionExpenses = ({
+export const TransactionsSectionAbono = ({
   transactions = [],
   isLoading = false,
   onTransactionUpdate,
@@ -658,23 +581,24 @@ export const TransactionsSectionExpenses = ({
   const [viewRow, setViewRow] = useState(null);
   const [deleteRow, setDeleteRow] = useState(null);
   const [sheetRow, setSheetRow] = useState(null);
-  const { setStatus } = useExpensesMutations();
-  const confirmPending = setStatus.isPending;
+  const { remove } = useAbonoMutations();
+  const confirmPending = remove.isPending;
 
   const closeConfirm = () => {
     if (!confirmPending) setDeleteRow(null);
   };
 
-  const runMarkDraft = async () => {
+  const runDelete = async () => {
     if (!deleteRow) return;
 
     try {
-      await setStatus.mutateAsync({ id: deleteRow.id, status: "draft" });
-      toast.success("Expense moved to draft");
+      await remove.mutateAsync(deleteRow.id);
+      toast.success("Abono deleted");
       setDeleteRow(null);
       setSheetRow(null);
+      setViewRow(null);
     } catch (err) {
-      toast.error(err?.message || "Couldn’t move expense to draft");
+      toast.error(err?.message || "Couldn't delete abono");
     }
   };
 
@@ -682,10 +606,7 @@ export const TransactionsSectionExpenses = ({
     <div className="mt-4 flex items-center gap-3 rounded-2xl border border-[var(--border)] bg-[var(--surface-2)]/60 px-4 py-3">
       <div className="min-w-0 flex-1">
         <p className="truncate text-base font-semibold text-[var(--ink)]">
-          {deleteRow.description || "Untitled expense"}
-        </p>
-        <p className="mt-0.5 truncate text-xs text-[var(--ink-muted)]">
-          {`${deleteRow.category || "Uncategorized"} · ${formatDate(deleteRow.date)}`}
+          {deleteRow.description || "Untitled Abono"}
         </p>
       </div>
       <span className="shrink-0 text-sm font-semibold tabular-nums text-[var(--ink)]">
@@ -761,11 +682,11 @@ export const TransactionsSectionExpenses = ({
           <div>
             <div className="flex items-center gap-2">
               <h3 className="font-display text-base font-semibold tracking-tight text-[var(--ink)]">
-                All Expenses
+                All Abono
               </h3>
             </div>
             <p className="text-xs text-[var(--ink-muted)] truncate">
-              Monitor spending and expenses.
+              Manage and track your out-of-pocket expenses.
             </p>
           </div>
         </div>
@@ -775,7 +696,7 @@ export const TransactionsSectionExpenses = ({
             onChange={(e) => setSearch(e.target.value)}
             leftIcon={<Search size={16} />}
             placeholder="Search..."
-            aria-label="Search Expenses"
+            aria-label="Search Abono"
             className="min-w-0 flex-1"
             rightSlot={
               search ? (
@@ -823,14 +744,14 @@ export const TransactionsSectionExpenses = ({
                   ? `Nothing was recorded in ${formatDateRange(dateRange)}. Try a wider range.`
                   : debouncedSearch
                     ? `No transactions matched "${debouncedSearch}". Try clearing your search.`
-                    : "No budget issuances, expenses, or abono records yet."
+                    : "No abono records yet — tap \"Add Abono\" to record your first one."
             }
           />
         ) : (
           <div className="overflow-x-auto rounded-2xl border border-[var(--border)] bg-[var(--surface)] shadow-card">
             <table className="w-full min-w-[720px] table-fixed border-collapse text-left">
               <caption className="sr-only">
-                Employee all transactions list
+                Employee abono list
               </caption>
               <colgroup>
                 {COLUMN_WIDTHS.map((width, i) => (
@@ -844,9 +765,6 @@ export const TransactionsSectionExpenses = ({
                   </th>
                   <th className="whitespace-nowrap border-b border-[var(--border)] px-4 py-3 type-eyebrow text-[var(--ink-muted)]">
                     Description
-                  </th>
-                  <th className="whitespace-nowrap border-b border-[var(--border)] px-4 py-3 type-eyebrow text-[var(--ink-muted)]">
-                    Payment Method
                   </th>
                   <th className="whitespace-nowrap border-b border-[var(--border)] px-4 py-3 type-eyebrow text-[var(--ink-muted)]">
                     Status
@@ -868,8 +786,14 @@ export const TransactionsSectionExpenses = ({
                   return (
                     <tr
                       key={`${tx.kind}-${tx.id}`}
+                      onClick={(e) => {
+                        // Click anywhere on the row except its action
+                        // buttons opens the details portal.
+                        if (e.target.closest("button")) return;
+                        setViewRow(tx);
+                      }}
                       className={cn(
-                        "relative transition-colors duration-150 hover:bg-[var(--accent)]/[0.05]",
+                        "relative cursor-pointer transition-colors duration-150 hover:bg-[var(--accent)]/[0.05]",
                         flagged &&
                           "bg-[var(--warning)]/[0.08] hover:bg-[var(--warning)]/[0.12]",
                       )}
@@ -884,9 +808,7 @@ export const TransactionsSectionExpenses = ({
                           aria-hidden
                           className={cn(
                             "absolute inset-y-2 left-0 w-[3px] rounded-full",
-                            flagged
-                              ? "bg-[var(--warning)]"
-                              : "bg-transparent",
+                            flagged ? "bg-[var(--warning)]" : "bg-transparent",
                           )}
                         />
                         <p className="whitespace-nowrap text-[13px] font-semibold leading-none tabular-nums text-[var(--ink)]">
@@ -921,14 +843,8 @@ export const TransactionsSectionExpenses = ({
                         )}
                       </td>
                       <td className="px-4 py-3 align-middle">
-                        <MethodBadge
-                          method={tx.method}
-                          className="max-w-full"
-                        />
-                      </td>
-                      <td className="px-4 py-3 align-middle">
                         {tx.status ? (
-                          <ExpenseStatusBadge
+                          <AbonoStatusBadge
                             status={tx.status}
                             className="max-w-full px-2 py-1 text-[11px]"
                           />
@@ -1010,7 +926,7 @@ export const TransactionsSectionExpenses = ({
                   ? `Nothing was recorded in ${formatDateRange(dateRange)}. Try a wider range.`
                   : debouncedSearch
                     ? `No transactions matched "${debouncedSearch}".`
-                    : "No transactions recorded yet."
+                    : "No abono records yet — tap \"Add Abono\" to record your first one."
             }
           />
         ) : (
@@ -1055,10 +971,15 @@ export const TransactionsSectionExpenses = ({
         </div>
       )}
 
-      <EmployeeExpenseDetailsModal
+      <EmployeeAbonoDetailsModal
         open={Boolean(viewRow)}
         expense={viewRow}
         onClose={() => setViewRow(null)}
+        onUpdate={(updatedRow) => {
+          setViewRow(updatedRow);
+          // Let the page overlay the edit so the ledger text flips too
+          onTransactionUpdate?.(updatedRow);
+        }}
       />
 
       <TransactionSheet
@@ -1077,18 +998,18 @@ export const TransactionsSectionExpenses = ({
       <ConfirmActionDialog
         open={Boolean(deleteRow)}
         icon={<Trash2 size={20} aria-hidden />}
-        title="Delete this expense?"
-        description="Nothing is permanently removed — the expense is kept as a Draft, but it will no longer show in your expense list."
+        title="Delete this abono?"
+        description="This permanently removes the abono record from your ledger. This can't be undone."
         summary={confirmSummary}
-        cancelLabel="Keep expense"
+        cancelLabel="Keep abono"
         confirmLabel="Yes, delete it"
         pendingLabel="Deleting…"
         pending={confirmPending}
         onCancel={closeConfirm}
-        onConfirm={runMarkDraft}
+        onConfirm={runDelete}
       />
     </Card>
   );
 };
 
-export default TransactionsSectionExpenses;
+export default TransactionsSectionAbono;

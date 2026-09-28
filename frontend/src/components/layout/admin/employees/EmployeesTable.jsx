@@ -297,7 +297,6 @@ function EmployeeRow({ employee, pending, onAction }) {
         </div>
       </td>
 
-      {/* Transactions — issued budget references tied to this employee */}
       <td className="px-4 py-4 text-center align-middle">
         <span className="inline-flex h-7 min-w-7 items-center justify-center rounded-full bg-[var(--surface-2)] px-2 text-xs font-semibold tabular-nums text-[var(--ink)] ring-1 ring-inset ring-[var(--border)]">
           {Number(employee.issued_references) || 0}

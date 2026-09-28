@@ -2,6 +2,7 @@ import express from "express";
 import authMiddleware from "../middleware/auth.middleware.js";
 import requireAdminAccess from "../middleware/admin.middleware.js";
 import requireEmployeeAccess from "../middleware/employee.middleware.js";
+import { uploadReceiptBatch } from "../middleware/upload.js";
 import * as expensesController from "../controllers/expenses.controller.js";
 
 const router = express.Router();
@@ -16,6 +17,20 @@ router.get(
   expensesController.expensesEmployee,
 );
 router.post("/", authMiddleware, expensesController.create);
+
+// Deferred receipt upload: every receipt the Add Expenses form still holds is
+// sent here in ONE multipart request when the admin confirms "Save expenses",
+// and only then is each file written to `uploads/receipts`. The scan endpoint
+// (`POST /ai/receipt-parse`) is parse-only, so a dropped-but-discarded receipt
+// never leaves a file behind. Declared before the "/:id" routes so the literal
+// "receipt-images" segment can never parse as a validated uuid — express.Router
+// matches top-down.
+router.post(
+  "/receipt-images",
+  authMiddleware,
+  uploadReceiptBatch,
+  expensesController.uploadReceiptImages,
+);
 
 // Declared before "/:id" so the literal "category" segment wins the match.
 router.delete(
@@ -53,6 +68,17 @@ router.patch(
   authMiddleware,
   requireAdminAccess,
   expensesController.markEmployeePaid,
+);
+
+// Admin approval for a flagged expense: clears `expenses.flag` back to 0
+// (the "Approve flag" action inside the flaggedNotice of the View expense
+// modal). Admin-only — employees see the flag as a read-only warning tone
+// in their own ledger, never the clear action.
+router.patch(
+  "/:id/clear-flag",
+  authMiddleware,
+  requireAdminAccess,
+  expensesController.clearFlag,
 );
 
 // Update expense description (inline editing from transaction sheet)

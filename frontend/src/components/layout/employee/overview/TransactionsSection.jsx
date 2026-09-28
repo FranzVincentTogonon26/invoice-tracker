@@ -1,7 +1,10 @@
-import { useState, useMemo, useEffect } from "react";
+import { useState, useMemo, useEffect, useRef, useCallback } from "react";
+import { createPortal } from "react-dom";
+import { AnimatePresence, motion } from "framer-motion";
 import {
   Banknote,
   CreditCard,
+  Flag,
   Landmark,
   Layers,
   Search,
@@ -96,6 +99,145 @@ const TYPE_CONFIG = {
 
 const PAGE_SIZE = 50;
 
+const SHEET_EASE = [0.16, 1, 0.3, 1];
+
+// `expenses.flag = 1` means the backend saved this employee line as backdated
+// (dated before the first budget issued to them). Accepts both the raw `flag`
+// column and the mapped `flagged` boolean so desktop + mobile render from any
+// shape the overview passes in. Only `expense` rows can ever be flagged —
+// issued/abono always carry `flag = 0`.
+const isFlagged = (row) => row?.flagged === true || Number(row?.flag) === 1;
+
+/* ── Mobile detail sheet body — amount hero + summary rows per kind ── */
+// Mirrors the budget ledger's IssuedDetailsBody: one amount hero on top,
+// then type-specific summaries below. Read-only — overview never edits.
+const OverviewDetailsBody = ({ row, meta }) => {
+  const flagged = isFlagged(row);
+  const kind = row?.kind;
+  const sign = kind === "expense" ? "-" : "+";
+  const statusBadge =
+    kind === "issued" ? (
+      <Badge tone="success">
+        <span className="h-2 w-2 rounded-full bg-current opacity-80" />
+        Received
+      </Badge>
+    ) : kind === "abono" ? (
+      <Badge tone="warning">
+        <span className="h-2 w-2 rounded-full bg-current opacity-80" />
+        Abono
+      </Badge>
+    ) : (
+      <Badge tone="neutral">
+        <span className="h-2 w-2 rounded-full bg-current opacity-80" />
+        Paid
+      </Badge>
+    );
+  const summaryLabel =
+    kind === "issued"
+      ? "Employee Budget"
+      : kind === "abono"
+        ? "Abono"
+        : row?.reference_label || "Expense";
+  return (
+    <div className="mt-4 space-y-3">
+      {flagged && (
+        <div
+          role="note"
+          className="flex items-start gap-2.5 rounded-2xl border border-[var(--warning)]/40 bg-[var(--warning)]/[0.1] px-4 py-3"
+        >
+          <Flag
+            size={14}
+            aria-hidden
+            className="mt-0.5 shrink-0 text-[var(--warning)]"
+          />
+          <div className="min-w-0">
+            <p className="text-xs font-bold text-[var(--warning)]">
+              Flagged for review
+            </p>
+            <p className="mt-0.5 text-xs leading-relaxed text-[var(--warning)]/90">
+              Dated before the first budget issued to you — an admin needs to
+              approve it.
+            </p>
+          </div>
+        </div>
+      )}
+      <div className="flex items-center justify-between gap-3 rounded-2xl border border-[var(--border)] bg-[var(--surface-2)]/60 px-4 py-3.5">
+        <div className="min-w-0">
+          <p className="type-eyebrow text-[var(--ink-muted)]">Amount</p>
+          <p className="mt-1 font-display text-2xl font-semibold leading-none tracking-tight tabular-nums text-[var(--ink)]">
+            {sign}
+            {formatMoney(row?.amount)}
+          </p>
+          <p className="mt-1.5 truncate text-xs text-[var(--ink-muted)]">
+            {[summaryLabel, methodLabel(row?.method)]
+              .filter(Boolean)
+              .join(" · ")}
+          </p>
+        </div>
+        {statusBadge}
+      </div>
+      <div className="space-y-2 rounded-2xl border border-[var(--border)] bg-[var(--surface-2)]/60 px-4 py-3.5">
+        <div className="border-b border-[var(--border)] py-3 first:pt-0">
+          <p className="type-eyebrow text-[var(--ink-muted)]">Description</p>
+          <p className="mt-1 break-words text-sm font-medium leading-snug text-[var(--ink)]">
+            {row?.description || meta?.label || "—"}
+          </p>
+        </div>
+        <div className="grid grid-cols-2 gap-3 py-1">
+          <div className="min-w-0">
+            <p className="type-eyebrow text-[var(--ink-muted)]">Date</p>
+            <p className="mt-1 truncate text-sm font-medium tabular-nums text-[var(--ink)]">
+              {formatDate(row?.date)}
+            </p>
+          </div>
+          <div className="min-w-0">
+            <p className="type-eyebrow text-[var(--ink-muted)]">Time</p>
+            <p className="mt-1 truncate text-sm font-medium tabular-nums text-[var(--ink)]">
+              {formatTime(row?.date)}
+            </p>
+          </div>
+        </div>
+        <div className="grid grid-cols-2 gap-3 py-1">
+          <div className="min-w-0">
+            <p className="type-eyebrow text-[var(--ink-muted)]">Type</p>
+            <p className="mt-1 truncate text-sm font-medium text-[var(--ink)]">
+              {TYPE_LABEL_SHORT[kind] ?? meta?.label ?? "—"}
+            </p>
+          </div>
+          <div className="min-w-0">
+            <p className="type-eyebrow text-[var(--ink-muted)]">Method</p>
+            <p className="mt-1 truncate text-sm font-medium text-[var(--ink)]">
+              {methodLabel(row?.method)}
+            </p>
+          </div>
+        </div>
+        {(row?.reference_label || row?.notes) && (
+          <div className="border-t border-[var(--border)] py-3 last:pb-0">
+            {row?.reference_label && (
+              <div className="min-w-0">
+                <p className="type-eyebrow text-[var(--ink-muted)]">
+                  Source of funds
+                </p>
+                <p className="mt-1 truncate text-sm font-medium text-[var(--ink)]">
+                  {row.reference_label}
+                </p>
+              </div>
+            )}
+            {row?.notes && (
+              <div className="mt-3 min-w-0">
+                <p className="type-eyebrow text-[var(--ink-muted)]">Notes</p>
+                <p className="mt-1 break-words text-sm leading-relaxed text-[var(--ink)]">
+                  {row.notes}
+                </p>
+              </div>
+            )}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+};
+
 function getDateGroupLabel(date) {
   const txDate = startOfDay(toDate(date));
   const today = startOfDay(new Date());
@@ -120,6 +262,108 @@ function groupTransactionsByDate(rows) {
     .filter((label) => groups.has(label) && groups.get(label).length > 0)
     .map((label) => ({ label, transactions: groups.get(label) }));
 }
+
+/* ── Mobile bottom sheet — same slide-up as the budget sheet ── */
+// Mobile-only (md:hidden): tapping a card opens this portal with the
+// tapped row's details + summary. Desktop keeps the plain table.
+function OverviewSheet({ row, onClose }) {
+  const sheetRef = useRef(null);
+  const close = useCallback(() => onClose?.(), [onClose]);
+
+  useEffect(() => {
+    if (!row) return undefined;
+    const onKeyDown = (event) => {
+      if (event.key !== "Escape") return;
+      event.stopPropagation();
+      close();
+    };
+    window.addEventListener("keydown", onKeyDown, true);
+    return () => window.removeEventListener("keydown", onKeyDown, true);
+  }, [row, close]);
+
+  const meta = TYPE_CONFIG[row?.kind] ?? TYPE_CONFIG.expense;
+  const Icon = meta.icon;
+  const title = row?.description || meta.label || "Transaction";
+
+  return createPortal(
+    <AnimatePresence>
+      {row && (
+        <motion.div
+          key="overview-sheet"
+          className="fixed inset-0 z-[70] flex flex-col justify-end md:hidden"
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          exit={{ opacity: 0 }}
+          transition={{ duration: 0.2, ease: "easeOut" }}
+        >
+          <motion.div
+            className="absolute inset-0 bg-[var(--ink)]/40 backdrop-blur-sm"
+            onClick={close}
+            aria-hidden="true"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: 0.22, ease: "easeOut" }}
+          />
+          <motion.div
+            ref={sheetRef}
+            role="dialog"
+            aria-modal="true"
+            aria-label={title}
+            initial={{ y: "100%" }}
+            animate={{ y: "0%" }}
+            exit={{ y: "100%" }}
+            transition={{ duration: 0.38, ease: SHEET_EASE }}
+            className={cn(
+              "scrollbar-slim relative max-h-[88dvh] w-full overflow-y-auto overscroll-contain outline-none",
+              "rounded-t-[15px] border border-b-0 border-[var(--border)]",
+              "bg-[var(--surface)] shadow-hover will-change-transform",
+              "px-4 pt-3 pb-[calc(env(safe-area-inset-bottom)+1.25rem)]",
+            )}
+          >
+            <div
+              aria-hidden
+              className="mx-auto h-1.5 w-10 rounded-full bg-[var(--ink-muted)]/25"
+            />
+            <div className="flex items-center gap-3 pt-4">
+              <span
+                aria-hidden
+                className={cn(
+                  "flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl",
+                  isFlagged(row)
+                    ? "bg-[var(--warning)]/15 text-[var(--warning)]"
+                    : meta.iconWrapperClass,
+                )}
+              >
+                <Icon size={20} />
+              </span>
+              <div className="min-w-0 flex-1">
+                <p className="truncate font-display text-base font-semibold tracking-tight text-[var(--ink)]">
+                  {title}
+                </p>
+                <p className="mt-0.5 truncate text-xs tabular-nums text-[var(--ink-muted)]">
+                  {formatDate(row?.date)}
+                  {row?.date ? ` · ${formatTime(row.date)}` : ""}
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={close}
+                aria-label="Close transaction preview"
+                className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-[var(--surface-2)] text-[var(--ink-muted)] transition-colors hover:text-[var(--ink)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)]/30"
+              >
+                <X size={16} aria-hidden />
+              </button>
+            </div>
+            <OverviewDetailsBody row={row} meta={meta} />
+          </motion.div>
+        </motion.div>
+      )}
+    </AnimatePresence>,
+    document.body,
+  );
+}
+
 const COLUMN_WIDTHS = ["16%", "28%", "18%", "16%", "22%"];
 
 export const TransactionsSection = ({
@@ -129,6 +373,8 @@ export const TransactionsSection = ({
   const [search, setSearch] = useState("");
   const [debouncedSearch, setDebouncedSearch] = useState("");
   const [page, setPage] = useState(0);
+  // Mobile-only detail portal: the tapped card's row. Desktop has no dialog.
+  const [sheetRow, setSheetRow] = useState(null);
   // Date window applied on top of the text search (client-side; the hook
   // keeps fetching everything so clearing the range restores all rows).
   const [dateRange, setDateRange] = useState(emptyDateRange);
@@ -200,7 +446,7 @@ export const TransactionsSection = ({
     filteredTransactions.length,
   );
   return (
-    <Card className="overflow-hidden">
+    <Card className="overflow-hidden px-2.5">
       {/* Header & Top Searchbar */}
       <div className="flex flex-col gap-4 border-b border-[var(--border)] pb-4 md:flex-row md:items-center md:justify-between">
         <div className="flex items-center gap-3">
@@ -319,13 +565,30 @@ export const TransactionsSection = ({
                     : tx.kind === "issued"
                       ? "text-[var(--accent-strong)]"
                       : "text-[var(--ink)]";
+                  const flagged = isFlagged(tx);
 
                   return (
                     <tr
                       key={`${tx.kind}-${tx.id}`}
-                      className="transition-colors duration-150 hover:bg-[var(--accent)]/[0.05]"
+                      className={cn(
+                        "relative transition-colors duration-150 hover:bg-[var(--accent)]/[0.05]",
+                        flagged &&
+                          "bg-[var(--warning)]/[0.08] hover:bg-[var(--warning)]/[0.12]",
+                      )}
+                      title={
+                        flagged
+                          ? "Flagged — dated before the first budget issued to you"
+                          : undefined
+                      }
                     >
-                      <td className="px-4 py-3 first:pl-5 align-middle">
+                      <td className="relative px-4 py-3 first:pl-5 align-middle">
+                        <span
+                          aria-hidden
+                          className={cn(
+                            "absolute inset-y-2 left-0 w-[3px] rounded-full",
+                            flagged ? "bg-[var(--warning)]" : "bg-transparent",
+                          )}
+                        />
                         <p className="whitespace-nowrap text-[13px] font-semibold leading-none tabular-nums text-[var(--ink)]">
                           {formatDate(tx.date)}
                         </p>
@@ -341,7 +604,22 @@ export const TransactionsSection = ({
                         >
                           {tx.reference_label || tx.description || "—"}
                         </p>
-                        {tx.reference_label && tx.description ? (
+                        {flagged ? (
+                          <span className="mt-1.5 inline-flex">
+                            <Badge
+                              tone="warning"
+                              className="gap-1 px-1.5 py-0.5 text-[10px]"
+                              title="Flagged — dated before the first budget issued to you"
+                            >
+                              <Flag
+                                size={10}
+                                aria-hidden
+                                className="shrink-0"
+                              />
+                              Flagged
+                            </Badge>
+                          </span>
+                        ) : tx.reference_label && tx.description ? (
                           <p
                             className="mt-0.5 truncate text-[11px] leading-snug text-[var(--ink-muted)]"
                             title={tx.description}
@@ -429,77 +707,130 @@ export const TransactionsSection = ({
                     : "No transactions recorded yet."
             }
           />
-        ) : (() => {
-          const dateGroups = groupTransactionsByDate(pageRows);
-          return (
-            <>
-              {dateGroups.map(({ label, transactions }) => (
-                <div key={label} className="space-y-2.5">
-                  <h4 className="px-1 text-[11px] font-semibold uppercase tracking-wider text-[var(--ink-muted)]">
-                    {label}
-                  </h4>
-                  {transactions.map((tx) => {
-                    const meta = TYPE_CONFIG[tx.kind] ?? TYPE_CONFIG.expense;
-                    const isNegative = tx.kind === "expense";
-                    const amountColor = isNegative
-                      ? "text-[var(--danger)]"
-                      : tx.kind === "issued"
-                        ? "text-[var(--accent-strong)]"
-                        : "text-[var(--ink)]";
+        ) : (
+          (() => {
+            const dateGroups = groupTransactionsByDate(pageRows);
+            return (
+              <>
+                {dateGroups.map(({ label, transactions }) => (
+                  <div key={label} className="space-y-2.5">
+                    <h4 className="px-1 text-[11px] font-semibold uppercase tracking-wider text-[var(--ink-muted)]">
+                      {label}
+                    </h4>
+                    {transactions.map((tx) => {
+                      const meta = TYPE_CONFIG[tx.kind] ?? TYPE_CONFIG.expense;
+                      const isNegative = tx.kind === "expense";
+                      const amountColor = isNegative
+                        ? "text-[var(--danger)]"
+                        : tx.kind === "issued"
+                          ? "text-[var(--accent-strong)]"
+                          : "text-[var(--warning)]";
+                      const flagged = isFlagged(tx);
 
-                    return (
-                      <div
-                        key={`${tx.kind}-${tx.id}`}
-                        className="flex items-center justify-between gap-3 rounded-2xl border border-[var(--border)] bg-[var(--surface-2)]/60 px-3.5 py-3.5 transition-shadow hover:shadow-card"
-                      >
-                        {/* Left: Icon & Details matching requested mobile structure */}
-                        <div className="flex items-center gap-3 min-w-0">
-                          <div className="min-w-0">
-                            <p className="truncate text-xs font-semibold leading-none text-[var(--ink)]">
-                              {tx.description || meta.label}
-                            </p>
-                            {/* Meta row: type · short date · method badge */}
-                            <p className="mt-1.5 flex min-w-0 items-center gap-1.5 text-[11px] font-medium leading-none text-[var(--ink-muted)]">
-                              <span className="shrink-0">
-                                {TYPE_LABEL_SHORT[tx.kind] ?? meta.label}
-                              </span>
-                              <span aria-hidden className="shrink-0 opacity-40">
-                                |
-                              </span>
-                              <span className="shrink-0 tabular-nums">
-                                {formatShortDate(tx.date)}
-                              </span>
-                              <span aria-hidden className="shrink-0 opacity-40">
-                                |
-                              </span>
-                              <span className="truncate text-[10px] type-eyebrow">
-                                {tx.method}
-                              </span>
+                      return (
+                        <div
+                          key={`${tx.kind}-${tx.id}`}
+                          onClick={() => setSheetRow(tx)}
+                          onKeyDown={(e) => {
+                            if (e.key !== "Enter" && e.key !== " ") return;
+                            if (e.target.closest("button")) return;
+                            e.preventDefault();
+                            setSheetRow(tx);
+                          }}
+                          role="button"
+                          tabIndex={0}
+                          aria-label={`View details for ${tx.description || meta.label}`}
+                          className={cn(
+                            "relative flex cursor-pointer items-center justify-between gap-3 overflow-hidden rounded-2xl border border-[var(--border)] bg-[var(--surface-2)]/60 px-3.5 py-3.5 transition-shadow hover:shadow-card active:scale-[0.99]",
+                            flagged &&
+                              "border-[var(--warning)]/50 bg-[var(--warning)]/[0.08] ring-1 ring-inset ring-[var(--warning)]/25",
+                          )}
+                          title={
+                            flagged
+                              ? "Flagged — dated before the first budget issued to you"
+                              : undefined
+                          }
+                        >
+                          <span
+                            aria-hidden
+                            className={cn(
+                              "absolute inset-y-0 left-0 w-1",
+                              flagged
+                                ? "bg-[var(--warning)]"
+                                : "bg-transparent",
+                            )}
+                          />
+                          {/* Left: Icon & Details matching requested mobile structure */}
+                          <div className="flex items-center gap-3 min-w-0">
+                            <div className="min-w-0">
+                              <p className="flex min-w-0 items-center gap-1.5 truncate text-xs font-semibold leading-none text-[var(--ink)]">
+                                <span className="min-w-0 truncate capitalize">
+                                  {tx.description || meta.label}
+                                </span>
+                                {flagged && (
+                                  <Badge
+                                    tone="warning"
+                                    className="shrink-0 gap-1 px-1.5 py-0.5 text-[10px]"
+                                    title="Flagged — dated before the first budget issued to you"
+                                  >
+                                    <Flag
+                                      size={10}
+                                      aria-hidden
+                                      className="shrink-0"
+                                    />
+                                    Flagged
+                                  </Badge>
+                                )}
+                              </p>
+                              {/* Meta row: type · short date · method badge */}
+                              <p className="mt-1.5 flex min-w-0 items-center gap-1.5 text-[11px] font-medium leading-none text-[var(--ink-muted)]">
+                                <span className="shrink-0">
+                                  {TYPE_LABEL_SHORT[tx.kind] ?? meta.label}
+                                </span>
+                                <span
+                                  aria-hidden
+                                  className="shrink-0 opacity-40"
+                                >
+                                  |
+                                </span>
+                                <span className="shrink-0 tabular-nums">
+                                  {formatShortDate(tx.date)}
+                                </span>
+                                <span
+                                  aria-hidden
+                                  className="shrink-0 opacity-40"
+                                >
+                                  |
+                                </span>
+                                <span className="truncate text-[10px] type-eyebrow">
+                                  {tx.method}
+                                </span>
+                              </p>
+                            </div>
+                          </div>
+
+                          {/* Right: Amount & Status */}
+                          <div className="text-right shrink-0">
+                            <p
+                              className={cn(
+                                "font-display text-sm font-semibold tabular-nums",
+                                amountColor,
+                              )}
+                            >
+                              {isNegative
+                                ? `-${formatMoney(tx.amount)}`
+                                : `+${formatMoney(tx.amount)}`}
                             </p>
                           </div>
                         </div>
-
-                        {/* Right: Amount & Status */}
-                        <div className="text-right shrink-0">
-                          <p
-                            className={cn(
-                              "font-display text-sm font-semibold tabular-nums",
-                              amountColor,
-                            )}
-                          >
-                            {isNegative
-                              ? `-${formatMoney(tx.amount)}`
-                              : `+${formatMoney(tx.amount)}`}
-                          </p>
-                        </div>
-                      </div>
-                    );
-                  })}
-                </div>
-              ))}
-            </>
-          );
-        })()}
+                      );
+                    })}
+                  </div>
+                ))}
+              </>
+            );
+          })()
+        )}
       </div>
 
       {/* Pagination — footer strip under both the table and the mobile cards:
@@ -514,6 +845,8 @@ export const TransactionsSection = ({
           <Pager page={currentPage} pageCount={pageCount} onChange={setPage} />
         </div>
       )}
+
+      <OverviewSheet row={sheetRow} onClose={() => setSheetRow(null)} />
     </Card>
   );
 };

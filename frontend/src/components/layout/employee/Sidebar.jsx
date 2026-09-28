@@ -4,12 +4,12 @@ import { AnimatePresence, motion } from "framer-motion";
 import {
   LayoutGrid,
   FileText,
-  Receipt,
   Settings,
   LogOut,
   X,
   Wallet,
   House,
+  HandCoins,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/context/AuthContext";
@@ -22,9 +22,14 @@ const NAV = [
     label: "Overview",
     primary: true,
   },
-  { to: "/employee/budget", icon: FileText, label: "My Budget", primary: true },
-  { to: "/employee/expenses", icon: Receipt, label: "Expenses", primary: true },
-  { to: "/employee/abono", icon: Wallet, label: "Abono", primary: true },
+  { to: "/employee/budget", icon: Wallet, label: "My Budget", primary: true },
+  {
+    to: "/employee/expenses",
+    icon: FileText,
+    label: "Expenses",
+    primary: true,
+  },
+  { to: "/employee/abono", icon: HandCoins, label: "Abono", primary: true },
 ];
 
 // `md` is the hand-off point: from here up the hover-expanding rail is used,

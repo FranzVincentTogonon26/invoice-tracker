@@ -4,9 +4,10 @@
 // message to `onError`). Used by the modal's dropzone (auto-scan on upload)
 // and the manual scan icon.
 //
-// The backend stores the upload during this call and answers with its public
-// URL (`image_url`), which the draft keeps instead of the multi-megabyte data
-// URL that used to overflow localStorage.
+// PARSE ONLY: the backend reads the upload from memory and never stores it, so
+// nothing reaches `uploads/receipts` during a scan. The picked File is kept in
+// the browser (`lib/receiptFiles.js`) and every held file is uploaded at once
+// when the Add Expenses form is saved — see `POST /expenses/receipt-images`.
 import { useCallback, useRef, useState } from "react";
 import { aiApi } from "../api/ai";
 import { useAuth } from "../context/AuthContext";
@@ -51,8 +52,8 @@ const normalizeParsedReceipt = (res) => {
     subtotal: num(res?.subtotal, 0),
     total: num(res?.total, 0),
     suggested_category: str(res?.suggested_category),
-    // The scan stores the upload on the server and returns its public URL —
-    // this is the value that ends up in `expenses.image_url`.
+    // Empty in the deferred-upload flow (the scan stores nothing); kept for
+    // any response that still carries an already-stored URL.
     imageUrl: str(res?.image_url),
     fileName: str(res?.file_name),
   };

@@ -1,4 +1,5 @@
 import { useEffect, useId, useMemo, useState } from "react";
+import { useQueryClient } from "@tanstack/react-query";
 import { AnimatePresence, motion } from "framer-motion";
 import {
   AlertCircle,
@@ -15,6 +16,7 @@ import {
   Maximize2,
   ReceiptText,
   RotateCcw,
+  ShieldCheck,
   Store,
   Tag,
   TriangleAlert,
@@ -27,6 +29,7 @@ import {
 import { Button } from "../../../ui/Button";
 import { Badge } from "../../../ui/Badge";
 import { useExpenseDetail } from "../../../../hooks/useExpenses";
+import { expensesApi } from "../../../../api/expenses";
 import {
   cn,
   formatDate,
@@ -110,6 +113,109 @@ const CreatorRow = ({ row }) => (
   </div>
 );
 
+// Green confirmation shown after the admin clears the flag — the
+// "Approved by admin" label. Same card size/padding as the red notice so the
+// layout doesn't shift, only the tone changes.
+const ApprovedFlagNotice = () => (
+  <div
+    role="status"
+    className="flex items-start gap-3 rounded-2xl border border-emerald-500/30 bg-emerald-500/10 p-3.5"
+  >
+    <ShieldCheck
+      size={16}
+      aria-hidden
+      className="mt-0.5 shrink-0 text-emerald-600"
+    />
+    <div className="min-w-0 flex-1">
+      <p className="text-xs font-bold text-emerald-700">Approved by admin</p>
+      <p className="mt-1 text-xs leading-relaxed text-emerald-700/90">
+        Flag cleared — this expense is no longer marked for review.
+      </p>
+    </div>
+  </div>
+);
+
+// ── Flagged notice + admin approval ─────────────────────────────────────
+// Same red card the modal always rendered — only an action row is added
+// inside it (button + "Action needed" hint). Approving PATCHes
+// /expenses/:id/clear-flag (flag = 0) and swaps this card for the green
+// "Approved by admin" label. Rendered ONLY when row.flagged is truthy, so a
+// non-flagged expense keeps the original design untouched.
+const FlaggedNotice = ({ expenseId, onCleared }) => {
+  const qc = useQueryClient();
+  const [approving, setApproving] = useState(false);
+  const [approved, setApproved] = useState(false);
+  const [error, setError] = useState(null);
+
+  const handleApprove = async () => {
+    if (!expenseId || approving || approved) return;
+    setApproving(true);
+    setError(null);
+    try {
+      await expensesApi.clearFlag(expenseId);
+      setApproved(true);
+      qc.invalidateQueries({ queryKey: ["expenses"] });
+      qc.invalidateQueries({ queryKey: ["employeeExpenses"] });
+      onCleared?.(expenseId);
+    } catch (err) {
+      setError(err?.message || "Couldn’t approve flag. Try again.");
+    } finally {
+      setApproving(false);
+    }
+  };
+
+  if (approved) {
+    return <ApprovedFlagNotice />;
+  }
+
+  return (
+    <div
+      role="note"
+      className="flex items-start gap-3 rounded-2xl border border-[var(--danger)]/30 bg-[var(--danger)]/10 p-3.5"
+    >
+      <TriangleAlert
+        size={16}
+        aria-hidden
+        className="mt-0.5 shrink-0 text-[var(--danger)]"
+      />
+      <div className="min-w-0 flex-1">
+        <p className="text-xs font-bold text-[var(--danger)]">
+          Receipt date predates the budget issuance date
+        </p>
+        <p className="mt-1 text-xs leading-relaxed text-[var(--danger)]/90">
+          This receipt is dated before the budget was issued to the employee.
+          Please verify the receipt details and legitimacy before approving.
+        </p>
+        <div className="mt-2.5 flex flex-row justify-end items-center gap-2 border-t border-[var(--danger)]/20 pt-2.5">
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            onClick={handleApprove}
+            disabled={approving || !expenseId}
+            className="h-7 rounded-full bg-[var(--surface)] px-3 text-[11px]"
+          >
+            {approving ? (
+              <Loader2 size={13} className="animate-spin" aria-hidden />
+            ) : (
+              <ShieldCheck size={13} aria-hidden />
+            )}
+            {approving ? "Approving…" : "Approve flag"}
+          </Button>
+        </div>
+        {error ? (
+          <p
+            role="alert"
+            className="mt-1.5 text-[11px] font-medium text-[var(--danger)]"
+          >
+            {error}
+          </p>
+        ) : null}
+      </div>
+    </div>
+  );
+};
+
 const LineCells = ({ item, index }) => (
   <>
     <td className="px-4 py-3 align-top">
@@ -158,15 +264,10 @@ const LineItemsSection = ({
         role="status"
         className="overflow-hidden rounded-2xl border border-[var(--border)] bg-[var(--surface)] shadow-xs"
       >
-        <div className="flex items-center justify-between gap-2 border-b border-[var(--border)] bg-[var(--surface-2)]/30 px-4 py-3">
-          <p className="text-[11px] font-semibold uppercase tracking-[0.08em] text-[var(--ink-muted)]">
-            Receipt items
-          </p>
-          <span className="h-5 w-14 animate-pulse rounded-full bg-[var(--surface-2)]" />
-        </div>
-        <div className="space-y-3 px-4 py-4">
-          <div className="flex items-center gap-3">
-            <div className="h-3 flex-1 animate-pulse rounded-full bg-[var(--surface-2)]" />
+        <div className="space-y-3 px-4 py-3">
+          <div className="items-center gap-3 space-y-3">
+            <span className="flex  h-5 w-20 animate-pulse rounded-full bg-[var(--surface-2)]" />
+            <div className="flex  h-3 flex-1 animate-pulse rounded-full bg-[var(--surface-2)]" />
           </div>
         </div>
       </section>
@@ -328,12 +429,18 @@ const ExpenseDetailsModal = ({
   expense,
   referenceLabel = "",
   onClose,
+  onFlagCleared,
 }) => {
   const titleId = useId();
   const itemsRegionId = useId();
   const [failedUrl, setFailedUrl] = useState(null);
   const [itemsOpen, setItemsOpen] = useState(false);
   const [zoomLevel, setZoomLevel] = useState(1);
+  // Expense id whose flag was just approved in this session — keeps the green
+  // "Approved by admin" label visible after the parent flips row.flagged to
+  // false (otherwise the notice would unmount and the confirmation would flash
+  // away). Reset per expense / per open below.
+  const [clearedFlagId, setClearedFlagId] = useState(null);
   const row = expense;
 
   // Reset the view (zoom level + items panel) on every open. Adjusting state
@@ -344,6 +451,14 @@ const ExpenseDetailsModal = ({
     setPrevOpen(open);
     setZoomLevel(1);
     setItemsOpen(false);
+    if (!open) setClearedFlagId(null);
+  }
+  // New expense selected while open → drop the previous approval label so a
+  // non-flagged expense keeps the original design untouched.
+  const [prevRowId, setPrevRowId] = useState(row?.id);
+  if (prevRowId !== row?.id) {
+    setPrevRowId(row?.id);
+    setClearedFlagId(null);
   }
 
   useEffect(() => {
@@ -403,25 +518,16 @@ const ExpenseDetailsModal = ({
   const zoomReset = () => setZoomLevel(1);
 
   const flaggedNotice = row?.flagged ? (
-    <div
-      role="note"
-      className="flex items-start gap-3 rounded-2xl border border-[var(--danger)]/30 bg-[var(--danger)]/10 p-3.5"
-    >
-      <TriangleAlert
-        size={16}
-        aria-hidden
-        className="mt-0.5 shrink-0 text-[var(--danger)]"
-      />
-      <div className="min-w-0 flex-1">
-        <p className="text-xs font-bold text-[var(--danger)]">
-          Receipt date predates the budget issuance date
-        </p>
-        <p className="mt-1 text-xs leading-relaxed text-[var(--danger)]/90">
-          This receipt is dated before the budget was issued to the employee.
-          Please verify the receipt details and legitimacy before approving.
-        </p>
-      </div>
-    </div>
+    <FlaggedNotice
+      key={row?.id}
+      expenseId={row?.id}
+      onCleared={(id) => {
+        setClearedFlagId(id);
+        onFlagCleared?.(id);
+      }}
+    />
+  ) : clearedFlagId && clearedFlagId === row?.id ? (
+    <ApprovedFlagNotice />
   ) : null;
 
   const detailRows = (
@@ -436,7 +542,7 @@ const ExpenseDetailsModal = ({
             />
           }
         >
-          Receipt date Expense
+          date Expense
         </FieldLabel>
         <p className="text-sm font-semibold text-[var(--ink)]">
           {formatDate(row?.date)}
@@ -460,7 +566,7 @@ const ExpenseDetailsModal = ({
               />
             }
           >
-            Receipt date entry
+            date entry
           </FieldLabel>
           <p className="text-sm font-semibold text-[var(--ink)]">
             {formatDate(row.timeDate)}
@@ -598,12 +704,12 @@ const ExpenseDetailsModal = ({
         }
       >
         Total amount
+        <ExpenseStatusBadge className="ml-2" status={row?.status} />
       </FieldLabel>
       <div className="flex flex-row items-center gap-3">
         <p className="mt-1.5 font-display text-4xl font-bold leading-none tracking-tight tabular-nums text-[var(--ink)]">
           {formatMoney(recordedTotal)}
         </p>
-        <ExpenseStatusBadge status={row?.status} />
       </div>
     </div>
   );
