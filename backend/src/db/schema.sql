@@ -1,6 +1,9 @@
 -- ============================================================
 -- BUDGET & INVOICE TRACKING SYSTEM
+-- ============================================================
+
 -- PostgreSQL Schema
+
 -- ============================================================
 
 CREATE EXTENSION IF NOT EXISTS "pgcrypto";
@@ -100,19 +103,35 @@ CREATE TABLE IF NOT EXISTS budget (
 -- ============================================================
 
 CREATE TABLE IF NOT EXISTS budget_issued_reference (
-    id             UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    reference_id   UUID NOT NULL
-                   REFERENCES budget_reference(reference_id)
-                   ON DELETE CASCADE,
-    user_id        UUID NOT NULL
-                   REFERENCES users(user_id)
-                   ON DELETE CASCADE,
-    notes          TEXT,
-    status         VARCHAR(20) NOT NULL DEFAULT 'open'
-                   CHECK (status IN ('open', 'close', 'cancel')),
-    date_cut_off   TIMESTAMPTZ,
-    date_forwarded TIMESTAMPTZ,
-    created_at     TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    id              UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    reference_id    UUID NOT NULL
+                    REFERENCES budget_reference(reference_id)
+                    ON DELETE CASCADE,
+    user_id         UUID NOT NULL
+                    REFERENCES users(user_id)
+                    ON DELETE CASCADE,
+    notes           TEXT,
+    status          VARCHAR(20) NOT NULL DEFAULT 'open'
+                    CHECK (status IN ('open', 'close', 'cancel')),
+    date_cut_off    TIMESTAMPTZ,
+    date_forwarded  TIMESTAMPTZ,
+    created_at      TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+
+-- ============================================================
+-- RECEIPT
+-- ============================================================
+
+CREATE TABLE IF NOT EXISTS receipt (
+    id          UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    receipt_id  VARCHAR(255) NOT NULL DEFAULT gen_random_uuid()::TEXT,
+    vendor      TEXT,
+    description TEXT,
+    qty         INTEGER DEFAULT 1,
+    rate        DECIMAL(12,2) DEFAULT 0,
+    amount      DECIMAL(12,2) DEFAULT 0,
+    created_at  TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
 
@@ -146,6 +165,29 @@ CREATE TABLE IF NOT EXISTS issued_budget (
 -- ============================================================
 
 CREATE TABLE IF NOT EXISTS employee_abono (
+    id            UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    reference_id  UUID NOT NULL
+                  REFERENCES budget_reference(reference_id)
+                  ON DELETE CASCADE,
+    user_id       UUID NOT NULL
+                  REFERENCES users(user_id)
+                  ON DELETE CASCADE,
+    amount        DECIMAL(12,2) NOT NULL,
+    description   TEXT NOT NULL,
+    status        VARCHAR(20) NOT NULL DEFAULT 'open'
+                  CHECK (status IN ('open', 'settled', 'draft')),
+    date_settled  TIMESTAMPTZ,
+    created_at    TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    updated_at    TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    CHECK (amount >= 0)
+);
+
+
+-- ============================================================
+-- BUDGET TRANSFER
+-- ============================================================
+
+CREATE TABLE IF NOT EXISTS budget_transfer (
     id           UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     reference_id UUID NOT NULL
                  REFERENCES budget_reference(reference_id)
@@ -154,9 +196,13 @@ CREATE TABLE IF NOT EXISTS employee_abono (
                  REFERENCES users(user_id)
                  ON DELETE CASCADE,
     amount       DECIMAL(12,2) NOT NULL,
-    description  TEXT NOT NULL,
-    status       VARCHAR(20) NOT NULL DEFAULT 'open'
-                 CHECK (status IN ('open', 'settled')),
+    notes        TEXT,
+    method       VARCHAR(255) NOT NULL,
+    status       VARCHAR(20) NOT NULL DEFAULT 'success'
+                 CHECK (status IN ('success', 'cancel')),
+    transfer_to  UUID NOT NULL
+                 REFERENCES users(user_id)
+                 ON DELETE CASCADE,
     created_at   TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     updated_at   TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     CHECK (amount >= 0)
@@ -164,20 +210,28 @@ CREATE TABLE IF NOT EXISTS employee_abono (
 
 
 -- ============================================================
--- BUDGET ADJUSTMENTS
+-- BUDGET TRANSFER RECEIVED
 -- ============================================================
 
-CREATE TABLE IF NOT EXISTS budget_adjustments (
+CREATE TABLE IF NOT EXISTS budget_transfer_received (
     id           UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    issued_ref_id UUID NOT NULL
-                  REFERENCES budget_issued_reference(id)
-                  ON DELETE CASCADE,
+    reference_id UUID NOT NULL
+                 REFERENCES budget_reference(reference_id)
+                 ON DELETE CASCADE,
     user_id      UUID NOT NULL
                  REFERENCES users(user_id)
+                 ON DELETE CASCADE,
+    transfer_id  UUID NOT NULL
+                 REFERENCES budget_transfer(id)
                  ON DELETE CASCADE,
     amount       DECIMAL(12,2) NOT NULL,
     notes        TEXT,
     method       VARCHAR(255) NOT NULL,
+    status       VARCHAR(20) NOT NULL DEFAULT 'success'
+                 CHECK (status IN ('success', 'cancel')),
+    transfer_by  UUID NOT NULL
+                 REFERENCES users(user_id)
+                 ON DELETE CASCADE,
     created_at   TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     updated_at   TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     CHECK (amount >= 0)
@@ -192,22 +246,6 @@ CREATE TABLE IF NOT EXISTS category (
     category_id   UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     category_name TEXT NOT NULL,
     created_at    TIMESTAMPTZ NOT NULL DEFAULT NOW()
-);
-
-
--- ============================================================
--- RECEIPT
--- ============================================================
-
-CREATE TABLE IF NOT EXISTS receipt (
-    id          UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    receipt_id  VARCHAR(255) NOT NULL DEFAULT gen_random_uuid()::TEXT,
-    vendor      TEXT,
-    description TEXT,
-    qty         INTEGER DEFAULT 1,
-    rate        DECIMAL(12,2) DEFAULT 0,
-    amount      DECIMAL(12,2) DEFAULT 0,
-    created_at  TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
 
@@ -336,7 +374,7 @@ CREATE INDEX IF NOT EXISTS idx_budget_approved_at
 CREATE INDEX IF NOT EXISTS idx_budget_cancelled_at
     ON budget(cancelled_at);
 
-CREATE INDEX IF NOT EXISTS idx_budget_reference_status
+CREATE INDEX IF NOT EXISTS idx_budget_reference_id_status
     ON budget(reference_id, status);
 
 
@@ -386,20 +424,6 @@ CREATE INDEX IF NOT EXISTS idx_employee_abono_status
 
 CREATE INDEX IF NOT EXISTS idx_employee_abono_created_at
     ON employee_abono(created_at);
-
-
--- ------------------------------------------------------------
--- BUDGET ADJUSTMENTS INDEXES
--- ------------------------------------------------------------
-
-CREATE INDEX IF NOT EXISTS idx_budget_adjustments_user_id
-    ON budget_adjustments(user_id);
-
-CREATE INDEX IF NOT EXISTS idx_budget_adjustments_created_at
-    ON budget_adjustments(created_at);
-
-CREATE INDEX IF NOT EXISTS idx_budget_adjustments_issued_ref_created
-    ON budget_adjustments(issued_ref_id, created_at);
 
 
 -- ------------------------------------------------------------

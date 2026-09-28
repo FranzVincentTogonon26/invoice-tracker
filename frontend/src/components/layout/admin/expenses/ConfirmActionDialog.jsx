@@ -4,21 +4,7 @@ import { AnimatePresence, motion } from "framer-motion";
 import { Loader2 } from "lucide-react";
 import { Button } from "../../../ui/Button";
 
-// Shared entrance/exit easing — the same curve the Budget actions dialogs use,
-// so every confirmation in the admin area animates identically.
 const DIALOG_EASE = [0.16, 1, 0.3, 1];
-
-/**
- * Destructive-confirmation dialog for the ledger row actions ("Delete expense"
- * / "Cancel issuance"). Nothing is submitted until the admin answers "yes":
- * the menu only records which row was picked, and this dialog runs the
- * mutation on confirm — mirroring the Budget actions' alertdialog shell
- * (portal, body lock, focus trap, Escape to dismiss, pending lockout) so every
- * confirmation in the admin area behaves the same way.
- *
- * Focus lands on the destructive button (the Budget dialogs' choice); the
- * dialog is opened from a static table row, not from a form being edited.
- */
 const ConfirmActionDialog = ({
   open,
   icon,
@@ -36,14 +22,10 @@ const ConfirmActionDialog = ({
   const descriptionId = useId();
   const confirmRef = useRef(null);
 
-  // Move focus into the dialog when it opens.
   useEffect(() => {
     if (open) confirmRef.current?.focus();
   }, [open]);
 
-  // Close on Escape while open. Capture phase + stopPropagation keeps
-  // page-level Escape handlers from also firing. Ignored while a request is in
-  // flight — the dialog must not be dismissed mid-submit.
   useEffect(() => {
     if (!open) return undefined;
     const onKeyDown = (e) => {

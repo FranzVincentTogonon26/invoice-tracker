@@ -28,6 +28,24 @@ export const expensesApi = {
   updateStatus: (id, status) =>
     apiClient.patch(`/expenses/${id}/status`, { status }).then((r) => r.data),
 
+  // Admin ledger row action ("Add to draft"): pushes an employee-authored
+  // expense that is still 'paid' back to 'draft'. Admin-only on the server —
+  // the guarded UPDATE only matches rows whose author is an employee and
+  // whose status is still 'paid'.
+  markEmployeeDraft: (id) =>
+    apiClient
+      .patch(`/expenses/${id}/employee-draft`)
+      .then((r) => r.data),
+
+  // Admin ledger row action ("Remove from draft"): the counterpart — an
+  // employee-authored draft is put back to 'paid' and counts against that
+  // employee's balance again. Admin-only on the server; the guarded UPDATE
+  // only matches employee-authored rows still sitting in 'draft'.
+  markEmployeePaid: (id) =>
+    apiClient
+      .patch(`/expenses/${id}/employee-paid`)
+      .then((r) => r.data),
+
   // Update expense description (inline editing)
   updateDescription: (id, description) =>
     apiClient.patch(`/expenses/${id}/description`, { description }).then((r) => r.data),

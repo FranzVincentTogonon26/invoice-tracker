@@ -154,6 +154,16 @@ class Expenses {
     return rows;
   }
 
+  // ── Add Expenses save ─────────────────────────────────────────────
+  // `first_issued_at` (YYYY-MM-DD) drives the employee-only backdated marker:
+  // when it is present, every line whose stored `expense_date` falls BEFORE the
+  // first budget issuance linked to `user_id` (the MIN of that user's
+  // `budget_issued_reference.created_at`) is inserted with `flag = 1` — the
+  // mark the admin ledger renders as "Flagged" (see ExpensesTable). The
+  // controller only ever passes it for a token whose role is 'employee'; admins
+  // (and an employee who holds no issuance yet) pass null, so flag stays 0. The
+  // comparison runs inside the INSERT against the very same COALESCE() the date
+  // column is stored with, so the flag can never disagree with `expense_date`.
   static async createExpenses({
     items,
     user_id,
@@ -162,6 +172,7 @@ class Expenses {
     receipts = [],
     image_url = null,
     receipt_date = null,
+    first_issued_at = null,
   }) {
     return withTransaction(async (client) => {
       const receiptRowIds = new Map();
@@ -204,10 +215,16 @@ class Expenses {
           `INSERT INTO expenses
              (user_id, issued_ref_id, reference_id, description, category_id,
               total_amount, expense_date, notes, receipt_id, payment_method,
-              image_url, receipt_date)
+              image_url, receipt_date, flag)
            VALUES
              ($1, $2, COALESCE($3::uuid, $11::uuid), $4, $5, $6,
-              COALESCE($7::date, CURRENT_DATE), $8, $9, $10, $12, $13)
+              COALESCE($7::date, CURRENT_DATE), $8, $9, $10, $12, $13,
+              CASE
+                WHEN $14::date IS NOT NULL
+                 AND COALESCE($7::date, CURRENT_DATE) < $14::date
+                THEN 1
+                ELSE 0
+              END)
            RETURNING *`,
           [
             user_id,
@@ -223,6 +240,7 @@ class Expenses {
             item.reference_id ?? null,
             item.image_url ?? image_url ?? null,
             item.receipt_date ?? receipt_date ?? null,
+            first_issued_at,
           ],
         );
 
@@ -231,6 +249,23 @@ class Expenses {
 
       return rows;
     });
+  }
+
+  // First date budget was issued to this user — MIN() over every
+  // `budget_issued_reference` row linked by `user_id`, formatted as YYYY-MM-DD
+  // (`to_char` pins the ISO shape instead of trusting the session's DateStyle).
+  // NULL when the user holds no issuance at all. It is both the value the
+  // employee Add Expenses form compares each line's date against (returned by
+  // `expensesOverviewEmployee`) and the cutoff `createExpenses` uses to set
+  // `expenses.flag`.
+  static async firstIssuedAt(userId) {
+    const result = await query(
+      `SELECT to_char(MIN(bir.created_at), 'YYYY-MM-DD') AS first_issued_at
+         FROM budget_issued_reference bir
+        WHERE bir.user_id = $1`,
+      [userId],
+    );
+    return result.rows[0]?.first_issued_at ?? null;
   }
 
   static async removeExpense(id) {
@@ -255,6 +290,54 @@ class Expenses {
         RETURNING id, description, total_amount::float8 AS total_amount,
                   status, image_url`,
       [id, status],
+    );
+    return result.rows[0] ?? null;
+  }
+
+  // Admin ledger row action ("Add to draft"): pushes an employee-authored
+  // expense that is still 'paid' back to 'draft'. The employee + paid guards
+  // live inside the UPDATE itself, so a row that moved on between the page's
+  // render and the click (already a draft/cancelled row, or authored by an
+  // admin) is never touched — the caller gets null and answers with an
+  // explanatory conflict. The employee ledger counts only 'paid' rows, so the
+  // amount returns to that employee's available balance until it is paid
+  // again.
+  static async markEmployeeExpenseDraft(id) {
+    const result = await query(
+      `UPDATE expenses e
+          SET status = 'draft', updated_at = NOW()
+         FROM users u
+        WHERE e.id = $1
+          AND u.user_id = e.user_id
+          AND u.role = 'employee'
+          AND e.status = 'paid'
+        RETURNING e.id, e.description,
+                  e.total_amount::float8 AS total_amount,
+                  e.status, e.image_url`,
+      [id],
+    );
+    return result.rows[0] ?? null;
+  }
+
+  // Admin ledger row action ("Remove from draft"): the counterpart of
+  // markEmployeeExpenseDraft — an employee-authored expense parked in 'draft'
+  // (by the employee's own soft delete or by an admin's "Add to draft") is put
+  // back to 'paid'. The same employee + draft guards live inside the UPDATE,
+  // so only an employee-authored draft row is ever touched and the amount
+  // counts against that employee's available balance again.
+  static async markEmployeeExpensePaid(id) {
+    const result = await query(
+      `UPDATE expenses e
+          SET status = 'paid', updated_at = NOW()
+         FROM users u
+        WHERE e.id = $1
+          AND u.user_id = e.user_id
+          AND u.role = 'employee'
+          AND e.status = 'draft'
+        RETURNING e.id, e.description,
+                  e.total_amount::float8 AS total_amount,
+                  e.status, e.image_url`,
+      [id],
     );
     return result.rows[0] ?? null;
   }
@@ -426,6 +509,12 @@ class Expenses {
            e.expense_date::text AS expense_date,
            e.payment_method,
            e.status,
+           -- Raw risk mark: 1 = the record has been flagged as suspicious and
+           -- must be visibly marked for the admin (see ExpensesTable). The Add
+           -- Expenses save sets it for an employee line dated before the first
+           -- budget issued to them (see createExpenses). Only the admin
+           -- overview returns it — employees never see this column.
+           e.flag,
            e.notes,
            e.created_at,
            e.category_id,
@@ -773,10 +862,16 @@ class Expenses {
     // The old hardcoded "lance" id was not a UUID and could not be
     // traced back to the issuance actually funding the employee.
     const references = await this.employeeReferenceList(userId);
+    // Employee-only guard surfaced to the Add Expenses form: each line's
+    // DatePicker value is compared against this first issuance date, and the
+    // save-time flag is decided from the very same value server-side (see
+    // createExpenses).
+    const firstIssuedAt = await this.firstIssuedAt(userId);
 
     return {
       categories,
       references,
+      firstIssuedAt,
       expenses: expenses.rows,
       overview: {
         totalBudget,

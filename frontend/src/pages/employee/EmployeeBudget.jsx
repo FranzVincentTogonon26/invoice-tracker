@@ -98,7 +98,7 @@ const EmployeeBudget = () => {
               aria-hidden
               className="pointer-events-none absolute -bottom-10 -right-8 select-none font-display text-[120px] font-bold leading-none tracking-tighter text-white/[0.07] sm:text-[168px]"
             >
-              â‚±
+              ₱
             </div>
             <div
               aria-hidden

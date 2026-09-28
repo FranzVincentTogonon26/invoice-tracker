@@ -1,6 +1,13 @@
 import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
-import { EllipsisVertical, Eye, Trash2, Wallet } from "lucide-react";
+import {
+  CircleCheck,
+  EllipsisVertical,
+  Eye,
+  RotateCcw,
+  Trash2,
+  Wallet,
+} from "lucide-react";
 import { Badge } from "../../../ui/Badge";
 import { MethodIcon } from "../../../ui/Select";
 import {
@@ -29,8 +36,6 @@ const EXPENSE_STATUS = {
   cancel: { tone: "danger", label: "Cancelled" },
 };
 
-// Source-of-funds label forced on every row created by an employee, whatever
-// reference the record is tagged with.
 const EMPLOYEE_SOURCE_LABEL = "Employee balance";
 
 export function ExpenseStatusBadge({ status, className }) {
@@ -46,10 +51,19 @@ export function ExpenseStatusBadge({ status, className }) {
   );
 }
 
-// Source of funds pill shared by the table row and the mobile card — the
-// budget_reference label resolved from expenses.reference_id (the page
-// guarantees a non-empty source), with a defensive em-dash branch kept for
-// rows that reach the table without one.
+export function FlaggedBadge({ className }) {
+  return (
+    <Badge
+      tone="danger"
+      className={className}
+      title="Flagged for review — this record may need verification"
+    >
+      {/* <TriangleAlert size={12} aria-hidden className="shrink-0" /> */}
+      Red Flag
+    </Badge>
+  );
+}
+
 function SourceFundsBadge({ source, tone }) {
   if (!source) {
     return (
@@ -73,7 +87,14 @@ function SourceFundsBadge({ source, tone }) {
   );
 }
 
-function RowActions({ row, pending, onView, onDelete }) {
+function RowActions({
+  row,
+  pending,
+  onView,
+  onDelete,
+  onAddToDraft,
+  onRemoveFromDraft,
+}) {
   const [open, setOpen] = useState(false);
   const [position, setPosition] = useState(null);
   const btnRef = useRef(null);
@@ -126,9 +147,28 @@ function RowActions({ row, pending, onView, onDelete }) {
       danger: false,
       onSelect: () => onView?.(row),
     },
-    // Employee-authored rows stay read-only from this menu unless the record
-    // is still a draft — only then can an admin delete it. Paid or cancelled
-    // employee rows keep just "View expense".
+    ...(row?.employeeRole === "employee" && row?.status === "paid"
+      ? [
+          {
+            key: "draft",
+            label: "Add to draft",
+            Icon: RotateCcw,
+            danger: false,
+            onSelect: () => onAddToDraft?.(row),
+          },
+        ]
+      : []),
+    ...(row?.employeeRole === "employee" && row?.status === "draft"
+      ? [
+          {
+            key: "restore",
+            label: "Remove from draft",
+            Icon: CircleCheck,
+            danger: false,
+            onSelect: () => onRemoveFromDraft?.(row),
+          },
+        ]
+      : []),
     ...(row?.employeeRole === "employee" && row?.status !== "draft"
       ? []
       : [
@@ -137,8 +177,6 @@ function RowActions({ row, pending, onView, onDelete }) {
             label: "Delete expense",
             Icon: Trash2,
             danger: true,
-            // Asks the page for confirmation — nothing is deleted until the
-            // dialog's "yes" runs the mutation.
             onSelect: () => onDelete?.(row),
           },
         ]),
@@ -259,16 +297,33 @@ function EmployeeCell({ name, role, avatarUrl, size = "md" }) {
   );
 }
 
-function LedgerRow({ row, removePending, onView, onDelete }) {
+function LedgerRow({
+  row,
+  pending,
+  onView,
+  onDelete,
+  onAddToDraft,
+  onRemoveFromDraft,
+}) {
   return (
-    <tr className="group border-b border-[var(--border)] transition-colors duration-150 last:border-b-0 hover:bg-[var(--accent)]/[0.04]">
+    <tr
+      className={cn(
+        "group border-b border-[var(--border)] transition-colors duration-150 last:border-b-0 hover:bg-[var(--accent)]/[0.04]",
+        row.flagged && "bg-[var(--danger)]/[0.03]",
+      )}
+    >
       <td className="relative px-4 py-4 pl-5 align-middle">
         <span
           aria-hidden
-          className="absolute inset-y-3 left-0 w-0.5 rounded-full bg-[var(--accent-strong)] opacity-0 transition-opacity duration-150 group-hover:opacity-100"
+          className={cn(
+            "absolute inset-y-3 left-0 w-0.5 rounded-full transition-opacity duration-150",
+            row.flagged
+              ? "bg-[var(--danger)] opacity-100"
+              : "bg-[var(--accent-strong)] opacity-0 group-hover:opacity-100",
+          )}
         />
         <p className="text-sm leading-none tabular-nums text-[var(--ink)]">
-          {formatDate(row.date)}
+          {formatDate(row.timeDate)}
         </p>
         <p className="mt-1.5 text-xs leading-none tabular-nums text-[var(--ink-muted)]">
           {formatTime(row.timeDate)}
@@ -282,12 +337,15 @@ function LedgerRow({ row, removePending, onView, onDelete }) {
         >
           {row.description || "Untitled"}
         </p>
-        <p
-          title={row.category || undefined}
-          className="mt-1 truncate text-xs leading-snug text-[var(--ink-muted)]"
-        >
-          {row.category || "—"}
-        </p>
+        <div className="mt-1 flex items-center gap-2">
+          <p
+            title={row.category || undefined}
+            className="min-w-0 truncate text-xs leading-snug text-[var(--ink-muted)]"
+          >
+            {row.category || "—"}
+          </p>
+          {row.flagged && <FlaggedBadge className="shrink-0" />}
+        </div>
       </td>
 
       <td className="px-4 py-4 align-middle">
@@ -331,9 +389,11 @@ function LedgerRow({ row, removePending, onView, onDelete }) {
         <div className="flex justify-end">
           <RowActions
             row={row}
-            pending={removePending}
+            pending={pending}
             onView={onView}
             onDelete={onDelete}
+            onAddToDraft={onAddToDraft}
+            onRemoveFromDraft={onRemoveFromDraft}
           />
         </div>
       </td>
@@ -341,9 +401,21 @@ function LedgerRow({ row, removePending, onView, onDelete }) {
   );
 }
 
-function LedgerCard({ row, removePending, onView, onDelete }) {
+function LedgerCard({
+  row,
+  pending,
+  onView,
+  onDelete,
+  onAddToDraft,
+  onRemoveFromDraft,
+}) {
   return (
-    <div className="relative overflow-hidden rounded-3xl border border-[var(--border)] bg-[var(--surface)] p-4 shadow-card transition-shadow hover:shadow-hover">
+    <div
+      className={cn(
+        "relative overflow-hidden rounded-3xl border border-[var(--border)] bg-[var(--surface)] p-4 shadow-card transition-shadow hover:shadow-hover",
+        row.flagged && "border-[var(--danger)]/60 bg-[var(--danger)]/[0.06]",
+      )}
+    >
       <div
         aria-hidden
         className="pointer-events-none absolute inset-x-6 top-0 h-px bg-[linear-gradient(90deg,transparent,var(--accent)/60,transparent)]"
@@ -377,21 +449,30 @@ function LedgerCard({ row, removePending, onView, onDelete }) {
         </span>
 
         <span className="ml-auto shrink-0 text-xs tabular-nums text-[var(--ink-muted)]">
-          {formatDate(row.date)}
+          {formatDate(row.timeDate)}
         </span>
 
         <RowActions
           row={row}
-          pending={removePending}
+          pending={pending}
           onView={onView}
           onDelete={onDelete}
+          onAddToDraft={onAddToDraft}
+          onRemoveFromDraft={onRemoveFromDraft}
         />
       </div>
     </div>
   );
 }
 
-const ExpensesTable = ({ rows, removePending = false, onView, onDelete }) => (
+const ExpensesTable = ({
+  rows,
+  pending = false,
+  onView,
+  onDelete,
+  onAddToDraft,
+  onRemoveFromDraft,
+}) => (
   <>
     <div
       className="hidden overflow-x-auto rounded-3xl focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)]/30 md:block"
@@ -444,9 +525,11 @@ const ExpensesTable = ({ rows, removePending = false, onView, onDelete }) => (
               <LedgerRow
                 key={row.id}
                 row={row}
-                removePending={removePending}
+                pending={pending}
                 onView={onView}
                 onDelete={onDelete}
+                onAddToDraft={onAddToDraft}
+                onRemoveFromDraft={onRemoveFromDraft}
               />
             ))}
           </tbody>
@@ -459,9 +542,11 @@ const ExpensesTable = ({ rows, removePending = false, onView, onDelete }) => (
         <LedgerCard
           key={row.id}
           row={row}
-          removePending={removePending}
+          pending={pending}
           onView={onView}
           onDelete={onDelete}
+          onAddToDraft={onAddToDraft}
+          onRemoveFromDraft={onRemoveFromDraft}
         />
       ))}
     </div>

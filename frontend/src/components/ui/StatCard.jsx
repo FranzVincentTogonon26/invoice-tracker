@@ -1,5 +1,5 @@
 import { ResponsiveContainer, LineChart, Line, BarChart, Bar } from "recharts";
-import { AlertCircle, Minus, TrendingDown, TrendingUp } from "lucide-react";
+import { Minus, TrendingDown, TrendingUp } from "lucide-react";
 import { Card } from "./Card";
 import { Badge } from "./Badge";
 import { cn } from "../../lib/utils";
@@ -70,28 +70,17 @@ export function StatCard({
   value,
   suffix,
   delta,
-  // Period-over-period delta. `deltaPolarity` decides which direction reads as
-  // "good": spend/records going up is bad news ("up-bad"), while balances and
-  // counts going up is good ("up-good", the default). `deltaCaption` states the
-  // comparison basis ("vs Aug 1 - Aug 31") — a bare percentage is never enough.
   deltaCaption,
   deltaPolarity = "up-good",
   chart = "line",
   data = [],
   breakdown,
   breakdownCaption = "Per reference",
-  // Compact alternative to `breakdown`: up to 3 `{ key, label, value, tone }`
-  // figures rendered as one full-width strip (hairline-divided columns, no
-  // scrollbar) — the "just the numbers that matter" density for KPI rows.
   stats,
   loading = false,
   icon: Icon,
   accent = false,
   tone,
-  // Optional status pill rendered right under the value (e.g. a depleted /
-  // overdrawn balance notice). `{ tone, label, icon: StatusIcon }` — tone
-  // reuses the same vocabulary as `tone` (`warning` / `danger` / `success`),
-  // and the pill carries `role="status"` so screen readers announce it.
   status,
 }) {
   const deltaUp = delta != null && delta > 0;
@@ -104,8 +93,6 @@ export function StatCard({
       : deltaGood
         ? "success"
         : "danger";
-  // Direction is carried by an arrow + a word as well as the color, so the
-  // badge still reads for anyone who can't separate red from green.
   const DeltaIcon = deltaFlat ? Minus : deltaUp ? TrendingUp : TrendingDown;
   const deltaWord = deltaFlat ? "no change" : deltaUp ? "increase" : "decrease";
   const color = accent
@@ -197,8 +184,6 @@ export function StatCard({
         "relative overflow-hidden",
         accent && "text-white hover:shadow-hover",
         !accent && "hover:-translate-y-0.5",
-        // Tone-matched hairline so warning/danger states read immediately —
-        // even before the eye reaches the value or the status pill.
         !accent && tone === "warning" && "border-[var(--warning)]/45",
         !accent && tone === "danger" && "border-[var(--danger)]/45",
       )}
@@ -238,7 +223,7 @@ export function StatCard({
               {label}
             </span>
           </div>
-          <div className="flex items-baseline gap-1 min-w-0">
+          <div className="flex items-baseline gap-1 min-w-0 items-center">
             <span
               className={cn(
                 "font-display tabular-nums text-2xl sm:text-3xl font-semibold tracking-tight truncate",
@@ -247,6 +232,21 @@ export function StatCard({
             >
               {displayValue}
             </span>
+            {status?.label != null &&
+              (() => {
+                return (
+                  <>
+                    <span className="">/</span>
+                    <Badge
+                      role="status"
+                      tone={status.tone ?? "neutral"}
+                      className={cn(accent && "bg-white/15 text-white")}
+                    >
+                      {status.label}
+                    </Badge>
+                  </>
+                );
+              })()}
             {suffix && (
               <span
                 className={cn(
@@ -258,9 +258,8 @@ export function StatCard({
               </span>
             )}
           </div>
-          {status?.label != null &&
+          {/* {status?.label != null &&
             (() => {
-              const StatusIcon = status.icon ?? AlertCircle;
               return (
                 <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
                   <Badge
@@ -268,12 +267,11 @@ export function StatCard({
                     tone={status.tone ?? "neutral"}
                     className={cn(accent && "bg-white/15 text-white")}
                   >
-                    <StatusIcon size={13} aria-hidden />
-                    {status.label}
+                    {status.label}vvggggg
                   </Badge>
                 </div>
               );
-            })()}
+            })()} */}
           {delta != null && (
             <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
               <Badge

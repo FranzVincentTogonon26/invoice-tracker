@@ -254,10 +254,10 @@ const IssuedTransactionFilters = ({
     <SearchInput
       value={search}
       onChange={(e) => onSearch(e.target.value)}
-      placeholder="Search employee, notes..."
+      placeholder="Search..."
       aria-label="Search issued transactions"
       leftIcon={<Search size={16} strokeWidth={2} />}
-      className="h-11 w-full sm:h-11 lg:h-9"
+      className="w-full"
     />
   );
 

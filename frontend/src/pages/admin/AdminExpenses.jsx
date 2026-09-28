@@ -13,11 +13,13 @@ import {
   ChevronLeft,
   ChevronRight,
   CircleAlert,
+  CircleCheck,
   CircleX,
   ClipboardList,
   HandCoins,
   Plus,
   ReceiptText,
+  RotateCcw,
   Search,
   SlidersHorizontal,
   Trash2,
@@ -128,6 +130,47 @@ const LEDGER_STATUS_META = {
 };
 
 const LEDGER_STATUS_ORDER = ["paid", "draft", "cancel"];
+
+// Copy for the shared row-action confirmation dialog — one entry per action
+// that opens it from the ledger (Delete / Add to draft / Remove from draft).
+// The dialog shell is shared; only these strings and the icon change.
+const CONFIRM_COPY = {
+  delete: {
+    icon: <Trash2 size={20} aria-hidden />,
+    title: "Delete this expense?",
+    description:
+      "This permanently removes the expense record — and the receipt image stored with it, unless another expense still uses it. This can't be undone.",
+    cancelLabel: "Keep expense",
+    confirmLabel: "Yes, delete it",
+    pendingLabel: "Deleting…",
+  },
+  draft: {
+    icon: <RotateCcw size={20} aria-hidden />,
+    title: "Add this expense to draft?",
+    description:
+      "The record stays in the employee's ledger, but its status moves back to Draft — only paid expenses count against the employee's balance, so this amount returns to their available balance until it is paid again.",
+    cancelLabel: "Keep as paid",
+    confirmLabel: "Yes, add to draft",
+    pendingLabel: "Moving…",
+  },
+  restore: {
+    icon: <CircleCheck size={20} aria-hidden />,
+    title: "Remove this expense from draft?",
+    description:
+      "The record leaves Draft and counts against the employee's balance again — exactly as it did before it was parked there.",
+    cancelLabel: "Keep as draft",
+    confirmLabel: "Yes, mark as paid",
+    pendingLabel: "Restoring…",
+  },
+};
+
+// Fallback toasts for the same actions when the API answers without a message
+// (network failure, timeout, …) — the server's own message always wins.
+const ACTION_ERROR = {
+  delete: "Couldn’t delete expense",
+  draft: "Couldn’t add expense to draft",
+  restore: "Couldn’t mark expense as paid",
+};
 const DAY_MS = 24 * 60 * 60 * 1000;
 
 const countDays = (start, end) =>
@@ -193,7 +236,8 @@ const AdminExpenses = () => {
   const { data, expenses, categories, references, isLoading, error, refetch } =
     useExpenses();
 
-  const { remove } = useExpensesMutations();
+  const { remove, markEmployeeDraft, markEmployeePaid } =
+    useExpensesMutations();
 
   const [search, setSearch] = useState("");
   const [debouncedSearch, setDebouncedSearch] = useState("");
@@ -324,6 +368,7 @@ const AdminExpenses = () => {
           employeeAvatar: e.created_by_avatar,
           method: e.payment_method,
           status: e.status,
+          flagged: Number(e.flag) === 1,
           notes: e.notes,
           referenceId: e.reference_id,
           sourceOfFunds:
@@ -488,6 +533,11 @@ const AdminExpenses = () => {
       };
     });
   }, [allLedgerRows]);
+
+  const flaggedCount = useMemo(
+    () => allLedgerRows.filter((row) => row.flagged).length,
+    [allLedgerRows],
+  );
 
   const categoryOptions = useMemo(
     () => [
@@ -681,11 +731,24 @@ const AdminExpenses = () => {
   };
 
   const requestDelete = (row) => {
-    setConfirmAction({ row });
+    setConfirmAction({ row, action: "delete" });
     setConfirmOpen(true);
   };
 
-  const confirmPending = remove.isPending;
+  const requestAddToDraft = (row) => {
+    setConfirmAction({ row, action: "draft" });
+    setConfirmOpen(true);
+  };
+
+  const requestRemoveFromDraft = (row) => {
+    setConfirmAction({ row, action: "restore" });
+    setConfirmOpen(true);
+  };
+
+  const confirmPending =
+    remove.isPending ||
+    markEmployeeDraft.isPending ||
+    markEmployeePaid.isPending;
 
   const closeConfirm = () => {
     if (!confirmPending) setConfirmOpen(false);
@@ -694,12 +757,22 @@ const AdminExpenses = () => {
   const runConfirmedAction = async () => {
     if (!confirmAction) return;
 
+    const { action, row } = confirmAction;
+
     try {
-      await remove.mutateAsync(confirmAction.row.id);
-      toast.success("Expense deleted");
+      if (action === "draft") {
+        await markEmployeeDraft.mutateAsync(row.id);
+        toast.success("Expense added to draft");
+      } else if (action === "restore") {
+        await markEmployeePaid.mutateAsync(row.id);
+        toast.success("Expense marked as paid");
+      } else {
+        await remove.mutateAsync(row.id);
+        toast.success("Expense deleted");
+      }
       setConfirmOpen(false);
     } catch (err) {
-      toast.error(err?.message || "Couldn't delete expense");
+      toast.error(err?.message || ACTION_ERROR[action] || ACTION_ERROR.delete);
     }
   };
 
@@ -719,6 +792,9 @@ const AdminExpenses = () => {
       </span>
     </div>
   ) : null;
+
+  const confirmCopy =
+    CONFIRM_COPY[confirmAction?.action] ?? CONFIRM_COPY.delete;
 
   const searchField = (
     <div className="flex w-full items-center gap-2">
@@ -922,6 +998,15 @@ const AdminExpenses = () => {
               chart="bars"
               data={recordSeries}
               stats={statusStats}
+              status={
+                flaggedCount > 0
+                  ? {
+                      tone: "danger",
+                      label:
+                        flaggedCount === 1 ? "1 flag" : `${flaggedCount} flag`,
+                    }
+                  : undefined
+              }
             />
           </motion.div>
         </motion.div>
@@ -1095,9 +1180,15 @@ const AdminExpenses = () => {
           <>
             <ExpensesTable
               rows={pageRows}
-              removePending={remove.isPending}
+              pending={
+                remove.isPending ||
+                markEmployeeDraft.isPending ||
+                markEmployeePaid.isPending
+              }
               onView={handleViewRow}
               onDelete={requestDelete}
+              onAddToDraft={requestAddToDraft}
+              onRemoveFromDraft={requestRemoveFromDraft}
             />
 
             <div
@@ -1140,13 +1231,13 @@ const AdminExpenses = () => {
 
       <ConfirmActionDialog
         open={confirmOpen}
-        icon={<Trash2 size={20} aria-hidden />}
-        title="Delete this expense?"
-        description="This permanently removes the expense record — and the receipt image stored with it, unless another expense still uses it. This can't be undone."
+        icon={confirmCopy.icon}
+        title={confirmCopy.title}
+        description={confirmCopy.description}
         summary={confirmSummary}
-        cancelLabel="Keep expense"
-        confirmLabel="Yes, delete it"
-        pendingLabel="Deleting…"
+        cancelLabel={confirmCopy.cancelLabel}
+        confirmLabel={confirmCopy.confirmLabel}
+        pendingLabel={confirmCopy.pendingLabel}
         pending={confirmPending}
         onCancel={closeConfirm}
         onConfirm={runConfirmedAction}

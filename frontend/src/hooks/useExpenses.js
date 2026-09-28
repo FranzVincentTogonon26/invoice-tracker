@@ -42,6 +42,12 @@ export function useExpenses(params, options = {}) {
     expenses: query.data?.expenses ?? [],
     categories: query.data?.categories ?? [],
     references: query.data?.references ?? [],
+    // Employee-only: MIN(budget_issued_reference.created_at) for the signed-in
+    // user as YYYY-MM-DD — the first date budget was issued to them. `null` for
+    // admins (the endpoint never sends it) and for employees without an
+    // issuance. Add Expenses compares each line's date against this and warns
+    // on the ones behind it; the backend stores those with `flag = 1`.
+    firstIssuedAt: query.data?.firstIssuedAt ?? null,
     // Rows from the `geminimodel` table — `ModelSource` maps them into the
     // "Source" Listbox of the Scan Receipt panel.
     geminiModel: query.data?.gemini_model ?? [],
@@ -77,6 +83,20 @@ export function useExpensesMutations() {
     // ledger's "Delete expense" parks the record back in 'draft' through this.
     setStatus: useMutation({
       mutationFn: ({ id, status }) => expensesApi.updateStatus(id, status),
+      onSuccess: invalidate,
+    }),
+    // Admin ledger row action ("Add to draft"): pushes an employee-authored
+    // paid expense back to 'draft' — the amount returns to the employee's
+    // available balance, which is why the employee ledger refreshes too.
+    markEmployeeDraft: useMutation({
+      mutationFn: expensesApi.markEmployeeDraft,
+      onSuccess: invalidate,
+    }),
+    // Admin ledger row action ("Remove from draft"): the counterpart — an
+    // employee-authored draft goes back to 'paid' and counts against that
+    // employee's balance again.
+    markEmployeePaid: useMutation({
+      mutationFn: expensesApi.markEmployeePaid,
       onSuccess: invalidate,
     }),
     // Deletes a category (UNIQUE-style feedback comes back as a 409).

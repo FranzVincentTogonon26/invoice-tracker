@@ -4,7 +4,6 @@ import { AnimatePresence, motion } from "framer-motion";
 import {
   Banknote,
   CreditCard,
-  Eye,
   Landmark,
   Layers,
   Search,
@@ -14,7 +13,7 @@ import {
   Inbox,
 } from "lucide-react";
 import { Card } from "../../../ui/Card";
-import { Badge, StatusBadge } from "../../../ui/Badge";
+import { Badge } from "../../../ui/Badge";
 import { SearchInput } from "../../../ui/Input";
 import { Pager } from "../../../ui/Pager";
 import { EmptyState, LoadingSkeleton } from "../../../ui/DataState";
@@ -49,7 +48,7 @@ const MethodBadge = ({ method, className }) => {
   return (
     <Badge
       tone={config.tone}
-      className={cn("shrink-0 px-2 py-1 text-[12px]", className)}
+      className={cn("shrink-0 px-2 py-1 text-[12px] truncate", className)}
     >
       <BadgeIcon size={16} aria-hidden />
       {methodLabel(method)}
@@ -64,16 +63,10 @@ const ISSUED_META = {
 };
 
 const SHEET_EASE = [0.16, 1, 0.3, 1];
-const DIALOG_EASE = [0.16, 1, 0.3, 1];
 const PAGE_SIZE = 50;
-// Date | Description | Source of Funds | Method | Status | Amount | Actions
-const COLUMN_WIDTHS = ["14%", "24%", "16%", "14%", "12%", "14%", "6%"];
+const COLUMN_WIDTHS = ["14%", "24%", "14%", "12%", "14%"];
 
-// The row's recorded facts — shared by the mobile bottom sheet and the
-// desktop details modal so both surfaces always read identically.
 const IssuedDetailsBody = ({ row }) => {
-  const status = row?.status ?? "open";
-
   return (
     <div className="mt-4 space-y-3">
       <div className="flex items-center justify-between gap-3 rounded-2xl border border-[var(--border)] bg-[var(--surface-2)]/60 px-4 py-3.5">
@@ -83,41 +76,16 @@ const IssuedDetailsBody = ({ row }) => {
             {formatMoney(row?.amount)}
           </p>
           <p className="mt-1.5 truncate text-xs text-[var(--ink-muted)]">
-            {[row?.source_of_funds, methodLabel(row?.method)]
+            {["Employee Budget", methodLabel(row.method)]
               .filter(Boolean)
               .join(" · ")}
           </p>
         </div>
-        <StatusBadge status={status} className="shrink-0" />
+        <Badge tone="success" className="">
+          <span className="h-2 w-2 rounded-full bg-current opacity-80" />
+          Received
+        </Badge>
       </div>
-
-      <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
-        <div className="rounded-2xl border border-[var(--border)] bg-[var(--surface-2)]/60 px-4 py-3">
-          <p className="type-eyebrow text-[var(--ink-muted)]">Date issued</p>
-          <p className="mt-1 truncate text-sm font-semibold tabular-nums text-[var(--ink)]">
-            {formatDate(row?.date)}
-            {row?.date ? ` · ${formatTime(row.date)}` : ""}
-          </p>
-        </div>
-        <div className="rounded-2xl border border-[var(--border)] bg-[var(--surface-2)]/60 px-4 py-3">
-          <p className="type-eyebrow text-[var(--ink-muted)]">Cut-off date</p>
-          <p className="mt-1 truncate text-sm font-semibold tabular-nums text-[var(--ink)]">
-            {row?.date_cut_off ? formatDate(row.date_cut_off) : "—"}
-          </p>
-        </div>
-      </div>
-
-      {row?.description && (
-        <p className="rounded-2xl border border-[var(--border)] bg-[var(--surface-2)]/60 px-4 py-3 text-sm font-medium leading-snug text-[var(--ink)]">
-          {row.description}
-        </p>
-      )}
-
-      {row?.notes && (
-        <p className="rounded-2xl border-l-2 border-[var(--accent)]/40 bg-[var(--surface-2)]/50 px-4 py-3 text-sm italic leading-relaxed text-[var(--ink-muted)]">
-          {row.notes}
-        </p>
-      )}
     </div>
   );
 };
@@ -161,7 +129,7 @@ function TransactionCard({ tx, onOpen }) {
               |
             </span>
             <span className="truncate text-[10px] type-eyebrow">
-              {tx.source_of_funds || methodLabel(tx.method)}
+              {methodLabel(tx.method)}
             </span>
           </span>
         </div>
@@ -170,7 +138,6 @@ function TransactionCard({ tx, onOpen }) {
         <p className="text-right font-display text-sm font-semibold tabular-nums text-[var(--ink)]">
           {formatMoney(tx.amount)}
         </p>
-        <StatusBadge status={tx.status ?? "open"} className="px-1.5 py-0.5" />
       </div>
     </div>
   );
@@ -179,9 +146,6 @@ function TransactionCard({ tx, onOpen }) {
 /* ── Mobile bottom sheet — same slide-up animation as the expenses sheet ── */
 function TransactionSheet({ row, onClose }) {
   const sheetRef = useRef(null);
-  // Lock is tied purely to `row` so it can never leak (see the expenses
-  // sheet): engage on open, release the instant the row clears. No
-  // `.focus()` — focusing the dialog scrolled the page to the top on mobile.
   const close = useCallback(() => onClose?.(), [onClose]);
 
   useEffect(() => {
@@ -194,8 +158,6 @@ function TransactionSheet({ row, onClose }) {
     window.addEventListener("keydown", onKeyDown, true);
     return () => window.removeEventListener("keydown", onKeyDown, true);
   }, [row, close]);
-
-
 
   const title = row?.description || "Issued budget";
 
@@ -276,91 +238,6 @@ function TransactionSheet({ row, onClose }) {
   );
 }
 
-/* ── Desktop details modal — same dialog animation as the expense modal ── */
-function BudgetDetailsModal({ row, onClose }) {
-  const titleRef = useRef(null);
-  const close = useCallback(() => onClose?.(), [onClose]);
-
-  useEffect(() => {
-    if (!row) return undefined;
-    const onKeyDown = (event) => {
-      if (event.key !== "Escape") return;
-      event.stopPropagation();
-      close();
-    };
-    window.addEventListener("keydown", onKeyDown, true);
-    return () => window.removeEventListener("keydown", onKeyDown, true);
-  }, [row, close]);
-
-  const title = row?.description || "Issued budget";
-
-  return createPortal(
-    <AnimatePresence>
-      {row && (
-        <motion.div
-          key="issued-details-backdrop"
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          exit={{ opacity: 0 }}
-          transition={{ duration: 0.18 }}
-          className="fixed inset-0 z-[70] hidden items-center justify-center bg-[var(--ink)]/35 p-3 backdrop-blur-md sm:p-4 md:flex"
-          onClick={close}
-        >
-          <motion.div
-            role="dialog"
-            aria-modal="true"
-            aria-label="Issued budget details"
-            initial={{ opacity: 0, scale: 0.97, y: 12 }}
-            animate={{ opacity: 1, scale: 1, y: 0 }}
-            exit={{ opacity: 0, scale: 0.97, y: 8 }}
-            transition={{ duration: 0.24, ease: DIALOG_EASE }}
-            onClick={(e) => e.stopPropagation()}
-            className="relative flex max-h-[calc(100dvh-1.5rem)] w-full max-w-[560px] flex-col overflow-hidden rounded-[26px] border border-[var(--border)] bg-[var(--surface)] shadow-hover"
-          >
-            <div className="flex shrink-0 items-start justify-between gap-4 border-b border-[var(--border)] px-5 py-4">
-              <div className="flex min-w-0 items-center gap-3">
-                <span
-                  className={cn(
-                    "flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl",
-                    ISSUED_META.iconWrapperClass,
-                  )}
-                >
-                  <ISSUED_META.icon size={18} aria-hidden />
-                </span>
-                <div className="min-w-0">
-                  <h3
-                    ref={titleRef}
-                    className="font-display text-base font-semibold tracking-tight text-[var(--ink)]"
-                  >
-                    Issued budget details
-                  </h3>
-                  <p className="mt-0.5 truncate text-xs tabular-nums text-[var(--ink-muted)]">
-                    {formatDate(row?.date)}
-                    {row?.date ? ` · ${formatTime(row.date)}` : ""}
-                  </p>
-                </div>
-              </div>
-              <button
-                type="button"
-                onClick={close}
-                aria-label="Close budget details"
-                className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-[var(--surface-2)] text-[var(--ink-muted)] transition-colors hover:bg-[var(--border)] hover:text-[var(--ink)]"
-              >
-                <X size={16} aria-hidden />
-              </button>
-            </div>
-            <div className="scrollbar-slim min-h-0 flex-1 overflow-y-auto overscroll-contain px-5 pb-4">
-              <IssuedDetailsBody row={row} />
-              <p className="sr-only">{title}</p>
-            </div>
-          </motion.div>
-        </motion.div>
-      )}
-    </AnimatePresence>,
-    document.body,
-  );
-}
-
 export const TransactionsSectionBudget = ({
   transactions = [],
   isLoading = false,
@@ -371,7 +248,6 @@ export const TransactionsSectionBudget = ({
   const [dateRange, setDateRange] = useState(emptyDateRange);
   const hasDateRange = Boolean(dateRange?.start && dateRange?.end);
   const [sheetRow, setSheetRow] = useState(null);
-  const [detailRow, setDetailRow] = useState(null);
 
   useEffect(() => {
     const timer = setTimeout(() => {
@@ -480,7 +356,6 @@ export const TransactionsSectionBudget = ({
         </div>
       </div>
 
-
       {/* ── Desktop: table (mirrors the expenses ledger) ── */}
       <div className="mt-4 hidden md:block">
         {isLoading ? (
@@ -507,10 +382,8 @@ export const TransactionsSectionBudget = ({
           />
         ) : (
           <div className="overflow-x-auto rounded-2xl border border-[var(--border)] bg-[var(--surface)] shadow-card">
-            <table className="w-full min-w-[760px] table-fixed border-collapse text-left">
-              <caption className="sr-only">
-                Employee issued budget list
-              </caption>
+            <table className="w-full table-fixed border-collapse text-left">
+              <caption className="sr-only">Employee issued budget list</caption>
               <colgroup>
                 {COLUMN_WIDTHS.map((width, i) => (
                   <col key={i} style={{ width }} />
@@ -525,19 +398,13 @@ export const TransactionsSectionBudget = ({
                     Description
                   </th>
                   <th className="whitespace-nowrap border-b border-[var(--border)] px-4 py-3 type-eyebrow text-[var(--ink-muted)]">
-                    Source of Funds
-                  </th>
-                  <th className="whitespace-nowrap border-b border-[var(--border)] px-4 py-3 type-eyebrow text-[var(--ink-muted)]">
-                    Payment Method
+                    Method
                   </th>
                   <th className="whitespace-nowrap border-b border-[var(--border)] px-4 py-3 type-eyebrow text-[var(--ink-muted)]">
                     Status
                   </th>
                   <th className="whitespace-nowrap border-b border-[var(--border)] px-4 py-3 text-right type-eyebrow text-[var(--ink-muted)]">
                     Amount
-                  </th>
-                  <th className="whitespace-nowrap border-b border-[var(--border)] px-4 py-3 text-right type-eyebrow text-[var(--ink-muted)] last:pr-5">
-                    <span className="sr-only">Actions</span>
                   </th>
                 </tr>
               </thead>
@@ -572,32 +439,18 @@ export const TransactionsSectionBudget = ({
                       )}
                     </td>
                     <td className="px-4 py-3 align-middle">
-                      <Badge tone="accent" className="max-w-full">
-                        <span className="truncate">
-                          {tx.source_of_funds || "—"}
-                        </span>
-                      </Badge>
-                    </td>
-                    <td className="px-4 py-3 align-middle">
                       <MethodBadge method={tx.method} />
                     </td>
                     <td className="px-4 py-3 align-middle">
-                      <StatusBadge status={tx.status ?? "open"} />
+                      <Badge tone="success">
+                        <span className="h-2 w-2 rounded-full bg-current opacity-80" />
+                        Received
+                      </Badge>
                     </td>
                     <td className="px-4 py-3 text-right align-middle">
                       <span className="text-[13px] font-semibold tabular-nums text-[var(--ink)]">
                         {formatMoney(tx.amount)}
                       </span>
-                    </td>
-                    <td className="px-4 py-3 text-right align-middle last:pr-5">
-                      <button
-                        type="button"
-                        onClick={() => setDetailRow(tx)}
-                        aria-label={`View details for ${tx.description || "issued budget"}`}
-                        className="inline-flex h-8 w-8 items-center justify-center rounded-full text-[var(--ink-muted)] transition-colors hover:bg-[var(--surface-2)] hover:text-[var(--ink)]"
-                      >
-                        <Eye size={16} aria-hidden />
-                      </button>
                     </td>
                   </tr>
                 ))}
@@ -606,8 +459,6 @@ export const TransactionsSectionBudget = ({
           </div>
         )}
       </div>
-
-
 
       {/* ── Mobile: cards (mirrors the expenses ledger) ── */}
       <div className="mt-4 block space-y-2.5 md:hidden">
@@ -669,7 +520,6 @@ export const TransactionsSectionBudget = ({
       )}
 
       <TransactionSheet row={sheetRow} onClose={() => setSheetRow(null)} />
-      <BudgetDetailsModal row={detailRow} onClose={() => setDetailRow(null)} />
     </Card>
   );
 };

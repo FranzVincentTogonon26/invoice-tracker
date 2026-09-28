@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
-import { Loader2, X } from "lucide-react";
+import { AlertTriangle, Loader2, X } from "lucide-react";
 import toast from "react-hot-toast";
 import { Button } from "../../ui/Button";
 import { useExpensesMutations } from "../../../hooks/useExpenses";
@@ -32,6 +32,7 @@ const ExpensesModal = ({
   onDelete,
   onReceiptCreated,
   onReceiptConfirmed,
+  isBackdatedDate,
 }) => {
   const { create, removeCategory } = useExpensesMutations();
   const tableRef = useSmoothScroll();
@@ -269,12 +270,24 @@ const ExpensesModal = ({
       setReceipt(blankReceipt());
       onClose?.();
 
+      if (isBackdatedDate?.(draft.date)) {
+        toast(
+          "Receipt confirmed, but its date is behind the first budget issued to you — the line is flagged.",
+          {
+            icon: (
+              <AlertTriangle size={16} className="text-[var(--warning)]" />
+            ),
+          },
+        );
+        return;
+      }
+
       toast.success(
         !persisted
-          ? "Receipt confirmed � grouped line added for this session only."
+          ? "Receipt confirmed grouped line added for this session only."
           : imageDropped
-            ? "Receipt confirmed � grouped line added (image couldn't be kept in this browser)."
-            : "Receipt confirmed � grouped line added.",
+            ? "Receipt confirmed grouped line added (image couldn't be kept in this browser)."
+            : "Receipt confirmed grouped line added.",
       );
       return;
     }

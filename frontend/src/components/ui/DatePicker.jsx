@@ -65,6 +65,10 @@ export function DatePicker({
   align = "start",
   className,
   disabled = false,
+  // Hover tooltip for the trigger — the Add Expenses form uses it to explain a
+  // warning state (a date behind the budget issued to the user) without
+  // lengthening the label.
+  title,
 }) {
   const [open, setOpen] = useState(false);
   const [viewMonth, setViewMonth] = useState(() =>
@@ -130,6 +134,7 @@ export function DatePicker({
         aria-haspopup="dialog"
         aria-expanded={open}
         aria-label={`Date: ${label}`}
+        title={title}
         className={cn(
           "flex font-semibold h-10 w-full items-center gap-2 rounded-full border border-[var(--border)] bg-[var(--surface)] pl-5 pr-4 text-sm tabular-nums outline-none transition-colors",
           "hover:border-[var(--accent)]/40 focus:border-[var(--accent)]/50 focus:ring-2 focus:ring-[var(--accent)]/15",

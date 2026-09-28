@@ -2,23 +2,33 @@ import { useEffect, useId, useMemo, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import {
   AlertCircle,
-  CalendarDays,
+  Banknote,
+  Calendar,
+  CalendarClock,
   ChevronDown,
-  CircleCheck,
+  CreditCard,
   Eye,
-  ImageOff,
-  ListChecks,
+  FileText,
+  Image as ImageIcon,
+  Landmark,
   Loader2,
+  Maximize2,
   ReceiptText,
-  Sparkles,
+  RotateCcw,
+  Store,
+  Tag,
+  TriangleAlert,
+  UserRound,
   Wallet,
   X,
+  ZoomIn,
+  ZoomOut,
 } from "lucide-react";
-import { Badge } from "../../../ui/Badge";
 import { Button } from "../../../ui/Button";
-import { MethodIcon } from "../../../ui/Select";
+import { Badge } from "../../../ui/Badge";
 import { useExpenseDetail } from "../../../../hooks/useExpenses";
 import {
+  cn,
   formatDate,
   formatMoney,
   formatTime,
@@ -47,102 +57,271 @@ const initialsOf = (name) =>
     .map((part) => part[0].toUpperCase())
     .join("");
 
-// ── Recommendations ────────────────────────────────────────────────
-const TIP_TONE = {
-  warning: {
-    wrap: "border-[var(--warning)]/20 bg-[var(--warning)]/8",
-    badge: "bg-[var(--warning)] text-white",
-    Icon: AlertCircle,
-  },
-  success: {
-    wrap: "border-[var(--success)]/20 bg-[var(--success)]/8",
-    badge: "bg-[var(--success)] text-white",
-    Icon: CircleCheck,
-  },
-  neutral: {
-    wrap: "border-[var(--border)] bg-[var(--surface)]",
-    badge: "bg-[var(--accent-soft)] text-[var(--accent-strong)]",
-    Icon: Sparkles,
-  },
+const getMethodIcon = (method) => {
+  switch (method) {
+    case "cash":
+      return <Banknote size={14} aria-hidden />;
+    case "bank_transfer":
+      return <Landmark size={14} aria-hidden />;
+    case "e_wallet":
+      return <Wallet size={14} aria-hidden />;
+    case "cheque":
+      return <FileText size={14} aria-hidden />;
+    default:
+      return <CreditCard size={14} aria-hidden />;
+  }
 };
 
-const RecommendationTip = ({ tip }) => {
-  const tone = TIP_TONE[tip.tone] ?? TIP_TONE.neutral;
-  const Icon = tone.Icon;
-  return (
-    <div
-      className={`flex items-start gap-3 rounded-2xl border px-3.5 py-3 ${tone.wrap}`}
-    >
-      <span
-        className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-xl ${tone.badge}`}
-      >
-        <Icon size={14} aria-hidden />
-      </span>
-      <div className="min-w-0 flex-1">
-        <p className="text-[13px] font-semibold leading-snug text-[var(--ink)]">
-          {tip.title}
-        </p>
-        <p className="mt-1 text-xs leading-relaxed text-[var(--ink-muted)]">
-          {tip.body}
-        </p>
-      </div>
-    </div>
-  );
-};
-
-// ── Receipt list — full width, not squeezed
-// Data comes straight from the `receipt` table via GET /expenses/detail/:id
-// (Expenses.receiptLinesForExpense) — no re-scan. Count + DB sum live on the
-// toggle above, so the list itself stays label-free.
-const ReceiptLineList = ({ lines }) => (
-  <ul className="space-y-2">
-    {lines.map((item) => (
-      <li
-        key={item.key}
-        className="flex items-start justify-between gap-4 rounded-xl border border-[var(--border)] bg-[var(--surface)] px-4 py-3 transition-colors hover:bg-[var(--surface-2)]/40"
-      >
-        <div className="min-w-0 flex-1">
-          <p className="break-words text-sm font-medium leading-snug text-[var(--ink)]">
-            {item.description || "Unnamed item"}
-          </p>
-          <p className="mt-1 text-xs tabular-nums text-[var(--ink-muted)]">
-            × {formatQty(item.quantity)} @ {formatMoney(item.rate)} each
-          </p>
-        </div>
-        <span className="shrink-0 text-sm font-semibold tabular-nums text-[var(--ink)]">
-          {formatMoney(item.amount)}
-        </span>
-      </li>
-    ))}
-  </ul>
+const FieldLabel = ({ children }) => (
+  <p className="flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-[0.08em] text-[var(--ink-muted)]">
+    {/* {icon} */}
+    <span>{children}</span>
+  </p>
 );
 
-const EmployeeBlock = ({ name, role, avatarUrl }) => (
-  <div className="flex items-center gap-3">
-    {avatarUrl ? (
+const CreatorRow = ({ row }) => (
+  <div className="flex items-center gap-3 rounded-2xl border border-[var(--border)] bg-[var(--surface)] p-3 shadow-xs">
+    {row?.employeeAvatar ? (
       <img
-        src={avatarUrl}
+        src={row.employeeAvatar}
         alt=""
-        className="h-9 w-9 shrink-0 rounded-full object-cover ring-1 ring-[var(--border)]"
+        className="h-10 w-10 shrink-0 rounded-full object-cover ring-2 ring-[var(--border)]"
       />
     ) : (
       <span
         aria-hidden
-        className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-[var(--accent-soft)] text-xs font-semibold text-[var(--accent-strong)]"
+        className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-[var(--accent-soft)] text-xs font-bold text-[var(--accent-strong)]"
       >
-        {initialsOf(name) || "?"}
+        {initialsOf(row?.employee)}
       </span>
     )}
-    <div className="min-w-0">
-      <p className="truncate text-[13px] font-semibold leading-tight text-[var(--ink)]">
-        {name || "Unknown"}
+    <div className="min-w-0 flex-1">
+      <p className="truncate text-sm font-semibold leading-tight text-[var(--ink)]">
+        {row?.employee || "Unknown"}
       </p>
-      <p className="truncate text-xs capitalize text-[var(--ink-muted)]">
-        {role || "—"}
-      </p>
+      {row?.employeeRole ? (
+        <p className="mt-0.5 truncate text-xs capitalize text-[var(--ink-muted)]">
+          {row.employeeRole}
+        </p>
+      ) : (
+        <p className="mt-0.5 text-xs text-[var(--ink-muted)]">Submitted by</p>
+      )}
     </div>
   </div>
 );
+
+const LineCells = ({ item, index }) => (
+  <>
+    <td className="px-4 py-3 align-top">
+      <div className="flex items-start gap-2.5">
+        <span
+          aria-hidden
+          className="mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-md bg-[var(--surface-2)] text-[10px] font-bold tabular-nums text-[var(--ink-muted)]"
+        >
+          {index + 1}
+        </span>
+        <div className="min-w-0 flex-1">
+          <p className="break-words font-medium leading-snug text-[var(--ink)]">
+            {item.description || "Unnamed item"}
+          </p>
+          {(item.quantity > 0 || item.rate > 0) && (
+            <p className="mt-0.5 text-[11px] tabular-nums text-[var(--ink-muted)]">
+              {item.quantity ? `Qty: ${formatQty(item.quantity)}` : null}
+              {item.quantity && item.rate ? " · " : null}
+              {item.rate ? `@ ${formatMoney(item.rate)} each` : null}
+            </p>
+          )}
+        </div>
+      </div>
+    </td>
+    <td className="whitespace-nowrap px-4 py-3 text-right align-top font-semibold tabular-nums text-[var(--ink)]">
+      {formatMoney(item.amount)}
+    </td>
+  </>
+);
+
+const LineItemsSection = ({
+  lines,
+  open,
+  onToggle,
+  loading,
+  error,
+  onRetry,
+  refetching,
+  regionId,
+}) => {
+  if (loading) {
+    return (
+      <section
+        aria-label="Receipt items"
+        aria-busy="true"
+        role="status"
+        className="overflow-hidden rounded-2xl border border-[var(--border)] bg-[var(--surface)] shadow-xs"
+      >
+        <div className="flex items-center justify-between gap-2 border-b border-[var(--border)] bg-[var(--surface-2)]/30 px-4 py-3">
+          <p className="text-[11px] font-semibold uppercase tracking-[0.08em] text-[var(--ink-muted)]">
+            Receipt items
+          </p>
+          <span className="h-5 w-14 animate-pulse rounded-full bg-[var(--surface-2)]" />
+        </div>
+        <div className="space-y-3 px-4 py-4">
+          <div className="flex items-center gap-3">
+            <div className="h-3 flex-1 animate-pulse rounded-full bg-[var(--surface-2)]" />
+          </div>
+        </div>
+      </section>
+    );
+  }
+
+  if (error) {
+    return (
+      <section
+        aria-label="Receipt items"
+        className="overflow-hidden rounded-2xl border border-[var(--border)] bg-[var(--surface)] shadow-xs"
+      >
+        <div className="flex items-center justify-between gap-2 border-b border-[var(--border)] bg-[var(--surface-2)]/30 px-4 py-3">
+          <p className="text-[11px] font-semibold uppercase tracking-[0.08em] text-[var(--ink-muted)]">
+            Receipt items
+          </p>
+        </div>
+        <div className="flex items-center gap-2.5 bg-[var(--danger)]/10 px-4 py-4">
+          <AlertCircle
+            size={16}
+            aria-hidden
+            className="shrink-0 text-[var(--danger)]"
+          />
+          <p className="min-w-0 flex-1 text-xs font-medium leading-snug text-[var(--danger)]">
+            Couldn&apos;t load receipt items
+          </p>
+          <Button
+            type="button"
+            variant="ghost"
+            size="sm"
+            onClick={onRetry}
+            disabled={refetching}
+          >
+            {refetching && (
+              <Loader2 size={12} className="animate-spin" aria-hidden />
+            )}
+            Retry
+          </Button>
+        </div>
+      </section>
+    );
+  }
+
+  if (lines.length === 0) {
+    return (
+      <section
+        aria-label="Receipt items"
+        className="rounded-2xl border border-dashed border-[var(--border)] bg-[var(--surface)] px-4 py-6 text-center"
+      >
+        <span className="mx-auto flex h-9 w-9 items-center justify-center rounded-xl bg-[var(--surface-2)] text-[var(--ink-muted)]">
+          <FileText size={16} aria-hidden />
+        </span>
+        <p className="mt-2 text-xs font-semibold text-[var(--ink)]">
+          No itemized lines found
+        </p>
+        <p className="mt-0.5 text-[11px] leading-relaxed text-[var(--ink-muted)]">
+          This receipt didn&apos;t include itemized details.
+        </p>
+      </section>
+    );
+  }
+
+  const itemsTotal = lines.reduce((sum, it) => sum + (it.amount || 0), 0);
+
+  return (
+    <section
+      aria-label="Receipt items"
+      className="overflow-hidden rounded-2xl border border-[var(--border)] bg-[var(--surface)] shadow-xs"
+    >
+      <button
+        type="button"
+        onClick={onToggle}
+        aria-expanded={open}
+        aria-controls={regionId}
+        className="flex w-full items-center justify-between gap-3 px-4 py-3.5 text-left transition-colors hover:bg-[var(--surface-2)]/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)]/30"
+      >
+        <div className="min-w-0 flex-1">
+          <div className="flex items-center gap-2">
+            <span className="text-xs font-semibold tracking-wide uppercase text-[var(--ink)]">
+              Receipt Items
+            </span>
+            <span className="inline-flex items-center rounded-full bg-[var(--surface-2)] px-2 py-0.5 text-[11px] font-medium text-[var(--ink-muted)]">
+              {lines.length} {lines.length === 1 ? "item" : "items"}
+            </span>
+          </div>
+          <p className="mt-0.5 text-xs text-[var(--ink-muted)]">
+            Total itemized:{" "}
+            <span className="font-semibold text-[var(--ink)]">
+              {formatMoney(itemsTotal)}
+            </span>
+          </p>
+        </div>
+
+        <div className="flex shrink-0 items-center gap-1.5 rounded-full border border-[var(--border)] bg-[var(--surface)] px-2.5 py-1 text-xs font-medium text-[var(--ink)] shadow-2xs">
+          <span>{open ? "Hide items" : "Show items"}</span>
+          <ChevronDown
+            size={14}
+            aria-hidden
+            className={cn(
+              "transition-transform duration-200 text-[var(--ink-muted)]",
+              open && "rotate-180",
+            )}
+          />
+        </div>
+      </button>
+
+      <AnimatePresence initial={false}>
+        {open && (
+          <motion.div
+            key="items-table-content"
+            id={regionId}
+            initial={{ height: 0, opacity: 0 }}
+            animate={{ height: "auto", opacity: 1 }}
+            exit={{ height: 0, opacity: 0 }}
+            transition={{ duration: 0.22, ease: DIALOG_EASE }}
+            className="overflow-hidden border-t border-[var(--border)]"
+          >
+            <div className="scrollbar-slim max-h-[280px] overflow-y-auto">
+              <table className="w-full border-collapse text-[13px]">
+                <thead className="sticky top-0 z-[1]">
+                  <tr className="border-b border-[var(--border)] bg-[var(--surface-2)]">
+                    <th className="px-4 py-2.5 text-left text-[10px] font-bold uppercase tracking-wider text-[var(--ink-muted)]">
+                      Item description
+                    </th>
+                    <th className="w-[120px] px-4 py-2.5 text-right text-[10px] font-bold uppercase tracking-wider text-[var(--ink-muted)]">
+                      Amount
+                    </th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-[var(--border)]/60 bg-[var(--surface)]">
+                  {lines.map((item, index) => (
+                    <tr
+                      key={item.key}
+                      className="transition-colors hover:bg-[var(--surface-2)]/40"
+                    >
+                      <LineCells item={item} index={index} />
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+            <div className="flex items-center justify-between border-t border-[var(--border)] bg-[var(--surface-2)]/40 px-4 py-2.5 text-xs">
+              <span className="text-[var(--ink-muted)]">
+                Scanned line items total
+              </span>
+              <span className="font-semibold tabular-nums text-[var(--ink)]">
+                {formatMoney(itemsTotal)}
+              </span>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </section>
+  );
+};
 
 const ExpenseDetailsModal = ({
   open,
@@ -153,7 +332,19 @@ const ExpenseDetailsModal = ({
   const titleId = useId();
   const itemsRegionId = useId();
   const [failedUrl, setFailedUrl] = useState(null);
+  const [itemsOpen, setItemsOpen] = useState(false);
+  const [zoomLevel, setZoomLevel] = useState(1);
   const row = expense;
+
+  // Reset the view (zoom level + items panel) on every open. Adjusting state
+  // during render is the documented alternative to a setState-in-effect — the
+  // same pattern BudgetModal / ReferencesModal use.
+  const [prevOpen, setPrevOpen] = useState(open);
+  if (prevOpen !== open) {
+    setPrevOpen(open);
+    setZoomLevel(1);
+    setItemsOpen(false);
+  }
 
   useEffect(() => {
     if (!open) return undefined;
@@ -186,90 +377,344 @@ const ExpenseDetailsModal = ({
 
   const receiptLines = useMemo(
     () =>
-      (receiptItems ?? []).map((item, index) => {
-        const quantity = toNumber(item?.qty);
-        const rate = toNumber(item?.rate);
-        return {
-          key: `${item?.id ?? "line"}-${index}`,
-          description: String(item?.description ?? "").trim(),
-          quantity,
-          rate,
-          amount: toNumber(item?.amount),
-        };
-      }),
+      (receiptItems ?? []).map((item, index) => ({
+        key: `${item?.id ?? "line"}-${index}`,
+        description: String(item?.description ?? "").trim(),
+        quantity: toNumber(item?.qty),
+        rate: toNumber(item?.rate),
+        amount: toNumber(item?.amount),
+      })),
     [receiptItems],
   );
 
-  const linesTotal = useMemo(
-    () =>
-      Number(
-        receiptLines.reduce((sum, item) => sum + item.amount, 0).toFixed(2),
-      ),
-    [receiptLines],
-  );
-
   const recordedTotal = toNumber(row?.amount);
-
   const vendorName = String(detailVendor ?? "").trim();
 
-  const [openItemsFor, setOpenItemsFor] = useState(null);
-  const itemsOpen =
-    hasReceipt &&
-    !linesLoading &&
-    !linesError &&
-    receiptLines.length > 0 &&
-    openItemsFor === row?.id;
+  const handleClose = () => {
+    setFailedUrl(null);
+    setZoomLevel(1);
+    onClose?.();
+  };
 
-  const recommendations = useMemo(() => {
-    const tips = [];
-    if (!open || !row) return tips;
+  const zoomIn = () =>
+    setZoomLevel((z) => Math.min(2.2, Number((z + 0.25).toFixed(2))));
+  const zoomOut = () =>
+    setZoomLevel((z) => Math.max(0.75, Number((z - 0.25).toFixed(2))));
+  const zoomReset = () => setZoomLevel(1);
 
-    // DB is source of truth — linesTotal is SUM(receipt.amount) from
-    // receipt table, not a re-scan. No mismatch warning: divergence is
-    // expected (tax/discount edits, toIntQty rounding, user edits to
-    // expenses.total_amount). Show DB rows as-is.
-    if (hasReceipt && !receiptUrl) {
-      tips.push({
-        key: "no-image",
-        tone: "warning",
-        title: "Receipt image missing",
-        body: "A receipt is linked but no file is stored. Re-attach if you need the paper trail.",
-      });
-    }
-    if (!row?.category) {
-      tips.push({
-        key: "no-category",
-        tone: "neutral",
-        title: "Add a category",
-        body: "Helps the overview cards and filters stay accurate.",
-      });
-    }
-    if (!row?.notes) {
-      tips.push({
-        key: "no-notes",
-        tone: "neutral",
-        title: "Add a note",
-        body: "A short purpose or project tag helps future audits.",
-      });
-    }
-    if (!referenceLabel && row?.referenceId) {
-      tips.push({
-        key: "closed-source",
-        tone: "neutral",
-        title: "Source of funds closed",
-        body: "The budget reference is no longer open, so the label can’t be shown.",
-      });
-    }
+  const flaggedNotice = row?.flagged ? (
+    <div
+      role="note"
+      className="flex items-start gap-3 rounded-2xl border border-[var(--danger)]/30 bg-[var(--danger)]/10 p-3.5"
+    >
+      <TriangleAlert
+        size={16}
+        aria-hidden
+        className="mt-0.5 shrink-0 text-[var(--danger)]"
+      />
+      <div className="min-w-0 flex-1">
+        <p className="text-xs font-bold text-[var(--danger)]">
+          Receipt date predates the budget issuance date
+        </p>
+        <p className="mt-1 text-xs leading-relaxed text-[var(--danger)]/90">
+          This receipt is dated before the budget was issued to the employee.
+          Please verify the receipt details and legitimacy before approving.
+        </p>
+      </div>
+    </div>
+  ) : null;
 
-    // Only show “all good” when there’s truly nothing else to say — and treat
-    // that as “no recommendations” so the section stays hidden. Keeps the modal
-    // focused on what needs action.
-    if (tips.length === 0) return [];
+  const detailRows = (
+    <dl className="grid grid-cols-1 gap-x-4 gap-y-4 sm:grid-cols-2">
+      <div className="min-w-0 space-y-1.5 rounded-xl border border-[var(--border)] bg-[var(--surface)] p-3">
+        <FieldLabel
+          icon={
+            <Calendar
+              size={13}
+              aria-hidden
+              className="shrink-0 text-[var(--accent-strong)]"
+            />
+          }
+        >
+          Receipt date Expense
+        </FieldLabel>
+        <p className="text-sm font-semibold text-[var(--ink)]">
+          {formatDate(row?.date)}
+          {row?.timeDate ? (
+            <span className="font-normal text-[var(--ink-muted)]">
+              {" "}
+              · {formatTime(row?.timeDate)}
+            </span>
+          ) : null}
+        </p>
+      </div>
 
-    return tips;
-  }, [open, row, hasReceipt, receiptUrl, referenceLabel]);
+      {row?.receiptDate ? (
+        <div className="min-w-0 space-y-1.5 rounded-xl border border-[var(--border)] bg-[var(--surface)] p-3">
+          <FieldLabel
+            icon={
+              <CalendarClock
+                size={13}
+                aria-hidden
+                className="shrink-0 text-[var(--accent-strong)]"
+              />
+            }
+          >
+            Receipt date entry
+          </FieldLabel>
+          <p className="text-sm font-semibold text-[var(--ink)]">
+            {formatDate(row.timeDate)}
+          </p>
+        </div>
+      ) : null}
 
-  const hasRecommendations = recommendations.length > 0;
+      <div className="min-w-0 space-y-1.5 rounded-xl border border-[var(--border)] bg-[var(--surface)] p-3">
+        <FieldLabel
+          icon={
+            <Wallet
+              size={13}
+              aria-hidden
+              className="shrink-0 text-[var(--accent-strong)]"
+            />
+          }
+        >
+          Payment method
+        </FieldLabel>
+        <p className="flex items-center gap-1.5 text-sm font-semibold text-[var(--ink)]">
+          <span className="text-[var(--ink-muted)]">
+            {getMethodIcon(row?.method)}
+          </span>
+          {methodLabel(row?.method)}
+        </p>
+      </div>
+
+      {row?.category ? (
+        <div className="min-w-0 space-y-1.5 rounded-xl border border-[var(--border)] bg-[var(--surface)] p-3">
+          <FieldLabel
+            icon={
+              <Tag
+                size={13}
+                aria-hidden
+                className="shrink-0 text-[var(--accent-strong)]"
+              />
+            }
+          >
+            Category
+          </FieldLabel>
+          <p className="truncate text-sm font-semibold text-[var(--ink)]">
+            {row.category}
+          </p>
+        </div>
+      ) : null}
+
+      {referenceLabel ? (
+        <div className="min-w-0 space-y-1.5 rounded-xl border border-[var(--border)] bg-[var(--surface)] p-3 sm:col-span-2">
+          <FieldLabel
+            icon={
+              <Tag
+                size={13}
+                aria-hidden
+                className="shrink-0 text-[var(--accent-strong)]"
+              />
+            }
+          >
+            Source of funds
+          </FieldLabel>
+          <p className="truncate text-sm font-semibold text-[var(--ink)]">
+            {referenceLabel}
+          </p>
+        </div>
+      ) : null}
+
+      <div className="min-w-0 space-y-1.5 sm:col-span-2">
+        <FieldLabel
+          icon={
+            <UserRound
+              size={13}
+              aria-hidden
+              className="shrink-0 text-[var(--accent-strong)]"
+            />
+          }
+        >
+          Submitted by
+        </FieldLabel>
+        <CreatorRow row={row} />
+      </div>
+
+      {row?.notes ? (
+        <div className="min-w-0 space-y-1.5 rounded-xl border border-[var(--border)] bg-[var(--surface)] p-3 sm:col-span-2">
+          <FieldLabel
+            icon={
+              <FileText
+                size={13}
+                aria-hidden
+                className="shrink-0 text-[var(--ink-muted)]"
+              />
+            }
+          >
+            Notes / remarks
+          </FieldLabel>
+          <p className="break-words text-xs italic leading-relaxed text-[var(--ink)]">
+            {row.notes}
+          </p>
+        </div>
+      ) : null}
+    </dl>
+  );
+
+  const titleBlock = (
+    <div className="min-w-0 space-y-1.5 rounded-2xl border border-[var(--border)] bg-[var(--surface)] p-4 shadow-xs">
+      <FieldLabel
+        icon={
+          <Store
+            size={13}
+            aria-hidden
+            className="shrink-0 text-[var(--accent-strong)]"
+          />
+        }
+      >
+        Vendor / description
+      </FieldLabel>
+      <p className="break-words font-display text-base font-semibold leading-snug text-[var(--ink)]">
+        {vendorName || row?.description || "Untitled expense"}
+      </p>
+      {vendorName && row?.description && vendorName !== row.description ? (
+        <p className="break-words text-xs leading-relaxed text-[var(--ink-muted)]">
+          {row.description}
+        </p>
+      ) : null}
+    </div>
+  );
+
+  const amountBlock = (
+    <div className="rounded-2xl border border-[var(--border)] bg-[var(--surface)] p-4 shadow-xs">
+      <FieldLabel
+        icon={
+          <ReceiptText
+            size={13}
+            aria-hidden
+            className="shrink-0 text-[var(--accent-strong)]"
+          />
+        }
+      >
+        Total amount
+      </FieldLabel>
+      <div className="flex flex-row items-center gap-3">
+        <p className="mt-1.5 font-display text-4xl font-bold leading-none tracking-tight tabular-nums text-[var(--ink)]">
+          {formatMoney(recordedTotal)}
+        </p>
+        <ExpenseStatusBadge status={row?.status} />
+      </div>
+    </div>
+  );
+
+  const receiptPreview = canPreviewImage ? (
+    <div className="flex flex-col bg-[#0b100f]">
+      {/* ── Viewer toolbar: zoom controls + open full size ── */}
+      <div className="flex items-center justify-between gap-3 border-b border-white/10 bg-black/40 px-3 py-2">
+        <span className="flex min-w-0 items-center gap-1.5 text-[11px] font-medium text-white/70">
+          <ImageIcon size={13} aria-hidden className="shrink-0" />
+          <span className="truncate">Receipt image</span>
+          {zoomLevel !== 1 ? (
+            <span className="rounded bg-white/20 px-1.5 py-0.5 text-[10px] font-bold tabular-nums text-white">
+              {Math.round(zoomLevel * 100)}%
+            </span>
+          ) : null}
+        </span>
+        <div className="flex shrink-0 items-center gap-1">
+          <button
+            type="button"
+            onClick={zoomOut}
+            disabled={zoomLevel <= 0.75}
+            title="Zoom out"
+            aria-label="Zoom out receipt image"
+            className="flex h-7 w-7 items-center justify-center rounded-lg bg-white/10 text-white transition-colors hover:bg-white/20 disabled:opacity-40"
+          >
+            <ZoomOut size={13} aria-hidden />
+          </button>
+          <button
+            type="button"
+            onClick={zoomReset}
+            disabled={zoomLevel === 1}
+            title="Reset zoom"
+            aria-label="Reset receipt zoom"
+            className="flex h-7 w-7 items-center justify-center rounded-lg bg-white/10 text-white transition-colors hover:bg-white/20 disabled:opacity-40"
+          >
+            <RotateCcw size={12} aria-hidden />
+          </button>
+          <button
+            type="button"
+            onClick={zoomIn}
+            disabled={zoomLevel >= 2.2}
+            title="Zoom in"
+            aria-label="Zoom in receipt image"
+            className="flex h-7 w-7 items-center justify-center rounded-lg bg-white/10 text-white transition-colors hover:bg-white/20 disabled:opacity-40"
+          >
+            <ZoomIn size={13} aria-hidden />
+          </button>
+          <span aria-hidden className="mx-1 h-3 w-px bg-white/20" />
+          <button
+            type="button"
+            onClick={() => openReceiptFile(receiptUrl)}
+            className="inline-flex items-center gap-1 rounded-lg bg-[var(--accent-strong)] px-2.5 py-1 text-xs font-semibold text-white transition-opacity hover:opacity-90"
+          >
+            <Maximize2 size={12} aria-hidden />
+            Full size
+          </button>
+        </div>
+      </div>
+
+      {/* ── Large, legible receipt viewport ── */}
+      <div className="scrollbar-slim relative max-h-[560px] min-h-[380px] overflow-auto p-4 lg:max-h-[640px]">
+        <img
+          src={receiptUrl}
+          alt="Scanned receipt"
+          onError={() => setFailedUrl(receiptUrl)}
+          style={{ transform: `scale(${zoomLevel})` }}
+          className="mx-auto block w-auto max-w-full rounded-lg bg-white object-contain shadow-2xl transition-transform duration-150"
+        />
+      </div>
+    </div>
+  ) : receiptUrl ? (
+    <div className="flex min-h-[340px] w-full flex-col items-center justify-center gap-4 bg-[var(--surface-2)]/50 p-8 text-center">
+      <span className="flex h-16 w-16 items-center justify-center rounded-2xl bg-[var(--accent-soft)] text-[var(--accent-strong)]">
+        {receiptIsPdf ? (
+          <FileText size={28} aria-hidden />
+        ) : (
+          <ImageIcon size={28} aria-hidden />
+        )}
+      </span>
+      <div className="max-w-[320px] space-y-1">
+        <p className="text-sm font-semibold text-[var(--ink)]">
+          {receiptIsPdf ? "PDF document receipt" : "Receipt attachment"}
+        </p>
+        <p className="text-xs leading-relaxed text-[var(--ink-muted)]">
+          {receiptIsPdf
+            ? "This expense is linked to a PDF document. Open it to inspect the full receipt."
+            : "A preview can't be shown here. Open the original file to view it."}
+        </p>
+      </div>
+      <Button
+        type="button"
+        variant="accent"
+        size="sm"
+        onClick={() => openReceiptFile(receiptUrl)}
+        className="gap-1.5"
+      >
+        <Eye size={14} aria-hidden />
+        {receiptIsPdf ? "Open PDF document" : "Open file"}
+      </Button>
+    </div>
+  ) : (
+    <div className="flex min-h-[300px] w-full flex-col items-center justify-center gap-3 bg-[var(--surface-2)]/40 px-6 py-10 text-center">
+      <span className="flex h-14 w-14 items-center justify-center rounded-2xl bg-[var(--surface-2)] text-[var(--ink-muted)]">
+        <ReceiptText size={24} aria-hidden />
+      </span>
+      <span className="max-w-[240px] text-[13px] font-medium leading-snug text-[var(--ink-muted)]">
+        No receipt image attached to this expense
+      </span>
+    </div>
+  );
 
   return (
     <AnimatePresence>
@@ -278,359 +723,130 @@ const ExpenseDetailsModal = ({
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           exit={{ opacity: 0 }}
-          className="fixed inset-0 z-[70] flex items-center justify-center bg-[var(--ink)]/35 p-3 backdrop-blur-md sm:p-4"
-          onClick={() => {
-            setFailedUrl(null);
-            onClose?.();
-          }}
+          className="fixed inset-0 z-[70] flex items-center justify-center bg-[var(--ink)]/45 p-3 backdrop-blur-md sm:p-5"
+          onClick={handleClose}
         >
           <motion.div
-            initial={{ opacity: 0, scale: 0.97, y: 12 }}
+            initial={{ opacity: 0, scale: 0.96, y: 16 }}
             animate={{ opacity: 1, scale: 1, y: 0 }}
-            exit={{ opacity: 0, scale: 0.97, y: 8 }}
-            transition={{ duration: 0.24, ease: DIALOG_EASE }}
+            exit={{ opacity: 0, scale: 0.96, y: 12 }}
+            transition={{ duration: 0.28, ease: DIALOG_EASE }}
             role="dialog"
             aria-modal="true"
             aria-labelledby={titleId}
             onClick={(e) => e.stopPropagation()}
-            className="relative flex max-h-[calc(100dvh-1.5rem)] w-full max-w-[880px] flex-col overflow-hidden rounded-[28px] border border-[var(--border)] bg-[var(--surface)] shadow-hover"
+            className={cn(
+              "p-3 relative flex max-h-[calc(100dvh-2rem)] w-full flex-col overflow-hidden rounded-3xl border border-[var(--border)] bg-[var(--surface)] shadow-2xl shadow-black/15",
+              hasReceipt ? "max-w-[1120px]" : "max-w-[520px]",
+            )}
           >
-            {/* ── Header ── */}
-            <div className="flex shrink-0 items-start justify-between gap-4 border-b border-[var(--border)] px-4 pb-3.5 pt-4 sm:px-6 sm:pb-4 sm:pt-5">
-              <div className="min-w-0 flex gap-3">
-                <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-[var(--accent-soft)] text-[var(--accent-strong)]">
-                  <ReceiptText size={18} aria-hidden />
-                </span>
-                <div className="min-w-0 pt-0.5">
+            <div className="flex shrink-0 items-center justify-between gap-3  px-5 pt-4 ">
+              <div className="flex min-w-0 items-center gap-3">
+                <div className="min-w-0">
                   <h3
                     id={titleId}
-                    className="font-display text-[17px] font-semibold tracking-tight text-[var(--ink)]"
+                    className="font-display truncate text-lg font-semibold tracking-tight text-[var(--ink)]"
                   >
                     Expense details
                   </h3>
-                  <p className="mt-0.5 line-clamp-1 text-xs text-[var(--ink-muted)]">
-                    {vendorName || formatDate(row?.date) || "—"}
+                  <p className="mt-0.5 truncate lg:text-sm text-xs text-[var(--ink-muted)]">
+                    {hasReceipt
+                      ? "Receipt & items on the left · expense details on the right"
+                      : "Recorded expense without a receipt scan"}
                   </p>
                 </div>
               </div>
-              <button
-                type="button"
-                onClick={() => {
-                  setFailedUrl(null);
-                  onClose?.();
-                }}
-                aria-label="Close expense details"
-                className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-[var(--surface-2)] text-[var(--ink-muted)] transition-colors hover:bg-[var(--border)] hover:text-[var(--ink)]"
-              >
-                <X size={16} aria-hidden />
-              </button>
-            </div>
-
-            {/* ── Body ── */}
-            <div className="scrollbar-slim min-h-0 flex-1 overflow-y-auto overscroll-contain px-4 py-4 sm:px-6 sm:py-5">
-              <div className="space-y-4 sm:space-y-5">
-                {/* Hero — amount + core context, no redundant labels */}
-                <div className="rounded-[24px] border border-[var(--border)] bg-[var(--surface-2)]/50 p-4 sm:p-5">
-                  <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-                    <div className="min-w-0 flex-1">
-                      <p className="break-words text-[15px] font-semibold leading-snug text-[var(--ink)]">
-                        {row?.description || "Untitled expense"}
-                      </p>
-                      <div className="mt-2.5 flex flex-wrap items-center gap-2">
-                        <ExpenseStatusBadge status={row?.status} />
-                        <Badge tone="accent" className="max-w-full">
-                          <span className="truncate">
-                            {row?.category || "Uncategorized"}
-                          </span>
-                        </Badge>
-                      </div>
-                    </div>
-                    <div className="shrink-0 sm:text-right">
-                      <p className="sr-only">Amount</p>
-                      <p className="font-display text-[26px] font-semibold tabular-nums leading-none tracking-tight text-[var(--ink)] sm:text-[28px]">
-                        {formatMoney(recordedTotal)}
-                      </p>
-                    </div>
-                  </div>
-
-                  {/* essential meta as pills — no MetaRow wall */}
-                  <div className="mt-3 flex flex-wrap items-center gap-2">
-                    <span className="inline-flex items-center gap-1.5 rounded-full border border-[var(--border)] bg-[var(--surface)] px-3 py-1.5 text-xs font-medium text-[var(--ink-muted)]">
-                      <CalendarDays
-                        size={13}
-                        aria-hidden
-                        className="shrink-0"
-                      />
-                      {formatDate(row?.date)}
-                    </span>
-                    <span className="inline-flex items-center gap-1.5 rounded-full border border-[var(--border)] bg-[var(--surface)] px-3 py-1.5 text-xs font-medium text-[var(--ink-muted)]">
-                      <MethodIcon
-                        method={row?.method}
-                        className="h-3.5 w-3.5"
-                      />
-                      {methodLabel(row?.method)}
-                    </span>
-                    {referenceLabel && (
-                      <span className="inline-flex items-center gap-1.5 rounded-full border border-[var(--border)] bg-[var(--surface)] px-3 py-1.5 text-xs font-medium text-[var(--ink-muted)]">
-                        <Wallet size={13} aria-hidden className="shrink-0" />
-                        <span className="truncate max-w-[14rem]">
-                          {referenceLabel}
-                        </span>
-                      </span>
-                    )}
-                  </div>
-
-                  {/* notes — soft quote, no nested card or label */}
-                  {row?.notes && (
-                    <p className="mt-3 border-l-2 border-[var(--accent)]/40 pl-3 text-sm italic leading-relaxed text-[var(--ink-muted)]">
-                      {row.notes}
-                    </p>
-                  )}
-
-                  {/* filed by — merged row, no extra card */}
-                  <div className="mt-3.5 flex items-center justify-between gap-3 border-t border-[var(--border)] pt-3">
-                    <EmployeeBlock
-                      name={row?.employee}
-                      role={row?.employeeRole}
-                      avatarUrl={row?.employeeAvatar}
-                    />
-                    <span className="shrink-0 text-xs tabular-nums text-[var(--ink-muted)]">
-                      Filed {formatTime(row?.timeDate)}
-                    </span>
-                  </div>
-                </div>
-
-                {/* Receipt */}
-                {hasReceipt && (
-                  <section aria-label="Receipt" className="space-y-3">
-                    <div className="px-1">
-                      <h4 className="flex items-center gap-2 text-[11px] font-semibold uppercase tracking-[0.12em] text-[var(--ink-muted)]">
-                        <ReceiptText
-                          size={13}
-                          aria-hidden
-                          className="text-[var(--accent-strong)]"
-                        />
-                        Receipt
-                      </h4>
-                    </div>
-
-                    <div className="space-y-3">
-                      {/* image — full width so the item list below stays breathable and not squeezed into a half column */}
-                      {canPreviewImage ? (
-                        <button
-                          type="button"
-                          onClick={() => openReceiptFile(receiptUrl)}
-                          aria-label="Open receipt image"
-                          className="group relative block w-full overflow-hidden rounded-2xl border border-white/10 bg-[#101817] p-2.5 sm:p-3"
-                        >
-                          <img
-                            src={receiptUrl}
-                            alt="Stored receipt"
-                            onError={() => setFailedUrl(receiptUrl)}
-                            className="mx-auto max-h-[300px] w-full max-w-[420px] rounded-xl bg-white object-contain shadow-[0_8px_32px_rgba(0,0,0,0.35)] transition-transform duration-200 group-hover:scale-[1.01] sm:max-h-[360px]"
-                          />
-                          <span className="pointer-events-none absolute inset-x-0 bottom-0 flex items-center justify-center gap-1.5 bg-black/65 px-3 py-2.5 text-xs font-medium text-white opacity-0 backdrop-blur-sm transition-opacity group-hover:opacity-100 group-focus-visible:opacity-100">
-                            <Eye size={13} aria-hidden />
-                            Tap to enlarge
-                          </span>
-                        </button>
-                      ) : (
-                        <div className="flex min-h-[120px] w-full flex-col items-center justify-center gap-3 rounded-2xl border border-dashed border-[var(--border)] bg-[var(--surface-2)]/50 px-4 py-5 text-center">
-                          <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-[var(--surface-2)] text-[var(--ink-muted)]">
-                            <ImageOff size={16} aria-hidden />
-                          </span>
-                          <div>
-                            <p className="text-sm font-semibold text-[var(--ink)]">
-                              {receiptIsPdf
-                                ? "PDF receipt"
-                                : receiptUrl
-                                  ? "Preview unavailable"
-                                  : "No image stored"}
-                            </p>
-                            <p className="mt-1 text-xs leading-snug text-[var(--ink-muted)]">
-                              {receiptUrl
-                                ? "Open the file to review it."
-                                : "Itemized lines are still shown below."}
-                            </p>
-                          </div>
-                          {receiptUrl && (
-                            <Button
-                              type="button"
-                              variant="soft"
-                              size="sm"
-                              onClick={() => openReceiptFile(receiptUrl)}
-                            >
-                              <Eye size={14} aria-hidden />
-                              {receiptIsPdf ? "Open PDF" : "Open file"}
-                            </Button>
-                          )}
-                        </div>
-                      )}
-
-                      {/* lines — full width, not compressed into a side column */}
-                      <div
-                        aria-busy={linesLoading || undefined}
-                        aria-live="polite"
-                      >
-                        {linesLoading ? (
-                          <div
-                            className="space-y-2"
-                            role="status"
-                            aria-label="Loading receipt lines"
-                          >
-                            {[0, 1, 2].map((i) => (
-                              <div
-                                key={i}
-                                className="h-[68px] animate-pulse rounded-xl border border-[var(--border)] bg-[var(--surface-2)]/60"
-                              />
-                            ))}
-                          </div>
-                        ) : linesError ? (
-                          <div className="flex flex-col gap-3 rounded-2xl border border-[var(--danger)]/20 bg-[var(--danger)]/8 px-4 py-4">
-                            <div className="flex items-start gap-3">
-                              <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-[var(--danger)]/15 text-[var(--danger)]">
-                                <AlertCircle size={14} aria-hidden />
-                              </span>
-                              <div className="min-w-0">
-                                <p className="text-sm font-semibold text-[var(--ink)]">
-                                  Couldn’t load items
-                                </p>
-                                <p className="mt-0.5 text-xs leading-relaxed text-[var(--ink-muted)]">
-                                  The receipt image is fine — only the line list
-                                  failed.
-                                </p>
-                              </div>
-                            </div>
-                            <Button
-                              type="button"
-                              variant="soft"
-                              size="sm"
-                              onClick={() => refetchLines()}
-                              disabled={linesRefetching}
-                              className="self-start"
-                            >
-                              {linesRefetching && (
-                                <Loader2
-                                  size={13}
-                                  className="animate-spin"
-                                  aria-hidden
-                                />
-                              )}
-                              Retry
-                            </Button>
-                          </div>
-                        ) : receiptLines.length === 0 ? (
-                          <div className="rounded-2xl border border-[var(--border)] bg-[var(--surface-2)]/40 px-4 py-6 text-center">
-                            <span className="mx-auto flex h-9 w-9 items-center justify-center rounded-xl bg-[var(--surface)] text-[var(--ink-muted)]">
-                              <ListChecks size={16} aria-hidden />
-                            </span>
-                            <p className="mt-3 text-sm font-semibold text-[var(--ink)]">
-                              No line items
-                            </p>
-                            <p className="mx-auto mt-1 max-w-[22ch] text-xs leading-relaxed text-[var(--ink-muted)]">
-                              Nothing was itemized when this was scanned — the
-                              recorded amount stands alone.
-                            </p>
-                          </div>
-                        ) : (
-                          <div>
-                            <button
-                              type="button"
-                              onClick={() =>
-                                setOpenItemsFor((prev) =>
-                                  prev === row?.id ? null : (row?.id ?? null),
-                                )
-                              }
-                              aria-expanded={itemsOpen}
-                              aria-controls={itemsRegionId}
-                              className="flex min-h-[52px] w-full items-center justify-between gap-3 rounded-xl border border-[var(--border)] bg-[var(--surface)] px-3.5 py-2.5 text-left transition-colors hover:border-[var(--accent)]/25 hover:bg-[var(--surface-2)]/40"
-                            >
-                              <span className="flex min-w-0 items-center gap-3">
-                                <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-[var(--accent-soft)] text-[var(--accent-strong)]">
-                                  <ListChecks size={16} aria-hidden />
-                                </span>
-                                <span className="min-w-0">
-                                  <span className="block text-sm font-semibold text-[var(--ink)]">
-                                    {itemsOpen ? "Hide items" : "View items"}
-                                  </span>
-                                  <span className="block truncate text-xs tabular-nums text-[var(--ink-muted)]">
-                                    {receiptLines.length}{" "}
-                                    {receiptLines.length === 1
-                                      ? "line"
-                                      : "lines"}{" "}
-                                    · {formatMoney(linesTotal)}
-                                  </span>
-                                </span>
-                              </span>
-                              <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-[var(--surface-2)] text-[var(--ink-muted)]">
-                                <ChevronDown
-                                  size={16}
-                                  aria-hidden
-                                  className={`transition-transform duration-200 ${itemsOpen ? "rotate-180" : ""}`}
-                                />
-                              </span>
-                            </button>
-
-                            <AnimatePresence initial={false}>
-                              {itemsOpen && (
-                                <motion.div
-                                  key="receipt-items"
-                                  id={itemsRegionId}
-                                  initial={{ height: 0, opacity: 0 }}
-                                  animate={{ height: "auto", opacity: 1 }}
-                                  exit={{ height: 0, opacity: 0 }}
-                                  transition={{
-                                    duration: 0.24,
-                                    ease: DIALOG_EASE,
-                                  }}
-                                  className="overflow-hidden"
-                                >
-                                  <div className="pt-2.5">
-                                    <ReceiptLineList lines={receiptLines} />
-                                  </div>
-                                </motion.div>
-                              )}
-                            </AnimatePresence>
-                          </div>
-                        )}
-                      </div>
-                    </div>
-                  </section>
-                )}
-
-                {/* Recommendations — only when there’s something to act on */}
-                {hasRecommendations && (
-                  <section aria-label="Insights" className="space-y-3">
-                    <div className="px-1">
-                      <h4 className="flex items-center gap-2 text-[11px] font-semibold uppercase tracking-[0.12em] text-[var(--ink-muted)]">
-                        <Sparkles
-                          size={13}
-                          aria-hidden
-                          className="text-[var(--accent-strong)]"
-                        />
-                        Insights
-                      </h4>
-                    </div>
-                    <div className="space-y-2">
-                      {recommendations.map((tip) => (
-                        <RecommendationTip key={tip.key} tip={tip} />
-                      ))}
-                    </div>
-                  </section>
-                )}
+              <div className="flex shrink-0 items-center gap-2">
+                <button
+                  type="button"
+                  onClick={handleClose}
+                  aria-label="Close expense details"
+                  autoFocus
+                  className="flex h-9 w-9 items-center justify-center rounded-full text-[var(--ink-muted)] transition-colors hover:bg-[var(--surface-2)] hover:text-[var(--ink)]"
+                >
+                  <X size={16} aria-hidden />
+                </button>
               </div>
             </div>
 
-            {/* ── Footer ── */}
-            <div className="flex shrink-0 items-center justify-end gap-2 border-t border-[var(--border)] bg-[var(--surface)] px-4 py-3 sm:px-6">
+            <div className="scrollbar-slim min-h-0 flex-1 overflow-y-auto overscroll-contain p-5 sm:p-6">
+              {hasReceipt ? (
+                <div className="grid grid-cols-1 items-start gap-6 lg:grid-cols-[minmax(0,1.15fr)_minmax(0,1fr)]">
+                  {/* ── Left: receipt document + toggleable items ── */}
+                  <div className="min-w-0 space-y-4">
+                    <section
+                      aria-label="Receipt document"
+                      className="overflow-hidden rounded-2xl border border-[var(--border)] bg-[var(--surface)] shadow-xs"
+                    >
+                      <div className="flex items-center justify-between gap-2 border-b border-[var(--border)] bg-[var(--surface-2)]/30 px-4 py-3">
+                        <div className="flex min-w-0 items-center gap-2">
+                          <p className="truncate text-[11px] font-semibold uppercase tracking-[0.08em] text-[var(--ink-muted)]">
+                            Receipt document
+                          </p>
+                          {receiptIsPdf ? (
+                            <Badge
+                              tone="accent"
+                              className="px-1.5 py-0.5 text-[10px]"
+                            >
+                              PDF
+                            </Badge>
+                          ) : null}
+                        </div>
+                        {!receiptIsPdf && receiptUrl ? (
+                          <span className="shrink-0 text-[11px] text-[var(--ink-muted)]">
+                            Zoom to read details
+                          </span>
+                        ) : null}
+                      </div>
+                      {receiptPreview}
+                    </section>
+
+                    <LineItemsSection
+                      lines={receiptLines}
+                      open={itemsOpen}
+                      onToggle={() => setItemsOpen((prev) => !prev)}
+                      loading={linesLoading}
+                      error={linesError}
+                      onRetry={() => refetchLines()}
+                      refetching={linesRefetching}
+                      regionId={itemsRegionId}
+                    />
+                  </div>
+
+                  {/* ── Right: recorded expense details ── */}
+                  <section
+                    aria-label="Expense details"
+                    className="min-w-0 space-y-4 rounded-2xl border border-[var(--border)] bg-[var(--surface-2)]/35 p-5 shadow-xs"
+                  >
+                    {flaggedNotice}
+                    {amountBlock}
+                    {titleBlock}
+                    <div className="border-t border-[var(--border)] pt-4">
+                      {detailRows}
+                    </div>
+                  </section>
+                </div>
+              ) : (
+                <section
+                  aria-label="Expense details"
+                  className="mx-auto max-w-[460px] space-y-4"
+                >
+                  {flaggedNotice}
+                  {amountBlock}
+                  {titleBlock}
+                  <div className="border-t border-[var(--border)] pt-4">
+                    {detailRows}
+                  </div>
+                </section>
+              )}
+            </div>
+
+            <div className="flex shrink-0 items-center justify-end gap-3  px-5 py-3.5 sm:px-6">
               <Button
                 type="button"
                 variant="outline"
-                onClick={() => {
-                  setFailedUrl(null);
-                  onClose?.();
-                }}
-                className="rounded-full"
+                onClick={handleClose}
+                className="rounded-full px-5 text-xs font-semibold"
               >
                 Close
               </Button>

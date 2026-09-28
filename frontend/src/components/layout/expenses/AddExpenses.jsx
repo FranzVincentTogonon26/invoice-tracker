@@ -1,5 +1,6 @@
 import {
   AlertCircle,
+  AlertTriangle,
   ArrowLeft,
   Eye,
   ImagePlus,
@@ -21,7 +22,13 @@ import { Card, CardDescription, CardTitle } from "../../ui/Card";
 import { DatePicker } from "../../ui/DatePicker";
 import { Input, TextArea } from "../../ui/Input";
 import Listbox from "../../ui/Listbox";
-import { cn, formatMoney, toISODate } from "../../../lib/utils";
+import {
+  cn,
+  formatDate,
+  formatMoney,
+  toDate,
+  toISODate,
+} from "../../../lib/utils";
 import { FUNDING_STATUS, fundingState } from "../../../lib/funding";
 import {
   ERROR_VISIBLE_MS,
@@ -108,6 +115,12 @@ const isoDateOnly = (value) => {
   return ISO_DATE_RE.test(iso) ? iso : undefined;
 };
 
+const isBeforeFirstIssued = (date, firstIssuedAt) => {
+  const day = isoDateOnly(date);
+  const first = isoDateOnly(firstIssuedAt);
+  return Boolean(day && first) && day < first;
+};
+
 const toPayload = (item, { receiptId, imageUrl, receiptDate } = {}) => ({
   description: item.description.trim(),
   category_id: item.categoryId || undefined,
@@ -174,7 +187,9 @@ function Field({ label, children, hint, hintTone = "muted" }) {
             "mt-1.5 block text-xs leading-snug",
             hintTone === "danger"
               ? "text-[var(--danger)]"
-              : "text-[var(--ink-muted)]",
+              : hintTone === "warning"
+                ? "text-[var(--warning)]"
+                : "text-[var(--ink-muted)]",
           )}
         >
           {hint}
@@ -201,14 +216,11 @@ const AddExpenses = () => {
   const {
     categories,
     references,
+    firstIssuedAt,
     isLoading: referencesLoading,
   } = useExpenses();
   const { create } = useExpensesMutations();
 
-  // Mirrors the backend auth middleware: a valid login is a real users row
-  // (user_id exists) whose status is 'active'. Employees draw their source of
-  // funds from their own remaining balance; admins keep the existing
-  // budget-reference picker.
   const isActiveSession = Boolean(user?.user_id && user?.status === "active");
   const isEmployee = user?.role === USER_ROLES.EMPLOYEE;
   const sourceMode = isEmployee ? "balance" : "budget";
@@ -334,13 +346,25 @@ const AddExpenses = () => {
   }, [references, referenceId]);
 
   const zeroAmountIndexes = useMemo(() => zeroAmountIndexesFor(items), [items]);
-  // Zero-amount validation — after a save attempt every listed item whose
-  // amount is not greater than zero (blank / 0 / 0.00) is flagged so the danger
-  // border points at the exact rows that must be fixed before the request can
-  // proceed. `handleSave` denies on this very same set.
   const flaggedLines = useMemo(
     () => (showZeroAmountErrors ? zeroAmountIndexes : []),
     [showZeroAmountErrors, zeroAmountIndexes],
+  );
+
+  const firstIssuedDate = isEmployee ? isoDateOnly(firstIssuedAt) : undefined;
+  const firstIssuedLabel = firstIssuedDate
+    ? formatDate(toDate(firstIssuedDate))
+    : "";
+  const backdatedLines = useMemo(
+    () =>
+      firstIssuedDate
+        ? items
+            .map((item, index) =>
+              isBeforeFirstIssued(item.date, firstIssuedDate) ? index : -1,
+            )
+            .filter((index) => index >= 0)
+        : [],
+    [items, firstIssuedDate],
   );
 
   const funding = useMemo(
@@ -456,19 +480,11 @@ const AddExpenses = () => {
     const touched = touchedIndexes.map((index) => items[index]);
 
     if (touched.length === 0) {
-      // Nothing filled in yet — there is no 0.00 item to fix, so drop any flag
-      // left over from an earlier attempt instead of painting the blank
-      // starter row red.
       setShowZeroAmountErrors(false);
       setFormError("Add at least one expense line before saving.");
       return;
     }
 
-    // Zero-amount restriction — EVERY item listed in the summary must carry a
-    // value greater than zero, so a blank / 0 / 0.00 line (including a trailing
-    // row that was added but left empty) denies the whole request and is called
-    // out by line number. The same `flaggedLines` set paints those rows red, so
-    // it is obvious which items need an amount before saving again.
     if (zeroAmountIndexes.length > 0) {
       const zeroLabels = zeroAmountIndexes.map(
         (index) =>
@@ -534,10 +550,6 @@ const AddExpenses = () => {
 
       await create.mutateAsync({
         type: "expense",
-        // Every save is tagged with the picked source from `references` —
-        // admins tag the budget reference, employees tag the reference their
-        // remaining balance was issued from (the server keeps it only when the
-        // employee actually holds an open issuance for it).
         reference_id: selectedReferenceId || undefined,
         receipts,
         items: touched.map((item) => {
@@ -551,11 +563,18 @@ const AddExpenses = () => {
       });
 
       clearPendingReceipts();
+      const flaggedCount = touchedIndexes.filter((index) =>
+        backdatedLines.includes(index),
+      ).length;
       toast.success(
-        `Saved ${touched.length} expense line${touched.length === 1 ? "" : "s"}.`,
+        `Saved ${touched.length} expense line${touched.length === 1 ? "" : "s"}.${
+          flaggedCount > 0
+            ? ` ${flaggedCount} dated behind your first issued budget ${
+                flaggedCount === 1 ? "was" : "were"
+              } flagged.`
+            : ""
+        }`,
       );
-      // Land each role back on its own expenses list — the Add Expenses form
-      // is shared, but the shells nest it under /admin and /employee.
       nav(isEmployee ? "/employee/expenses" : "/admin/expenses");
     } catch (error) {
       setFormError(error?.message || "Couldn't save expenses.");
@@ -651,9 +670,6 @@ const AddExpenses = () => {
                 animate={{ opacity: 1, y: 0 }}
                 className={cn(
                   "group relative rounded-2xl border border-[var(--border)] bg-[var(--surface-2)]/50 p-4 transition-colors sm:p-5",
-                  // Zero-amount guard — this line is denied on save until its
-                  // amount is greater than zero, so it carries the danger
-                  // border the summary also points at.
                   flaggedLines.includes(i) &&
                     "border-[var(--danger)]/40 bg-[var(--danger)]/5",
                 )}
@@ -678,6 +694,16 @@ const AddExpenses = () => {
                       >
                         <Sparkles size={11} />
                         {it.aiSuggested ? "AI suggested" : "From receipt"}
+                      </Badge>
+                    )}
+                    {backdatedLines.includes(i) && (
+                      <Badge
+                        tone="warning"
+                        className="hidden shrink-0 sm:inline-flex"
+                        title={`This line is dated before the first budget issued to you (${firstIssuedLabel}) — it will be saved flagged`}
+                      >
+                        <AlertTriangle size={11} aria-hidden />
+                        Behind budget
                       </Badge>
                     )}
                   </div>
@@ -732,17 +758,35 @@ const AddExpenses = () => {
                   <Field
                     label="Date"
                     hint={
-                      it.dateLocked
-                        ? "From the scanned receipt — locked."
-                        : undefined
+                      backdatedLines.includes(i)
+                        ? `Behind the budget issued to you (${firstIssuedLabel}) — this line will be flagged.`
+                        : it.dateLocked
+                          ? "From the scanned receipt — locked."
+                          : undefined
+                    }
+                    hintTone={
+                      backdatedLines.includes(i) ? "warning" : undefined
                     }
                   >
                     <DatePicker
                       value={it.date}
                       onChange={(next) => setItem(i, { date: next })}
                       placeholder="Select date"
-                      className="tabular-nums"
+                      className={cn(
+                        "tabular-nums",
+                        // Employee-only: a date behind the first budget issued
+                        // to this user reads amber so it is identifiable at a
+                        // glance. The save is not blocked — the backend stores
+                        // these lines with flag = 1.
+                        backdatedLines.includes(i) &&
+                          "border-[var(--warning)]/60 ring-2 ring-[var(--warning)]/20 focus:border-[var(--warning)]/60 focus:ring-[var(--warning)]/25",
+                      )}
                       disabled={it.dateLocked}
+                      title={
+                        backdatedLines.includes(i)
+                          ? `This date is behind the first budget issued to you (${firstIssuedLabel}) — saving will mark it as flagged`
+                          : undefined
+                      }
                     />
                   </Field>
 
@@ -922,21 +966,30 @@ const AddExpenses = () => {
             <div className="mt-4 space-y-1">
               {items.map((it, i) => {
                 const missingAmount = flaggedLines.includes(i);
+                const backdated = backdatedLines.includes(i);
                 return (
                   <div
                     key={i}
                     className={cn(
                       "flex items-center justify-between gap-2 rounded-xl px-2 py-1.5 text-sm transition-colors hover:bg-[var(--surface-2)]/70",
-                      missingAmount &&
-                        "bg-[var(--danger)]/10 ring-1 ring-inset ring-[var(--danger)]/30",
+                      // A zero amount blocks the save (red) and wins the ring;
+                      // an employee line dated behind the first budget issued to
+                      // them reads amber instead — it still saves, marked with
+                      // flag = 1.
+                      missingAmount
+                        ? "bg-[var(--danger)]/10 ring-1 ring-inset ring-[var(--danger)]/30"
+                        : backdated &&
+                            "bg-[var(--warning)]/10 ring-1 ring-inset ring-[var(--warning)]/30",
                     )}
                   >
                     <span className="flex min-w-0 items-center gap-2 text-[var(--ink-muted)]">
                       <span
                         className={cn(
                           "flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-[var(--surface-2)] text-xs font-semibold tabular-nums",
-                          missingAmount &&
-                            "bg-[var(--danger)]/12 text-[var(--danger)]",
+                          missingAmount
+                            ? "bg-[var(--danger)]/12 text-[var(--danger)]"
+                            : backdated &&
+                                "bg-[var(--warning)]/14 text-[var(--warning)]",
                         )}
                       >
                         {i + 1}
@@ -950,6 +1003,14 @@ const AddExpenses = () => {
                           </span>
                         ) : null}
                       </span>
+                      {backdated && (
+                        <span
+                          className="shrink-0 text-[var(--warning)]"
+                          title={`Line ${i + 1} is dated behind the first budget issued to you (${firstIssuedLabel}) — it will be saved flagged`}
+                        >
+                          <AlertTriangle size={13} aria-hidden />
+                        </span>
+                      )}
                     </span>
                     {missingAmount ? (
                       <span
@@ -1061,6 +1122,11 @@ const AddExpenses = () => {
         onAdd={handleCategoryAdded}
         onDelete={handleCategoryDeleted}
         onReceiptConfirmed={handleReceiptConfirmed}
+        isBackdatedDate={
+          isEmployee && firstIssuedDate
+            ? (date) => isBeforeFirstIssued(date, firstIssuedDate)
+            : undefined
+        }
         onClose={() => setModal(null)}
       />
 

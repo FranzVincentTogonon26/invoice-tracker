@@ -120,6 +120,17 @@ export const create = async (req, res, next) => {
       }
     }
 
+    // Employee-only backdated guard: a line dated before the FIRST budget
+    // issuance linked to this token's user_id (`budget_issued_reference`
+    // .created_at, any status) is stored with `expenses.flag = 1` — the
+    // "Flagged" mark the admin ledger shows. The role comes from the verified
+    // token, so an admin save (or an employee who holds no issuance yet) passes
+    // null and nothing is ever flagged.
+    const firstIssuedAt =
+      req.user.role === "employee"
+        ? await Expenses.firstIssuedAt(req.user.id)
+        : null;
+
     const rows = await Expenses.createExpenses({
       items: payload.items,
       user_id: req.user.id,
@@ -132,6 +143,7 @@ export const create = async (req, res, next) => {
       receipts: payload.receipts ?? [],
       image_url: payload.image_url ?? null,
       receipt_date: payload.receipt_date ?? null,
+      first_issued_at: firstIssuedAt,
     });
     return res.status(201).json({
       expenses: rows,
@@ -246,6 +258,82 @@ export const updateStatus = async (req, res, next) => {
       expense,
       message: `Expense status updated to ${payload.status}.`,
     });
+  } catch (err) {
+    next(err);
+  }
+};
+
+// Admin ledger row action ("Add to draft" in the admin RowActions menu): the
+// mirror of the employee's soft delete — an employee-authored expense that is
+// still 'paid' is parked back in 'draft'. The model guards the employee + paid
+// condition inside the UPDATE, so this handler only explains why nothing was
+// updated: a missing id is a 404, and an id that belongs to an admin row or is
+// no longer paid answers with a 409 describing the rule.
+export const markEmployeeDraft = async (req, res, next) => {
+  try {
+    const { id } = req.params;
+    if (!UUID_RE.test(id || ""))
+      throw ApiError.badRequest("Invalid expense id", "VALIDATION_ERROR");
+
+    const expense = await Expenses.markEmployeeExpenseDraft(id);
+    if (expense) {
+      return res.status(200).json({
+        expense,
+        message: "Expense moved back to draft.",
+      });
+    }
+
+    const existing = await Expenses.findExpenseById(id);
+    if (!existing)
+      throw ApiError.notFound("Expense not found", "EXPENSE_NOT_FOUND");
+    if (existing.created_by_role !== "employee")
+      throw ApiError.conflict(
+        "Only an expense recorded by an employee can be moved back to draft.",
+        "EXPENSE_NOT_EMPLOYEE_ROW",
+      );
+
+    throw ApiError.conflict(
+      `Only a paid expense can be moved back to draft (current status: ${existing.status}).`,
+      "EXPENSE_NOT_PAID",
+    );
+  } catch (err) {
+    next(err);
+  }
+};
+
+// Admin ledger row action ("Remove from draft" in the admin RowActions menu):
+// the counterpart of markEmployeeDraft — an employee-authored draft is put
+// back to 'paid', so it counts against that employee's balance again. The model
+// guards the employee + draft condition inside the UPDATE, so this handler only
+// explains why nothing was updated: a missing id is a 404, and an id that
+// belongs to an admin row or is no longer a draft answers with a 409.
+export const markEmployeePaid = async (req, res, next) => {
+  try {
+    const { id } = req.params;
+    if (!UUID_RE.test(id || ""))
+      throw ApiError.badRequest("Invalid expense id", "VALIDATION_ERROR");
+
+    const expense = await Expenses.markEmployeeExpensePaid(id);
+    if (expense) {
+      return res.status(200).json({
+        expense,
+        message: "Expense moved back to paid.",
+      });
+    }
+
+    const existing = await Expenses.findExpenseById(id);
+    if (!existing)
+      throw ApiError.notFound("Expense not found", "EXPENSE_NOT_FOUND");
+    if (existing.created_by_role !== "employee")
+      throw ApiError.conflict(
+        "Only an expense recorded by an employee can be moved back to paid.",
+        "EXPENSE_NOT_EMPLOYEE_ROW",
+      );
+
+    throw ApiError.conflict(
+      `Only a draft expense can be moved back to paid (current status: ${existing.status}).`,
+      "EXPENSE_NOT_DRAFT",
+    );
   } catch (err) {
     next(err);
   }
