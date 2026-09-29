@@ -178,16 +178,17 @@ class Budget {
 
       if (!issuedReference) {
         try {
-          issuedReference = (
-            await q(
-              `INSERT INTO budget_issued_reference
+          issuedReference =
+            (
+              await q(
+                `INSERT INTO budget_issued_reference
                  (reference_id, user_id, date_cut_off)
                VALUES
                  ($1, $2, NOW() + INTERVAL '1 month')
                RETURNING *`,
-              [reference_id, user_id],
-            )
-          ).rows[0] ?? null;
+                [reference_id, user_id],
+              )
+            ).rows[0] ?? null;
         } catch (err) {
           // Race lost: a concurrent submit inserted the OPEN row first and the
           // partial unique index (migration 003) rejected this insert with
@@ -337,7 +338,7 @@ class Budget {
           COALESCE((
             SELECT SUM(e.total_amount)
             FROM expenses e
-            WHERE e.reference_id = $1 AND e.status != 'cancel'
+            WHERE e.reference_id = $1  AND e.status = 'paid'
               AND NOT EXISTS (
                 SELECT 1 FROM users u
                  WHERE u.user_id = e.user_id AND u.role = 'employee'
@@ -350,7 +351,12 @@ class Budget {
     const allocated = Number(row.allocated);
     const issued = Number(row.issued);
     const expenses = Number(row.expenses);
-    return { allocated, issued, expenses, balance: allocated - issued - expenses };
+    return {
+      allocated,
+      issued,
+      expenses,
+      balance: allocated - issued - expenses,
+    };
   }
 
   // Restriction guard for issuing budgets — an employee may only hold ONE open
@@ -397,8 +403,11 @@ class Budget {
   //     of funds label (ILIKE)
   static async employeeBudget(userId, { search } = {}) {
     // Overview mirrors employee.overview.model: the hero reads money the
-    // employee still HOLDS (open issuances only) minus what they SPENT
-    // (PAID expenses only — drafts/cancelled rows never count as spent).
+    // employee still HOLDS (open issuances only) and the "Remaining" mini
+    // stat reads the SAME balance the Overview page hero shows —
+    // issued + OPEN abono − PAID expenses (drafts/cancelled rows never count
+    // as spent, and only an OPEN out-of-pocket top-up widens what can still
+    // be spent — settled/draft abono never fund it).
     const overviewResult = await query(
       `SELECT
           COALESCE((
@@ -412,6 +421,11 @@ class Budget {
             FROM expenses e
             WHERE e.user_id = $1 AND e.status = 'paid'
           ), 0)::float8 AS total_expenses,
+          COALESCE((
+            SELECT SUM(ea.amount)
+            FROM employee_abono ea
+            WHERE ea.user_id = $1 AND ea.status = 'open'
+          ), 0)::float8 AS total_abono,
           COALESCE((
             SELECT COUNT(*)
             FROM budget_issued_reference bir
@@ -459,12 +473,14 @@ class Budget {
     const toMoney = (value) => Math.round((Number(value) || 0) * 100) / 100;
     const totalBudget = toMoney(row.total_budget);
     const totalExpenses = toMoney(row.total_expenses);
+    const totalAbono = toMoney(row.total_abono);
 
     return {
       overview: {
         totalBudget,
         totalExpenses,
-        totalBalance: toMoney(totalBudget - totalExpenses),
+        totalAbono,
+        totalBalance: toMoney(totalBudget + totalAbono - totalExpenses),
         activeReferences: Number(row.active_references) || 0,
       },
       transactions: txResult.rows,

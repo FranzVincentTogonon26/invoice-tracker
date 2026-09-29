@@ -19,6 +19,7 @@ export function useEmployeeBudget(params = {}) {
     overview: query.data?.overview ?? {
       totalBudget: 0,
       totalExpenses: 0,
+      totalAbono: 0,
       totalBalance: 0,
       activeReferences: 0,
     },

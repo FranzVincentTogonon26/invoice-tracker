@@ -3,16 +3,24 @@ import { createPortal } from "react-dom";
 import { AnimatePresence, motion } from "framer-motion";
 import { Loader2 } from "lucide-react";
 import { Button } from "../../../ui/Button";
+import { cn } from "../../../../lib/utils";
 
 const DIALOG_EASE = [0.16, 1, 0.3, 1];
+
+// Shared confirmation modal for consequential actions. Danger-toned by
+// default — every existing caller relies on that; an approval flow can
+// override the icon tile tint (`iconClassName`) and the confirm button tone
+// (`confirmVariant`) without changing those defaults.
 const ConfirmActionDialog = ({
   open,
   icon,
+  iconClassName = "bg-[var(--danger)]/12 text-[var(--danger)]",
   title,
   description,
   summary,
   cancelLabel = "Keep",
   confirmLabel = "Confirm",
+  confirmVariant = "danger",
   pendingLabel = "Working…",
   pending = false,
   onCancel,
@@ -85,7 +93,12 @@ const ConfirmActionDialog = ({
             transition={{ duration: 0.22, ease: DIALOG_EASE }}
             className="relative w-full max-w-sm rounded-3xl border border-[var(--border)] bg-[var(--surface)] p-6 shadow-hover"
           >
-            <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-[var(--danger)]/12 text-[var(--danger)]">
+            <div
+              className={cn(
+                "flex h-11 w-11 items-center justify-center rounded-2xl",
+                iconClassName,
+              )}
+            >
               {icon}
             </div>
 
@@ -116,7 +129,7 @@ const ConfirmActionDialog = ({
               <Button
                 ref={confirmRef}
                 type="button"
-                variant="danger"
+                variant={confirmVariant}
                 onClick={onConfirm}
                 disabled={pending}
               >

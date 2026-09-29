@@ -102,8 +102,7 @@ const hasSheetReceipt = (row) => Boolean(row?.receiptId || row?.imageUrl);
 // (dated before the first budget issued to them). Accepts both the raw `flag`
 // column and the mapped `flagged` boolean so desktop + mobile render from any
 // shape the ledger passes in.
-const isFlagged = (row) =>
-  row?.flagged === true || Number(row?.flag) === 1;
+const isFlagged = (row) => row?.flagged === true || Number(row?.flag) === 1;
 const PAGE_SIZE = 50;
 
 function getDateGroupLabel(date) {
@@ -181,7 +180,7 @@ function TransactionCard({ tx, meta, disabled, onOpen }) {
         </span>
         <div className="min-w-0">
           <p className="flex min-w-0 items-center gap-1.5 truncate text-xs font-semibold leading-none text-[var(--ink)]">
-            <span className="min-w-0 truncate">
+            <span className="min-w-0 truncate capitalize">
               {tx.description || meta.label}
             </span>
             {flagged && (
@@ -424,15 +423,23 @@ function TransactionSheetBody({
                 Flagged for review
               </p>
               <p className="mt-0.5 text-xs leading-relaxed text-[var(--warning)]/90">
-                Dated before the first budget issued to you — an admin needs
-                to approve it.
+                Dated before the first budget issued to you — an admin needs to
+                approve it.
               </p>
             </div>
           </div>
         )}
         <div className="space-y-2 rounded-2xl border border-[var(--border)] bg-[var(--surface-2)]/60 px-4 py-3.5">
           <div className="border-b border-[var(--border)] py-3">
-            <p className="type-eyebrow text-[var(--ink-muted)]">Description</p>
+            <div className="flex items-center">
+              <p className="type-eyebrow text-[var(--ink-muted)]">
+                Description
+              </p>
+              <span className="ml-2 text-[10px] text-[var(--ink-muted)]">
+                Double-click to edit
+              </span>
+            </div>
+
             {isEditing ? (
               <textarea
                 ref={textareaRef}
@@ -460,7 +467,7 @@ function TransactionSheetBody({
                   e.target.dataset.lastTap = now;
                 }}
                 className={cn(
-                  "mt-1.5 text-sm text-[var(--ink)]",
+                  "mt-1.5 text-sm text-[var(--ink)] normal-case",
                   actionable && !pending && "cursor-pointer hover:underline",
                 )}
               >
@@ -884,9 +891,7 @@ export const TransactionsSectionExpenses = ({
                           aria-hidden
                           className={cn(
                             "absolute inset-y-2 left-0 w-[3px] rounded-full",
-                            flagged
-                              ? "bg-[var(--warning)]"
-                              : "bg-transparent",
+                            flagged ? "bg-[var(--warning)]" : "bg-transparent",
                           )}
                         />
                         <p className="whitespace-nowrap text-[13px] font-semibold leading-none tabular-nums text-[var(--ink)]">
@@ -898,7 +903,7 @@ export const TransactionsSectionExpenses = ({
                       </td>
                       <td className="px-4 py-3 align-middle">
                         <p
-                          className="truncate text-[13px] font-semibold leading-snug text-[var(--ink)]"
+                          className="normal-case truncate text-[13px] font-semibold leading-snug text-[var(--ink)]"
                           title={tx.reference_label || tx.description}
                         >
                           {tx.description}

@@ -14,9 +14,11 @@ const toMoney = (value) => Math.round((Number(value) || 0) * 100) / 100;
 //                    read as spent here — same rule as the expenses UNION
 //                    below and the employee expenses ledger, so the "Spent"
 //                    card always reconciles with the transaction list.
-//   - totalAbono:    SUM(employee_abono.amount)
+//   - totalAbono:    SUM(employee_abono.amount) of OPEN rows only — a settled
+//                    (reimbursed) or draft (parked) abono no longer funds
+//                    spending, so it never reaches the "Abono" card
 //   - totalBalance:  what the employee can still spend
-//                    (issued + abono − PAID expenses)
+//                    (issued + OPEN abono − PAID expenses)
 // Counts ride along so the cards can show "N references / N transactions"
 // captions without a second round-trip. One query, all scalar subqueries.
 class EmployeeOverview {
@@ -47,7 +49,7 @@ class EmployeeOverview {
           COALESCE((
             SELECT SUM(ea.amount)
             FROM employee_abono ea
-            WHERE ea.user_id = $1
+            WHERE ea.user_id = $1 AND ea.status = 'open'
           ), 0)::float8 AS total_abono,
           COALESCE((
             SELECT COUNT(*)
@@ -62,7 +64,9 @@ class EmployeeOverview {
     const totalExpenses = toMoney(row.total_expenses);
     const totalAbono = toMoney(row.total_abono);
 
-    // Fetch individual transactions for this employee across issued budget, expenses, and abono
+    // Fetch individual transactions for this employee across issued budget,
+    // expenses, and abono. Abono rows carry `date_settled` so the details sheet
+    // can show when a settled abono was closed out (other kinds carry NULL).
     const txParams = [userId];
     let searchFilter = "";
     if (search && search.trim()) {
@@ -88,6 +92,7 @@ class EmployeeOverview {
           ib.notes,
           ib.method,
           bir.status,
+          NULL::timestamptz AS date_settled,
           br.label AS reference_label,
           bir.reference_id,
           0 AS flag,
@@ -109,6 +114,7 @@ class EmployeeOverview {
           COALESCE(e.notes, c.category_name) AS notes,
           e.payment_method AS method,
           e.status,
+          NULL::timestamptz AS date_settled,
           br.label AS reference_label,
           e.reference_id,
           e.flag AS flag,
@@ -130,6 +136,7 @@ class EmployeeOverview {
           NULL AS notes,
           'cash' AS method,
           ea.status,
+          ea.date_settled,
           br.label AS reference_label,
           ea.reference_id,
           0 AS flag,

@@ -1,6 +1,6 @@
 import { useCallback, useMemo, useState } from "react";
 import { motion } from "framer-motion";
-import { CircleAlert, CircleX, HandCoins, Plus, Wallet } from "lucide-react";
+import { Banknote, CircleAlert, CircleX, Plus, Wallet } from "lucide-react";
 import { PageHeader } from "../../components/ui/PageHeader";
 import { Button } from "../../components/ui/Button";
 import { cn, formatMoney } from "../../lib/utils";
@@ -59,6 +59,9 @@ const toTransaction = (row) => ({
   amount: Number(row.amount) || 0,
   status: row.status,
   reference_label: row.reference_label || "",
+  // Raw `date_settled` — lets the details sheet render its "Date Settled"
+  // row for settled rows (other statuses leave it null).
+  dateSettled: row.date_settled,
   notes: "",
   method: "cash",
   flag: 0,
@@ -78,10 +81,6 @@ const EmployeeAbono = () => {
     [data?.abono],
   );
 
-  // Inline description edits made from the transaction sheet / details
-  // portal, keyed by row id. They are overlaid on the server rows below so
-  // edits survive refetches, and rows the server no longer returns (deleted
-  // ones) drop out automatically — same pattern as EmployeeExpenses.
   const [localEdits, setLocalEdits] = useState({});
 
   const transactions = useMemo(
@@ -96,8 +95,6 @@ const EmployeeAbono = () => {
     setLocalEdits((prev) => ({ ...prev, [updatedTx.id]: updatedTx }));
   }, []);
 
-  // Balance pill on the hero — mirrors the expenses page: warn when the
-  // available balance (issued + abono − paid) dips below zero or bottoms out.
   const isOverdrawn = totalBalance < -0.004;
   const StatusIcon = isOverdrawn ? CircleX : CircleAlert;
   const showStatus =
@@ -190,19 +187,19 @@ const EmployeeAbono = () => {
             className="grid grid-cols-2 divide-x divide-[var(--border)] rounded-[20px] border border-[var(--border)] bg-[var(--surface)] shadow-card sm:rounded-[24px]"
           >
             <MiniStat
+              icon={Banknote}
+              label="Remaining"
+              value={formatMoney(totalBalance)}
+              loading={isLoading}
+              title={formatMoney(totalBalance)}
+              iconClass="bg-[var(--accent-soft)] text-[var(--accent-strong)]"
+            />
+            <MiniStat
               icon={Wallet}
               label="Budget"
               value={formatMoney(totalBudget)}
               loading={isLoading}
               title={formatMoney(totalBudget)}
-              iconClass="bg-[var(--accent-soft)] text-[var(--accent-strong)]"
-            />
-            <MiniStat
-              icon={HandCoins}
-              label="Remaining"
-              value={formatMoney(totalBalance)}
-              loading={isLoading}
-              title={formatMoney(totalBalance)}
               iconClass="bg-[var(--accent-soft)] text-[var(--accent-strong)]"
             />
           </motion.div>

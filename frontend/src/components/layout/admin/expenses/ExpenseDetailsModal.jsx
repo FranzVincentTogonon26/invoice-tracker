@@ -39,6 +39,7 @@ import {
 } from "../../../../lib/utils";
 import { isReceiptPdf, openReceiptFile } from "../../../../lib/receiptMedia";
 import { ExpenseStatusBadge } from "./ExpensesTable";
+import ConfirmActionDialog from "./ConfirmActionDialog";
 
 const DIALOG_EASE = [0.16, 1, 0.3, 1];
 
@@ -137,15 +138,29 @@ const ApprovedFlagNotice = () => (
 
 // ── Flagged notice + admin approval ─────────────────────────────────────
 // Same red card the modal always rendered — only an action row is added
-// inside it (button + "Action needed" hint). Approving PATCHes
-// /expenses/:id/clear-flag (flag = 0) and swaps this card for the green
+// inside it (button + "Action needed" hint). Approving asks for a
+// confirmation first (ConfirmActionDialog) and only THEN PATCHes
+// /expenses/:id/clear-flag (flag = 0), swapping this card for the green
 // "Approved by admin" label. Rendered ONLY when row.flagged is truthy, so a
 // non-flagged expense keeps the original design untouched.
-const FlaggedNotice = ({ expenseId, onCleared }) => {
+const FlaggedNotice = ({
+  expenseId,
+  expense,
+  onCleared,
+  onConfirmOpenChange,
+}) => {
   const qc = useQueryClient();
+  const [confirmOpen, setConfirmOpen] = useState(false);
   const [approving, setApproving] = useState(false);
   const [approved, setApproved] = useState(false);
   const [error, setError] = useState(null);
+
+  // Keep the parent modal in the loop: its Escape handler must stand down
+  // while this confirmation floats above it (see ExpenseDetailsModal).
+  const setConfirm = (next) => {
+    setConfirmOpen(next);
+    onConfirmOpenChange?.(next);
+  };
 
   const handleApprove = async () => {
     if (!expenseId || approving || approved) return;
@@ -154,11 +169,14 @@ const FlaggedNotice = ({ expenseId, onCleared }) => {
     try {
       await expensesApi.clearFlag(expenseId);
       setApproved(true);
+      setConfirm(false);
       qc.invalidateQueries({ queryKey: ["expenses"] });
       qc.invalidateQueries({ queryKey: ["employeeExpenses"] });
       onCleared?.(expenseId);
     } catch (err) {
       setError(err?.message || "Couldn’t approve flag. Try again.");
+      // Close the dialog so the inline error on the notice stays visible.
+      setConfirm(false);
     } finally {
       setApproving(false);
     }
@@ -168,51 +186,83 @@ const FlaggedNotice = ({ expenseId, onCleared }) => {
     return <ApprovedFlagNotice />;
   }
 
-  return (
-    <div
-      role="note"
-      className="flex items-start gap-3 rounded-2xl border border-[var(--danger)]/30 bg-[var(--danger)]/10 p-3.5"
-    >
-      <TriangleAlert
-        size={16}
-        aria-hidden
-        className="mt-0.5 shrink-0 text-[var(--danger)]"
-      />
+  // Expense recap inside the confirmation — same summary card the admin
+  // ledger's confirm dialogs render, so the admin can verify WHICH receipt
+  // they are approving before the flag is cleared.
+  const summary = expense ? (
+    <div className="mt-4 flex items-center gap-3 rounded-2xl border border-[var(--border)] bg-[var(--surface-2)]/60 px-4 py-3">
       <div className="min-w-0 flex-1">
-        <p className="text-xs font-bold text-[var(--danger)]">
-          Receipt date predates the budget issuance date
+        <p className="truncate text-base font-semibold text-[var(--ink)]">
+          {expense.description || "Untitled expense"}
         </p>
-        <p className="mt-1 text-xs leading-relaxed text-[var(--danger)]/90">
-          This receipt is dated before the budget was issued to the employee.
-          Please verify the receipt details and legitimacy before approving.
+        <p className="mt-0.5 truncate text-xs text-[var(--ink-muted)]">
+          {`${expense.category || "Uncategorized"} · ${formatDate(expense.date)}`}
         </p>
-        <div className="mt-2.5 flex flex-row justify-end items-center gap-2 border-t border-[var(--danger)]/20 pt-2.5">
-          <Button
-            type="button"
-            variant="outline"
-            size="sm"
-            onClick={handleApprove}
-            disabled={approving || !expenseId}
-            className="h-7 rounded-full bg-[var(--surface)] px-3 text-[11px]"
-          >
-            {approving ? (
-              <Loader2 size={13} className="animate-spin" aria-hidden />
-            ) : (
-              <ShieldCheck size={13} aria-hidden />
-            )}
-            {approving ? "Approving…" : "Approve flag"}
-          </Button>
-        </div>
-        {error ? (
-          <p
-            role="alert"
-            className="mt-1.5 text-[11px] font-medium text-[var(--danger)]"
-          >
-            {error}
-          </p>
-        ) : null}
       </div>
+      <span className="shrink-0 text-sm font-semibold tabular-nums text-[var(--ink)]">
+        {formatMoney(expense.amount)}
+      </span>
     </div>
+  ) : null;
+
+  return (
+    <>
+      <div
+        role="note"
+        className="flex items-start gap-3 rounded-2xl border border-[var(--danger)]/30 bg-[var(--danger)]/10 p-3.5"
+      >
+        <TriangleAlert
+          size={16}
+          aria-hidden
+          className="mt-0.5 shrink-0 text-[var(--danger)]"
+        />
+        <div className="min-w-0 flex-1">
+          <p className="text-xs font-bold text-[var(--danger)]">
+            Receipt date predates the budget issuance date
+          </p>
+          <p className="mt-1 text-xs leading-relaxed text-[var(--danger)]/90">
+            This receipt is dated before the budget was issued to the employee.
+            Please verify the receipt details and legitimacy before approving.
+          </p>
+          <div className="mt-2.5 flex flex-row justify-end items-center gap-2 border-t border-[var(--danger)]/20 pt-2.5">
+            <Button
+              type="button"
+              variant="soft"
+              onClick={() => setConfirm(true)}
+              disabled={approving || !expenseId}
+              className="h-7 rounded-full px-3 text-xs"
+            >
+              <ShieldCheck size={16} aria-hidden />
+              Approve
+            </Button>
+          </div>
+          {error ? (
+            <p
+              role="alert"
+              className="mt-1.5 text-[11px] font-medium text-[var(--danger)]"
+            >
+              {error}
+            </p>
+          ) : null}
+        </div>
+      </div>
+
+      <ConfirmActionDialog
+        open={confirmOpen}
+        icon={<ShieldCheck size={20} aria-hidden />}
+        iconClassName="bg-[var(--accent-soft)] text-[var(--accent-strong)]"
+        title="Approve this flagged expense?"
+        description="This clears the review flag and marks the receipt as approved. Only approve after the receipt details and legitimacy have been verified."
+        summary={summary}
+        cancelLabel="Keep flagged"
+        confirmLabel="Yes, approve"
+        confirmVariant="accent"
+        pendingLabel="Approving…"
+        pending={approving}
+        onCancel={() => setConfirm(false)}
+        onConfirm={handleApprove}
+      />
+    </>
   );
 };
 
@@ -441,6 +491,10 @@ const ExpenseDetailsModal = ({
   // false (otherwise the notice would unmount and the confirmation would flash
   // away). Reset per expense / per open below.
   const [clearedFlagId, setClearedFlagId] = useState(null);
+  // True while the flag-approval confirmation floats above this modal — the
+  // modal's Escape handler stands down so Escape closes only that dialog
+  // (see FlaggedNotice's onConfirmOpenChange).
+  const [flagConfirmOpen, setFlagConfirmOpen] = useState(false);
   const row = expense;
 
   // Reset the view (zoom level + items panel) on every open. Adjusting state
@@ -451,7 +505,10 @@ const ExpenseDetailsModal = ({
     setPrevOpen(open);
     setZoomLevel(1);
     setItemsOpen(false);
-    if (!open) setClearedFlagId(null);
+    if (!open) {
+      setClearedFlagId(null);
+      setFlagConfirmOpen(false);
+    }
   }
   // New expense selected while open → drop the previous approval label so a
   // non-flagged expense keeps the original design untouched.
@@ -459,19 +516,23 @@ const ExpenseDetailsModal = ({
   if (prevRowId !== row?.id) {
     setPrevRowId(row?.id);
     setClearedFlagId(null);
+    setFlagConfirmOpen(false);
   }
 
   useEffect(() => {
     if (!open) return undefined;
     const onKeyDown = (e) => {
       if (e.key !== "Escape") return;
+      // The flag-approval confirmation owns Escape while it's open — let it
+      // close just the dialog instead of tearing down this whole modal.
+      if (flagConfirmOpen) return;
       e.stopPropagation();
       setFailedUrl(null);
       onClose?.();
     };
     window.addEventListener("keydown", onKeyDown, true);
     return () => window.removeEventListener("keydown", onKeyDown, true);
-  }, [open, onClose]);
+  }, [open, onClose, flagConfirmOpen]);
 
   const receiptUrl = row?.imageUrl || "";
   const receiptIsPdf = isReceiptPdf(receiptUrl);
@@ -521,10 +582,12 @@ const ExpenseDetailsModal = ({
     <FlaggedNotice
       key={row?.id}
       expenseId={row?.id}
+      expense={row}
       onCleared={(id) => {
         setClearedFlagId(id);
         onFlagCleared?.(id);
       }}
+      onConfirmOpenChange={setFlagConfirmOpen}
     />
   ) : clearedFlagId && clearedFlagId === row?.id ? (
     <ApprovedFlagNotice />

@@ -278,10 +278,10 @@ class Expenses {
     return result.rows[0] ?? null;
   }
 
-// Soft delete for the ledger: the row is kept and only its status moves.
-// The employee "Delete expense" action parks the record back in 'draft'
-// through here instead of removing it (see the expenses controller's
-// `updateStatus`); `updated_at` is bumped so the change is traceable.
+  // Soft delete for the ledger: the row is kept and only its status moves.
+  // The employee "Delete expense" action parks the record back in 'draft'
+  // through here instead of removing it (see the expenses controller's
+  // `updateStatus`); `updated_at` is bumped so the change is traceable.
   static async updateExpenseStatus(id, status) {
     const result = await query(
       `UPDATE expenses
@@ -470,7 +470,7 @@ class Expenses {
             SELECT SUM(e.total_amount)
               FROM expenses e
              WHERE e.reference_id = b.reference_id
-               AND e.status != 'cancel'
+               AND e.status = 'paid'
                -- Employee rows are tagged with their source too, but their
                -- spend already left the reference as "issued" — counting it
                -- again would double-subtract (see budget.model.js).
@@ -569,7 +569,7 @@ class Expenses {
           COUNT(*)::int AS total_transactions
        FROM expenses e
        JOIN users u ON u.user_id = e.user_id
-       WHERE e.status != 'cancel'
+       WHERE e.status = 'paid'
          AND u.role = 'admin'`,
       [],
     );
@@ -719,14 +719,16 @@ class Expenses {
       sources.map((source) => [source.reference_id, source]),
     );
 
-    // Abono grouped by the budget reference it was booked against. Abono sitting
-    // on a reference without an open issuance still funds the employee, so it is
-    // credited to the oldest open source instead of silently disappearing.
+    // Abono grouped by the budget reference it was booked against. Only OPEN
+    // rows fund the employee (settled/draft rows are reimbursed or parked —
+    // same rule as the dashboard totals), and abono sitting on a reference
+    // without an open issuance still funds the employee, so it is credited to
+    // the oldest open source instead of silently disappearing.
     const abono = await query(
       `SELECT ea.reference_id,
               COALESCE(SUM(ea.amount), 0)::float8 AS abono
          FROM employee_abono ea
-        WHERE ea.user_id = $1
+        WHERE ea.user_id = $1 AND ea.status = 'open'
         GROUP BY ea.reference_id`,
       [userId],
     );
@@ -752,7 +754,7 @@ class Expenses {
       `SELECT e.reference_id,
               COALESCE(SUM(e.total_amount), 0)::float8 AS expenses
          FROM expenses e
-        WHERE e.user_id = $1 AND e.status != 'cancel'
+        WHERE e.user_id = $1 AND e.status = 'paid'
         GROUP BY e.reference_id`,
       [userId],
     );
@@ -847,7 +849,8 @@ class Expenses {
     // neither may read as spent here. That keeps `totalExpenses` (and the
     // derived `totalBalance`) in step with the paid-only ledger the page
     // renders — drafts can later be restored by an admin, which brings them
-    // back into these sums.
+    // back into these sums. Abono follows the same "live only" rule: just
+    // OPEN rows fund the balance (settled = reimbursed, draft = parked).
     const stats = await query(
       `SELECT
             COALESCE(SUM(e.total_amount), 0)::float8 AS total_expenses,
@@ -864,7 +867,7 @@ class Expenses {
             COALESCE((
               SELECT SUM(ea.amount)
               FROM employee_abono ea
-              WHERE ea.user_id = $1
+              WHERE ea.user_id = $1 AND ea.status = 'open'
             ), 0)::float8 AS total_abono
          FROM expenses e
          WHERE e.user_id = $1 AND e.status = 'paid'`,

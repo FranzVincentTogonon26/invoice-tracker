@@ -3,7 +3,6 @@ import { createPortal } from "react-dom";
 import { AnimatePresence, motion } from "framer-motion";
 import toast from "react-hot-toast";
 import {
-  Eye,
   Flag,
   Layers,
   Search,
@@ -38,7 +37,6 @@ import {
 import DateRangePicker from "../../../ui/DateRangePicker";
 import ConfirmActionDialog from "../../admin/expenses/ConfirmActionDialog";
 import { AbonoStatusBadge } from "./AbonoStatusBadge";
-import EmployeeAbonoDetailsModal from "./EmployeeAbonoDetailsModal";
 
 import { useAbonoMutations } from "../../../../hooks/useAbono";
 import { abonoApi } from "../../../../api/abono";
@@ -51,9 +49,6 @@ const formatShortDate = (value) => {
 
 const SHEET_EASE = [0.16, 1, 0.3, 1];
 
-// Row types this ledger can render. The Abono page only feeds `abono` rows —
-// issued/expense entries are kept so the copied table/sheet structure never
-// renders an undefined meta if a row of another kind slips in.
 const TYPE_CONFIG = {
   issued: {
     label: "Received",
@@ -111,6 +106,10 @@ const COLUMN_WIDTHS = ["18%", "34%", "16%", "18%", "14%"];
 function TransactionCard({ tx, meta, disabled, onOpen }) {
   const actionable = isSheetActionable(tx);
   const Icon = meta.icon;
+  // Open abono is live money the employee is still owed — tint the icon tile
+  // with the warning badge styling (the same tone AbonoStatusBadge uses for
+  // "Open") so outstanding rows stand out from settled/draft ones.
+  const isOpenAbono = tx?.kind === "abono" && tx?.status === "open";
 
   return (
     <div
@@ -130,6 +129,7 @@ function TransactionCard({ tx, meta, disabled, onOpen }) {
       className={cn(
         "relative flex items-center justify-between gap-3 overflow-hidden rounded-2xl border border-[var(--border)] bg-[var(--surface-2)]/60 px-2.5 py-3 transition-shadow hover:shadow-card",
         actionable && !disabled && "cursor-pointer active:scale-[0.99]",
+        isOpenAbono && "border-[var(--warning)]/50 bg-[var(--warning)]/[0.08]",
       )}
     >
       <span aria-hidden className={cn("absolute inset-y-0 left-0 w-1")} />
@@ -138,6 +138,9 @@ function TransactionCard({ tx, meta, disabled, onOpen }) {
           aria-hidden
           className={cn(
             "flex h-10 w-10 shrink-0 items-center justify-center rounded-xl",
+            isOpenAbono
+              ? "bg-[var(--warning)]/15 text-[var(--warning)]"
+              : "bg-[var(--accent-soft)] text-[var(--accent-strong)]",
           )}
         >
           <Icon size={18} />
@@ -265,7 +268,6 @@ function TransactionSheetBody({
   actionable,
   pending,
   close,
-  onView,
   onDelete,
   onUpdate,
 }) {
@@ -276,6 +278,10 @@ function TransactionSheetBody({
   const isEditing = draft !== null;
   const description = draft ?? title ?? "";
   const textareaRef = useRef(null);
+  // A settled abono is closed out: its description is frozen — no edit hint,
+  // no double-click/tap editing, and the textarea stays disabled if it ever
+  // renders. Open rows keep the editable flow untouched.
+  const isSettled = row?.status === "settled";
 
   const handleSave = useCallback(async () => {
     const trimmed = description.trim();
@@ -313,12 +319,12 @@ function TransactionSheetBody({
   );
 
   const handleDoubleClick = useCallback(() => {
-    if (actionable && !pending) {
+    if (actionable && !pending && !isSettled) {
       setDraft(title || "");
       // Focus textarea after render
       setTimeout(() => textareaRef.current?.focus(), 0);
     }
-  }, [actionable, pending, title]);
+  }, [actionable, pending, isSettled, title]);
 
   return (
     <>
@@ -357,7 +363,16 @@ function TransactionSheetBody({
       <div className="mt-4 space-y-3">
         <div className="space-y-2 rounded-2xl border border-[var(--border)] bg-[var(--surface-2)]/60 px-4 py-3.5">
           <div className="border-b border-[var(--border)] py-3">
-            <p className="type-eyebrow text-[var(--ink-muted)]">Description</p>
+            <div className="flex items-center">
+              <p className="type-eyebrow text-[var(--ink-muted)]">
+                Description
+              </p>
+              {!isSettled && (
+                <span className="ml-2 text-[10px] text-[var(--ink-muted)]">
+                  Double-click to edit
+                </span>
+              )}
+            </div>
             {isEditing ? (
               <textarea
                 ref={textareaRef}
@@ -366,6 +381,7 @@ function TransactionSheetBody({
                 onBlur={handleBlur}
                 onKeyDown={handleKeyDown}
                 autoFocus
+                disabled={isSettled}
                 rows={2}
                 className="mt-1.5 w-full min-h-[44px] rounded-lg border border-[var(--accent)] bg-[var(--surface)] px-3 py-2 text-sm text-[var(--ink)] placeholder-[var(--ink-muted)] focus:outline-none focus:ring-2 focus:ring-[var(--accent)]/30 resize-none"
                 placeholder="Enter description"
@@ -386,7 +402,10 @@ function TransactionSheetBody({
                 }}
                 className={cn(
                   "mt-1.5 text-sm text-[var(--ink)]",
-                  actionable && !pending && "cursor-pointer hover:underline",
+                  actionable &&
+                    !pending &&
+                    !isSettled &&
+                    "cursor-pointer hover:underline",
                 )}
               >
                 {title || "—"}
@@ -407,22 +426,24 @@ function TransactionSheetBody({
             </div>
             <AbonoStatusBadge status={row.status} className="shrink-0" />
           </div>
+          {row?.status === "settled" && row?.dateSettled ? (
+            <div className="flex mt-4 border-t border-[var(--border)] py-3.5">
+              <div className="min-w-0">
+                <p className="type-eyebrow text-[var(--ink-muted)]">
+                  Date Settled
+                </p>
+                <p className="mt-1 truncate text-sm font-medium tabular-nums text-[var(--ink)]">
+                  {formatDate(row?.dateSettled)}
+                </p>
+              </div>
+            </div>
+          ) : null}
         </div>
       </div>
-      {actionable && (
+      {/* A settled abono is closed out — hide the delete action (mirrors the
+          desktop row menu below). Open rows are untouched. */}
+      {actionable && row?.status !== "settled" && (
         <div className="mt-4 space-y-2">
-          <Button
-            type="button"
-            variant="accent"
-            className="w-full"
-            onClick={() => {
-              close();
-              onView?.(row);
-            }}
-          >
-            <Eye size={15} aria-hidden />
-            View abono details
-          </Button>
           <Button
             type="button"
             variant="outline"
@@ -439,7 +460,7 @@ function TransactionSheetBody({
   );
 }
 
-function RowActions({ row, pending, onView, onDelete }) {
+function RowActions({ row, pending, onDelete }) {
   const [open, setOpen] = useState(false);
   const [position, setPosition] = useState(null);
   const btnRef = useRef(null);
@@ -485,13 +506,6 @@ function RowActions({ row, pending, onView, onDelete }) {
   }, [open]);
 
   const items = [
-    {
-      key: "view",
-      label: "View abono",
-      Icon: Eye,
-      danger: false,
-      onSelect: () => onView?.(row),
-    },
     {
       key: "delete",
       label: "Delete abono",
@@ -578,7 +592,6 @@ export const TransactionsSectionAbono = ({
   const [page, setPage] = useState(0);
   const [dateRange, setDateRange] = useState(emptyDateRange);
   const hasDateRange = Boolean(dateRange?.start && dateRange?.end);
-  const [viewRow, setViewRow] = useState(null);
   const [deleteRow, setDeleteRow] = useState(null);
   const [sheetRow, setSheetRow] = useState(null);
   const { remove } = useAbonoMutations();
@@ -596,7 +609,6 @@ export const TransactionsSectionAbono = ({
       toast.success("Abono deleted");
       setDeleteRow(null);
       setSheetRow(null);
-      setViewRow(null);
     } catch (err) {
       toast.error(err?.message || "Couldn't delete abono");
     }
@@ -744,15 +756,13 @@ export const TransactionsSectionAbono = ({
                   ? `Nothing was recorded in ${formatDateRange(dateRange)}. Try a wider range.`
                   : debouncedSearch
                     ? `No transactions matched "${debouncedSearch}". Try clearing your search.`
-                    : "No abono records yet — tap \"Add Abono\" to record your first one."
+                    : 'No abono records yet — tap "Add Abono" to record your first one.'
             }
           />
         ) : (
           <div className="overflow-x-auto rounded-2xl border border-[var(--border)] bg-[var(--surface)] shadow-card">
             <table className="w-full min-w-[720px] table-fixed border-collapse text-left">
-              <caption className="sr-only">
-                Employee abono list
-              </caption>
+              <caption className="sr-only">Employee abono list</caption>
               <colgroup>
                 {COLUMN_WIDTHS.map((width, i) => (
                   <col key={i} style={{ width }} />
@@ -786,12 +796,6 @@ export const TransactionsSectionAbono = ({
                   return (
                     <tr
                       key={`${tx.kind}-${tx.id}`}
-                      onClick={(e) => {
-                        // Click anywhere on the row except its action
-                        // buttons opens the details portal.
-                        if (e.target.closest("button")) return;
-                        setViewRow(tx);
-                      }}
                       className={cn(
                         "relative cursor-pointer transition-colors duration-150 hover:bg-[var(--accent)]/[0.05]",
                         flagged &&
@@ -873,12 +877,15 @@ export const TransactionsSectionAbono = ({
                       </td>
                       <td className="px-4 py-4 pr-5 text-right align-middle">
                         <div className="flex justify-end">
-                          <RowActions
-                            row={tx}
-                            pending={confirmPending}
-                            onView={setViewRow}
-                            onDelete={setDeleteRow}
-                          />
+                          {/* Settled abono is closed out — the delete menu stays
+                              hidden (mirrors the mobile sheet above). */}
+                          {tx?.status !== "settled" && (
+                            <RowActions
+                              row={tx}
+                              pending={confirmPending}
+                              onDelete={setDeleteRow}
+                            />
+                          )}
                         </div>
                       </td>
                     </tr>
@@ -926,7 +933,7 @@ export const TransactionsSectionAbono = ({
                   ? `Nothing was recorded in ${formatDateRange(dateRange)}. Try a wider range.`
                   : debouncedSearch
                     ? `No transactions matched "${debouncedSearch}".`
-                    : "No abono records yet — tap \"Add Abono\" to record your first one."
+                    : 'No abono records yet — tap "Add Abono" to record your first one.'
             }
           />
         ) : (
@@ -971,22 +978,10 @@ export const TransactionsSectionAbono = ({
         </div>
       )}
 
-      <EmployeeAbonoDetailsModal
-        open={Boolean(viewRow)}
-        expense={viewRow}
-        onClose={() => setViewRow(null)}
-        onUpdate={(updatedRow) => {
-          setViewRow(updatedRow);
-          // Let the page overlay the edit so the ledger text flips too
-          onTransactionUpdate?.(updatedRow);
-        }}
-      />
-
       <TransactionSheet
         row={sheetRow}
         pending={confirmPending}
         onClose={() => setSheetRow(null)}
-        onView={setViewRow}
         onDelete={setDeleteRow}
         onUpdate={(updatedRow) => {
           setSheetRow(updatedRow);

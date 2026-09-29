@@ -1,5 +1,5 @@
 import { motion } from "framer-motion";
-import { CircleAlert, CircleX, Plus, ReceiptText, Wallet } from "lucide-react";
+import { Banknote, CircleAlert, CircleX, Plus, TrendingUp } from "lucide-react";
 import { PageHeader } from "../../components/ui/PageHeader";
 import { cn, formatMoney } from "../../lib/utils";
 import TransactionsSectionExpenses from "../../components/layout/employee/expenses/TransactionsSectionExpenses";
@@ -209,7 +209,7 @@ const EmployeeExpenses = () => {
             className="grid grid-cols-2 divide-x divide-[var(--border)] rounded-[20px] border border-[var(--border)] bg-[var(--surface)] shadow-card sm:rounded-[24px]"
           >
             <MiniStat
-              icon={Wallet}
+              icon={Banknote}
               label="Remaining"
               value={formatMoney(totalBalance)}
               loading={isLoading}
@@ -217,7 +217,7 @@ const EmployeeExpenses = () => {
               iconClass="bg-[var(--accent-soft)] text-[var(--accent-strong)]"
             />
             <MiniStat
-              icon={ReceiptText}
+              icon={TrendingUp}
               label="Transactions"
               value={totalTransactions}
               loading={isLoading}

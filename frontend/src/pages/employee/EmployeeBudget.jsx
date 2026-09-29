@@ -3,7 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { useEmployeeBudget } from "../../hooks/useEmployeeBudget";
 import { cn, formatMoney } from "../../lib/utils";
 import { PageHeader } from "../../components/ui/PageHeader";
-import { ArrowLeftRight, ReceiptText, Wallet } from "lucide-react";
+import { ArrowLeftRight, Banknote, ReceiptText } from "lucide-react";
 import { Button } from "../../components/ui/Button";
 import TransactionsSectionBudget from "../../components/layout/employee/budget/TransactionsSectionBudget";
 
@@ -129,7 +129,7 @@ const EmployeeBudget = () => {
             className="grid grid-cols-2 divide-x divide-[var(--border)] rounded-[20px] border border-[var(--border)] bg-[var(--surface)] shadow-card sm:rounded-[24px]"
           >
             <MiniStat
-              icon={Wallet}
+              icon={Banknote}
               label="Remaining"
               value={formatMoney(totalBalance)}
               loading={isLoading}

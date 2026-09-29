@@ -192,7 +192,6 @@ const AddAbonoModal = ({ open, onClose }) => {
                       id="abono-description"
                       ref={descriptionRef}
                       rows={4}
-                      placeholder="e.g. Taxi fare to the client meeting"
                       value={description}
                       onChange={(e) => setDescription(e.target.value)}
                       disabled={pending}

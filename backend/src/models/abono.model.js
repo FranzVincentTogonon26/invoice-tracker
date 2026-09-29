@@ -63,9 +63,9 @@ class Abono {
   }
 
   // The Abono page hero + mini stats. Money rules mirror
-  // employee.overview.model: totalBalance = open issuances + abono − PAID
-  // expenses, so an out-of-pocket top-up immediately widens what the
-  // employee can spend.
+  // employee.overview.model: totalBalance = open issuances + OPEN abono −
+  // PAID expenses, so an out-of-pocket top-up immediately widens what the
+  // employee can spend while a settled/draft row never funds it.
   static async employeeAbonoOverview(userId) {
     const [abono, statsResult] = await Promise.all([
       this.listByUser(userId),
@@ -74,7 +74,7 @@ class Abono {
             COALESCE((
               SELECT SUM(ea.amount)
                 FROM employee_abono ea
-               WHERE ea.user_id = $1
+               WHERE ea.user_id = $1 AND ea.status = 'open'
             ), 0)::float8 AS total_abono,
             COALESCE((
               SELECT COUNT(*)

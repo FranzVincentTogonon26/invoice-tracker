@@ -54,6 +54,16 @@ const TYPE_LABEL_SHORT = {
   abono: "Abono",
 };
 
+// Mobile OverviewSheet header label per kind — the sheet titles itself by the
+// item's TYPE (matching the TYPE_LABEL_SHORT wording above: Received -> Budget,
+// Spent -> Expenses, Abono -> Abono) instead of echoing the row's
+// description, which already renders in the details body's Description row.
+const TYPE_ITEM_TITLE = {
+  issued: "Budget Item",
+  expense: "Expenses Item",
+  abono: "Abono Item",
+};
+
 // Instant-scan method badge: tint + glyph per payment method so the type is
 // readable without parsing text. Unknown methods fall back to neutral.
 const METHOD_BADGE = {
@@ -122,10 +132,19 @@ const OverviewDetailsBody = ({ row, meta }) => {
         Received
       </Badge>
     ) : kind === "abono" ? (
-      <Badge tone="warning">
-        <span className="h-2 w-2 rounded-full bg-current opacity-80" />
-        Abono
-      </Badge>
+      // A settled abono is closed out (reimbursed) — accent tone + explicit
+      // "Settled Abono" wording so it never reads like live money.
+      row?.status === "settled" ? (
+        <Badge tone="accent">
+          <span className="h-2 w-2 rounded-full bg-current opacity-80" />
+          Settled Abono
+        </Badge>
+      ) : (
+        <Badge tone="warning">
+          <span className="h-2 w-2 rounded-full bg-current opacity-80" />
+          Abono
+        </Badge>
+      )
     ) : (
       <Badge tone="neutral">
         <span className="h-2 w-2 rounded-full bg-current opacity-80" />
@@ -133,11 +152,7 @@ const OverviewDetailsBody = ({ row, meta }) => {
       </Badge>
     );
   const summaryLabel =
-    kind === "issued"
-      ? "Employee Budget"
-      : kind === "abono"
-        ? "Abono"
-        : row?.reference_label || "Expense";
+    kind === "issued" ? "Received" : kind === "abono" ? "Abono" : "Spent";
   return (
     <div className="mt-4 space-y-3">
       {flagged && (
@@ -179,11 +194,11 @@ const OverviewDetailsBody = ({ row, meta }) => {
       <div className="space-y-2 rounded-2xl border border-[var(--border)] bg-[var(--surface-2)]/60 px-4 py-3.5">
         <div className="border-b border-[var(--border)] py-3 first:pt-0">
           <p className="type-eyebrow text-[var(--ink-muted)]">Description</p>
-          <p className="mt-1 break-words text-sm font-medium leading-snug text-[var(--ink)]">
+          <p className="mt-1 break-words text-sm font-medium leading-snug text-[var(--ink)] normal-case">
             {row?.description || meta?.label || "—"}
           </p>
         </div>
-        <div className="grid grid-cols-2 gap-3 py-1">
+        <div className="grid grid-cols-3 gap-3 py-1">
           <div className="min-w-0">
             <p className="type-eyebrow text-[var(--ink-muted)]">Date</p>
             <p className="mt-1 truncate text-sm font-medium tabular-nums text-[var(--ink)]">
@@ -196,14 +211,6 @@ const OverviewDetailsBody = ({ row, meta }) => {
               {formatTime(row?.date)}
             </p>
           </div>
-        </div>
-        <div className="grid grid-cols-2 gap-3 py-1">
-          <div className="min-w-0">
-            <p className="type-eyebrow text-[var(--ink-muted)]">Type</p>
-            <p className="mt-1 truncate text-sm font-medium text-[var(--ink)]">
-              {TYPE_LABEL_SHORT[kind] ?? meta?.label ?? "—"}
-            </p>
-          </div>
           <div className="min-w-0">
             <p className="type-eyebrow text-[var(--ink-muted)]">Method</p>
             <p className="mt-1 truncate text-sm font-medium text-[var(--ink)]">
@@ -211,28 +218,16 @@ const OverviewDetailsBody = ({ row, meta }) => {
             </p>
           </div>
         </div>
-        {(row?.reference_label || row?.notes) && (
-          <div className="border-t border-[var(--border)] py-3 last:pb-0">
-            {row?.reference_label && (
-              <div className="min-w-0">
-                <p className="type-eyebrow text-[var(--ink-muted)]">
-                  Source of funds
-                </p>
-                <p className="mt-1 truncate text-sm font-medium text-[var(--ink)]">
-                  {row.reference_label}
-                </p>
-              </div>
-            )}
-            {row?.notes && (
-              <div className="mt-3 min-w-0">
-                <p className="type-eyebrow text-[var(--ink-muted)]">Notes</p>
-                <p className="mt-1 break-words text-sm leading-relaxed text-[var(--ink)]">
-                  {row.notes}
-                </p>
-              </div>
-            )}
+        {kind === "abono" && row?.status === "settled" && row?.date_settled ? (
+          <div className="grid border-t border-[var(--border)] pt-3 py-1">
+            <div className="min-w-0">
+              <p className="type-eyebrow text-[var(--ink-muted)]">Date Settled</p>
+              <p className="mt-1 truncate text-sm font-medium tabular-nums text-[var(--ink)]">
+                {formatDate(row?.date_settled)}
+              </p>
+            </div>
           </div>
-        )}
+        ) : null}
       </div>
     </div>
   );
@@ -283,7 +278,10 @@ function OverviewSheet({ row, onClose }) {
 
   const meta = TYPE_CONFIG[row?.kind] ?? TYPE_CONFIG.expense;
   const Icon = meta.icon;
-  const title = row?.description || meta.label || "Transaction";
+  // Title by item type (see TYPE_ITEM_TITLE) — same wording the details body's
+  // "Type" row shows, so the header reads "Budget Item" / "Expenses Item" /
+  // "Abono Item" instead of the row's description.
+  const title = TYPE_ITEM_TITLE[row?.kind] ?? meta.label ?? "Transaction";
 
   return createPortal(
     <AnimatePresence>
