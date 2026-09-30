@@ -1,5 +1,5 @@
 import { motion } from "framer-motion";
-import { Banknote, CircleAlert, CircleX, Plus, TrendingUp } from "lucide-react";
+import { Banknote, Plus, TrendingUp } from "lucide-react";
 import { PageHeader } from "../../components/ui/PageHeader";
 import { cn, formatMoney } from "../../lib/utils";
 import TransactionsSectionExpenses from "../../components/layout/employee/expenses/TransactionsSectionExpenses";
@@ -113,9 +113,6 @@ const EmployeeExpenses = () => {
   );
 
   const isOverdrawn = totalBalance < -0.004;
-  const StatusIcon = isOverdrawn ? CircleX : CircleAlert;
-  const showStatus =
-    !isLoading && (isOverdrawn || Math.abs(totalBalance) < 0.005);
 
   // Handle transaction updates from the sheet (e.g., description edits)
   const handleTransactionUpdate = useCallback((updatedTx) => {
@@ -180,19 +177,6 @@ const EmployeeExpenses = () => {
               <span className="type-eyebrow text-[10px] tracking-[0.18em] text-white/65 sm:text-[11px]">
                 Total Expenses
               </span>
-              {showStatus && (
-                <span className="ml-auto inline-flex items-center gap-1 rounded-full bg-white px-2.5 py-1 text-[11px] font-bold leading-none text-[var(--ink)]">
-                  <StatusIcon
-                    size={12}
-                    className={
-                      isOverdrawn
-                        ? "text-[var(--danger)]"
-                        : "text-[var(--warning)]"
-                    }
-                  />
-                  {isOverdrawn ? "Overdrawn" : "Depleted"}
-                </span>
-              )}
             </div>
 
             {isLoading ? (

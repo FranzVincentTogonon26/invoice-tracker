@@ -1,4 +1,4 @@
-import { query } from "../config/db.js";
+import { query, withTransaction } from "../config/db.js";
 
 // Round to centavos so a fully-spent balance reads exactly 0 instead of a
 // floating-point residue (same helper the expenses model uses).
@@ -113,6 +113,98 @@ class Abono {
     };
   }
 
+  // Settle Abono — flips every OPEN row the employee checked to 'settled' and
+  // stamps `date_settled = NOW()`. One transaction:
+  //   1. lock + re-read the requested rows, scoped to the employee's user_id
+  //      and keeping only rows still in status 'open' (the ledger may have
+  //      moved since the dialog loaded)
+  //   2. re-apply the money rule: settling takes those amounts OUT of the
+  //      spendable pool (open issuances + OPEN abono − PAID expenses), so a
+  //      request the remaining balance can't cover must fail BEFORE any write.
+  //      Resolved as `insufficient: true` — the controller answers with the
+  //      400 notice; nothing is committed.
+  //   3. update only the still-open rows and hand them back.
+  // Resolves `{ insufficient, requested, totalBalance, settled }`.
+  static async settleOpen(userId, ids) {
+    return withTransaction(async (client) => {
+      const q = (text, params) => client.query(text, params);
+
+      // `FOR UPDATE` holds these rows for the rest of the transaction, so a
+      // parallel settle / delete can't interleave between read and write.
+      const locked = await q(
+        `SELECT id, amount::float8 AS amount
+           FROM employee_abono
+          WHERE user_id = $1
+            AND id = ANY($2::uuid[])
+            AND status = 'open'
+          FOR UPDATE`,
+        [userId, ids],
+      );
+
+      // Nothing still open → nothing to settle, no writes, no balance read.
+      if (locked.rows.length === 0) {
+        return {
+          insufficient: false,
+          requested: 0,
+          totalBalance: null,
+          settled: [],
+        };
+      }
+
+      const requested = toMoney(
+        locked.rows.reduce((sum, row) => sum + Number(row.amount), 0),
+      );
+
+      // Same money rules every overview model uses (employee.overview.model):
+      // what the employee can still spend right now, counting OPEN abono only.
+      const balance = (
+        await q(
+          `SELECT
+              COALESCE((
+                SELECT SUM(ib.amount)
+                FROM budget_issued_reference bir
+                JOIN issued_budget ib ON ib.issued_ref_id = bir.id
+                WHERE bir.user_id = $1 AND bir.status = 'open'
+              ), 0)::float8
+              + COALESCE((
+                SELECT SUM(ea.amount)
+                FROM employee_abono ea
+                WHERE ea.user_id = $1 AND ea.status = 'open'
+              ), 0)::float8
+              - COALESCE((
+                SELECT SUM(e.total_amount)
+                FROM expenses e
+                WHERE e.user_id = $1 AND e.status = 'paid'
+              ), 0)::float8 AS total_balance`,
+          [userId],
+        )
+      ).rows[0];
+      const totalBalance = toMoney(balance?.total_balance);
+
+      if (requested > totalBalance) {
+        // No writes happened — the transaction commits an empty change set.
+        return { insufficient: true, requested, totalBalance, settled: [] };
+      }
+
+      const settled = (
+        await q(
+          `UPDATE employee_abono
+              SET status = 'settled',
+                  date_settled = NOW(),
+                  updated_at = NOW()
+            WHERE user_id = $1
+              AND id = ANY($2::uuid[])
+              AND status = 'open'
+            RETURNING id, reference_id, user_id, amount::float8 AS amount,
+                      description, status, date_settled, created_at, updated_at`,
+          [userId, ids],
+        )
+      ).rows;
+
+      return { insufficient: false, requested, totalBalance, settled };
+    });
+  }
+
   // Default source of funds for a new abono: the employee's OLDEST open
   // issuance — the same "oldest-funding-first" order employeeReferenceList
   // uses to credit untagged abono, so create and reporting always agree.
@@ -187,6 +279,34 @@ class Abono {
       [id],
     );
     return result.rows[0] ?? null;
+  }
+
+  // Spendable balance for one employee — the same money rule every overview
+  // model uses: open issuances + OPEN abono − PAID expenses. Deleting (like
+  // settling) takes an OPEN abono OUT of this pool, so a delete whose amount
+  // the balance can't cover means the money is already spent.
+  static async spendableBalance(userId) {
+    const result = await query(
+      `SELECT
+          COALESCE((
+            SELECT SUM(ib.amount)
+              FROM budget_issued_reference bir
+              JOIN issued_budget ib ON ib.issued_ref_id = bir.id
+             WHERE bir.user_id = $1 AND bir.status = 'open'
+          ), 0)::float8
+          + COALESCE((
+            SELECT SUM(ea.amount)
+              FROM employee_abono ea
+             WHERE ea.user_id = $1 AND ea.status = 'open'
+          ), 0)::float8
+          - COALESCE((
+            SELECT SUM(e.total_amount)
+              FROM expenses e
+             WHERE e.user_id = $1 AND e.status = 'paid'
+          ), 0)::float8 AS total_balance`,
+      [userId],
+    );
+    return toMoney(result.rows[0]?.total_balance);
   }
 }
 

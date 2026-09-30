@@ -159,13 +159,6 @@ function TransactionCard({ tx, meta, disabled, onOpen }) {
           "border-[var(--warning)]/50 bg-[var(--warning)]/[0.08] ring-1 ring-inset ring-[var(--warning)]/25",
       )}
     >
-      <span
-        aria-hidden
-        className={cn(
-          "absolute inset-y-0 left-0 w-1",
-          flagged ? "bg-[var(--warning)]" : "bg-transparent",
-        )}
-      />
       <div className="flex min-w-0 flex-1 items-center gap-3">
         <span
           aria-hidden
@@ -759,7 +752,7 @@ export const TransactionsSectionExpenses = ({
   );
 
   return (
-    <Card className="overflow-hidden">
+    <Card className="overflow-hidden px-2.5">
       <div className="flex flex-col gap-4 border-b border-[var(--border)] pb-4 md:flex-row md:items-center md:justify-between">
         <div className="flex items-center gap-3">
           <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-[var(--surface-2)] text-[var(--ink)]">
@@ -887,13 +880,6 @@ export const TransactionsSectionExpenses = ({
                       }
                     >
                       <td className="relative px-4 py-3 first:pl-5 align-middle">
-                        <span
-                          aria-hidden
-                          className={cn(
-                            "absolute inset-y-2 left-0 w-[3px] rounded-full",
-                            flagged ? "bg-[var(--warning)]" : "bg-transparent",
-                          )}
-                        />
                         <p className="whitespace-nowrap text-[13px] font-semibold leading-none tabular-nums text-[var(--ink)]">
                           {formatDate(tx.date)}
                         </p>

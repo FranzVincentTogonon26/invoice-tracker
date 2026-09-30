@@ -73,6 +73,22 @@ const TYPE_CONFIG = {
 const isSheetActionable = (row) => row?.kind === "abono";
 // Only expense rows are backdated-flagged — abono always arrives flag-less.
 const isFlagged = (row) => row?.flagged === true || Number(row?.flag) === 1;
+
+// Round to centavos so the client-side check reconciles with the centavo
+// rounding every overview model applies server-side.
+const toMoney = (value) => Math.round((Number(value) || 0) * 100) / 100;
+
+// An OPEN abono funds the spendable pool
+// (balance = open budget + OPEN abono − paid expenses). Deleting it shrinks
+// that pool, so when its amount is already covered by expenses
+// (amount > remaining balance) the money is spent and the row must not be
+// deletable. Draft rows never funded the pool and settled rows are already
+// closed out — only OPEN rows can be spent.
+const isAbonoSpent = (row, totalBalance) => {
+  if (row?.status !== "open") return false;
+  if (totalBalance == null || Number.isNaN(Number(totalBalance))) return false;
+  return toMoney(totalBalance) - toMoney(row?.amount) < -0.004;
+};
 const PAGE_SIZE = 50;
 
 function getDateGroupLabel(date) {
@@ -176,6 +192,7 @@ function TransactionCard({ tx, meta, disabled, onOpen }) {
 function TransactionSheet({
   row,
   pending,
+  totalBalance,
   onClose,
   onView,
   onDelete,
@@ -247,6 +264,7 @@ function TransactionSheet({
               title={title}
               actionable={actionable}
               pending={pending}
+              totalBalance={totalBalance}
               close={close}
               onView={onView}
               onDelete={onDelete}
@@ -267,6 +285,7 @@ function TransactionSheetBody({
   title,
   actionable,
   pending,
+  totalBalance,
   close,
   onDelete,
   onUpdate,
@@ -427,7 +446,7 @@ function TransactionSheetBody({
             <AbonoStatusBadge status={row.status} className="shrink-0" />
           </div>
           {row?.status === "settled" && row?.dateSettled ? (
-            <div className="flex mt-4 border-t border-[var(--border)] py-3.5">
+            <div className="grid grid-cols-2 mt-4 border-t border-[var(--border)] py-3.5">
               <div className="min-w-0">
                 <p className="type-eyebrow text-[var(--ink-muted)]">
                   Date Settled
@@ -436,26 +455,52 @@ function TransactionSheetBody({
                   {formatDate(row?.dateSettled)}
                 </p>
               </div>
+              <div className="min-w-0">
+                <p className="type-eyebrow text-[var(--ink-muted)]">Time</p>
+                <p className="mt-1 truncate text-sm font-medium tabular-nums text-[var(--ink)]">
+                  {formatTime(row?.dateSettled)}
+                </p>
+              </div>
             </div>
           ) : null}
         </div>
       </div>
       {/* A settled abono is closed out — hide the delete action (mirrors the
-          desktop row menu below). Open rows are untouched. */}
-      {actionable && row?.status !== "settled" && (
-        <div className="mt-4 space-y-2">
-          <Button
-            type="button"
-            variant="outline"
-            className="w-full text-[var(--danger)]"
-            disabled={pending}
-            onClick={() => onDelete?.(row)}
+          desktop row menu below). A spent OPEN abono (its amount already
+          covered by expenses) is also locked: deleting it would overdraw the
+          remaining balance. */}
+      {actionable &&
+        row?.status !== "settled" &&
+        !isAbonoSpent(row, totalBalance) && (
+          <div className="mt-4 space-y-2">
+            <Button
+              type="button"
+              variant="outline"
+              className="w-full text-[var(--danger)]"
+              disabled={pending}
+              onClick={() => onDelete?.(row)}
+            >
+              <Trash2 size={15} aria-hidden />
+              Delete abono
+            </Button>
+          </div>
+        )}
+      {actionable &&
+        row?.status !== "settled" &&
+        isAbonoSpent(row, totalBalance) && (
+          <div
+            role="note"
+            className="mt-4 rounded-2xl border border-[var(--border)] bg-[var(--surface-2)]/60 px-4 py-3"
           >
-            <Trash2 size={15} aria-hidden />
-            Delete abono
-          </Button>
-        </div>
-      )}
+            <p className="text-xs font-bold text-[var(--ink-muted)]">
+              Already spent — can't be deleted
+            </p>
+            <p className="mt-0.5 text-xs leading-relaxed text-[var(--ink-muted)]">
+              The amount of this abono has already been used. Deleting it would
+              overdraw your remaining balance.
+            </p>
+          </div>
+        )}
     </>
   );
 }
@@ -585,6 +630,7 @@ function RowActions({ row, pending, onDelete }) {
 export const TransactionsSectionAbono = ({
   transactions = [],
   isLoading = false,
+  totalBalance = null,
   onTransactionUpdate,
 }) => {
   const [search, setSearch] = useState("");
@@ -601,8 +647,31 @@ export const TransactionsSectionAbono = ({
     if (!confirmPending) setDeleteRow(null);
   };
 
+  // Central gate for every delete entry point (sheet button, desktop row
+  // menu). A spent OPEN abono never reaches the confirm dialog.
+  const requestDelete = (row) => {
+    if (!row) return;
+    if (isAbonoSpent(row, totalBalance)) {
+      toast.error(
+        "The amount of this abono has already been spent, so it can't be deleted.",
+      );
+      return;
+    }
+    setDeleteRow(row);
+  };
+
   const runDelete = async () => {
     if (!deleteRow) return;
+
+    // Re-check at confirm time — expenses may have consumed the balance
+    // while the dialog was open. The server re-checks too.
+    if (isAbonoSpent(deleteRow, totalBalance)) {
+      toast.error(
+        "The amount of this abono has already been spent, so it can't be deleted.",
+      );
+      setDeleteRow(null);
+      return;
+    }
 
     try {
       await remove.mutateAsync(deleteRow.id);
@@ -685,7 +754,7 @@ export const TransactionsSectionAbono = ({
   );
 
   return (
-    <Card className="overflow-hidden">
+    <Card className="overflow-hidden px-2.5">
       <div className="flex flex-col gap-4 border-b border-[var(--border)] pb-4 md:flex-row md:items-center md:justify-between">
         <div className="flex items-center gap-3">
           <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-[var(--surface-2)] text-[var(--ink)]">
@@ -698,7 +767,7 @@ export const TransactionsSectionAbono = ({
               </h3>
             </div>
             <p className="text-xs text-[var(--ink-muted)] truncate">
-              Manage and track your out-of-pocket expenses.
+              Manage your out-of-pocket expenses.
             </p>
           </div>
         </div>
@@ -877,15 +946,18 @@ export const TransactionsSectionAbono = ({
                       </td>
                       <td className="px-4 py-4 pr-5 text-right align-middle">
                         <div className="flex justify-end">
-                          {/* Settled abono is closed out — the delete menu stays
-                              hidden (mirrors the mobile sheet above). */}
-                          {tx?.status !== "settled" && (
-                            <RowActions
-                              row={tx}
-                              pending={confirmPending}
-                              onDelete={setDeleteRow}
-                            />
-                          )}
+                          {/* Settled abono is closed out and a spent OPEN abono
+                              (already covered by expenses) is locked — the
+                              delete menu stays hidden (mirrors the mobile
+                              sheet above). */}
+                          {tx?.status !== "settled" &&
+                            !isAbonoSpent(tx, totalBalance) && (
+                              <RowActions
+                                row={tx}
+                                pending={confirmPending}
+                                onDelete={requestDelete}
+                              />
+                            )}
                         </div>
                       </td>
                     </tr>

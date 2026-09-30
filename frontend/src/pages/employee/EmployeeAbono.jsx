@@ -1,11 +1,12 @@
 import { useCallback, useMemo, useState } from "react";
 import { motion } from "framer-motion";
-import { Banknote, CircleAlert, CircleX, Plus, Wallet } from "lucide-react";
+import { BadgeCheck, Banknote, Plus, Wallet } from "lucide-react";
 import { PageHeader } from "../../components/ui/PageHeader";
 import { Button } from "../../components/ui/Button";
 import { cn, formatMoney } from "../../lib/utils";
 import TransactionsSectionAbono from "../../components/layout/employee/abono/TransactionsSectionAbono";
 import AddAbonoModal from "../../components/layout/employee/abono/AddAbonoModal";
+import SettleAbonoModal from "../../components/layout/employee/abono/SettleAbonoModal";
 import { useEmployeeAbono } from "../../hooks/useEmployeeAbono";
 
 const grid = {
@@ -71,6 +72,7 @@ const toTransaction = (row) => ({
 const EmployeeAbono = () => {
   const { data, isLoading } = useEmployeeAbono();
   const [addOpen, setAddOpen] = useState(false);
+  const [settleOpen, setSettleOpen] = useState(false);
 
   const totalAbono = Number(data?.overview?.totalAbono) || 0;
   const totalBudget = Number(data?.overview?.totalBudget) || 0;
@@ -91,14 +93,17 @@ const EmployeeAbono = () => {
     [serverTransactions, localEdits],
   );
 
+  // OPEN abono only — exactly the rows the Settle dialog offers.
+  const openAbonoRows = useMemo(
+    () => transactions.filter((tx) => tx.status === "open"),
+    [transactions],
+  );
+
   const handleTransactionUpdate = useCallback((updatedTx) => {
     setLocalEdits((prev) => ({ ...prev, [updatedTx.id]: updatedTx }));
   }, []);
 
   const isOverdrawn = totalBalance < -0.004;
-  const StatusIcon = isOverdrawn ? CircleX : CircleAlert;
-  const showStatus =
-    !isLoading && (isOverdrawn || Math.abs(totalBalance) < 0.005);
 
   return (
     <div className="space-y-4 sm:space-y-5">
@@ -107,6 +112,19 @@ const EmployeeAbono = () => {
         description="Manage and track your out-of-pocket expenses."
         actions={
           <div className="flex w-full flex-nowrap items-center gap-2 sm:w-auto justify-end">
+            <Button
+              variant="soft"
+              className="shrink-0"
+              onClick={() => setSettleOpen(true)}
+              disabled={isLoading || openAbonoRows.length === 0}
+              title={
+                openAbonoRows.length === 0
+                  ? "No open abono to settle"
+                  : undefined
+              }
+            >
+              <BadgeCheck size={15} /> Settle
+            </Button>
             <Button
               variant="accent"
               className="shrink-0"
@@ -158,19 +176,6 @@ const EmployeeAbono = () => {
               <span className="type-eyebrow text-[10px] tracking-[0.18em] text-white/65 sm:text-[11px]">
                 Total Abono
               </span>
-              {showStatus && (
-                <span className="ml-auto inline-flex items-center gap-1 rounded-full bg-white px-2.5 py-1 text-[11px] font-bold leading-none text-[var(--ink)]">
-                  <StatusIcon
-                    size={12}
-                    className={
-                      isOverdrawn
-                        ? "text-[var(--danger)]"
-                        : "text-[var(--warning)]"
-                    }
-                  />
-                  {isOverdrawn ? "Overdrawn" : "Depleted"}
-                </span>
-              )}
             </div>
 
             {isLoading ? (
@@ -215,11 +220,18 @@ const EmployeeAbono = () => {
         <TransactionsSectionAbono
           transactions={transactions}
           isLoading={isLoading}
+          totalBalance={totalBalance}
           onTransactionUpdate={handleTransactionUpdate}
         />
       </motion.div>
 
       <AddAbonoModal open={addOpen} onClose={() => setAddOpen(false)} />
+      <SettleAbonoModal
+        open={settleOpen}
+        onClose={() => setSettleOpen(false)}
+        openRows={openAbonoRows}
+        totalBalance={totalBalance}
+      />
     </div>
   );
 };

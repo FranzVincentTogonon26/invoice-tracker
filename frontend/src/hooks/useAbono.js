@@ -32,5 +32,17 @@ export function useAbonoMutations() {
       mutationFn: abonoApi.remove,
       onSuccess: invalidate,
     }),
+    // Settle Abono — flips the checked OPEN rows to 'settled'. Settled abono
+    // stops funding the spendable pool, so every employee view that shows a
+    // balance (Overview / Budget / Expenses) refreshes alongside this page.
+    settle: useMutation({
+      mutationFn: abonoApi.settle,
+      onSuccess: () => {
+        invalidate();
+        qc.invalidateQueries({ queryKey: ["employeeOverview"] });
+        qc.invalidateQueries({ queryKey: ["employeeBudget"] });
+        qc.invalidateQueries({ queryKey: ["employeeExpenses"] });
+      },
+    }),
   };
 }

@@ -14,6 +14,18 @@ router.get(
   requireEmployeeAccess,
   abonoController.abonoEmployee,
 );
+
+// Settle Abono (employee page): flips the checked OPEN rows to 'settled' and
+// stamps `date_settled`, in one transaction. Scoped to the token's user id
+// server-side; declared before the "/:id" routes so "settle" is never parsed
+// as an abono id.
+router.patch(
+  "/settle",
+  authMiddleware,
+  requireEmployeeAccess,
+  abonoController.settleAbono,
+);
+
 router.post("/", authMiddleware, abonoController.create);
 
 // Inline description editing (double-click) from the transaction sheet /

@@ -132,7 +132,14 @@ const EmployeeOverview = () => {
                 Available balance
               </span>
               {showStatus && (
-                <span className="ml-auto inline-flex items-center gap-1 rounded-full bg-white px-2.5 py-1 text-[11px] font-bold leading-none text-[var(--ink)]">
+                <span
+                  className={cn(
+                    "ml-auto inline-flex items-center gap-1 border rounded-full px-2.5 py-1 text-[11px] font-bold leading-none text-[var(--ink)]",
+                    isOverdrawn
+                      ? "border-[var(--danger)]"
+                      : "border-[var(--warning)]",
+                  )}
+                >
                   <StatusIcon
                     size={12}
                     className={

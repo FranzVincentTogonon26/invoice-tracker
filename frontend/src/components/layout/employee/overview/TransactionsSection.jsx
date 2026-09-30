@@ -35,6 +35,7 @@ import {
   addDays,
 } from "../../../../lib/utils";
 import DateRangePicker from "../../../ui/DateRangePicker";
+import { ExpenseStatusBadge } from "../../admin/expenses/ExpensesTable";
 
 // Short "20 Oct" date for the compact mobile meta row. Falls back to the
 // full `formatDate` for valid non-midnight timestamps only when parsing
@@ -59,9 +60,9 @@ const TYPE_LABEL_SHORT = {
 // Spent -> Expenses, Abono -> Abono) instead of echoing the row's
 // description, which already renders in the details body's Description row.
 const TYPE_ITEM_TITLE = {
-  issued: "Budget Item",
-  expense: "Expenses Item",
-  abono: "Abono Item",
+  issued: "Budget",
+  expense: "Expenses",
+  abono: "Abono",
 };
 
 // Instant-scan method badge: tint + glyph per payment method so the type is
@@ -118,6 +119,24 @@ const SHEET_EASE = [0.16, 1, 0.3, 1];
 // issued/abono always carry `flag = 0`.
 const isFlagged = (row) => row?.flagged === true || Number(row?.flag) === 1;
 
+// Expense rows the ledger labels with their OWN status badge: a soft-deleted
+// row is parked in 'draft' and a voided one sits in 'cancel' (see the row
+// actions). Paid rows keep the plain type badge, and issued/abono rows have
+// their own badges — only these two statuses get an identifying badge.
+const isDraftOrCancelled = (row) =>
+  row?.kind === "expense" &&
+  (row?.status === "draft" || row?.status === "cancel");
+
+// A cancelled row never counts toward any total — strike its amount so it
+// reads as void at a glance.
+const isCancelled = (row) =>
+  row?.kind === "expense" && row?.status === "cancel";
+
+// Draft expenses read warning-toned; cancelled rows danger-toned — the same
+// status colors their badges use, so the row and badge speak one language.
+const isDraftExpense = (row) =>
+  row?.kind === "expense" && row?.status === "draft";
+
 /* ── Mobile detail sheet body — amount hero + summary rows per kind ── */
 // Mirrors the budget ledger's IssuedDetailsBody: one amount hero on top,
 // then type-specific summaries below. Read-only — overview never edits.
@@ -145,6 +164,10 @@ const OverviewDetailsBody = ({ row, meta }) => {
           Abono
         </Badge>
       )
+    ) : isDraftOrCancelled(row) ? (
+      // Only draft / cancelled expenses add a status badge here — a paid row
+      // keeps the plain "Paid" pill it always had.
+      <ExpenseStatusBadge status={row.status} />
     ) : (
       <Badge tone="neutral">
         <span className="h-2 w-2 rounded-full bg-current opacity-80" />
@@ -219,11 +242,31 @@ const OverviewDetailsBody = ({ row, meta }) => {
           </div>
         </div>
         {kind === "abono" && row?.status === "settled" && row?.date_settled ? (
-          <div className="grid border-t border-[var(--border)] pt-3 py-1">
+          <div className="grid grid-cols-3 border-t border-[var(--border)] pt-3 py-1">
             <div className="min-w-0">
-              <p className="type-eyebrow text-[var(--ink-muted)]">Date Settled</p>
+              <p className="type-eyebrow text-[var(--ink-muted)]">
+                Date Settled
+              </p>
               <p className="mt-1 truncate text-sm font-medium tabular-nums text-[var(--ink)]">
                 {formatDate(row?.date_settled)}
+              </p>
+            </div>
+            <div className="min-w-0">
+              <p className="type-eyebrow text-[var(--ink-muted)]">Time</p>
+              <p className="mt-1 truncate text-sm font-medium tabular-nums text-[var(--ink)]">
+                {formatTime(row?.date_settled)}
+              </p>
+            </div>
+          </div>
+        ) : null}
+        {/* Cancelled expenses read their own (void/remarks) note on this row —
+            other kinds carry no expense note. */}
+        {kind === "expense" && row?.status === "cancel" ? (
+          <div className="grid border-t border-[var(--border)] pt-3 py-1">
+            <div className="min-w-0">
+              <p className="type-eyebrow text-[var(--ink-muted)]">Notes</p>
+              <p className="mt-1  text-sm font-medium tabular-nums text-[var(--ink)]">
+                {row?.notes || "—"}
               </p>
             </div>
           </div>
@@ -570,8 +613,13 @@ export const TransactionsSection = ({
                       key={`${tx.kind}-${tx.id}`}
                       className={cn(
                         "relative transition-colors duration-150 hover:bg-[var(--accent)]/[0.05]",
-                        flagged &&
+                        // Same status tones as the mobile cards: draft warns,
+                        // cancelled reads danger. Flagged rows keep the normal
+                        // tone — the "Flagged" badge below carries that state.
+                        isDraftExpense(tx) &&
                           "bg-[var(--warning)]/[0.08] hover:bg-[var(--warning)]/[0.12]",
+                        isCancelled(tx) &&
+                          "bg-[var(--danger)]/[0.08] hover:bg-[var(--danger)]/[0.12]",
                       )}
                       title={
                         flagged
@@ -582,10 +630,7 @@ export const TransactionsSection = ({
                       <td className="relative px-4 py-3 first:pl-5 align-middle">
                         <span
                           aria-hidden
-                          className={cn(
-                            "absolute inset-y-2 left-0 w-[3px] rounded-full",
-                            flagged ? "bg-[var(--warning)]" : "bg-transparent",
-                          )}
+                          className="absolute inset-y-2 left-0 w-[3px] rounded-full bg-transparent"
                         />
                         <p className="whitespace-nowrap text-[13px] font-semibold leading-none tabular-nums text-[var(--ink)]">
                           {formatDate(tx.date)}
@@ -633,23 +678,33 @@ export const TransactionsSection = ({
                         />
                       </td>
                       <td className="px-4 py-3 align-middle">
-                        <Badge
-                          tone={meta.badgeTone}
-                          className="max-w-full gap-1.5 px-2 py-1 text-[11px]"
-                        >
-                          <Icon
-                            size={12}
-                            strokeWidth={2.2}
-                            className="shrink-0"
+                        {isDraftOrCancelled(tx) ? (
+                          // Draft / cancelled expenses show their own status —
+                          // the type badge's "Paid" would be wrong for them.
+                          <ExpenseStatusBadge
+                            status={tx.status}
+                            className="max-w-full gap-1.5 px-2 py-1 text-[11px]"
                           />
-                          <span className="truncate">{meta.label}</span>
-                        </Badge>
+                        ) : (
+                          <Badge
+                            tone={meta.badgeTone}
+                            className="max-w-full gap-1.5 px-2 py-1 text-[11px]"
+                          >
+                            <Icon
+                              size={12}
+                              strokeWidth={2.2}
+                              className="shrink-0"
+                            />
+                            <span className="truncate">{meta.label}</span>
+                          </Badge>
+                        )}
                       </td>
                       <td className="px-4 py-3 text-right last:pr-5 align-middle">
                         <span
                           className={cn(
                             "whitespace-nowrap font-display text-[15px] font-semibold tabular-nums",
                             amountColor,
+                            isCancelled(tx) && "line-through",
                           )}
                         >
                           {isNegative
@@ -740,8 +795,14 @@ export const TransactionsSection = ({
                           aria-label={`View details for ${tx.description || meta.label}`}
                           className={cn(
                             "relative flex cursor-pointer items-center justify-between gap-3 overflow-hidden rounded-2xl border border-[var(--border)] bg-[var(--surface-2)]/60 px-3.5 py-3.5 transition-shadow hover:shadow-card active:scale-[0.99]",
-                            flagged &&
-                              "border-[var(--warning)]/50 bg-[var(--warning)]/[0.08] ring-1 ring-inset ring-[var(--warning)]/25",
+                            // Status tone drives the card: draft warns,
+                            // cancelled reads danger. Flagged rows keep the
+                            // normal tone — the "Flagged" pill badge below
+                            // carries that state instead.
+                            isDraftExpense(tx) &&
+                              "border-[var(--warning)]/50 bg-[var(--warning)]/[0.08]",
+                            isCancelled(tx) &&
+                              "border-[var(--danger)]/40 bg-[var(--danger)]/[0.08]",
                           )}
                           title={
                             flagged
@@ -751,12 +812,7 @@ export const TransactionsSection = ({
                         >
                           <span
                             aria-hidden
-                            className={cn(
-                              "absolute inset-y-0 left-0 w-1",
-                              flagged
-                                ? "bg-[var(--warning)]"
-                                : "bg-transparent",
-                            )}
+                            className="absolute inset-y-0 left-0 w-1 bg-transparent"
                           />
                           {/* Left: Icon & Details matching requested mobile structure */}
                           <div className="flex items-center gap-3 min-w-0">
@@ -765,6 +821,12 @@ export const TransactionsSection = ({
                                 <span className="min-w-0 truncate capitalize">
                                   {tx.description || meta.label}
                                 </span>
+                                {isDraftOrCancelled(tx) && (
+                                  <ExpenseStatusBadge
+                                    status={tx.status}
+                                    className="shrink-0 gap-1 px-1.5 py-0.5 text-[10px]"
+                                  />
+                                )}
                                 {flagged && (
                                   <Badge
                                     tone="warning"
@@ -813,6 +875,7 @@ export const TransactionsSection = ({
                               className={cn(
                                 "font-display text-sm font-semibold tabular-nums",
                                 amountColor,
+                                isCancelled(tx) && "line-through",
                               )}
                             >
                               {isNegative

@@ -32,3 +32,15 @@ export const updateAbonoDescriptionSchema = z.object({
     .min(2, { message: "Description must be at least 2 characters" })
     .max(200, { message: "Description is too long" }),
 });
+
+// Settle Abono — the ids of the OPEN rows the employee checked in the Settle
+// dialog. At least one id (an empty selection is a client bug, not a request),
+// capped so one call can't carry an unbounded list.
+export const settleAbonoSchema = z.object({
+  ids: z
+    .array(z.uuid({ message: "Invalid abono id" }), {
+      error: "Select at least one abono to settle",
+    })
+    .min(1, { message: "Select at least one abono to settle" })
+    .max(500, { message: "Too many abono records in one request" }),
+});

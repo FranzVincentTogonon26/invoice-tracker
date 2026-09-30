@@ -298,8 +298,11 @@ const ExpensesModal = ({
         return;
       }
 
+      // Hand the live footer sum over as the stored total: it is the same
+      // figure "Confirm Receipt" displays, so the draft's lines and its
+      // total can never disagree (a stale scanned grand total would).
       const { draft, persisted, imageDropped } = savePendingReceipt(
-        buildReceiptDraft({ ...receipt, items }),
+        buildReceiptDraft({ ...receipt, items }, itemsTotal),
       );
 
       // Park the picked file under the draft id — the deferred batch upload
@@ -315,9 +318,7 @@ const ExpensesModal = ({
         toast(
           "Receipt confirmed, but its date is behind the first budget issued to you — the line is flagged.",
           {
-            icon: (
-              <AlertTriangle size={16} className="text-[var(--warning)]" />
-            ),
+            icon: <AlertTriangle size={16} className="text-[var(--warning)]" />,
           },
         );
         return;

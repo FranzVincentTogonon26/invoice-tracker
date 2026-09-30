@@ -11,9 +11,10 @@ const toMoney = (value) => Math.round((Number(value) || 0) * 100) / 100;
 //   - totalExpenses: SUM(expenses.total_amount) of PAID rows only. A
 //                    soft-deleted row is parked in 'draft' and a voided one
 //                    sits in 'cancel' (see the row actions), so neither may
-//                    read as spent here — same rule as the expenses UNION
-//                    below and the employee expenses ledger, so the "Spent"
-//                    card always reconciles with the transaction list.
+//                    read as spent here. The transaction feed below still
+//                    LISTS every status — drafts/cancels carry an identifying
+//                    badge client-side — which is exactly why these totals
+//                    stay paid-only instead of following the list.
 //   - totalAbono:    SUM(employee_abono.amount) of OPEN rows only — a settled
 //                    (reimbursed) or draft (parked) abono no longer funds
 //                    spending, so it never reaches the "Abono" card
@@ -105,7 +106,9 @@ class EmployeeOverview {
 
         UNION ALL
 
-        -- 2. Expense transactions
+        -- 2. Expense transactions — EVERY status is listed (paid / draft /
+        --    cancel) so the ledger shows the full record; only the aggregate
+        --    subqueries above stay paid-only, so no total moves.
         SELECT
           e.id,
           'expense' AS kind,
@@ -123,7 +126,7 @@ class EmployeeOverview {
         FROM expenses e
         LEFT JOIN category c ON c.category_id = e.category_id
         LEFT JOIN budget_reference br ON br.reference_id = e.reference_id
-        WHERE e.user_id = $1 AND e.status = 'paid'
+        WHERE e.user_id = $1
 
         UNION ALL
 

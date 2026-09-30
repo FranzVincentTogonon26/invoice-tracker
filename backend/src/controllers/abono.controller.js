@@ -3,6 +3,7 @@ import ApiError from "../utils/ApiError.js";
 import { validate } from "../utils/validate.js";
 import {
   createAbonoSchema,
+  settleAbonoSchema,
   updateAbonoDescriptionSchema,
 } from "../validations/abono.validation.js";
 
@@ -125,7 +126,11 @@ export const updateDescription = async (req, res, next) => {
 
 // DELETE /abono/:id — the row action's "Delete abono": removes the record
 // outright (abono has no soft-delete state; the status column tracks the
-// reimbursement lifecycle, not deletions).
+// reimbursement lifecycle, not deletions). Guard: an OPEN abono funds the
+// spendable pool, so when its amount has already been spent (remaining
+// balance can't cover it) the delete is rejected — removing it would
+// overdraw the employee. Draft/settled rows never fund the pool and stay
+// deletable.
 export const removeAbono = async (req, res, next) => {
   try {
     const { id } = req.params;
@@ -136,11 +141,65 @@ export const removeAbono = async (req, res, next) => {
     if (!existing || !canTouchRow(req, existing))
       throw ApiError.notFound("Abono not found", "ABONO_NOT_FOUND");
 
+    if (existing.status === "open") {
+      const totalBalance = await Abono.spendableBalance(existing.user_id);
+      const remaining =
+        Math.round((Number(totalBalance) || 0) * 100) / 100 -
+        (Math.round((Number(existing.amount) || 0) * 100) / 100);
+      if (remaining < -0.004) {
+        throw ApiError.badRequest(
+          "The amount of this abono has already been spent, so it can't be deleted.",
+          "ABONO_ALREADY_SPENT",
+        );
+      }
+    }
+
     const abono = await Abono.remove(id);
     if (!abono)
       throw ApiError.notFound("Abono not found", "ABONO_NOT_FOUND");
 
     return res.status(200).json({ abono, message: "Abono deleted." });
+  } catch (err) {
+    next(err);
+  }
+};
+
+// PATCH /abono/settle — the Settle Abono dialog: every OPEN row the employee
+// checked flips to 'settled' with `date_settled` stamped, in ONE transaction.
+// Scope is the token's user id (an employee can only settle their own rows).
+// The server re-checks the remaining balance before writing: when the request
+// can't be covered the answer is the insufficient-balance 400 the dialog
+// already previews client-side, and nothing is committed.
+export const settleAbono = async (req, res, next) => {
+  try {
+    const payload = validate(settleAbonoSchema, req.body);
+
+    const { insufficient, requested, totalBalance, settled } =
+      await Abono.settleOpen(req.user.id, payload.ids);
+
+    if (insufficient) {
+      throw ApiError.badRequest(
+        "Cannot proceed your request due to insufficient balance — the checked abono is more than what remains.",
+        "INSUFFICIENT_BALANCE",
+      );
+    }
+
+    if (settled.length === 0) {
+      throw ApiError.badRequest(
+        "None of the checked abono are still open.",
+        "NOTHING_TO_SETTLE",
+      );
+    }
+
+    return res.status(200).json({
+      settled,
+      requested,
+      totalBalance,
+      message:
+        settled.length === 1
+          ? "Abono settled."
+          : `${settled.length} abono settled.`,
+    });
   } catch (err) {
     next(err);
   }

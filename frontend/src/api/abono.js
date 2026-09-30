@@ -21,6 +21,13 @@ export const abonoApi = {
       .patch(`/abono/${id}/description`, { description })
       .then((r) => r.data),
 
+  // Settle Abono — flips the checked OPEN rows to 'settled' server-side and
+  // stamps `date_settled`. The server re-validates the remaining balance and
+  // answers with the insufficient-balance 400 when the selection can't be
+  // covered.
+  settle: (ids) =>
+    apiClient.patch("/abono/settle", { ids }).then((r) => r.data),
+
   // Row action: permanently removes the abono record.
   remove: (id) => apiClient.delete(`/abono/${id}`).then((r) => r.data),
 };

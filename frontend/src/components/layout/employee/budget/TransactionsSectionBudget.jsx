@@ -305,7 +305,7 @@ export const TransactionsSectionBudget = ({
   );
 
   return (
-    <Card className="overflow-hidden">
+    <Card className="overflow-hidden px-2.5">
       <div className="flex flex-col gap-4 border-b border-[var(--border)] pb-4 md:flex-row md:items-center md:justify-between">
         <div className="flex items-center gap-3">
           <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-[var(--surface-2)] text-[var(--ink)]">

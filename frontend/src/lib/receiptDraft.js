@@ -67,10 +67,14 @@ export const createReceiptId = () => {
 /**
  * ExpensesModal scan state → stored draft.
  * `items` keeps the receipt's own quantity/rate plus the derived amount, and
- * `total` prefers the scanned grand total (it may include tax) over the sum of
- * the lines.
+ * `total` is the LIVE line sum the "Confirm Receipt" footer computed
+ * (`confirmedTotal`) — the figure the user actually saw and confirmed. The
+ * scan's own grand total is NOT preferred here: lines can be edited, added or
+ * removed after a scan (and the grand total may include tax the lines don't
+ * itemize), so storing the scan value would park a stale total that no longer
+ * matches the confirmed lines.
  */
-export const buildReceiptDraft = (receipt) => {
+export const buildReceiptDraft = (receipt, confirmedTotal) => {
   const items = (receipt?.items ?? []).map((item) => {
     const quantity = Number(item?.quantity) || 0;
     const rate = Number(item?.rate) || 0;
@@ -83,10 +87,19 @@ export const buildReceiptDraft = (receipt) => {
     };
   });
 
-  const itemsTotal = Number(
+  const derivedTotal = Number(
     items.reduce((sum, item) => sum + item.amount, 0).toFixed(2),
   );
-  const scannedTotal = Number(receipt?.total) || 0;
+  const passedTotal = Number(confirmedTotal);
+
+  // The footer sum wins — fall back to the lines' own sum only when the
+  // caller didn't hand the live figure over.
+  const total =
+    confirmedTotal !== undefined &&
+    Number.isFinite(passedTotal) &&
+    passedTotal > 0
+      ? Number(passedTotal.toFixed(2))
+      : derivedTotal;
 
   return {
     receiptId: createReceiptId(),
@@ -95,8 +108,8 @@ export const buildReceiptDraft = (receipt) => {
     currency: String(receipt?.currency ?? "").trim(),
     suggestedCategory: String(receipt?.suggestedCategory ?? "").trim(),
     items,
-    itemsTotal,
-    total: scannedTotal > 0 ? scannedTotal : itemsTotal,
+    itemsTotal: total,
+    total,
     imageUrl: receipt?.imageUrl ?? "",
     fileName: receipt?.fileName ?? "",
     createdAt: new Date().toISOString(),
