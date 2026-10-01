@@ -209,11 +209,6 @@ CREATE TABLE IF NOT EXISTS budget_transfer (
 );
 
 
--- NOTE: `budget_transfer_received` was removed — a transfer's recipient is
--- `budget_transfer.transfer_to`, so the mirror table only duplicated data.
--- Existing databases drop it via migration 004.
-
-
 -- ============================================================
 -- CATEGORY
 -- ============================================================

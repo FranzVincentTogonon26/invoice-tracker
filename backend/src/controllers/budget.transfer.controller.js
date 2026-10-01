@@ -106,3 +106,55 @@ export const create = async (req, res, next) => {
     next(err);
   }
 };
+
+const UUID_RE =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+// Row-level access for the cancel endpoint: admins may cancel any transfer;
+// everyone else must be an *active employee* and the sender of that transfer
+// (a recipient can never cancel money sent to them). A rejected caller gets
+// the plain "not found" instead of a 403 so the response never reveals that
+// someone else's transfer id exists (same rule as abono.controller.js).
+const canTouchTransfer = (req, transfer) => {
+  if (req.user?.role === "admin") return true;
+  return (
+    req.user?.role === "employee" &&
+    req.user?.status === "active" &&
+    String(transfer?.user_id ?? "") === String(req.user?.id ?? "")
+  );
+};
+
+// DELETE /budget-transfer/:id — the sheet's "Cancel budget transfer":
+// removes the record outright. Guard: deleting takes the received amount back
+// out of the recipient's pool, so when they already spent it the cancel is
+// rejected — removing it would overdraw them.
+export const remove = async (req, res, next) => {
+  try {
+    await ensureTransferAccess(req);
+    const { id } = req.params;
+    if (!UUID_RE.test(id || ""))
+      throw ApiError.badRequest("Invalid transfer id", "VALIDATION_ERROR");
+
+    const existing = await BudgetTransfer.findById(id);
+    if (!existing || !canTouchTransfer(req, existing))
+      throw ApiError.notFound("Transfer not found", "TRANSFER_NOT_FOUND");
+
+    const result = await BudgetTransfer.cancelTransfer(id);
+    if (result.notFound)
+      throw ApiError.notFound("Transfer not found", "TRANSFER_NOT_FOUND");
+
+    if (result.recipientSpent) {
+      throw ApiError.badRequest(
+        "Cannot cancel this transfer — the recipient has already spent the transferred amount.",
+        "TRANSFER_ALREADY_SPENT",
+      );
+    }
+
+    return res.status(200).json({
+      transfer: result.transfer,
+      message: "Budget transfer cancelled.",
+    });
+  } catch (err) {
+    next(err);
+  }
+};

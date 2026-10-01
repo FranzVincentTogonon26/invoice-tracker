@@ -44,5 +44,10 @@ export function useBudgetTransferMutations() {
       mutationFn: budgetTransferApi.transfer,
       onSuccess: invalidate,
     }),
+    // Sheet action: "Cancel budget transfer" removes a sent record outright.
+    cancelTransfer: useMutation({
+      mutationFn: budgetTransferApi.cancelTransfer,
+      onSuccess: invalidate,
+    }),
   };
 }

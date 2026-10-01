@@ -18,4 +18,9 @@ router.get(
 
 router.post("/", authMiddleware, budgetTransferController.create);
 
+// Row action: "Cancel budget transfer" removes the record outright. Only the
+// sender (or an admin) may cancel it — ownership is checked in the
+// controller, and the cancel is refused when the recipient already spent it.
+router.delete("/:id", authMiddleware, budgetTransferController.remove);
+
 export default router;

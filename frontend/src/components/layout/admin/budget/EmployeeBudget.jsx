@@ -3,6 +3,7 @@ import { motion } from "framer-motion";
 import { ChevronRight, Loader, Wallet } from "lucide-react";
 import { Card, CardDescription, CardHeader, CardTitle } from "../../../ui/Card";
 import { Badge } from "../../../ui/Badge";
+import { EmployeeAvatar } from "../../../ui/SelectEmployee";
 import { cn, formatDate, formatMoney } from "../../../../lib/utils";
 
 const EmployeeBudget = ({ employeeIssuedBudget = [], isLoading, onOpen }) => {
@@ -18,6 +19,7 @@ const EmployeeBudget = ({ employeeIssuedBudget = [], isLoading, onOpen }) => {
           group = {
             user_id: row.user_id,
             name: row.name,
+            avatar_url: row.avatar_url,
             budgets: [],
             labelGroups: {},
           };
@@ -153,14 +155,11 @@ const EmployeeBudget = ({ employeeIssuedBudget = [], isLoading, onOpen }) => {
                 />
                 {/* Employee header — identity left, aggregate total right */}
                 <div className="flex items-center gap-3">
-                  <div
-                    className={cn(
-                      "flex shrink-0 select-none items-center justify-center rounded-full bg-[var(--accent-soft)] font-semibold text-[var(--accent-strong)] ring-1 ring-[var(--accent)]/15 transition-transform duration-200 group-hover/row:scale-105",
-                      hasMultipleRefs ? "h-9 w-9 text-sm" : "h-9 w-9 text-sm",
-                    )}
-                  >
-                    {group.name?.[0]?.toUpperCase() || "?"}
-                  </div>
+                  <EmployeeAvatar
+                    name={group.name}
+                    avatarUrl={group.avatar_url}
+                    className="h-9 w-9 text-sm"
+                  />
                   <div className="min-w-0 flex-1">
                     <p className="truncate text-sm font-semibold text-[var(--ink)]">
                       {group.name}

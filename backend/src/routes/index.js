@@ -7,6 +7,7 @@ import budgetTransferRoutes from "./budget.transfer.route.js";
 import abonoRoutes from "./abono.route.js";
 import aiRoutes from "./ai.route.js";
 import employeeOverviewRoutes from "./employee.overview.route.js";
+import employeeSettingsRoutes from "./employee.settings.route.js";
 
 const router = express.Router();
 
@@ -26,5 +27,6 @@ router.use("/budget-transfer", budgetTransferRoutes);
 router.use("/abono", abonoRoutes);
 router.use("/ai", aiRoutes);
 router.use("/employee_overview", employeeOverviewRoutes);
+router.use("/employee_settings", employeeSettingsRoutes);
 
 export default router;

@@ -11,4 +11,10 @@ export const budgetTransferApi = {
   // server-side and the remaining balance is re-checked there.
   transfer: (payload) =>
     apiClient.post("/budget-transfer", payload).then((r) => r.data),
+
+  // Cancels a sent transfer — permanently removes the record. Only the
+  // sender (or an admin) may cancel; the server refuses when the recipient
+  // already spent the amount.
+  cancelTransfer: (id) =>
+    apiClient.delete(`/budget-transfer/${id}`).then((r) => r.data),
 };

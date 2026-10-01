@@ -142,7 +142,6 @@ const EmployeesModal = ({ open, onClose, create }) => {
                       value={form.fullname}
                       onChange={set("fullname")}
                       placeholder="e.g. Juan Dela Cruz"
-                      autoFocus
                     />
                   </Field>
                   <Field label="Email">

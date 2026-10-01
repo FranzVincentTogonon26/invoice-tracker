@@ -160,6 +160,12 @@ const isDraftOrCancelled = (row) =>
 const isCancelled = (row) =>
   row?.kind === "expense" && row?.status === "cancel";
 
+// A cancelled issuance no longer funds the employee — mark it with a danger
+// "Cancelled" badge and strike its amount, but leave every tone alone: row,
+// badge family and amount color stay exactly as a live row renders.
+const isCancelledIssued = (row) =>
+  row?.kind === "issued" && row?.status === "cancel";
+
 // Draft expenses read warning-toned; cancelled rows danger-toned — the same
 // status colors their badges use, so the row and badge speak one language.
 const isDraftExpense = (row) =>
@@ -177,10 +183,17 @@ const OverviewDetailsBody = ({ row, meta }) => {
   const sign = isNegative(row) ? "-" : "+";
   const statusBadge =
     kind === "issued" ? (
-      <Badge tone="success">
-        <span className="h-2 w-2 rounded-full bg-current opacity-80" />
-        Received
-      </Badge>
+      row?.status === "cancel" ? (
+        <Badge tone="danger">
+          <span className="h-2 w-2 rounded-full bg-current opacity-80" />
+          Cancelled
+        </Badge>
+      ) : (
+        <Badge tone="success">
+          <span className="h-2 w-2 rounded-full bg-current opacity-80" />
+          Received
+        </Badge>
+      )
     ) : kind === "abono" ? (
       // A settled abono is closed out (reimbursed) — accent tone + explicit
       // "Settled Abono" wording so it never reads like live money.
@@ -244,7 +257,12 @@ const OverviewDetailsBody = ({ row, meta }) => {
       <div className="flex items-center justify-between gap-3 rounded-2xl border border-[var(--border)] bg-[var(--surface-2)]/60 px-4 py-3.5">
         <div className="min-w-0">
           <p className="type-eyebrow text-[var(--ink-muted)]">Amount</p>
-          <p className="mt-1 font-display text-2xl font-semibold leading-none tracking-tight tabular-nums text-[var(--ink)]">
+          <p
+            className={cn(
+              "mt-1 font-display text-2xl font-semibold leading-none tracking-tight tabular-nums text-[var(--ink)]",
+              isCancelledIssued(row) && "line-through",
+            )}
+          >
             {sign}
             {formatMoney(row?.amount)}
           </p>
@@ -286,7 +304,7 @@ const OverviewDetailsBody = ({ row, meta }) => {
         {/* Transfer rows read who the money moved to / came from, plus the
             sender's notes when the description shows them. */}
         {transfer && (counterparty || row?.notes) ? (
-          <div className="grid grid-cols-2 gap-3 border-t border-[var(--border)] pt-3 py-1">
+          <div className="grid gap-3 border-t border-[var(--border)] pt-3 py-1">
             {counterparty && (
               <div className="min-w-0">
                 <p className="type-eyebrow text-[var(--ink-muted)]">
@@ -294,14 +312,6 @@ const OverviewDetailsBody = ({ row, meta }) => {
                 </p>
                 <p className="mt-1 truncate text-sm font-medium text-[var(--ink)]">
                   {row.counterparty}
-                </p>
-              </div>
-            )}
-            {row?.notes && (
-              <div className="min-w-0">
-                <p className="type-eyebrow text-[var(--ink-muted)]">Notes</p>
-                <p className="mt-1 break-words text-sm font-medium leading-snug text-[var(--ink)]">
-                  {row.notes}
                 </p>
               </div>
             )}
@@ -388,9 +398,13 @@ function OverviewSheet({ row, onClose }) {
   const meta = TYPE_CONFIG[row?.kind] ?? TYPE_CONFIG.expense;
   const Icon = meta.icon;
   // Title by item type (see TYPE_ITEM_TITLE) — same wording the details body's
-  // "Type" row shows, so the header reads "Budget Item" / "Expenses Item" /
-  // "Abono Item" instead of the row's description.
-  const title = TYPE_ITEM_TITLE[row?.kind] ?? meta.label ?? "Transaction";
+  // "Type" row shows, so the header reads "Budget" / "Expenses" / "Abono" /
+  // "Transfer" instead of the row's description. The one exception is a
+  // received transfer: money came in, so it reads "Budget Received".
+  const title =
+    row?.kind === "transfer" && row?.direction === "received"
+      ? "Budget Received"
+      : (TYPE_ITEM_TITLE[row?.kind] ?? meta.label ?? "Transaction");
 
   return createPortal(
     <AnimatePresence>
@@ -764,6 +778,16 @@ export const TransactionsSection = ({
                             status={tx.status}
                             className="max-w-full gap-1.5 px-2 py-1 text-[11px]"
                           />
+                        ) : isCancelledIssued(tx) ? (
+                          // Cancelled issuance: danger identifier only — every
+                          // tone on the row stays untouched.
+                          <Badge
+                            tone="danger"
+                            className="max-w-full gap-1.5 px-2 py-1 text-[11px]"
+                          >
+                            <span className="h-2 w-2 rounded-full bg-current opacity-80" />
+                            <span className="truncate">Cancelled</span>
+                          </Badge>
                         ) : transfer ? (
                           <Badge
                             tone={sent ? "neutral" : meta.badgeTone}
@@ -797,7 +821,8 @@ export const TransactionsSection = ({
                           className={cn(
                             "whitespace-nowrap font-display text-[15px] font-semibold tabular-nums",
                             amountColor,
-                            isCancelled(tx) && "line-through",
+                            (isCancelled(tx) || isCancelledIssued(tx)) &&
+                              "line-through",
                           )}
                         >
                           {negative
@@ -935,11 +960,23 @@ export const TransactionsSection = ({
                                     Flagged
                                   </Badge>
                                 )}
+                                {isCancelledIssued(tx) && (
+                                  <Badge
+                                    tone="danger"
+                                    className="shrink-0 gap-1 px-1.5 py-0.5 text-[10px]"
+                                    title="Cancelled — this issuance no longer funds your balance"
+                                  >
+                                    Cancelled
+                                  </Badge>
+                                )}
                               </p>
                               {/* Meta row: type · short date · method badge */}
                               <p className="mt-1.5 flex min-w-0 items-center gap-1.5 text-[11px] font-medium leading-none text-[var(--ink-muted)]">
                                 <span className="shrink-0">
-                                  {TYPE_LABEL_SHORT[tx.kind] ?? meta.label}
+                                  {isTransfer(tx) &&
+                                  tx?.direction === "received"
+                                    ? "Received"
+                                    : (TYPE_LABEL_SHORT[tx.kind] ?? meta.label)}
                                 </span>
                                 <span
                                   aria-hidden
@@ -969,7 +1006,8 @@ export const TransactionsSection = ({
                               className={cn(
                                 "font-display text-sm font-semibold tabular-nums",
                                 amountColor,
-                                isCancelled(tx) && "line-through",
+                                (isCancelled(tx) || isCancelledIssued(tx)) &&
+                                  "line-through",
                               )}
                             >
                               {negative

@@ -14,6 +14,8 @@ import {
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/context/AuthContext";
 import AILogo from "../../ui/AILogo";
+import ConfirmActionDialog from "../admin/expenses/ConfirmActionDialog";
+import { EmployeeAvatar } from "../../ui/SelectEmployee";
 
 const NAV = [
   {
@@ -86,7 +88,7 @@ function ActionRow({ icon: Icon, label, onClick, to }) {
       className={cn(
         ROW_BASE,
         isActive
-          ? "bg-[var(--ink)] text-[var(--bg)] shadow-card"
+          ? "bg-[var(--accent-soft)] text-[var(--accent-strong)] shadow-card"
           : "text-[var(--ink-muted)] hover:bg-[var(--surface-2)] hover:text-[var(--ink)]",
       )}
     >
@@ -152,6 +154,9 @@ const SHEET_LABEL = "mt-5 px-1 type-eyebrow " + "text-[var(--ink-muted)]";
  */
 function MobileDock({ onOpenMenu }) {
   const { pathname } = useLocation();
+  // Routes outside the dock (e.g. /employee/setting, opened from the menu
+  // sheet) belong to "More" — highlight it so the dock never looks dead.
+  const moreActive = DOCK_ITEMS.every((item) => !isActivePath(pathname, item));
   return (
     <nav
       aria-label="Primary"
@@ -197,10 +202,31 @@ function MobileDock({ onOpenMenu }) {
           onClick={onOpenMenu}
           title="More"
           aria-label="More navigation"
-          className={cn(DOCK_CELL, "text-[var(--ink-muted)]")}
+          className={cn(
+            DOCK_CELL,
+            moreActive
+              ? "text-[var(--accent-strong)]"
+              : "text-[var(--ink-muted)]",
+          )}
         >
-          <span className={cn(DOCK_INNER, "hover:bg-[var(--surface-2)]")}>
-            <LayoutGrid size={18} strokeWidth={2.3} />
+          <span
+            className={cn(
+              DOCK_INNER,
+              !moreActive && "hover:bg-[var(--surface-2)]",
+            )}
+          >
+            {moreActive && (
+              <motion.span
+                layoutId="mobile-dock-active"
+                className="absolute inset-0 rounded-full bg-[var(--accent-soft)]"
+                transition={{
+                  type: "spring",
+                  duration: 0.45,
+                  bounce: 0.18,
+                }}
+              />
+            )}
+            <LayoutGrid size={18} strokeWidth={2.3} className="relative z-10" />
           </span>
         </button>
       </div>
@@ -219,7 +245,6 @@ function MobileMenuSheet({ open, onClose, onLogout, user }) {
   const panelRef = useRef(null);
   const displayName = user?.name || "Account";
   const displayEmail = user?.email || "";
-  const initial = user?.name?.[0]?.toUpperCase() || "R";
 
   // Escape dismisses it. Capture phase + stopPropagation keeps page-level
   // Escape handlers from also firing (matches the dialog pattern).
@@ -299,9 +324,11 @@ function MobileMenuSheet({ open, onClose, onLogout, user }) {
 
             {/* Signed-in account */}
             <div className="mt-4 flex items-center gap-3 rounded-2xl border border-[var(--border)] bg-[var(--surface-2)] px-3.5 py-3">
-              <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-[var(--accent-soft)] text-sm font-semibold text-[var(--accent-strong)] ring-2 ring-[var(--surface)]">
-                {initial}
-              </div>
+              <EmployeeAvatar
+                name={user?.name}
+                avatarUrl={user?.avatar_url}
+                className="h-10 w-10 text-sm ring-2"
+              />
               <div className="min-w-0 flex-1">
                 <div className="truncate text-sm font-semibold text-[var(--ink)]">
                   {displayName}
@@ -356,7 +383,7 @@ function MobileMenuSheet({ open, onClose, onLogout, user }) {
             <div className={SHEET_LABEL}>Account</div>
             <div className="mt-2 flex flex-col gap-1">
               <NavLink
-                to="/settings"
+                to="/employee/settings"
                 onClick={onClose}
                 className="block focus-visible:outline-none"
               >
@@ -426,6 +453,15 @@ export function Sidebar() {
   const openMenu = useCallback(() => setMenuOpen(true), []);
   const closeMenu = useCallback(() => setMenuOpen(false), []);
 
+  // Logout always asks first — both the rail row and the menu sheet route
+  // through here, so no tap can end the session by accident.
+  const [logoutOpen, setLogoutOpen] = useState(false);
+  const requestLogout = useCallback(() => setLogoutOpen(true), []);
+  const confirmLogout = useCallback(() => {
+    setLogoutOpen(false);
+    logout();
+  }, [logout]);
+
   // The hover rail takes over at `md`. If the viewport grows while the sheet
   // is open, dismiss it so a mobile-only overlay (and its scroll lock) can
   // never linger behind the desktop layout.
@@ -480,8 +516,8 @@ export function Sidebar() {
         </div>
 
         <div className="flex flex-col items-center gap-2 w-full">
-          <ActionRow icon={Settings} label="Settings" to="/settings" />
-          <ActionRow icon={LogOut} label="Log out" onClick={logout} />
+          <ActionRow icon={Settings} label="Settings" to="/employee/settings" />
+          <ActionRow icon={LogOut} label="Log out" onClick={requestLogout} />
 
           <div
             className={cn(
@@ -489,8 +525,12 @@ export function Sidebar() {
               "transition-[width] duration-300 ease-[cubic-bezier(0.16,1,0.3,1)]",
             )}
           >
-            <div className="h-10 w-10 rounded-full bg-[var(--accent-soft)] text-[var(--accent-strong)] font-semibold flex items-center justify-center text-sm ring-2 ring-[var(--surface)] shrink-0">
-              {user?.name?.[0]?.toUpperCase() || "R"}
+            <div className="h-10 w-10 shrink-0">
+              <EmployeeAvatar
+                name={user?.name}
+                avatarUrl={user?.avatar_url}
+                className="h-10 w-10 text-sm ring-2"
+              />
             </div>
             <div
               className={cn(
@@ -518,8 +558,34 @@ export function Sidebar() {
       <MobileMenuSheet
         open={menuOpen}
         onClose={closeMenu}
-        onLogout={logout}
+        onLogout={requestLogout}
         user={user}
+      />
+
+      <ConfirmActionDialog
+        open={logoutOpen}
+        icon={<LogOut size={20} aria-hidden />}
+        title="Log out?"
+        description="You'll be signed out of your account and need to sign in again to continue."
+        summary={
+          <div className="mt-4 flex items-center gap-3 rounded-2xl border border-[var(--border)] bg-[var(--surface-2)]/60 px-4 py-3">
+            <div className="min-w-0 flex-1">
+              <p className="truncate text-base font-semibold text-[var(--ink)]">
+                {displayName}
+              </p>
+              {displayEmail && (
+                <p className="mt-0.5 truncate text-xs text-[var(--ink-muted)]">
+                  {displayEmail}
+                </p>
+              )}
+            </div>
+          </div>
+        }
+        cancelLabel="Stay signed in"
+        confirmLabel="Log out"
+        pendingLabel="Logging out…"
+        onCancel={() => setLogoutOpen(false)}
+        onConfirm={confirmLogout}
       />
     </>
   );

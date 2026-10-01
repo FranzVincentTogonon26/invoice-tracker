@@ -248,7 +248,6 @@ export default function Listbox({
                   <input
                     type="text"
                     value={search}
-                    autoFocus
                     aria-label="Search options"
                     placeholder="Search..."
                     onChange={(e) => {

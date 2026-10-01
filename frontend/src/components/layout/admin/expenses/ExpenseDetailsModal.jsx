@@ -930,7 +930,6 @@ const ExpenseDetailsModal = ({
                   type="button"
                   onClick={handleClose}
                   aria-label="Close expense details"
-                  autoFocus
                   className="flex h-9 w-9 items-center justify-center rounded-full text-[var(--ink-muted)] transition-colors hover:bg-[var(--surface-2)] hover:text-[var(--ink)]"
                 >
                   <X size={16} aria-hidden />

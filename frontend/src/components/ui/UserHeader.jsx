@@ -1,4 +1,5 @@
-import { getInitials, greetingFor } from "@/lib/utils";
+import { greetingFor } from "@/lib/utils";
+import { EmployeeAvatar } from "./SelectEmployee";
 
 export function UserHeader({ user }) {
   const displayName = user?.name?.trim() || "Account";
@@ -23,12 +24,11 @@ export function UserHeader({ user }) {
           {greeting}, {firstName}.
         </h1>
 
-        <div
-          className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-[var(--accent-soft)] text-sm font-semibold text-[var(--accent-strong)] "
-          aria-hidden="true"
-        >
-          {getInitials(user?.name)}
-        </div>
+        <EmployeeAvatar
+          name={user?.name}
+          avatarUrl={user?.avatar_url}
+          className="h-12 w-12 text-sm"
+        />
 
         <div className="min-w-0 flex-1">
           <p className="type-eyebrow text-[11px]  leading-tight text-[var(--ink-muted)]">

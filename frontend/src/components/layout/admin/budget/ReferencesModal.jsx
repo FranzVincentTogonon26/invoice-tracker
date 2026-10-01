@@ -169,7 +169,6 @@ const ReferencesModal = ({
                   placeholder="New reference label…"
                   Icon={Hash}
                   disabled={adding}
-                  autoFocus
                 />
                 <Button
                   type="submit"

@@ -24,6 +24,66 @@ class User {
     return result.rows[0];
   }
 
+  // Find User by email, excluding one user_id — the email-uniqueness check
+  // when the signed-in employee changes their own email (their current row
+  // must NOT count as a conflict).
+  static async findUserByEmailExceptId(email, id) {
+    const result = await query(
+      `SELECT ${SAFE_COLUMNS} FROM users WHERE email = $1 AND user_id <> $2`,
+      [email, id],
+    );
+    return result.rows[0];
+  }
+
+  // Find User WITH the password hash by id — ONLY the change-password flow
+  // needs it (to bcrypt-compare the current password before replacing it).
+  // Same contract as findUserByEmail: callers must never respond with it.
+  static async findUserWithPasswordById(id) {
+    const result = await query(
+      `SELECT ${SAFE_COLUMNS}, password FROM users WHERE user_id = $1`,
+      [id],
+    );
+    return result.rows[0];
+  }
+
+  // Update the signed-in employee's own account info (Setting → Account):
+  // name, email and avatar_url. `avatarUrl` is the final value the controller
+  // resolved (new upload URL, the stored URL, or NULL when the photo was
+  // removed), so the statement never has to branch. `status = 'active'` is
+  // re-checked in the WHERE clause as a last guard: if the account was
+  // deactivated mid-request the UPDATE matches nothing and returns null.
+  static async updateUserAccount({ id, name, email, avatarUrl }) {
+    const result = await query(
+      `UPDATE users
+          SET name = $2,
+              email = $3,
+              avatar_url = $4,
+              updated_at = NOW()
+        WHERE user_id = $1 AND status = 'active'
+        RETURNING ${SAFE_COLUMNS}`,
+      [id, name, email, avatarUrl],
+    );
+    return result.rows[0] ?? null;
+  }
+
+  // Replace the user's password — hashed with the SAME procedure and cost as
+  // createUser (bcrypt, SALT_ROUNDS), so a password set here is verified by
+  // the existing login flow with `bcrypt.compare`. The plaintext never
+  // touches the database (users.password stores only the hash).
+  static async updateUserPassword({ id, password }) {
+    const hashedPassword = await bcrypt.hash(password, SALT_ROUNDS);
+
+    const result = await query(
+      `UPDATE users
+          SET password = $2,
+              updated_at = NOW()
+        WHERE user_id = $1 AND status = 'active'
+        RETURNING ${SAFE_COLUMNS}`,
+      [id, hashedPassword],
+    );
+    return result.rows[0] ?? null;
+  }
+
   // Create User (hashes the plaintext password before storing)
   static async createUser({ name, email, password }) {
     let role,

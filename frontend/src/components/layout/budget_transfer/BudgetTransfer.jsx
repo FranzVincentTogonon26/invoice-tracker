@@ -37,15 +37,6 @@ const initialForm = {
 // insufficient-balance preview agrees with the backend check.
 const toMoney = (value) => Math.round((Number(value) || 0) * 100) / 100;
 
-const initialsOf = (name) =>
-  String(name || "")
-    .trim()
-    .split(/\s+/)
-    .filter(Boolean)
-    .slice(0, 2)
-    .map((w) => w[0].toUpperCase())
-    .join("") || "?";
-
 function Field({ label, optional, hint, children, count, max }) {
   return (
     <label className="block">
@@ -71,27 +62,6 @@ function Field({ label, optional, hint, children, count, max }) {
         </span>
       )}
     </label>
-  );
-}
-
-function OwnerAvatar({ name, avatarUrl }) {
-  if (avatarUrl) {
-    return (
-      <img
-        src={avatarUrl}
-        alt=""
-        aria-hidden
-        className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full object-cover ring-2 ring-[var(--surface)]"
-      />
-    );
-  }
-  return (
-    <div
-      aria-hidden
-      className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-[var(--accent-soft)] text-sm font-semibold text-[var(--accent-strong)] ring-2 ring-[var(--surface)]"
-    >
-      {initialsOf(name)}
-    </div>
   );
 }
 
@@ -324,7 +294,11 @@ const BudgetTransfer = () => {
         <Card>
           {/* ── From: owner account (full width) ── */}
           <div className="flex items-center gap-3 rounded-2xl border border-[var(--border)] bg-[var(--surface-2)] px-3.5 py-3">
-            <OwnerAvatar name={me?.name} avatarUrl={me?.avatar_url} />
+            <EmployeeAvatar
+              name={me?.name}
+              avatarUrl={me?.avatar_url}
+              className="h-10 w-10 text-sm ring-2"
+            />
             <div className="min-w-0 flex-1">
               <div className="truncate text-sm font-semibold text-[var(--ink)]">
                 {isLoading ? "Loading…" : me?.name || "Your account"}

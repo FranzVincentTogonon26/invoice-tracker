@@ -283,6 +283,16 @@ export function greetingFor(date = new Date()) {
 }
 
 /**
+ * Lowercase extension of a file name ("Photo.JPG" → "jpg"), or "" when the
+ * name carries none — used by the avatar picker to check a picked photo
+ * against AVATAR_EXTENSIONS before it is ever uploaded.
+ */
+export function fileExtension(name) {
+  const match = /\.([a-z0-9]+)$/i.exec(String(name ?? "").trim());
+  return match ? match[1].toLowerCase() : "";
+}
+
+/**
  * Up-to-two-letter initials for an avatar fallback: first letter of the
  * first word plus the first letter of the last word ("Franz Vincent
  * Togonon" → "FT"). Single-word names keep their one letter and blank

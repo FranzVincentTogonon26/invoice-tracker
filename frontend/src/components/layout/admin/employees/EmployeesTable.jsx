@@ -1,6 +1,7 @@
 import { motion } from "framer-motion";
 import { AlertCircle, Check } from "lucide-react";
 import { Badge } from "../../../ui/Badge";
+import { EmployeeAvatar } from "../../../ui/SelectEmployee";
 import { cn, formatDate, formatMoney, formatTime } from "../../../../lib/utils";
 import EmployeeActions from "./EmployeeActions";
 
@@ -214,13 +215,16 @@ function SharePill({ remaining, issued, share, overSpent, className }) {
   );
 }
 
-/** Avatar circle with the employee's initial, name and email below it. */
+/** Employee identity cell — stored photo when the account has one, initial
+    tile otherwise. */
 function EmployeeCell({ employee }) {
   return (
     <div className="flex min-w-0 items-center gap-3">
-      <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-[linear-gradient(135deg,var(--accent-soft),var(--surface-2))] font-display text-sm font-semibold tracking-tight text-[var(--accent-strong)] ring-1 ring-inset ring-[var(--accent)]/15 transition-transform duration-200 group-hover:rotate-[-6deg] group-hover:scale-[1.06] group-hover:ring-[var(--accent)]/30">
-        {employee.name?.trim()?.[0]?.toUpperCase() || "?"}
-      </span>
+      <EmployeeAvatar
+        name={employee.name}
+        avatarUrl={employee.avatar_url}
+        className="h-11 w-11 rounded-2xl text-sm ring-1 ring-inset ring-[var(--accent)]/15"
+      />
       <div className="min-w-0">
         <p className="truncate font-display text-sm font-semibold leading-snug tracking-tight text-[var(--ink)] transition-colors duration-150 group-hover:text-[var(--accent-strong)]">
           {employee.name}

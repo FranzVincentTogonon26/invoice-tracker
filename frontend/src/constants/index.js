@@ -91,6 +91,14 @@ export const blankReceipt = () => ({
 // Exactly the set the scan engine validates against (PNG/JPG/WEBP + PDF) —
 // a broad "image/*" would let GIF/BMP/SVG through the picker only to fail
 // the scan.
+// Exactly the set the avatar picker validates against — photos only. The
+// backend enforces the same list (middleware/upload.js + utils/avatarImage.js)
+// and, unlike receipts, there is NO size cap: any photo size is accepted.
+export const AVATAR_EXTENSIONS = ["png", "jpg", "jpeg", "webp", "heic", "heif"];
+export const AVATAR_ACCEPT = ".png,.jpg,.jpeg,.webp,.heic,.heif";
+export const AVATAR_UPLOAD_HINT =
+  "Any photo size — PNG, JPG, JPEG, WEBP, HEIC or HEIF.";
+
 export const RECEIPT_ACCEPT = {
   "image/png": [".png"],
   "image/jpeg": [".jpg", ".jpeg"],

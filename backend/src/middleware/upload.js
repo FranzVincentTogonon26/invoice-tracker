@@ -1,5 +1,9 @@
 import multer from "multer";
 import ApiError from "../utils/ApiError.js";
+import {
+  AVATAR_ALLOWED_EXTENSIONS,
+  AVATAR_ALLOWED_MIME_TYPES,
+} from "../utils/avatarImage.js";
 
 const MAX_BYTES = 10 * 1024 * 1024;
 
@@ -76,6 +80,61 @@ export const uploadReceiptBatch = (req, res, next) => {
     if (!req.files?.length) {
       return next(ApiError.badRequest("No receipt files uploaded"));
     }
+    next();
+  });
+};
+
+// Setting → Account avatar photo (multipart field name: `avatar`).
+//
+// PHOTOS ONLY and — unlike receipts — deliberately NO byte cap: any photo
+// size is accepted, so `limits` only pins the file COUNT (one avatar per
+// request). The file filter checks BOTH the mime type and the file-name
+// extension against the shared allow-list in utils/avatarImage.js (the same
+// list the storage step re-checked when it mints the stored file name), so an
+// executable renamed `photo.png` still fails on its mime type while a
+// genuine camera photo passes regardless of how large it is.
+const AVATAR_MIME_TYPES = new Set(AVATAR_ALLOWED_MIME_TYPES);
+const AVATAR_EXTENSIONS = new Set(AVATAR_ALLOWED_EXTENSIONS);
+
+const extensionOf = (fileName) => {
+  const match = /\.([a-z0-9]+)$/i.exec(String(fileName ?? "").trim());
+  return match ? match[1].toLowerCase() : "";
+};
+
+const uploadAvatarFile = multer({
+  storage: multer.memoryStorage(),
+  limits: { files: 1 },
+  fileFilter: (req, file, cb) => {
+    const accepted =
+      AVATAR_MIME_TYPES.has(String(file.mimetype).toLowerCase()) &&
+      AVATAR_EXTENSIONS.has(extensionOf(file.originalname));
+
+    if (!accepted) {
+      return cb(
+        ApiError.badRequest(
+          "Upload a photo (PNG, JPG, JPEG, WEBP, HEIC or HEIF).",
+          "INVALID_AVATAR_FILE",
+        ),
+      );
+    }
+    cb(null, true);
+  },
+});
+
+// A missing file is NOT an error here: the account form may only be changing
+// the name/email, and the photo is optional on every save.
+export const uploadAvatar = (req, res, next) => {
+  uploadAvatarFile.single("avatar")(req, res, (err) => {
+    if (err instanceof multer.MulterError) {
+      if (err.code === "LIMIT_FILE_COUNT" || err.code === "LIMIT_UNEXPECTED_FILE") {
+        return next(
+          ApiError.badRequest("Only one avatar photo can be uploaded at a time."),
+        );
+      }
+      return next(ApiError.badRequest(err.message, "INVALID_AVATAR_UPLOAD"));
+    }
+
+    if (err) return next(err);
     next();
   });
 };

@@ -271,6 +271,7 @@ class Budget {
           bir.id AS issued_ref_id,
           bir.user_id,
           u.name,
+          u.avatar_url,
           br.reference_id,
           br.label,
           ib.amount::float8 AS total_amount,

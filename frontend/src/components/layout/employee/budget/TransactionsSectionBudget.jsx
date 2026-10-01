@@ -11,10 +11,14 @@ import {
   Wallet,
   Wallet as MethodWalletIcon,
   X,
+  XCircle,
   Inbox,
+  Trash2,
 } from "lucide-react";
+import toast from "react-hot-toast";
 import { Card } from "../../../ui/Card";
 import { Badge } from "../../../ui/Badge";
+import { Button } from "../../../ui/Button";
 import { SearchInput } from "../../../ui/Input";
 import { Pager } from "../../../ui/Pager";
 import { EmptyState, LoadingSkeleton } from "../../../ui/DataState";
@@ -30,6 +34,8 @@ import {
   toDate,
 } from "../../../../lib/utils";
 import DateRangePicker from "../../../ui/DateRangePicker";
+import ConfirmActionDialog from "../../admin/expenses/ConfirmActionDialog";
+import { useBudgetTransferMutations } from "../../../../hooks/useBudgetTransfer";
 
 const formatShortDate = (value) => {
   const parsed = toDate(value);
@@ -76,6 +82,12 @@ const TRANSFER_META = {
 const isTransfer = (tx) => tx?.kind === "transfer";
 const isSentTransfer = (tx) => isTransfer(tx) && tx?.direction === "sent";
 
+// A cancelled issuance no longer funds the employee — mark it with a danger
+// "Cancelled" badge and strike its amount, but leave every tone alone: row,
+// badge family and amount color stay exactly as a live row renders.
+const isCancelledIssued = (tx) =>
+  tx?.kind === "issued" && tx?.status === "cancel";
+
 const rowMeta = (tx) => (isTransfer(tx) ? TRANSFER_META : ISSUED_META);
 
 const rowTitle = (tx) =>
@@ -106,7 +118,7 @@ const SHEET_EASE = [0.16, 1, 0.3, 1];
 const PAGE_SIZE = 50;
 const COLUMN_WIDTHS = ["14%", "24%", "14%", "12%", "14%"];
 
-const TransferDetailsBody = ({ row }) => {
+const TransferDetailsBody = ({ row, pending, onCancel }) => {
   const sent = isSentTransfer(row);
   const counterparty = rowCounterparty(row);
   return (
@@ -171,11 +183,29 @@ const TransferDetailsBody = ({ row }) => {
           </div>
         </div>
       </div>
+      {/* Only the sender can take a transfer back — received rows offer no
+          action. Cancelling asks for confirmation first, then deletes the
+          `budget_transfer` record server-side. */}
+      {sent && (
+        <div className="mt-4 space-y-2">
+          <Button
+            type="button"
+            variant="outline"
+            className="w-full text-[var(--danger)]"
+            disabled={pending}
+            onClick={() => onCancel?.(row)}
+          >
+            <Trash2 size={15} aria-hidden />
+            Cancel transfer
+          </Button>
+        </div>
+      )}
     </div>
   );
 };
 
 const IssuedDetailsBody = ({ row }) => {
+  const cancelled = isCancelledIssued(row);
   return (
     <div className="mt-4 space-y-3">
       <div className="space-y-4 rounded-2xl border border-[var(--border)] bg-[var(--surface-2)]/60 px-4 py-3.5">
@@ -186,6 +216,7 @@ const IssuedDetailsBody = ({ row }) => {
               className={cn(
                 "mt-1 font-display text-2xl font-semibold leading-none tracking-tight tabular-nums",
                 rowAmountClass(row),
+                cancelled && "line-through",
               )}
             >
               {formatMoney(row?.amount)}
@@ -196,10 +227,17 @@ const IssuedDetailsBody = ({ row }) => {
                 .join(" · ")}
             </p>
           </div>
-          <Badge tone="success" className="">
-            <span className="h-2 w-2 rounded-full bg-current opacity-80" />
-            Received
-          </Badge>
+          {cancelled ? (
+            <Badge tone="danger" className="">
+              <span className="h-2 w-2 rounded-full bg-current opacity-80" />
+              Cancelled
+            </Badge>
+          ) : (
+            <Badge tone="success" className="">
+              <span className="h-2 w-2 rounded-full bg-current opacity-80" />
+              Received
+            </Badge>
+          )}
         </div>
         <div className="  border-t border-[var(--border)] py-3">
           <div className="grid grid-cols-2 gap-3 py-1">
@@ -227,9 +265,14 @@ function TransactionCard({ tx, onOpen }) {
   const Icon = meta.icon;
   const counterparty = rowCounterparty(tx);
   // Card title is the record kind — admin issuances read "Budget Issued",
-  // transfers read "Budget Transfer". The row's own description stays in the
-  // details sheet and the desktop table.
-  const title = isTransfer(tx) ? "Budget Transfer" : "Budget Issued";
+  // sent transfers read "Budget Transfer", received transfers read
+  // "Budget Received". The row's own description stays in the details sheet
+  // and the desktop table.
+  const title = isTransfer(tx)
+    ? isSentTransfer(tx)
+      ? "Budget Transfer"
+      : "Budget Received"
+    : "Budget Issued";
 
   return (
     <div
@@ -256,8 +299,17 @@ function TransactionCard({ tx, onOpen }) {
           <Icon size={18} />
         </span>
         <div className="min-w-0">
-          <p className="truncate text-xs font-semibold leading-none text-[var(--ink)]">
-            {title}
+          <p className="flex min-w-0 items-center gap-1.5 truncate text-xs font-semibold leading-none text-[var(--ink)]">
+            <span className="min-w-0 truncate">{title}</span>
+            {isCancelledIssued(tx) && (
+              <Badge
+                tone="danger"
+                className="shrink-0 gap-1 px-1.5 py-0.5 text-[10px]"
+                title="Cancelled — this issuance no longer funds your balance"
+              >
+                Cancelled
+              </Badge>
+            )}
           </p>
           <span className="mt-1.5 flex min-w-0 items-center gap-1.5 text-[11px] font-medium leading-none text-[var(--ink-muted)]">
             <span className="shrink-0 tabular-nums">
@@ -277,6 +329,7 @@ function TransactionCard({ tx, onOpen }) {
           className={cn(
             "text-right font-display text-sm font-semibold tabular-nums",
             rowAmountClass(tx),
+            isCancelledIssued(tx) && "line-through",
           )}
         >
           {isTransfer(tx) ? rowSignedAmount(tx) : formatMoney(tx.amount)}
@@ -287,9 +340,12 @@ function TransactionCard({ tx, onOpen }) {
 }
 
 /* ── Mobile bottom sheet — same slide-up animation as the expenses sheet ── */
-function TransactionSheet({ row, onClose }) {
+function TransactionSheet({ row, pending, onClose, onCancel }) {
   const sheetRef = useRef(null);
-  const close = useCallback(() => onClose?.(), [onClose]);
+  const close = useCallback(() => {
+    if (pending) return;
+    onClose?.();
+  }, [onClose, pending]);
 
   useEffect(() => {
     if (!row) return undefined;
@@ -303,10 +359,15 @@ function TransactionSheet({ row, onClose }) {
   }, [row, close]);
 
   const meta = rowMeta(row);
-  // Sheet headline is the record kind — budget issuances read
-  // "Budget Issued", transfers read "Budget Transfer". The row's own
-  // description stays in the details body below.
-  const title = isTransfer(row) ? "Budget Transfer" : "Budget Issued";
+  // Sheet headline follows the card: budget issuances read "Budget Issued",
+  // sent transfers read "Budget Transfer", received transfers read
+  // "Budget Received". The row's own description stays in the details body
+  // below.
+  const title = isTransfer(row)
+    ? isSentTransfer(row)
+      ? "Budget Transfer"
+      : "Budget Received"
+    : "Budget Issued";
 
   return createPortal(
     <AnimatePresence>
@@ -377,7 +438,11 @@ function TransactionSheet({ row, onClose }) {
               </button>
             </div>
             {isTransfer(row) ? (
-              <TransferDetailsBody row={row} />
+              <TransferDetailsBody
+                row={row}
+                pending={pending}
+                onCancel={onCancel}
+              />
             ) : (
               <IssuedDetailsBody row={row} />
             )}
@@ -399,6 +464,49 @@ export const TransactionsSectionBudget = ({
   const [dateRange, setDateRange] = useState(emptyDateRange);
   const hasDateRange = Boolean(dateRange?.start && dateRange?.end);
   const [sheetRow, setSheetRow] = useState(null);
+  const [cancelRow, setCancelRow] = useState(null);
+  const { cancelTransfer } = useBudgetTransferMutations();
+  const cancelPending = cancelTransfer.isPending;
+
+  const closeCancelConfirm = () => {
+    if (!cancelPending) setCancelRow(null);
+  };
+
+  // Central gate for the sheet's cancel button. Only sent transfers offer
+  // the action; the server re-checks ownership and the recipient's balance.
+  const requestCancel = (row) => {
+    if (!row || !isSentTransfer(row)) return;
+    setCancelRow(row);
+  };
+
+  const runCancel = async () => {
+    if (!cancelRow) return;
+    try {
+      await cancelTransfer.mutateAsync(cancelRow.id);
+      toast.success("Budget transfer cancelled");
+      setCancelRow(null);
+      setSheetRow(null);
+    } catch (err) {
+      toast.error(err?.message || "Couldn't cancel budget transfer");
+    }
+  };
+
+  const cancelSummary = cancelRow ? (
+    <div className="mt-4 flex items-center gap-3 rounded-2xl border border-[var(--border)] bg-[var(--surface-2)]/60 px-4 py-3">
+      <div className="min-w-0 flex-1">
+        <p className="truncate text-base font-semibold text-[var(--ink)]">
+          {rowCounterparty(cancelRow) || "Budget transfer"}
+        </p>
+        <p className="mt-0.5 truncate text-xs text-[var(--ink-muted)]">
+          {formatDate(cancelRow.date)}
+          {cancelRow.date ? ` · ${formatTime(cancelRow.date)}` : ""}
+        </p>
+      </div>
+      <span className="shrink-0 text-sm font-semibold tabular-nums text-[var(--danger)]">
+        -{formatMoney(cancelRow.amount)}
+      </span>
+    </div>
+  ) : null;
 
   useEffect(() => {
     const timer = setTimeout(() => {
@@ -615,6 +723,11 @@ export const TransactionsSectionBudget = ({
                             />
                             {sent ? "Sent" : "Received"}
                           </Badge>
+                        ) : isCancelledIssued(tx) ? (
+                          <Badge tone="danger">
+                            <span className="h-2 w-2 rounded-full bg-current opacity-80" />
+                            Cancelled
+                          </Badge>
                         ) : (
                           <Badge tone="success">
                             <span className="h-2 w-2 rounded-full bg-current opacity-80" />
@@ -627,6 +740,7 @@ export const TransactionsSectionBudget = ({
                           className={cn(
                             "text-[13px] font-semibold tabular-nums",
                             rowAmountClass(tx),
+                            isCancelledIssued(tx) && "line-through",
                           )}
                         >
                           {transfer
@@ -702,7 +816,26 @@ export const TransactionsSectionBudget = ({
         </div>
       )}
 
-      <TransactionSheet row={sheetRow} onClose={() => setSheetRow(null)} />
+      <TransactionSheet
+        row={sheetRow}
+        pending={cancelPending}
+        onClose={() => setSheetRow(null)}
+        onCancel={requestCancel}
+      />
+
+      <ConfirmActionDialog
+        open={Boolean(cancelRow)}
+        icon={<XCircle size={20} aria-hidden />}
+        title="Cancel this budget transfer?"
+        description="This permanently deletes the transfer record and returns the amount to your remaining balance. This can't be undone."
+        summary={cancelSummary}
+        cancelLabel="Keep transfer"
+        confirmLabel="Yes, cancel it"
+        pendingLabel="Cancelling…"
+        pending={cancelPending}
+        onCancel={closeCancelConfirm}
+        onConfirm={runCancel}
+      />
     </Card>
   );
 };

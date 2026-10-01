@@ -508,6 +508,131 @@ class BudgetTransfer {
       };
     });
   }
+
+  // Row lookup for the cancel endpoint. Ownership is enforced in the
+  // controller — same pattern as Abono.findById + canTouchRow.
+  static async findById(id) {
+    const result = await query(
+      `SELECT id, reference_id, user_id, amount::float8 AS amount,
+              notes, method, status, transfer_to, created_at, updated_at
+         FROM budget_transfer
+        WHERE id = $1`,
+      [id],
+    );
+    return result.rows[0] ?? null;
+  }
+
+  // Cancel a sent transfer — hard-deletes the `budget_transfer` row in ONE
+  // transaction:
+  //   1. locks the row and re-checks it is still a successful transfer,
+  //   2. re-applies the money rule on the RECIPIENT side: deleting takes the
+  //      received amount back OUT of their pool, so when they already spent
+  //      it (their balance can't cover the take-back) the cancel resolves
+  //      `recipientSpent: true` with nothing deleted — same protection the
+  //      abono delete guard gives,
+  //   3. deletes the row. The sender's pool grows back by the amount
+  //      automatically since sent totals only count existing rows.
+  // Resolves `{ notFound, recipientSpent, recipientBalance, transfer }`.
+  static async cancelTransfer(id) {
+    return withTransaction(async (client) => {
+      const q = (text, params) => client.query(text, params);
+
+      const locked = (
+        await q(
+          `SELECT id, user_id, transfer_to, amount::float8 AS amount, status
+             FROM budget_transfer
+            WHERE id = $1
+            FOR UPDATE`,
+          [id],
+        )
+      ).rows[0];
+
+      if (!locked || locked.status !== "success") {
+        return {
+          notFound: true,
+          recipientSpent: false,
+          recipientBalance: null,
+          transfer: null,
+        };
+      }
+
+      const amount = toMoney(locked.amount);
+      const recipientBalance = (
+        await q(
+          `SELECT
+              COALESCE((
+                SELECT SUM(ib.amount)
+                  FROM budget_issued_reference bir
+                  JOIN issued_budget ib ON ib.issued_ref_id = bir.id
+                 WHERE bir.user_id = $1 AND bir.status = 'open'
+              ), 0)::float8 AS total_budget,
+              COALESCE((
+                SELECT SUM(e.total_amount)
+                  FROM expenses e
+                 WHERE e.user_id = $1 AND e.status = 'paid'
+              ), 0)::float8 AS total_expenses,
+              COALESCE((
+                SELECT SUM(ea.amount)
+                  FROM employee_abono ea
+                 WHERE ea.user_id = $1 AND ea.status = 'open'
+              ), 0)::float8 AS total_abono,
+              COALESCE((
+                SELECT SUM(bt.amount)
+                  FROM budget_transfer bt
+                 WHERE bt.user_id = $1 AND bt.status = 'success'
+              ), 0)::float8 AS total_sent,
+              COALESCE((
+                SELECT SUM(btr.amount)
+                  FROM budget_transfer btr
+                 WHERE btr.transfer_to = $1 AND btr.status = 'success'
+              ), 0)::float8 AS total_received`,
+          [locked.transfer_to],
+        )
+      ).rows[0] ?? {};
+
+      const remaining = toMoney(
+        Number(recipientBalance.total_budget || 0) +
+          Number(recipientBalance.total_abono || 0) -
+          Number(recipientBalance.total_expenses || 0) -
+          Number(recipientBalance.total_sent || 0) +
+          Number(recipientBalance.total_received || 0) -
+          amount,
+      );
+
+      if (remaining < -0.004) {
+        return {
+          notFound: false,
+          recipientSpent: true,
+          recipientBalance: toMoney(
+            Number(recipientBalance.total_budget || 0) +
+              Number(recipientBalance.total_abono || 0) -
+              Number(recipientBalance.total_expenses || 0) -
+              Number(recipientBalance.total_sent || 0) +
+              Number(recipientBalance.total_received || 0),
+          ),
+          transfer: null,
+        };
+      }
+
+      const transfer = (
+        await q(
+          `DELETE FROM budget_transfer
+            WHERE id = $1
+            RETURNING id, reference_id, user_id, amount::float8 AS amount,
+                      notes, method, status, transfer_to,
+                      created_at, updated_at`,
+          [id],
+        )
+      ).rows[0];
+
+      return {
+        notFound: false,
+        recipientSpent: false,
+        recipientBalance: remaining,
+        transfer,
+      };
+    });
+  }
 }
 
 export default BudgetTransfer;
