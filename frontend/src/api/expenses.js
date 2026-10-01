@@ -44,9 +44,9 @@ export const expensesApi = {
     apiClient.patch(`/expenses/${id}/status`, { status }).then((r) => r.data),
 
   // Admin ledger row action ("Add to draft"): pushes an employee-authored
-  // expense that is still 'paid' back to 'draft'. Admin-only on the server —
-  // the guarded UPDATE only matches rows whose author is an employee and
-  // whose status is still 'paid'.
+  // expense that is still 'paid' (or voided 'cancel') back to 'draft'.
+  // Admin-only on the server — the guarded UPDATE only matches rows whose
+  // author is an employee and whose status is still 'paid' or 'cancel'.
   markEmployeeDraft: (id) =>
     apiClient
       .patch(`/expenses/${id}/employee-draft`)

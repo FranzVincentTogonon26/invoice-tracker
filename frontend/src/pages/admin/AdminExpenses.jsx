@@ -25,6 +25,7 @@ import {
   Trash2,
   Wallet,
   X,
+  XCircle,
 } from "lucide-react";
 import toast from "react-hot-toast";
 import { Button } from "../../components/ui/Button";
@@ -132,8 +133,8 @@ const LEDGER_STATUS_META = {
 const LEDGER_STATUS_ORDER = ["paid", "draft", "cancel"];
 
 // Copy for the shared row-action confirmation dialog — one entry per action
-// that opens it from the ledger (Delete / Add to draft / Remove from draft).
-// The dialog shell is shared; only these strings and the icon change.
+// that opens it from the ledger (Delete / Add to draft / Remove from draft /
+// Cancel). The dialog shell is shared; only these strings and the icon change.
 const CONFIRM_COPY = {
   delete: {
     icon: <Trash2 size={20} aria-hidden />,
@@ -162,6 +163,15 @@ const CONFIRM_COPY = {
     confirmLabel: "Yes, mark as paid",
     pendingLabel: "Restoring…",
   },
+  cancel: {
+    icon: <XCircle size={20} aria-hidden />,
+    title: "Cancel this expense?",
+    description:
+      "The record stays in the ledger, but its status moves to Cancelled — it is void and never counts against anyone's balance. Only paid or draft expenses can be spent again afterwards.",
+    cancelLabel: "Keep as draft",
+    confirmLabel: "Yes, cancel it",
+    pendingLabel: "Cancelling…",
+  },
 };
 
 // Fallback toasts for the same actions when the API answers without a message
@@ -170,6 +180,7 @@ const ACTION_ERROR = {
   delete: "Couldn’t delete expense",
   draft: "Couldn’t add expense to draft",
   restore: "Couldn’t mark expense as paid",
+  cancel: "Couldn’t cancel expense",
 };
 const DAY_MS = 24 * 60 * 60 * 1000;
 
@@ -236,8 +247,12 @@ const AdminExpenses = () => {
   const { data, expenses, categories, references, isLoading, error, refetch } =
     useExpenses();
 
-  const { remove, markEmployeeDraft, markEmployeePaid } =
-    useExpensesMutations();
+  const {
+    remove,
+    markEmployeeDraft,
+    markEmployeePaid,
+    setStatus: setExpenseStatus,
+  } = useExpensesMutations();
 
   const [search, setSearch] = useState("");
   const [debouncedSearch, setDebouncedSearch] = useState("");
@@ -751,10 +766,16 @@ const AdminExpenses = () => {
     setConfirmOpen(true);
   };
 
+  const requestCancelExpense = (row) => {
+    setConfirmAction({ row, action: "cancel" });
+    setConfirmOpen(true);
+  };
+
   const confirmPending =
     remove.isPending ||
     markEmployeeDraft.isPending ||
-    markEmployeePaid.isPending;
+    markEmployeePaid.isPending ||
+    setExpenseStatus.isPending;
 
   const closeConfirm = () => {
     if (!confirmPending) setConfirmOpen(false);
@@ -772,6 +793,9 @@ const AdminExpenses = () => {
       } else if (action === "restore") {
         await markEmployeePaid.mutateAsync(row.id);
         toast.success("Expense marked as paid");
+      } else if (action === "cancel") {
+        await setExpenseStatus.mutateAsync({ id: row.id, status: "cancel" });
+        toast.success("Expense cancelled");
       } else {
         await remove.mutateAsync(row.id);
         toast.success("Expense deleted");
@@ -799,8 +823,14 @@ const AdminExpenses = () => {
     </div>
   ) : null;
 
-  const confirmCopy =
+  const confirmCopyBase =
     CONFIRM_COPY[confirmAction?.action] ?? CONFIRM_COPY.delete;
+  // Drafting a cancelled row keeps the row out of "paid" wording — the dismiss
+  // action reads "Keep cancelled" instead of "Keep as paid".
+  const confirmCopy =
+    confirmAction?.action === "draft" && confirmAction?.row?.status === "cancel"
+      ? { ...confirmCopyBase, cancelLabel: "Keep cancelled" }
+      : confirmCopyBase;
 
   const searchField = (
     <div className="flex w-full items-center gap-2">
@@ -1189,12 +1219,14 @@ const AdminExpenses = () => {
               pending={
                 remove.isPending ||
                 markEmployeeDraft.isPending ||
-                markEmployeePaid.isPending
+                markEmployeePaid.isPending ||
+                setExpenseStatus.isPending
               }
               onView={handleViewRow}
               onDelete={requestDelete}
               onAddToDraft={requestAddToDraft}
               onRemoveFromDraft={requestRemoveFromDraft}
+              onCancelExpense={requestCancelExpense}
             />
 
             <div

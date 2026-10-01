@@ -49,9 +49,10 @@ router.get("/detail/:id", authMiddleware, expensesController.detail);
 router.patch("/:id/status", authMiddleware, expensesController.updateStatus);
 
 // Admin ledger row action: "Add to draft" — an employee-authored expense that
-// is still 'paid' is pushed back to 'draft' (the row stays in the ledger and
-// the amount returns to that employee's available balance). Admin-only: the
-// employee + paid condition is enforced inside the model's guarded UPDATE.
+// is still 'paid' (or voided 'cancel') is pushed back to 'draft' (the row
+// stays in the ledger and the amount returns to that employee's available
+// balance). Admin-only: the employee + paid-or-cancelled condition is
+// enforced inside the model's guarded UPDATE.
 router.patch(
   "/:id/employee-draft",
   authMiddleware,

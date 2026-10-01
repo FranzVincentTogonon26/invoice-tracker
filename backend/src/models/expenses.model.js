@@ -295,13 +295,13 @@ class Expenses {
   }
 
   // Admin ledger row action ("Add to draft"): pushes an employee-authored
-  // expense that is still 'paid' back to 'draft'. The employee + paid guards
-  // live inside the UPDATE itself, so a row that moved on between the page's
-  // render and the click (already a draft/cancelled row, or authored by an
-  // admin) is never touched — the caller gets null and answers with an
-  // explanatory conflict. The employee ledger counts only 'paid' rows, so the
-  // amount returns to that employee's available balance until it is paid
-  // again.
+  // expense that is still 'paid' — or voided 'cancel' — back to 'draft'. The
+  // employee + paid-or-cancelled guards live inside the UPDATE itself, so a
+  // row that moved on between the page's render and the click (already a
+  // draft, or authored by an admin) is never touched — the caller gets null
+  // and answers with an explanatory conflict. The employee ledger counts only
+  // 'paid' rows, so the amount returns to that employee's available balance
+  // until it is paid again.
   static async markEmployeeExpenseDraft(id) {
     const result = await query(
       `UPDATE expenses e
@@ -310,7 +310,7 @@ class Expenses {
         WHERE e.id = $1
           AND u.user_id = e.user_id
           AND u.role = 'employee'
-          AND e.status = 'paid'
+          AND e.status IN ('paid', 'cancel')
         RETURNING e.id, e.description,
                   e.total_amount::float8 AS total_amount,
                   e.status, e.image_url`,

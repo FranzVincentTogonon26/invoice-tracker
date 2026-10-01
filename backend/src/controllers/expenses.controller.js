@@ -297,10 +297,11 @@ export const updateStatus = async (req, res, next) => {
 
 // Admin ledger row action ("Add to draft" in the admin RowActions menu): the
 // mirror of the employee's soft delete — an employee-authored expense that is
-// still 'paid' is parked back in 'draft'. The model guards the employee + paid
-// condition inside the UPDATE, so this handler only explains why nothing was
-// updated: a missing id is a 404, and an id that belongs to an admin row or is
-// no longer paid answers with a 409 describing the rule.
+// still 'paid' (or voided 'cancel') is parked back in 'draft'. The model
+// guards the employee + paid-or-cancelled condition inside the UPDATE, so this
+// handler only explains why nothing was updated: a missing id is a 404, and an
+// id that belongs to an admin row or is no longer paid/cancelled answers with
+// a 409 describing the rule.
 export const markEmployeeDraft = async (req, res, next) => {
   try {
     const { id } = req.params;
@@ -325,7 +326,7 @@ export const markEmployeeDraft = async (req, res, next) => {
       );
 
     throw ApiError.conflict(
-      `Only a paid expense can be moved back to draft (current status: ${existing.status}).`,
+      `Only a paid or cancelled expense can be moved back to draft (current status: ${existing.status}).`,
       "EXPENSE_NOT_PAID",
     );
   } catch (err) {

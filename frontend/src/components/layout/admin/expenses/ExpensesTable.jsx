@@ -7,6 +7,7 @@ import {
   RotateCcw,
   Trash2,
   Wallet,
+  XCircle,
 } from "lucide-react";
 import { Badge } from "../../../ui/Badge";
 import { MethodIcon } from "../../../ui/Select";
@@ -94,6 +95,7 @@ function RowActions({
   onDelete,
   onAddToDraft,
   onRemoveFromDraft,
+  onCancelExpense,
 }) {
   const [open, setOpen] = useState(false);
   const [position, setPosition] = useState(null);
@@ -139,37 +141,57 @@ function RowActions({
     };
   }, [open]);
 
+  // Cancelled employee rows keep the full lifecycle: View, Add to draft
+  // (reactivate as a draft) and Delete. Paid employee rows offer View + Add
+  // to draft (soft-delete path, so no hard Delete); drafts offer View +
+  // Remove from draft + Cancel expense + Delete. Admin-authored rows never
+  // enter the draft lifecycle, so they offer View + Delete only.
+  // `group` clusters the dropdown: viewing, status moves, then the
+  // destructive action — rendered with a separator between clusters.
+  const isEmployeeRow = row?.employeeRole === "employee";
   const items = [
     {
       key: "view",
       label: "View expense",
       Icon: Eye,
       danger: false,
+      group: "view",
       onSelect: () => onView?.(row),
     },
-    ...(row?.employeeRole === "employee" && row?.status === "paid"
+    ...(isEmployeeRow &&
+    (row?.status === "paid" || row?.status === "cancel")
       ? [
           {
             key: "draft",
             label: "Add to draft",
             Icon: RotateCcw,
             danger: false,
+            group: "lifecycle",
             onSelect: () => onAddToDraft?.(row),
           },
         ]
       : []),
-    ...(row?.employeeRole === "employee" && row?.status === "draft"
+    ...(isEmployeeRow && row?.status === "draft"
       ? [
           {
             key: "restore",
             label: "Remove from draft",
             Icon: CircleCheck,
             danger: false,
+            group: "lifecycle",
             onSelect: () => onRemoveFromDraft?.(row),
+          },
+          {
+            key: "cancel",
+            label: "Cancel expense",
+            Icon: XCircle,
+            danger: false,
+            group: "lifecycle",
+            onSelect: () => onCancelExpense?.(row),
           },
         ]
       : []),
-    ...(row?.employeeRole === "employee" && row?.status !== "draft"
+    ...(isEmployeeRow && row?.status === "paid"
       ? []
       : [
           {
@@ -177,10 +199,17 @@ function RowActions({
             label: "Delete expense",
             Icon: Trash2,
             danger: true,
+            group: "danger",
             onSelect: () => onDelete?.(row),
           },
         ]),
   ];
+
+  // Preserve group order (view → lifecycle → danger), dropping empty clusters
+  // so no stray separator renders.
+  const sections = ["view", "lifecycle", "danger"]
+    .map((group) => items.filter((item) => item.group === group))
+    .filter((section) => section.length > 0);
 
   const openMenu = () => {
     const rect = btnRef.current?.getBoundingClientRect();
@@ -216,24 +245,35 @@ function RowActions({
             style={{ top: position.top, right: position.right }}
             className="fixed z-[70] min-w-[11rem] overflow-hidden rounded-2xl border border-[var(--border)] bg-[var(--surface)] py-1 shadow-hover"
           >
-            {items.map(({ key, label, Icon, danger, onSelect }) => (
-              <button
-                key={key}
-                type="button"
-                role="menuitem"
-                disabled={pending}
-                onClick={() => {
-                  setOpen(false);
-                  onSelect();
-                }}
-                className={cn(
-                  "flex w-full items-center gap-2.5 px-3.5 py-2 text-sm font-medium transition-colors hover:bg-[var(--surface-2)] disabled:pointer-events-none disabled:opacity-40",
-                  danger ? "text-[var(--danger)]" : "text-[var(--ink)]",
+            {sections.map((section, sectionIndex) => (
+              <div key={section[0].group}>
+                {sectionIndex > 0 && (
+                  <div
+                    role="separator"
+                    aria-hidden
+                    className="mx-3 border-t border-[var(--border)]"
+                  />
                 )}
-              >
-                <Icon size={15} aria-hidden />
-                {label}
-              </button>
+                {section.map(({ key, label, Icon, danger, onSelect }) => (
+                  <button
+                    key={key}
+                    type="button"
+                    role="menuitem"
+                    disabled={pending}
+                    onClick={() => {
+                      setOpen(false);
+                      onSelect();
+                    }}
+                    className={cn(
+                      "flex w-full items-center gap-2.5 px-3.5 py-2 text-sm font-medium transition-colors hover:bg-[var(--surface-2)] disabled:pointer-events-none disabled:opacity-40",
+                      danger ? "text-[var(--danger)]" : "text-[var(--ink)]",
+                    )}
+                  >
+                    <Icon size={15} aria-hidden />
+                    {label}
+                  </button>
+                ))}
+              </div>
             ))}
           </div>,
           document.body,
@@ -304,6 +344,7 @@ function LedgerRow({
   onDelete,
   onAddToDraft,
   onRemoveFromDraft,
+  onCancelExpense,
 }) {
   return (
     <tr
@@ -394,6 +435,7 @@ function LedgerRow({
             onDelete={onDelete}
             onAddToDraft={onAddToDraft}
             onRemoveFromDraft={onRemoveFromDraft}
+            onCancelExpense={onCancelExpense}
           />
         </div>
       </td>
@@ -408,6 +450,7 @@ function LedgerCard({
   onDelete,
   onAddToDraft,
   onRemoveFromDraft,
+  onCancelExpense,
 }) {
   return (
     <div
@@ -459,6 +502,7 @@ function LedgerCard({
           onDelete={onDelete}
           onAddToDraft={onAddToDraft}
           onRemoveFromDraft={onRemoveFromDraft}
+          onCancelExpense={onCancelExpense}
         />
       </div>
     </div>
@@ -472,6 +516,7 @@ const ExpensesTable = ({
   onDelete,
   onAddToDraft,
   onRemoveFromDraft,
+  onCancelExpense,
 }) => (
   <>
     <div
@@ -530,6 +575,7 @@ const ExpensesTable = ({
                 onDelete={onDelete}
                 onAddToDraft={onAddToDraft}
                 onRemoveFromDraft={onRemoveFromDraft}
+                onCancelExpense={onCancelExpense}
               />
             ))}
           </tbody>
@@ -547,6 +593,7 @@ const ExpensesTable = ({
           onDelete={onDelete}
           onAddToDraft={onAddToDraft}
           onRemoveFromDraft={onRemoveFromDraft}
+          onCancelExpense={onCancelExpense}
         />
       ))}
     </div>
