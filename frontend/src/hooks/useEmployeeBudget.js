@@ -4,9 +4,10 @@ import { budgetsApi } from "../api/budget";
 export const employeeBudgetKey = (params) => ["employeeBudget", params || {}];
 
 // Employee budget page data: every `issued_budget` row the employee received
-// (through their own `budget_issued_reference`, scoped server-side to the
-// token's user_id) plus the balance overview. Read-only — issuing and
-// cancelling budgets stay admin actions, so there are no mutations here.
+// plus every successful `budget_transfer` they sent or received (through
+// their own `budget_issued_reference`, scoped server-side to the token's
+// user_id) plus the balance overview. Read-only — issuing and cancelling
+// budgets stay admin actions, so there are no mutations here.
 export function useEmployeeBudget(params = {}) {
   const query = useQuery({
     queryKey: employeeBudgetKey(params),

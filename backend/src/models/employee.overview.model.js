@@ -19,7 +19,9 @@ const toMoney = (value) => Math.round((Number(value) || 0) * 100) / 100;
 //                    (reimbursed) or draft (parked) abono no longer funds
 //                    spending, so it never reaches the "Abono" card
 //   - totalBalance:  what the employee can still spend
-//                    (issued + OPEN abono − PAID expenses)
+//                    (issued + OPEN abono − PAID expenses − sent transfers +
+//                    received transfers). Only 'success' transfers move money —
+//                    a 'cancel' row is an audit trail and never counts.
 // Counts ride along so the cards can show "N references / N transactions"
 // captions without a second round-trip. One query, all scalar subqueries.
 class EmployeeOverview {
@@ -56,7 +58,17 @@ class EmployeeOverview {
             SELECT COUNT(*)
             FROM employee_abono ea
             WHERE ea.user_id = $1
-          ), 0)::int AS abono_count`,
+          ), 0)::int AS abono_count,
+          COALESCE((
+            SELECT SUM(bt.amount)
+            FROM budget_transfer bt
+            WHERE bt.user_id = $1 AND bt.status = 'success'
+          ), 0)::float8 AS total_sent,
+          COALESCE((
+            SELECT SUM(btr.amount)
+            FROM budget_transfer btr
+            WHERE btr.transfer_to = $1 AND btr.status = 'success'
+          ), 0)::float8 AS total_received`,
       [userId],
     );
 
@@ -64,10 +76,15 @@ class EmployeeOverview {
     const totalBudget = toMoney(row.total_budget);
     const totalExpenses = toMoney(row.total_expenses);
     const totalAbono = toMoney(row.total_abono);
+    const totalSent = toMoney(row.total_sent);
+    const totalReceived = toMoney(row.total_received);
 
     // Fetch individual transactions for this employee across issued budget,
-    // expenses, and abono. Abono rows carry `date_settled` so the details sheet
-    // can show when a settled abono was closed out (other kinds carry NULL).
+    // expenses, abono, and budget transfers (success only — transfers complete
+    // or not at all, so there is no draft state to list). Abono rows carry
+    // `date_settled` so the details sheet can show when a settled abono was
+    // closed out (other kinds carry NULL). Transfer rows carry `direction`
+    // ('sent' | 'received') and the other party's name as `counterparty`.
     const txParams = [userId];
     let searchFilter = "";
     if (search && search.trim()) {
@@ -79,6 +96,8 @@ class EmployeeOverview {
         OR t.status ILIKE $2
         OR t.notes ILIKE $2
         OR t.kind ILIKE $2
+        OR t.direction ILIKE $2
+        OR t.counterparty ILIKE $2
       )`;
     }
 
@@ -98,7 +117,9 @@ class EmployeeOverview {
           bir.reference_id,
           0 AS flag,
           ib.created_at AS date,
-          ib.created_at AS created_at
+          ib.created_at AS created_at,
+          NULL AS direction,
+          NULL AS counterparty
         FROM issued_budget ib
         JOIN budget_issued_reference bir ON ib.issued_ref_id = bir.id
         LEFT JOIN budget_reference br ON br.reference_id = bir.reference_id
@@ -122,7 +143,9 @@ class EmployeeOverview {
           e.reference_id,
           e.flag AS flag,
           e.created_at AS date,
-          e.created_at AS created_at
+          e.created_at AS created_at,
+          NULL AS direction,
+          NULL AS counterparty
         FROM expenses e
         LEFT JOIN category c ON c.category_id = e.category_id
         LEFT JOIN budget_reference br ON br.reference_id = e.reference_id
@@ -144,18 +167,72 @@ class EmployeeOverview {
           ea.reference_id,
           0 AS flag,
           ea.created_at AS date,
-          ea.created_at AS created_at
+          ea.created_at AS created_at,
+          NULL AS direction,
+          NULL AS counterparty
         FROM employee_abono ea
         LEFT JOIN budget_reference br ON br.reference_id = ea.reference_id
         WHERE ea.user_id = $1
+
+        UNION ALL
+
+        -- 4. Budget transfers sent — money leaving this employee's pool.
+        SELECT
+          bt.id,
+          'transfer' AS kind,
+          bt.amount::float8 AS amount,
+          COALESCE(
+            NULLIF(TRIM(bt.notes), ''),
+            'Budget transfer to ' || COALESCE(ru.name, 'employee')
+          ) AS description,
+          bt.notes,
+          bt.method,
+          bt.status,
+          NULL::timestamptz AS date_settled,
+          NULL AS reference_label,
+          bt.reference_id,
+          0 AS flag,
+          bt.created_at AS date,
+          bt.created_at AS created_at,
+          'sent' AS direction,
+          ru.name AS counterparty
+        FROM budget_transfer bt
+        LEFT JOIN users ru ON ru.user_id = bt.transfer_to
+        WHERE bt.user_id = $1 AND bt.status = 'success'
+
+        UNION ALL
+
+        -- 5. Budget transfers received — money entering this employee's pool.
+        SELECT
+          bt.id,
+          'transfer' AS kind,
+          bt.amount::float8 AS amount,
+          COALESCE(
+            NULLIF(TRIM(bt.notes), ''),
+            'Budget transfer from ' || COALESCE(su.name, 'employee')
+          ) AS description,
+          bt.notes,
+          bt.method,
+          bt.status,
+          NULL::timestamptz AS date_settled,
+          NULL AS reference_label,
+          bt.reference_id,
+          0 AS flag,
+          bt.created_at AS date,
+          bt.created_at AS created_at,
+          'received' AS direction,
+          su.name AS counterparty
+        FROM budget_transfer bt
+        LEFT JOIN users su ON su.user_id = bt.user_id
+        WHERE bt.transfer_to = $1 AND bt.status = 'success'
       )
       SELECT * FROM all_tx t
       ${searchFilter}
       -- Newest first by when the record was ADDED — not by the business date
-      -- an expense was booked for. One merge across issued/expense/abono, so a
-      -- row entered today always sits above anything older, whatever table it
-      -- came from. The date column stays the displayed (and date-filtered)
-      -- value.
+      -- an expense was booked for. One merge across issued/expense/abono and
+      -- transfers, so a row entered today always sits above anything older,
+      -- whatever table it came from. The date column stays the displayed (and
+      -- date-filtered) value.
       ORDER BY t.created_at DESC NULLS LAST, t.date DESC
     `;
 
@@ -165,7 +242,11 @@ class EmployeeOverview {
       totalBudget,
       totalExpenses,
       totalAbono,
-      totalBalance: toMoney(totalBudget + totalAbono - totalExpenses),
+      totalSent,
+      totalReceived,
+      totalBalance: toMoney(
+        totalBudget + totalAbono - totalExpenses - totalSent + totalReceived,
+      ),
       activeReferences: Number(row.active_references) || 0,
       expenseCount: Number(row.expense_count) || 0,
       abonoCount: Number(row.abono_count) || 0,

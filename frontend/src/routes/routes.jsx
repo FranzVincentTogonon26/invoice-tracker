@@ -26,6 +26,7 @@ import EmployeeBudget from "../pages/employee/EmployeeBudget";
 import EmployeeExpenses from "../pages/employee/EmployeeExpenses";
 import EmployeeAbono from "../pages/employee/EmployeeAbono";
 import EmployeeSetting from "../pages/employee/EmployeeSetting";
+import BudgetTransfer from "../components/layout/budget_transfer/BudgetTransfer";
 
 export const router = createBrowserRouter([
   {
@@ -56,6 +57,7 @@ export const router = createBrowserRouter([
               { path: "employees", element: <AdminEmployees /> },
               { path: "expenses", element: <AdminExpenses /> },
               { path: "expenses/add", element: <AddExpenses /> },
+              { path: "budget-transfer", element: <BudgetTransfer /> },
               { path: "profile", element: <AdminProfile /> },
             ],
           },
@@ -72,6 +74,7 @@ export const router = createBrowserRouter([
               { path: "budget", element: <EmployeeBudget /> },
               { path: "expenses", element: <EmployeeExpenses /> },
               { path: "expenses/add", element: <AddExpenses /> },
+              { path: "budget-transfer", element: <BudgetTransfer /> },
               { path: "abono", element: <EmployeeAbono /> },
               { path: "setting", element: <EmployeeSetting /> },
             ],

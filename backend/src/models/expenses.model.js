@@ -744,6 +744,33 @@ class Expenses {
       sources[0].abono = toMoney(sources[0].abono + abonoLeft);
     }
 
+    // Budget transfers (success only): money the employee sent out behaves
+    // like spent, money received behaves like additional funding. Neither is
+    // tagged with a reference, so sent joins the untagged spend pool below
+    // (spread oldest-first, capped at what each source received) and received
+    // is credited to the oldest open source — the same treatment untagged
+    // expenses and orphan abono already get. Without this the Add Expenses
+    // balance card would disagree with the Overview remaining balance.
+    const transfers = await query(
+      `SELECT
+          COALESCE((
+            SELECT SUM(bt.amount)
+              FROM budget_transfer bt
+             WHERE bt.user_id = $1 AND bt.status = 'success'
+          ), 0)::float8 AS sent,
+          COALESCE((
+            SELECT SUM(btr.amount)
+              FROM budget_transfer btr
+             WHERE btr.transfer_to = $1 AND btr.status = 'success'
+          ), 0)::float8 AS received`,
+      [userId],
+    );
+    const sent = toMoney(transfers.rows[0]?.sent);
+    const received = toMoney(transfers.rows[0]?.received);
+    if (received > 0) {
+      sources[0].abono = toMoney(sources[0].abono + received);
+    }
+
     // The employee ledger grouped by reference: rows tagged with an open
     // reference are charged to it directly, everything else (legacy saves that
     // carry no tag, or a reference the employee no longer holds) is spread
@@ -759,7 +786,7 @@ class Expenses {
       [userId],
     );
 
-    let untagged = 0;
+    let untagged = toMoney(sent);
     for (const row of spend.rows) {
       const amount = toMoney(row.expenses);
       const target = byId.get(row.reference_id);
@@ -769,8 +796,8 @@ class Expenses {
 
     for (const source of sources) {
       if (untagged <= 0) break;
-      const received = toMoney(source.issued + source.abono);
-      const room = Math.max(0, toMoney(received - source.expenses));
+      const funded = toMoney(source.issued + source.abono);
+      const room = Math.max(0, toMoney(funded - source.expenses));
       const used = Math.min(room, untagged);
       source.expenses = toMoney(source.expenses + used);
       untagged = toMoney(untagged - used);
@@ -785,8 +812,9 @@ class Expenses {
         allocated,
         issued,
         expenses,
-        // Employee sources spend `received − spent` — abono counts as received
-        // and nothing was ever allocated against this entry, so the admin formula
+        // Employee sources spend `received − spent` — abono and received
+        // transfers count as received, sent transfers count as spent, and
+        // nothing was ever allocated against this entry, so the admin formula
         // (allocated − issued − expenses) does not apply. `balance` is always
         // sent, so funding.js never falls back to that formula.
         balance: toMoney(allocated - expenses),
@@ -851,6 +879,8 @@ class Expenses {
     // renders — drafts can later be restored by an admin, which brings them
     // back into these sums. Abono follows the same "live only" rule: just
     // OPEN rows fund the balance (settled = reimbursed, draft = parked).
+    // Successful budget transfers move money too (sent out shrinks the pool,
+    // received widens it), so the balance matches the Overview hero exactly.
     const stats = await query(
       `SELECT
             COALESCE(SUM(e.total_amount), 0)::float8 AS total_expenses,
@@ -868,7 +898,17 @@ class Expenses {
               SELECT SUM(ea.amount)
               FROM employee_abono ea
               WHERE ea.user_id = $1 AND ea.status = 'open'
-            ), 0)::float8 AS total_abono
+            ), 0)::float8 AS total_abono,
+            COALESCE((
+              SELECT SUM(bt.amount)
+              FROM budget_transfer bt
+              WHERE bt.user_id = $1 AND bt.status = 'success'
+            ), 0)::float8 AS total_sent,
+            COALESCE((
+              SELECT SUM(btr.amount)
+              FROM budget_transfer btr
+              WHERE btr.transfer_to = $1 AND btr.status = 'success'
+            ), 0)::float8 AS total_received
          FROM expenses e
          WHERE e.user_id = $1 AND e.status = 'paid'`,
       [userId],
@@ -878,7 +918,11 @@ class Expenses {
     const totalBudget = toMoney(s.total_budget);
     const totalExpenses = toMoney(s.total_expenses);
     const totalAbono = toMoney(s.total_abono);
-    const totalBalance = toMoney(totalBudget + totalAbono - totalExpenses);
+    const totalSent = toMoney(s.total_sent);
+    const totalReceived = toMoney(s.total_received);
+    const totalBalance = toMoney(
+      totalBudget + totalAbono - totalExpenses - totalSent + totalReceived,
+    );
 
     // Real rows out of budget_issued_reference (see employeeReferenceList).
     // The old hardcoded "lance" id was not a UUID and could not be
@@ -899,6 +943,8 @@ class Expenses {
         totalBudget,
         totalExpenses,
         totalAbono,
+        totalSent,
+        totalReceived,
         totalBalance,
         thisMonth: toMoney(s.this_month),
         totalTransactions: Number(s.total_transactions) || 0,

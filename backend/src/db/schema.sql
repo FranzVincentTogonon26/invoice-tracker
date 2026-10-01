@@ -209,33 +209,9 @@ CREATE TABLE IF NOT EXISTS budget_transfer (
 );
 
 
--- ============================================================
--- BUDGET TRANSFER RECEIVED
--- ============================================================
-
-CREATE TABLE IF NOT EXISTS budget_transfer_received (
-    id           UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    reference_id UUID NOT NULL
-                 REFERENCES budget_reference(reference_id)
-                 ON DELETE CASCADE,
-    user_id      UUID NOT NULL
-                 REFERENCES users(user_id)
-                 ON DELETE CASCADE,
-    transfer_id  UUID NOT NULL
-                 REFERENCES budget_transfer(id)
-                 ON DELETE CASCADE,
-    amount       DECIMAL(12,2) NOT NULL,
-    notes        TEXT,
-    method       VARCHAR(255) NOT NULL,
-    status       VARCHAR(20) NOT NULL DEFAULT 'success'
-                 CHECK (status IN ('success', 'cancel')),
-    transfer_by  UUID NOT NULL
-                 REFERENCES users(user_id)
-                 ON DELETE CASCADE,
-    created_at   TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-    updated_at   TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-    CHECK (amount >= 0)
-);
+-- NOTE: `budget_transfer_received` was removed — a transfer's recipient is
+-- `budget_transfer.transfer_to`, so the mirror table only duplicated data.
+-- Existing databases drop it via migration 004.
 
 
 -- ============================================================

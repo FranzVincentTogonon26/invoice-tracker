@@ -64,8 +64,9 @@ class Abono {
 
   // The Abono page hero + mini stats. Money rules mirror
   // employee.overview.model: totalBalance = open issuances + OPEN abono −
-  // PAID expenses, so an out-of-pocket top-up immediately widens what the
-  // employee can spend while a settled/draft row never funds it.
+  // PAID expenses − sent transfers + received transfers, so an out-of-pocket
+  // top-up immediately widens what the employee can spend while a
+  // settled/draft row never funds it. Only 'success' transfers move money.
   static async employeeAbonoOverview(userId) {
     const [abono, statsResult] = await Promise.all([
       this.listByUser(userId),
@@ -89,9 +90,19 @@ class Abono {
             ), 0)::float8 AS total_budget,
             COALESCE((
               SELECT SUM(e.total_amount)
-                FROM expenses e
-               WHERE e.user_id = $1 AND e.status = 'paid'
-            ), 0)::float8 AS total_expenses`,
+                 FROM expenses e
+                WHERE e.user_id = $1 AND e.status = 'paid'
+             ), 0)::float8 AS total_expenses,
+            COALESCE((
+              SELECT SUM(bt.amount)
+                FROM budget_transfer bt
+               WHERE bt.user_id = $1 AND bt.status = 'success'
+            ), 0)::float8 AS total_sent,
+            COALESCE((
+              SELECT SUM(btr.amount)
+                FROM budget_transfer btr
+               WHERE btr.transfer_to = $1 AND btr.status = 'success'
+            ), 0)::float8 AS total_received`,
         [userId],
       ),
     ]);
@@ -100,6 +111,8 @@ class Abono {
     const totalBudget = toMoney(s.total_budget);
     const totalAbono = toMoney(s.total_abono);
     const totalExpenses = toMoney(s.total_expenses);
+    const totalSent = toMoney(s.total_sent);
+    const totalReceived = toMoney(s.total_received);
 
     return {
       abono,
@@ -107,7 +120,11 @@ class Abono {
         totalAbono,
         totalBudget,
         totalExpenses,
-        totalBalance: toMoney(totalBudget + totalAbono - totalExpenses),
+        totalSent,
+        totalReceived,
+        totalBalance: toMoney(
+          totalBudget + totalAbono - totalExpenses - totalSent + totalReceived,
+        ),
         abonoCount: Number(s.abono_count) || 0,
       },
     };
@@ -156,7 +173,8 @@ class Abono {
       );
 
       // Same money rules every overview model uses (employee.overview.model):
-      // what the employee can still spend right now, counting OPEN abono only.
+      // what the employee can still spend right now, counting OPEN abono
+      // only, minus sent transfers plus received transfers (success only).
       const balance = (
         await q(
           `SELECT
@@ -175,6 +193,16 @@ class Abono {
                 SELECT SUM(e.total_amount)
                 FROM expenses e
                 WHERE e.user_id = $1 AND e.status = 'paid'
+              ), 0)::float8
+              - COALESCE((
+                SELECT SUM(bt.amount)
+                FROM budget_transfer bt
+                WHERE bt.user_id = $1 AND bt.status = 'success'
+              ), 0)::float8
+              + COALESCE((
+                SELECT SUM(btr.amount)
+                FROM budget_transfer btr
+                WHERE btr.transfer_to = $1 AND btr.status = 'success'
               ), 0)::float8 AS total_balance`,
           [userId],
         )
@@ -282,9 +310,10 @@ class Abono {
   }
 
   // Spendable balance for one employee — the same money rule every overview
-  // model uses: open issuances + OPEN abono − PAID expenses. Deleting (like
-  // settling) takes an OPEN abono OUT of this pool, so a delete whose amount
-  // the balance can't cover means the money is already spent.
+  // model uses: open issuances + OPEN abono − PAID expenses − sent transfers
+  // + received transfers (success only). Deleting (like settling) takes an
+  // OPEN abono OUT of this pool, so a delete whose amount the balance can't
+  // cover means the money is already spent.
   static async spendableBalance(userId) {
     const result = await query(
       `SELECT
@@ -303,6 +332,16 @@ class Abono {
             SELECT SUM(e.total_amount)
               FROM expenses e
              WHERE e.user_id = $1 AND e.status = 'paid'
+          ), 0)::float8
+          - COALESCE((
+            SELECT SUM(bt.amount)
+              FROM budget_transfer bt
+             WHERE bt.user_id = $1 AND bt.status = 'success'
+          ), 0)::float8
+          + COALESCE((
+            SELECT SUM(btr.amount)
+              FROM budget_transfer btr
+             WHERE btr.transfer_to = $1 AND btr.status = 'success'
           ), 0)::float8 AS total_balance`,
       [userId],
     );

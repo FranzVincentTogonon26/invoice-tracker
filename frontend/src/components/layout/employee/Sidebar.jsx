@@ -22,7 +22,13 @@ const NAV = [
     label: "Overview",
     primary: true,
   },
-  { to: "/employee/budget", icon: Wallet, label: "My Budget", primary: true },
+  {
+    to: "/employee/budget",
+    icon: Wallet,
+    label: "My Budget",
+    primary: true,
+    match: ["/employee/budget-transfer"],
+  },
   {
     to: "/employee/expenses",
     icon: FileText,
@@ -32,16 +38,8 @@ const NAV = [
   { to: "/employee/abono", icon: HandCoins, label: "Abono", primary: true },
 ];
 
-// `md` is the hand-off point: from here up the hover-expanding rail is used,
-// below it every mobile surface takes over. Kept in sync with the `md:`
-// classes below (Tailwind's default `md` breakpoint = 768px).
 const DESKTOP_QUERY = "(min-width: 768px)";
-
-// Entrance/exit curve shared with the rest of the app's overlays.
 const SHEET_EASE = [0.16, 1, 0.3, 1];
-
-// Primary destinations are pinned to the mobile dock; every entry is listed
-// in the mobile menu sheet.
 const DOCK_ITEMS = NAV.filter((item) => item.primary);
 
 const ROW_BASE =
@@ -55,24 +53,29 @@ const LABEL_BASE =
   "transition-[opacity,transform] duration-200 ease-out " +
   "group-hover/sidebar:opacity-100 group-hover/sidebar:translate-x-0 group-hover/sidebar:delay-100";
 
-function NavItem({ to, icon: Icon, label }) {
+const isActivePath = (pathname, { to, match }) =>
+  pathname === to ||
+  pathname.startsWith(`${to}/`) ||
+  (match ?? []).some((p) => pathname === p || pathname.startsWith(`${p}/`));
+
+function NavItem({ to, icon: Icon, label, match }) {
+  const { pathname } = useLocation();
+  const active = isActivePath(pathname, { to, match });
   return (
     <NavLink to={to} className="block">
-      {({ isActive }) => (
-        <div
-          className={cn(
-            ROW_BASE,
-            isActive
-              ? "bg-[var(--accent-soft)] text-[var(--accent-strong)] shadow-card"
-              : "text-[var(--ink-muted)] hover:bg-[var(--surface-2)] hover:text-[var(--ink)]",
-          )}
-        >
-          <span className="h-11 w-11 flex items-center justify-center shrink-0">
-            <Icon size={18} strokeWidth={2} />
-          </span>
-          <span className={LABEL_BASE}>{label}</span>
-        </div>
-      )}
+      <div
+        className={cn(
+          ROW_BASE,
+          active
+            ? "bg-[var(--accent-soft)] text-[var(--accent-strong)] shadow-card"
+            : "text-[var(--ink-muted)] hover:bg-[var(--surface-2)] hover:text-[var(--ink)]",
+        )}
+      >
+        <span className="h-11 w-11 flex items-center justify-center shrink-0">
+          <Icon size={18} strokeWidth={2} />
+        </span>
+        <span className={LABEL_BASE}>{label}</span>
+      </div>
     </NavLink>
   );
 }
@@ -125,7 +128,7 @@ const DOCK_CELL =
   "focus-visible:ring-2 focus-visible:ring-[var(--accent)]/30";
 
 const DOCK_INNER =
-  "relative flex h-13 w-full flex-col items-center justify-center gap-1 " +
+  "relative flex h-14 w-full flex-col items-center justify-center gap-1 " +
   "rounded-full transition-colors duration-200";
 
 const SHEET_TILE =
@@ -148,15 +151,18 @@ const SHEET_LABEL = "mt-5 px-1 type-eyebrow " + "text-[var(--ink-muted)]";
  * marked by a sliding accent pill (`layoutId`, same technique as `Tabs`).
  */
 function MobileDock({ onOpenMenu }) {
+  const { pathname } = useLocation();
   return (
     <nav
       aria-label="Primary"
       className="md:hidden pointer-events-none fixed inset-x-0 bottom-0 z-40 flex justify-center px-1 pb-[calc(env(safe-area-inset-bottom)+0.75rem)]"
     >
       <div className="pointer-events-auto flex w-full max-w-[290px] items-center gap-0 rounded-full border border-[var(--border)] bg-[var(--surface)]/85 p-0.5 shadow-hover backdrop-blur-xl">
-        {DOCK_ITEMS.map(({ to, icon: Icon, label }) => (
-          <NavLink key={to} to={to} title={label} className={DOCK_CELL}>
-            {({ isActive }) => (
+        {DOCK_ITEMS.map((item) => {
+          const { to, icon: Icon, label } = item;
+          const isActive = isActivePath(pathname, item);
+          return (
+            <NavLink key={to} to={to} title={label} className={DOCK_CELL}>
               <span
                 className={cn(
                   DOCK_INNER,
@@ -182,9 +188,9 @@ function MobileDock({ onOpenMenu }) {
                   className="relative z-10"
                 />
               </span>
-            )}
-          </NavLink>
-        ))}
+            </NavLink>
+          );
+        })}
 
         <button
           type="button"
@@ -209,6 +215,7 @@ function MobileDock({ onOpenMenu }) {
  * row tap, or navigation.
  */
 function MobileMenuSheet({ open, onClose, onLogout, user }) {
+  const location = useLocation();
   const panelRef = useRef(null);
   const displayName = user?.name || "Account";
   const displayEmail = user?.email || "";
@@ -309,14 +316,16 @@ function MobileMenuSheet({ open, onClose, onLogout, user }) {
 
             <div className={SHEET_LABEL}>Menu</div>
             <div className="mt-2 grid grid-cols-2 gap-2">
-              {NAV.map(({ to, icon: Icon, label }) => (
-                <NavLink
-                  key={to}
-                  to={to}
-                  onClick={onClose}
-                  className="block min-w-0 focus-visible:outline-none"
-                >
-                  {({ isActive }) => (
+              {NAV.map((item) => {
+                const { to, icon: Icon, label } = item;
+                const isActive = isActivePath(location.pathname, item);
+                return (
+                  <NavLink
+                    key={to}
+                    to={to}
+                    onClick={onClose}
+                    className="block min-w-0 focus-visible:outline-none"
+                  >
                     <span
                       className={cn(
                         SHEET_TILE,
@@ -339,9 +348,9 @@ function MobileMenuSheet({ open, onClose, onLogout, user }) {
                         {label}
                       </span>
                     </span>
-                  )}
-                </NavLink>
-              ))}
+                  </NavLink>
+                );
+              })}
             </div>
 
             <div className={SHEET_LABEL}>Account</div>

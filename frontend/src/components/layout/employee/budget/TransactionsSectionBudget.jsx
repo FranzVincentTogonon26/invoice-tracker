@@ -2,6 +2,7 @@ import { useState, useMemo, useEffect, useRef, useCallback } from "react";
 import { createPortal } from "react-dom";
 import { AnimatePresence, motion } from "framer-motion";
 import {
+  ArrowLeftRight,
   Banknote,
   CreditCard,
   Landmark,
@@ -62,36 +63,173 @@ const ISSUED_META = {
   iconWrapperClass: "bg-[var(--accent-soft)] text-[var(--accent-strong)]",
 };
 
+// Budget transfers are identified by the ArrowLeftRight glyph everywhere in
+// this ledger (card, table badge, sheet). Direction splits the reading:
+// sent money leaves the pool (−, danger), received money widens it (+,
+// accent) — the same sign convention the overview ledger uses.
+const TRANSFER_META = {
+  label: "Transfer",
+  icon: ArrowLeftRight,
+  iconWrapperClass: "bg-[var(--accent-soft)] text-[var(--accent-strong)]",
+};
+
+const isTransfer = (tx) => tx?.kind === "transfer";
+const isSentTransfer = (tx) => isTransfer(tx) && tx?.direction === "sent";
+
+const rowMeta = (tx) => (isTransfer(tx) ? TRANSFER_META : ISSUED_META);
+
+const rowTitle = (tx) =>
+  tx?.description ||
+  (isTransfer(tx)
+    ? isSentTransfer(tx)
+      ? "Budget transfer sent"
+      : "Budget transfer received"
+    : "Issued budget");
+
+// "To <name>" / "From <name>" second line for transfer rows.
+const rowCounterparty = (tx) =>
+  isTransfer(tx) && tx?.counterparty
+    ? `${isSentTransfer(tx) ? "To" : "From"} ${tx.counterparty}`
+    : "";
+
+const rowSignedAmount = (tx) =>
+  `${isSentTransfer(tx) ? "-" : "+"}${formatMoney(tx?.amount)}`;
+
+const rowAmountClass = (tx) =>
+  isTransfer(tx)
+    ? isSentTransfer(tx)
+      ? "text-[var(--danger)]"
+      : "text-[var(--accent-strong)]"
+    : "text-[var(--ink)]";
+
 const SHEET_EASE = [0.16, 1, 0.3, 1];
 const PAGE_SIZE = 50;
 const COLUMN_WIDTHS = ["14%", "24%", "14%", "12%", "14%"];
 
-const IssuedDetailsBody = ({ row }) => {
+const TransferDetailsBody = ({ row }) => {
+  const sent = isSentTransfer(row);
+  const counterparty = rowCounterparty(row);
   return (
     <div className="mt-4 space-y-3">
       <div className="flex items-center justify-between gap-3 rounded-2xl border border-[var(--border)] bg-[var(--surface-2)]/60 px-4 py-3.5">
         <div className="min-w-0">
           <p className="type-eyebrow text-[var(--ink-muted)]">Amount</p>
-          <p className="mt-1 font-display text-2xl font-semibold leading-none tracking-tight tabular-nums text-[var(--ink)]">
-            {formatMoney(row?.amount)}
+          <p
+            className={cn(
+              "mt-1 font-display text-2xl font-semibold leading-none tracking-tight tabular-nums",
+              rowAmountClass(row),
+            )}
+          >
+            {rowSignedAmount(row)}
           </p>
           <p className="mt-1.5 truncate text-xs text-[var(--ink-muted)]">
-            {["Employee Budget", methodLabel(row.method)]
+            {[counterparty || "Budget Transfer", methodLabel(row.method)]
               .filter(Boolean)
               .join(" · ")}
           </p>
         </div>
-        <Badge tone="success" className="">
-          <span className="h-2 w-2 rounded-full bg-current opacity-80" />
-          Received
+        <Badge tone={sent ? "neutral" : "success"}>
+          <ArrowLeftRight size={12} aria-hidden className="shrink-0" />
+          {sent ? "Sent" : "Received"}
         </Badge>
+      </div>
+      <div className="space-y-2 rounded-2xl border border-[var(--border)] bg-[var(--surface-2)]/60 px-4 py-3.5">
+        <div className="border-b border-[var(--border)] py-3 first:pt-0">
+          <p className="type-eyebrow text-[var(--ink-muted)]">Description</p>
+          <p className="mt-1 break-words text-sm font-medium leading-snug text-[var(--ink)]">
+            {row?.notes || row?.description || "—"}
+          </p>
+        </div>
+        <div className="grid grid-cols-2 gap-3 py-1">
+          <div className="min-w-0">
+            <p className="type-eyebrow text-[var(--ink-muted)]">Date</p>
+            <p className="mt-1 truncate text-sm font-medium tabular-nums text-[var(--ink)]">
+              {formatDate(row?.date)}
+            </p>
+          </div>
+          <div className="min-w-0">
+            <p className="type-eyebrow text-[var(--ink-muted)]">Time</p>
+            <p className="mt-1 truncate text-sm font-medium tabular-nums text-[var(--ink)]">
+              {formatTime(row?.date)}
+            </p>
+          </div>
+        </div>
+        <div className="grid grid-cols-2 gap-3 py-1">
+          <div className="min-w-0">
+            <p className="type-eyebrow text-[var(--ink-muted)]">
+              {sent ? "Sent to" : "Received from"}
+            </p>
+            <p className="mt-1 truncate text-sm font-medium text-[var(--ink)]">
+              {row?.counterparty || "—"}
+            </p>
+          </div>
+          <div className="min-w-0">
+            <p className="type-eyebrow text-[var(--ink-muted)]">Method</p>
+            <p className="mt-1 truncate text-sm font-medium text-[var(--ink)]">
+              {methodLabel(row?.method)}
+            </p>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+const IssuedDetailsBody = ({ row }) => {
+  return (
+    <div className="mt-4 space-y-3">
+      <div className="space-y-4 rounded-2xl border border-[var(--border)] bg-[var(--surface-2)]/60 px-4 py-3.5">
+        <div className="flex items-center justify-between pt-3">
+          <div className="min-w-0">
+            <p className="type-eyebrow text-[var(--ink-muted)]">Amount</p>
+            <p
+              className={cn(
+                "mt-1 font-display text-2xl font-semibold leading-none tracking-tight tabular-nums",
+                rowAmountClass(row),
+              )}
+            >
+              {formatMoney(row?.amount)}
+            </p>
+            <p className="mt-1.5 truncate text-xs text-[var(--ink-muted)]">
+              {["Employee Budget", methodLabel(row.method)]
+                .filter(Boolean)
+                .join(" · ")}
+            </p>
+          </div>
+          <Badge tone="success" className="">
+            <span className="h-2 w-2 rounded-full bg-current opacity-80" />
+            Received
+          </Badge>
+        </div>
+        <div className="  border-t border-[var(--border)] py-3">
+          <div className="grid grid-cols-2 gap-3 py-1">
+            <div className="min-w-0">
+              <p className="type-eyebrow text-[var(--ink-muted)]">Date</p>
+              <p className="mt-1 truncate text-sm font-medium tabular-nums text-[var(--ink)]">
+                {formatDate(row?.date)}
+              </p>
+            </div>
+            <div className="min-w-0">
+              <p className="type-eyebrow text-[var(--ink-muted)]">Time</p>
+              <p className="mt-1 truncate text-sm font-medium tabular-nums text-[var(--ink)]">
+                {formatTime(row?.date)}
+              </p>
+            </div>
+          </div>
+        </div>
       </div>
     </div>
   );
 };
 
 function TransactionCard({ tx, onOpen }) {
-  const Icon = ISSUED_META.icon;
+  const meta = rowMeta(tx);
+  const Icon = meta.icon;
+  const counterparty = rowCounterparty(tx);
+  // Card title is the record kind — admin issuances read "Budget Issued",
+  // transfers read "Budget Transfer". The row's own description stays in the
+  // details sheet and the desktop table.
+  const title = isTransfer(tx) ? "Budget Transfer" : "Budget Issued";
 
   return (
     <div
@@ -104,7 +242,7 @@ function TransactionCard({ tx, onOpen }) {
       }}
       role="button"
       tabIndex={0}
-      aria-label={`View details for ${tx.description || "issued budget"}`}
+      aria-label={`View details for ${title}`}
       className="flex cursor-pointer items-center justify-between gap-3 rounded-2xl border border-[var(--border)] bg-[var(--surface-2)]/60 px-2.5 py-3 transition-shadow hover:shadow-card active:scale-[0.99]"
     >
       <div className="flex min-w-0 flex-1 items-center gap-3">
@@ -112,14 +250,14 @@ function TransactionCard({ tx, onOpen }) {
           aria-hidden
           className={cn(
             "flex h-10 w-10 shrink-0 items-center justify-center rounded-xl",
-            ISSUED_META.iconWrapperClass,
+            meta.iconWrapperClass,
           )}
         >
           <Icon size={18} />
         </span>
         <div className="min-w-0">
           <p className="truncate text-xs font-semibold leading-none text-[var(--ink)]">
-            {tx.description || "Issued budget"}
+            {title}
           </p>
           <span className="mt-1.5 flex min-w-0 items-center gap-1.5 text-[11px] font-medium leading-none text-[var(--ink-muted)]">
             <span className="shrink-0 tabular-nums">
@@ -129,14 +267,19 @@ function TransactionCard({ tx, onOpen }) {
               |
             </span>
             <span className="truncate text-[10px] type-eyebrow">
-              {methodLabel(tx.method)}
+              {counterparty || methodLabel(tx.method)}
             </span>
           </span>
         </div>
       </div>
       <div className="flex shrink-0 flex-col items-end gap-1.5">
-        <p className="text-right font-display text-sm font-semibold tabular-nums text-[var(--ink)]">
-          {formatMoney(tx.amount)}
+        <p
+          className={cn(
+            "text-right font-display text-sm font-semibold tabular-nums",
+            rowAmountClass(tx),
+          )}
+        >
+          {isTransfer(tx) ? rowSignedAmount(tx) : formatMoney(tx.amount)}
         </p>
       </div>
     </div>
@@ -159,7 +302,11 @@ function TransactionSheet({ row, onClose }) {
     return () => window.removeEventListener("keydown", onKeyDown, true);
   }, [row, close]);
 
-  const title = row?.description || "Issued budget";
+  const meta = rowMeta(row);
+  // Sheet headline is the record kind — budget issuances read
+  // "Budget Issued", transfers read "Budget Transfer". The row's own
+  // description stays in the details body below.
+  const title = isTransfer(row) ? "Budget Transfer" : "Budget Issued";
 
   return createPortal(
     <AnimatePresence>
@@ -206,10 +353,10 @@ function TransactionSheet({ row, onClose }) {
                 aria-hidden
                 className={cn(
                   "flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl",
-                  ISSUED_META.iconWrapperClass,
+                  meta.iconWrapperClass,
                 )}
               >
-                <ISSUED_META.icon size={20} />
+                <meta.icon size={20} />
               </span>
               <div className="min-w-0 flex-1">
                 <p className="truncate font-display text-base font-semibold tracking-tight text-[var(--ink)]">
@@ -229,7 +376,11 @@ function TransactionSheet({ row, onClose }) {
                 <X size={16} aria-hidden />
               </button>
             </div>
-            <IssuedDetailsBody row={row} />
+            {isTransfer(row) ? (
+              <TransferDetailsBody row={row} />
+            ) : (
+              <IssuedDetailsBody row={row} />
+            )}
           </motion.div>
         </motion.div>
       )}
@@ -270,6 +421,9 @@ export const TransactionsSectionBudget = ({
       const notes = (tx.notes || "").toLowerCase();
       const method = methodLabel(tx.method || "").toLowerCase();
       const status = (tx.status || "").toLowerCase();
+      const kind = (tx.kind || "").toLowerCase();
+      const direction = (tx.direction || "").toLowerCase();
+      const counterparty = (tx.counterparty || "").toLowerCase();
       const amountStr = String(tx.amount || "");
 
       return (
@@ -278,6 +432,9 @@ export const TransactionsSectionBudget = ({
         notes.includes(q) ||
         method.includes(q) ||
         status.includes(q) ||
+        kind.includes(q) ||
+        direction.includes(q) ||
+        counterparty.includes(q) ||
         amountStr.includes(q)
       );
     });
@@ -318,7 +475,7 @@ export const TransactionsSectionBudget = ({
               </h3>
             </div>
             <p className="truncate text-xs text-[var(--ink-muted)]">
-              Every budget your admin issued to you.
+              Issued budgets and budget transfers.
             </p>
           </div>
         </div>
@@ -377,7 +534,7 @@ export const TransactionsSectionBudget = ({
                   ? `No budget was issued in ${formatDateRange(dateRange)}. Try a wider range.`
                   : debouncedSearch
                     ? `No issuances matched "${debouncedSearch}". Try clearing your search.`
-                    : "Budgets your admin issues will appear here."
+                    : "Budgets your admin issues and transfers will appear here."
             }
           />
         ) : (
@@ -409,51 +566,77 @@ export const TransactionsSectionBudget = ({
                 </tr>
               </thead>
               <tbody className="divide-y divide-[var(--border)]">
-                {pageRows.map((tx) => (
-                  <tr
-                    key={`${tx.kind}-${tx.id}`}
-                    className="transition-colors duration-150 hover:bg-[var(--accent)]/[0.05]"
-                  >
-                    <td className="px-4 py-3 align-middle first:pl-5">
-                      <p className="whitespace-nowrap text-[13px] font-semibold leading-none tabular-nums text-[var(--ink)]">
-                        {formatDate(tx.date)}
-                      </p>
-                      <p className="mt-1 whitespace-nowrap text-[11px] leading-none tabular-nums text-[var(--ink-muted)]">
-                        {formatTime(tx.date)}
-                      </p>
-                    </td>
-                    <td className="px-4 py-3 align-middle">
-                      <p
-                        className="truncate text-[13px] font-semibold leading-snug text-[var(--ink)]"
-                        title={tx.description || "Issued budget"}
-                      >
-                        {tx.description || "Issued budget"}
-                      </p>
-                      {tx.notes && (
-                        <p
-                          className="mt-0.5 truncate text-[11px] leading-snug text-[var(--ink-muted)]"
-                          title={tx.notes}
-                        >
-                          {tx.notes}
+                {pageRows.map((tx) => {
+                  const transfer = isTransfer(tx);
+                  const sent = isSentTransfer(tx);
+                  const counterparty = rowCounterparty(tx);
+                  const subline = transfer
+                    ? [counterparty, tx.notes].filter(Boolean).join(" · ")
+                    : tx.notes;
+                  return (
+                    <tr
+                      key={`${tx.kind}-${tx.id}`}
+                      className="transition-colors duration-150 hover:bg-[var(--accent)]/[0.05]"
+                    >
+                      <td className="px-4 py-3 align-middle first:pl-5">
+                        <p className="whitespace-nowrap text-[13px] font-semibold leading-none tabular-nums text-[var(--ink)]">
+                          {formatDate(tx.date)}
                         </p>
-                      )}
-                    </td>
-                    <td className="px-4 py-3 align-middle">
-                      <MethodBadge method={tx.method} />
-                    </td>
-                    <td className="px-4 py-3 align-middle">
-                      <Badge tone="success">
-                        <span className="h-2 w-2 rounded-full bg-current opacity-80" />
-                        Received
-                      </Badge>
-                    </td>
-                    <td className="px-4 py-3 text-right align-middle">
-                      <span className="text-[13px] font-semibold tabular-nums text-[var(--ink)]">
-                        {formatMoney(tx.amount)}
-                      </span>
-                    </td>
-                  </tr>
-                ))}
+                        <p className="mt-1 whitespace-nowrap text-[11px] leading-none tabular-nums text-[var(--ink-muted)]">
+                          {formatTime(tx.date)}
+                        </p>
+                      </td>
+                      <td className="px-4 py-3 align-middle">
+                        <p
+                          className="truncate text-[13px] font-semibold leading-snug text-[var(--ink)]"
+                          title={rowTitle(tx)}
+                        >
+                          {rowTitle(tx)}
+                        </p>
+                        {subline && (
+                          <p
+                            className="mt-0.5 truncate text-[11px] leading-snug text-[var(--ink-muted)]"
+                            title={subline}
+                          >
+                            {subline}
+                          </p>
+                        )}
+                      </td>
+                      <td className="px-4 py-3 align-middle">
+                        <MethodBadge method={tx.method} />
+                      </td>
+                      <td className="px-4 py-3 align-middle">
+                        {transfer ? (
+                          <Badge tone={sent ? "neutral" : "success"}>
+                            <ArrowLeftRight
+                              size={12}
+                              aria-hidden
+                              className="shrink-0"
+                            />
+                            {sent ? "Sent" : "Received"}
+                          </Badge>
+                        ) : (
+                          <Badge tone="success">
+                            <span className="h-2 w-2 rounded-full bg-current opacity-80" />
+                            Received
+                          </Badge>
+                        )}
+                      </td>
+                      <td className="px-4 py-3 text-right align-middle">
+                        <span
+                          className={cn(
+                            "text-[13px] font-semibold tabular-nums",
+                            rowAmountClass(tx),
+                          )}
+                        >
+                          {transfer
+                            ? rowSignedAmount(tx)
+                            : formatMoney(tx.amount)}
+                        </span>
+                      </td>
+                    </tr>
+                  );
+                })}
               </tbody>
             </table>
           </div>
@@ -495,7 +678,7 @@ export const TransactionsSectionBudget = ({
                   ? `No budget was issued in ${formatDateRange(dateRange)}. Try a wider range.`
                   : debouncedSearch
                     ? `No issuances matched "${debouncedSearch}".`
-                    : "Budgets your admin issues will appear here."
+                    : "Budgets your admin issues and transfers will appear here."
             }
           />
         ) : (
@@ -513,7 +696,7 @@ export const TransactionsSectionBudget = ({
         <div className="mt-4 flex flex-col items-center gap-3 border-t border-[var(--border)] pt-4 sm:flex-row sm:items-center sm:justify-between">
           <p className="text-xs tabular-nums text-[var(--ink-muted)]">
             Showing {rangeStart}–{rangeEnd} of {filteredTransactions.length}{" "}
-            issuances
+            records
           </p>
           <Pager page={currentPage} pageCount={pageCount} onChange={setPage} />
         </div>

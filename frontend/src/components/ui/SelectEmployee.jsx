@@ -52,6 +52,10 @@ export const SelectEmployee = ({
   placeholder,
   disabled,
   searchable = true,
+  // Optional overrides so a caller can restyle the trigger (e.g. match an
+  // owner/recipient card) without changing this default dropdown look.
+  buttonClassName,
+  renderTrigger,
 }) => {
   const options = employees.map((employee) => ({
     value: employee.user_id,
@@ -65,6 +69,18 @@ export const SelectEmployee = ({
     <EmployeeAvatar name={name} avatarUrl={avatarUrl} />
   );
 
+  const defaultRenderTrigger = (selectedOption) =>
+    selectedOption ? (
+      <span className="flex items-center gap-2 min-w-0 -ml-1.5">
+        {renderAvatar(selectedOption.label, selected?.avatar_url)}
+        <span className="truncate">{selectedOption.label}</span>
+      </span>
+    ) : (
+      <span className="truncate text-[var(--ink-muted)]">
+        {placeholder || "Select employee"}
+      </span>
+    );
+
   return (
     <Listbox
       options={options}
@@ -73,18 +89,8 @@ export const SelectEmployee = ({
       placeholder={placeholder || "Select employee"}
       disabled={disabled}
       searchable={searchable}
-      renderTrigger={(selectedOption) =>
-        selectedOption ? (
-          <span className="flex items-center gap-2 min-w-0 -ml-1.5">
-            {renderAvatar(selectedOption.label, selected?.avatar_url)}
-            <span className="truncate">{selectedOption.label}</span>
-          </span>
-        ) : (
-          <span className="truncate text-[var(--ink-muted)]">
-            {placeholder || "Select employee"}
-          </span>
-        )
-      }
+      buttonClassName={buttonClassName}
+      renderTrigger={renderTrigger ?? defaultRenderTrigger}
       renderOption={(option, { selected: isSelected }) => (
         <>
           {renderAvatar(option.label, option.employee?.avatar_url)}

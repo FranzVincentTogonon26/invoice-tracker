@@ -393,11 +393,13 @@ class Budget {
     return result.rows;
   }
 
-  // Employee budget page — every `issued_budget` row the employee received,
-  // reached through THEIR OWN `budget_issued_reference` rows (scoped by
+  // Employee budget page — every `issued_budget` row the employee received
+  // plus every successful `budget_transfer` they sent or received, reached
+  // through THEIR OWN `budget_issued_reference` rows (scoped by
   // `user_id`, never a query param), joined to the source budget reference
   // label. Unlike the overview totals below, ALL statuses are returned so a
-  // cancelled/closed issuance stays visible in the list with its status badge.
+  // cancelled/closed issuance stays visible in the list with its status badge
+  // (transfers are success-only: they complete or not at all).
   // Optional filter:
   //   - `search`: matched against description, notes, method and the source
   //     of funds label (ILIKE)
@@ -405,9 +407,10 @@ class Budget {
     // Overview mirrors employee.overview.model: the hero reads money the
     // employee still HOLDS (open issuances only) and the "Remaining" mini
     // stat reads the SAME balance the Overview page hero shows —
-    // issued + OPEN abono − PAID expenses (drafts/cancelled rows never count
-    // as spent, and only an OPEN out-of-pocket top-up widens what can still
-    // be spent — settled/draft abono never fund it).
+    // issued + OPEN abono − PAID expenses − sent transfers + received
+    // transfers (only 'success' transfers move money; drafts/cancelled rows
+    // never count as spent, and only an OPEN out-of-pocket top-up widens
+    // what can still be spent — settled/draft abono never fund it).
     const overviewResult = await query(
       `SELECT
           COALESCE((
@@ -427,6 +430,16 @@ class Budget {
             WHERE ea.user_id = $1 AND ea.status = 'open'
           ), 0)::float8 AS total_abono,
           COALESCE((
+            SELECT SUM(bt.amount)
+            FROM budget_transfer bt
+            WHERE bt.user_id = $1 AND bt.status = 'success'
+          ), 0)::float8 AS total_sent,
+          COALESCE((
+            SELECT SUM(btr.amount)
+            FROM budget_transfer btr
+            WHERE btr.transfer_to = $1 AND btr.status = 'success'
+          ), 0)::float8 AS total_received,
+          COALESCE((
             SELECT COUNT(*)
             FROM budget_issued_reference bir
             WHERE bir.user_id = $1 AND bir.status = 'open'
@@ -438,34 +451,95 @@ class Budget {
     let searchClause = "";
     if (search && search.trim()) {
       txParams.push(`%${search.trim()}%`);
-      searchClause = `AND (ib.description ILIKE $2
-              OR ib.notes ILIKE $2
-              OR ib.method ILIKE $2
-              OR br.label ILIKE $2)`;
+      searchClause = `WHERE (t.description ILIKE $2
+              OR t.notes ILIKE $2
+              OR t.method ILIKE $2
+              OR t.source_of_funds ILIKE $2
+              OR t.counterparty ILIKE $2
+              OR t.kind ILIKE $2
+              OR t.direction ILIKE $2)`;
     }
 
     // `::float8` casts DECIMAL (returned by pg as strings) to a JS number.
+    // The ledger merges the employee's `issued_budget` rows with their
+    // `budget_transfer` rows (success only — transfers complete or not at
+    // all, so there is no draft state to list): sent rows read
+    // `direction = 'sent'` with the recipient as counterparty, received rows
+    // read `direction = 'received'` with the sender as counterparty. All
+    // three branches expose the same column shape positionally.
     const txResult = await query(
-      `SELECT
-          ib.id,
-          ib.issued_ref_id,
-          bir.reference_id,
-          br.label AS source_of_funds,
-          'issued' AS kind,
-          ib.description,
-          ib.notes,
-          ib.amount::float8 AS amount,
-          ib.method,
-          bir.status,
-          bir.date_cut_off,
-          ib.created_at AS date,
-          ib.created_at AS created_at
-       FROM budget_issued_reference bir
-       JOIN issued_budget ib ON ib.issued_ref_id = bir.id
-       LEFT JOIN budget_reference br ON br.reference_id = bir.reference_id
-       WHERE bir.user_id = $1
+      `SELECT * FROM (
+         SELECT
+            ib.id,
+            ib.issued_ref_id,
+            bir.reference_id,
+            br.label AS source_of_funds,
+            'issued' AS kind,
+            NULL AS direction,
+            ib.description,
+            ib.notes,
+            ib.amount::float8 AS amount,
+            ib.method,
+            bir.status,
+            bir.date_cut_off,
+            NULL AS counterparty,
+            ib.created_at AS date,
+            ib.created_at AS created_at
+           FROM budget_issued_reference bir
+           JOIN issued_budget ib ON ib.issued_ref_id = bir.id
+           LEFT JOIN budget_reference br ON br.reference_id = bir.reference_id
+          WHERE bir.user_id = $1
+        UNION ALL
+         SELECT
+            bt.id,
+            NULL::uuid AS issued_ref_id,
+            bt.reference_id,
+            br.label AS source_of_funds,
+            'transfer' AS kind,
+            'sent' AS direction,
+            COALESCE(
+              NULLIF(TRIM(bt.notes), ''),
+              'Budget transfer to ' || COALESCE(ru.name, 'employee')
+            ) AS description,
+            bt.notes,
+            bt.amount::float8 AS amount,
+            bt.method,
+            bt.status,
+            NULL::timestamptz AS date_cut_off,
+            ru.name AS counterparty,
+            bt.created_at AS date,
+            bt.created_at AS created_at
+           FROM budget_transfer bt
+           LEFT JOIN budget_reference br ON br.reference_id = bt.reference_id
+           LEFT JOIN users ru ON ru.user_id = bt.transfer_to
+          WHERE bt.user_id = $1 AND bt.status = 'success'
+        UNION ALL
+         SELECT
+            bt.id,
+            NULL::uuid AS issued_ref_id,
+            bt.reference_id,
+            br.label AS source_of_funds,
+            'transfer' AS kind,
+            'received' AS direction,
+            COALESCE(
+              NULLIF(TRIM(bt.notes), ''),
+              'Budget transfer from ' || COALESCE(su.name, 'employee')
+            ) AS description,
+            bt.notes,
+            bt.amount::float8 AS amount,
+            bt.method,
+            bt.status,
+            NULL::timestamptz AS date_cut_off,
+            su.name AS counterparty,
+            bt.created_at AS date,
+            bt.created_at AS created_at
+           FROM budget_transfer bt
+           LEFT JOIN budget_reference br ON br.reference_id = bt.reference_id
+           LEFT JOIN users su ON su.user_id = bt.user_id
+          WHERE bt.transfer_to = $1 AND bt.status = 'success'
+       ) t
        ${searchClause}
-       ORDER BY ib.created_at DESC`,
+       ORDER BY t.created_at DESC`,
       txParams,
     );
 
@@ -474,13 +548,19 @@ class Budget {
     const totalBudget = toMoney(row.total_budget);
     const totalExpenses = toMoney(row.total_expenses);
     const totalAbono = toMoney(row.total_abono);
+    const totalSent = toMoney(row.total_sent);
+    const totalReceived = toMoney(row.total_received);
 
     return {
       overview: {
         totalBudget,
         totalExpenses,
         totalAbono,
-        totalBalance: toMoney(totalBudget + totalAbono - totalExpenses),
+        totalSent,
+        totalReceived,
+        totalBalance: toMoney(
+          totalBudget + totalAbono - totalExpenses - totalSent + totalReceived,
+        ),
         activeReferences: Number(row.active_references) || 0,
       },
       transactions: txResult.rows,

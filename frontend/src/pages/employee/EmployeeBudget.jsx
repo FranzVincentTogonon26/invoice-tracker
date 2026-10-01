@@ -64,7 +64,7 @@ const EmployeeBudget = () => {
           <div className="flex w-full flex-nowrap items-center gap-2 sm:w-auto justify-end">
             <Button
               variant="accent"
-              onClick={() => nav("/employee/expenses/add")}
+              onClick={() => nav("/employee/budget-transfer")}
               className="shrink-0"
             >
               <ArrowLeftRight size={15} /> Transfer Budget

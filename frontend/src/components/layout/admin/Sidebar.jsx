@@ -26,7 +26,10 @@ const NAV = [
     label: "Dashboard",
     primary: true,
   },
-  { to: "/admin/budget", icon: FileText, label: "Budget", primary: true },
+  { to: "/admin/budget", icon: FileText, label: "Budget", primary: true,
+    // Budget Transfer is a sub-page of Budget — keep this row highlighted
+    // while it is open.
+    match: ["/admin/budget-transfer"] },
   {
     to: "/admin/transaction",
     icon: ArrowLeftRight,
@@ -66,24 +69,36 @@ const LABEL_BASE =
   "transition-[opacity,transform] duration-200 ease-out " +
   "group-hover/sidebar:opacity-100 group-hover/sidebar:translate-x-0 group-hover/sidebar:delay-100";
 
-function NavItem({ to, icon: Icon, label }) {
+// Active check shared by the rail, dock and sheet: the item's own path (or
+// any path under it, e.g. /expenses/add) plus extra `match` prefixes for
+// sub-pages that live outside the item's segment (e.g. /budget-transfer,
+// whose "-transfer" suffix breaks NavLink's default segment matching, so
+// nothing would highlight without this).
+const isActivePath = (pathname, { to, match }) =>
+  pathname === to ||
+  pathname.startsWith(`${to}/`) ||
+  (match ?? []).some(
+    (p) => pathname === p || pathname.startsWith(`${p}/`),
+  );
+
+function NavItem({ to, icon: Icon, label, match }) {
+  const { pathname } = useLocation();
+  const active = isActivePath(pathname, { to, match });
   return (
     <NavLink to={to} className="block">
-      {({ isActive }) => (
-        <div
-          className={cn(
-            ROW_BASE,
-            isActive
-              ? "bg-[var(--accent-soft)] text-[var(--accent-strong)] shadow-card"
-              : "text-[var(--ink-muted)] hover:bg-[var(--surface-2)] hover:text-[var(--ink)]",
-          )}
-        >
-          <span className="h-11 w-11 flex items-center justify-center shrink-0">
-            <Icon size={18} strokeWidth={2} />
-          </span>
-          <span className={LABEL_BASE}>{label}</span>
-        </div>
-      )}
+      <div
+        className={cn(
+          ROW_BASE,
+          active
+            ? "bg-[var(--accent-soft)] text-[var(--accent-strong)] shadow-card"
+            : "text-[var(--ink-muted)] hover:bg-[var(--surface-2)] hover:text-[var(--ink)]",
+        )}
+      >
+        <span className="h-11 w-11 flex items-center justify-center shrink-0">
+          <Icon size={18} strokeWidth={2} />
+        </span>
+        <span className={LABEL_BASE}>{label}</span>
+      </div>
     </NavLink>
   );
 }
@@ -159,46 +174,49 @@ const SHEET_LABEL = "mt-5 px-1 type-eyebrow " + "text-[var(--ink-muted)]";
  * marked by a sliding accent pill (`layoutId`, same technique as `Tabs`).
  */
 function MobileDock({ onOpenMenu }) {
+  const { pathname } = useLocation();
   return (
     <nav
       aria-label="Primary"
       className="md:hidden pointer-events-none fixed inset-x-0 bottom-0 z-40 flex justify-center px-1 pb-[calc(env(safe-area-inset-bottom)+0.75rem)]"
     >
       <div className="pointer-events-auto flex w-full max-w-[390px] items-center gap-0 rounded-2xl border border-[var(--border)] bg-[var(--surface)]/85 p-0.5 shadow-hover backdrop-blur-xl">
-        {DOCK_ITEMS.map(({ to, icon: Icon, label }) => (
+        {DOCK_ITEMS.map((item) => {
+          const { to, icon: Icon, label } = item;
+          const isActive = isActivePath(pathname, item);
+          return (
           <NavLink key={to} to={to} title={label} className={DOCK_CELL}>
-            {({ isActive }) => (
-              <span
-                className={cn(
-                  DOCK_INNER,
-                  isActive
-                    ? "text-[var(--accent-strong)]"
-                    : "text-[var(--ink-muted)]",
-                )}
-              >
-                {isActive && (
-                  <motion.span
-                    layoutId="mobile-dock-active"
-                    className="absolute inset-0 rounded-2xl bg-[var(--accent-soft)]"
-                    transition={{
-                      type: "spring",
-                      duration: 0.45,
-                      bounce: 0.18,
-                    }}
-                  />
-                )}
-                <Icon
-                  size={20}
-                  strokeWidth={isActive ? 2.4 : 2}
-                  className="relative z-10"
+            <span
+              className={cn(
+                DOCK_INNER,
+                isActive
+                  ? "text-[var(--accent-strong)]"
+                  : "text-[var(--ink-muted)]",
+              )}
+            >
+              {isActive && (
+                <motion.span
+                  layoutId="mobile-dock-active"
+                  className="absolute inset-0 rounded-2xl bg-[var(--accent-soft)]"
+                  transition={{
+                    type: "spring",
+                    duration: 0.45,
+                    bounce: 0.18,
+                  }}
                 />
-                <span className="relative z-10 max-w-full truncate text-[12px] font-medium leading-none">
-                  {label}
-                </span>
+              )}
+              <Icon
+                size={20}
+                strokeWidth={isActive ? 2.4 : 2}
+                className="relative z-10"
+              />
+              <span className="relative z-10 max-w-full truncate text-[12px] font-medium leading-none">
+                {label}
               </span>
-            )}
+            </span>
           </NavLink>
-        ))}
+          );
+        })}
 
         <button
           type="button"
@@ -226,6 +244,7 @@ function MobileDock({ onOpenMenu }) {
  * row tap, or navigation.
  */
 function MobileMenuSheet({ open, onClose, onLogout, user }) {
+  const location = useLocation();
   const panelRef = useRef(null);
   const displayName = user?.name || "Account";
   const displayEmail = user?.email || "";
@@ -326,39 +345,41 @@ function MobileMenuSheet({ open, onClose, onLogout, user }) {
 
             <div className={SHEET_LABEL}>Menu</div>
             <div className="mt-2 grid grid-cols-2 gap-2">
-              {NAV.map(({ to, icon: Icon, label }) => (
+              {NAV.map((item) => {
+                const { to, icon: Icon, label } = item;
+                const isActive = isActivePath(location.pathname, item);
+                return (
                 <NavLink
                   key={to}
                   to={to}
                   onClick={onClose}
                   className="block min-w-0 focus-visible:outline-none"
                 >
-                  {({ isActive }) => (
+                  <span
+                    className={cn(
+                      SHEET_TILE,
+                      isActive
+                        ? "border-[var(--accent)]/35 bg-[var(--accent-soft)] text-[var(--accent-strong)] shadow-card"
+                        : "border-[var(--border)] bg-[var(--surface)] text-[var(--ink-muted)]",
+                    )}
+                  >
                     <span
                       className={cn(
-                        SHEET_TILE,
+                        "flex h-9 w-9 shrink-0 items-center justify-center rounded-xl",
                         isActive
-                          ? "border-[var(--accent)]/35 bg-[var(--accent-soft)] text-[var(--accent-strong)] shadow-card"
-                          : "border-[var(--border)] bg-[var(--surface)] text-[var(--ink-muted)]",
+                          ? "bg-[var(--surface)] text-[var(--accent-strong)]"
+                          : "bg-[var(--surface-2)]",
                       )}
                     >
-                      <span
-                        className={cn(
-                          "flex h-9 w-9 shrink-0 items-center justify-center rounded-xl",
-                          isActive
-                            ? "bg-[var(--surface)] text-[var(--accent-strong)]"
-                            : "bg-[var(--surface-2)]",
-                        )}
-                      >
-                        <Icon size={16} />
-                      </span>
+                      <Icon size={16} />
+                    </span>
                       <span className="truncate text-sm font-semibold tracking-tight">
                         {label}
                       </span>
                     </span>
-                  )}
                 </NavLink>
-              ))}
+                );
+              })}
             </div>
 
             <div className={SHEET_LABEL}>Account</div>

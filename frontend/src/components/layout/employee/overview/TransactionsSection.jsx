@@ -2,6 +2,7 @@ import { useState, useMemo, useEffect, useRef, useCallback } from "react";
 import { createPortal } from "react-dom";
 import { AnimatePresence, motion } from "framer-motion";
 import {
+  ArrowLeftRight,
   Banknote,
   CreditCard,
   Flag,
@@ -53,16 +54,19 @@ const TYPE_LABEL_SHORT = {
   issued: "Received",
   expense: "Spent",
   abono: "Abono",
+  transfer: "Transfer",
 };
 
 // Mobile OverviewSheet header label per kind — the sheet titles itself by the
 // item's TYPE (matching the TYPE_LABEL_SHORT wording above: Received -> Budget,
-// Spent -> Expenses, Abono -> Abono) instead of echoing the row's
-// description, which already renders in the details body's Description row.
+// Spent -> Expenses, Abono -> Abono, Transfer -> Transfer) instead of echoing
+// the row's description, which already renders in the details body's
+// Description row.
 const TYPE_ITEM_TITLE = {
   issued: "Budget",
   expense: "Expenses",
   abono: "Abono",
+  transfer: "Transfer",
 };
 
 // Instant-scan method badge: tint + glyph per payment method so the type is
@@ -106,6 +110,16 @@ const TYPE_CONFIG = {
     icon: HandCoins,
     iconWrapperClass: "bg-[var(--warning)]/15 text-[var(--warning)]",
   },
+  // Budget transfers are identified by the ArrowLeftRight glyph everywhere in
+  // this ledger (table badge, mobile meta, sheet). Direction splits the
+  // reading: sent money leaves the pool (−, danger), received money widens it
+  // (+, accent) — the same sign convention the budget ledger uses.
+  transfer: {
+    label: "Transfer",
+    badgeTone: "accent",
+    icon: ArrowLeftRight,
+    iconWrapperClass: "bg-[var(--accent-soft)] text-[var(--accent-strong)]",
+  },
 };
 
 const PAGE_SIZE = 50;
@@ -118,6 +132,20 @@ const SHEET_EASE = [0.16, 1, 0.3, 1];
 // shape the overview passes in. Only `expense` rows can ever be flagged —
 // issued/abono always carry `flag = 0`.
 const isFlagged = (row) => row?.flagged === true || Number(row?.flag) === 1;
+
+// Budget-transfer rows (kind "transfer", success only): `direction` is 'sent'
+// (this employee moved money out) or 'received' (money moved in). Only
+// `expense` and sent-transfer rows can ever read negative — issued/abono and
+// received transfers always carry `flag = 0` too.
+const isTransfer = (row) => row?.kind === "transfer";
+const isSentTransfer = (row) => isTransfer(row) && row?.direction === "sent";
+const isNegative = (row) => row?.kind === "expense" || isSentTransfer(row);
+
+// "To <name>" / "From <name>" second line for transfer rows.
+const transferCounterparty = (row) =>
+  isTransfer(row) && row?.counterparty
+    ? `${isSentTransfer(row) ? "To" : "From"} ${row.counterparty}`
+    : "";
 
 // Expense rows the ledger labels with their OWN status badge: a soft-deleted
 // row is parked in 'draft' and a voided one sits in 'cancel' (see the row
@@ -143,7 +171,10 @@ const isDraftExpense = (row) =>
 const OverviewDetailsBody = ({ row, meta }) => {
   const flagged = isFlagged(row);
   const kind = row?.kind;
-  const sign = kind === "expense" ? "-" : "+";
+  const transfer = isTransfer(row);
+  const sent = isSentTransfer(row);
+  const counterparty = transferCounterparty(row);
+  const sign = isNegative(row) ? "-" : "+";
   const statusBadge =
     kind === "issued" ? (
       <Badge tone="success">
@@ -164,6 +195,11 @@ const OverviewDetailsBody = ({ row, meta }) => {
           Abono
         </Badge>
       )
+    ) : transfer ? (
+      <Badge tone={sent ? "neutral" : "success"}>
+        <ArrowLeftRight size={12} aria-hidden className="shrink-0" />
+        {sent ? "Sent" : "Received"}
+      </Badge>
     ) : isDraftOrCancelled(row) ? (
       // Only draft / cancelled expenses add a status badge here — a paid row
       // keeps the plain "Paid" pill it always had.
@@ -175,7 +211,13 @@ const OverviewDetailsBody = ({ row, meta }) => {
       </Badge>
     );
   const summaryLabel =
-    kind === "issued" ? "Received" : kind === "abono" ? "Abono" : "Spent";
+    kind === "issued"
+      ? "Received"
+      : kind === "abono"
+        ? "Abono"
+        : transfer
+          ? counterparty || "Transfer"
+          : "Spent";
   return (
     <div className="mt-4 space-y-3">
       {flagged && (
@@ -241,6 +283,30 @@ const OverviewDetailsBody = ({ row, meta }) => {
             </p>
           </div>
         </div>
+        {/* Transfer rows read who the money moved to / came from, plus the
+            sender's notes when the description shows them. */}
+        {transfer && (counterparty || row?.notes) ? (
+          <div className="grid grid-cols-2 gap-3 border-t border-[var(--border)] pt-3 py-1">
+            {counterparty && (
+              <div className="min-w-0">
+                <p className="type-eyebrow text-[var(--ink-muted)]">
+                  {sent ? "Sent to" : "Received from"}
+                </p>
+                <p className="mt-1 truncate text-sm font-medium text-[var(--ink)]">
+                  {row.counterparty}
+                </p>
+              </div>
+            )}
+            {row?.notes && (
+              <div className="min-w-0">
+                <p className="type-eyebrow text-[var(--ink-muted)]">Notes</p>
+                <p className="mt-1 break-words text-sm font-medium leading-snug text-[var(--ink)]">
+                  {row.notes}
+                </p>
+              </div>
+            )}
+          </div>
+        ) : null}
         {kind === "abono" && row?.status === "settled" && row?.date_settled ? (
           <div className="grid grid-cols-3 border-t border-[var(--border)] pt-3 py-1">
             <div className="min-w-0">
@@ -430,7 +496,7 @@ export const TransactionsSection = ({
     return () => clearTimeout(timer);
   }, [search]);
 
-  // The feed merges three tables, so never trust the incoming order: newest
+  // The feed merges four sources, so never trust the incoming order: newest
   // record first — by when it was ADDED (`created_at`). An expense booked for
   // an older date still belongs on top when it was entered today.
   const sortedTransactions = useMemo(() => {
@@ -451,6 +517,8 @@ export const TransactionsSection = ({
       const notes = (tx.notes || "").toLowerCase();
       const method = methodLabel(tx.method || "").toLowerCase();
       const status = (tx.status || "").toLowerCase();
+      const direction = (tx.direction || "").toLowerCase();
+      const counterparty = (tx.counterparty || "").toLowerCase();
       const amountStr = String(tx.amount || "");
 
       return (
@@ -460,6 +528,8 @@ export const TransactionsSection = ({
         typeLabel.includes(q) ||
         method.includes(q) ||
         status.includes(q) ||
+        direction.includes(q) ||
+        counterparty.includes(q) ||
         amountStr.includes(q)
       );
     });
@@ -501,7 +571,7 @@ export const TransactionsSection = ({
               </h3>
             </div>
             <p className="text-xs text-[var(--ink-muted)] truncate">
-              Every budget issuance, expense and abono
+              Every budget issuance, expense, abono and transfer
             </p>
           </div>
         </div>
@@ -562,7 +632,7 @@ export const TransactionsSection = ({
                   ? `Nothing was recorded in ${formatDateRange(dateRange)}. Try a wider range.`
                   : debouncedSearch
                     ? `No transactions matched "${debouncedSearch}". Try clearing your search.`
-                    : "No budget issuances, expenses, or abono records yet."
+                    : "No budget issuances, expenses, abono or transfer records yet."
             }
           />
         ) : (
@@ -600,10 +670,12 @@ export const TransactionsSection = ({
                 {pageRows.map((tx) => {
                   const meta = TYPE_CONFIG[tx.kind] ?? TYPE_CONFIG.expense;
                   const Icon = meta.icon;
-                  const isNegative = tx.kind === "expense";
-                  const amountColor = isNegative
+                  const transfer = isTransfer(tx);
+                  const sent = isSentTransfer(tx);
+                  const negative = isNegative(tx);
+                  const amountColor = negative
                     ? "text-[var(--danger)]"
-                    : tx.kind === "issued"
+                    : tx.kind === "issued" || (!sent && transfer)
                       ? "text-[var(--accent-strong)]"
                       : "text-[var(--ink)]";
                   const flagged = isFlagged(tx);
@@ -662,6 +734,13 @@ export const TransactionsSection = ({
                               Flagged
                             </Badge>
                           </span>
+                        ) : transfer && tx.notes && transferCounterparty(tx) ? (
+                          <p
+                            className="mt-0.5 truncate text-[11px] leading-snug text-[var(--ink-muted)]"
+                            title={transferCounterparty(tx)}
+                          >
+                            {transferCounterparty(tx)}
+                          </p>
                         ) : tx.reference_label && tx.description ? (
                           <p
                             className="mt-0.5 truncate text-[11px] leading-snug text-[var(--ink-muted)]"
@@ -685,6 +764,20 @@ export const TransactionsSection = ({
                             status={tx.status}
                             className="max-w-full gap-1.5 px-2 py-1 text-[11px]"
                           />
+                        ) : transfer ? (
+                          <Badge
+                            tone={sent ? "neutral" : meta.badgeTone}
+                            className="max-w-full gap-1.5 px-2 py-1 text-[11px]"
+                          >
+                            <Icon
+                              size={12}
+                              strokeWidth={2.2}
+                              className="shrink-0"
+                            />
+                            <span className="truncate">
+                              {sent ? "Sent" : "Transfer"}
+                            </span>
+                          </Badge>
                         ) : (
                           <Badge
                             tone={meta.badgeTone}
@@ -707,7 +800,7 @@ export const TransactionsSection = ({
                             isCancelled(tx) && "line-through",
                           )}
                         >
-                          {isNegative
+                          {negative
                             ? `-${formatMoney(tx.amount)}`
                             : `+${formatMoney(tx.amount)}`}
                         </span>
@@ -772,10 +865,11 @@ export const TransactionsSection = ({
                     </h4>
                     {transactions.map((tx) => {
                       const meta = TYPE_CONFIG[tx.kind] ?? TYPE_CONFIG.expense;
-                      const isNegative = tx.kind === "expense";
-                      const amountColor = isNegative
+                      const negative = isNegative(tx);
+                      const sent = isSentTransfer(tx);
+                      const amountColor = negative
                         ? "text-[var(--danger)]"
-                        : tx.kind === "issued"
+                        : tx.kind === "issued" || (!sent && isTransfer(tx))
                           ? "text-[var(--accent-strong)]"
                           : "text-[var(--warning)]";
                       const flagged = isFlagged(tx);
@@ -878,7 +972,7 @@ export const TransactionsSection = ({
                                 isCancelled(tx) && "line-through",
                               )}
                             >
-                              {isNegative
+                              {negative
                                 ? `-${formatMoney(tx.amount)}`
                                 : `+${formatMoney(tx.amount)}`}
                             </p>
