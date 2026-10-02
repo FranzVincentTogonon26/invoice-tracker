@@ -637,7 +637,7 @@ const AddExpenses = () => {
   };
 
   return (
-    <div className="mx-auto w-full max-w-6xl space-y-5 pb-3">
+    <div className="mx-auto w-full max-w-6xl space-y-5">
       <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
         <div className="flex items-start gap-3">
           <button

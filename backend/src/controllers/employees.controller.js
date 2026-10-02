@@ -82,6 +82,17 @@ export const remove = async (req, res, next) => {
     if (!UUID_RE.test(id || ""))
       throw ApiError.badRequest("Invalid employee id", "VALIDATION_ERROR");
 
+    // Issuance history must survive: an employee with any
+    // `budget_issued_reference` row cannot be deleted (deactivate the account
+    // instead) — otherwise the cascade would destroy their budget trail. The
+    // menu already hides Delete for these accounts; this rejects direct calls.
+    const issuedReferences = await Employee.countIssuedReferences(id);
+    if (issuedReferences > 0)
+      throw ApiError.conflict(
+        "This employee has issued budget history and can't be deleted. Deactivate the account instead.",
+        "EMPLOYEE_HAS_ISSUED_HISTORY",
+      );
+
     const employee = await Employee.removeEmployee(id);
     if (!employee)
       throw ApiError.notFound("Employee not found", "EMPLOYEE_NOT_FOUND");

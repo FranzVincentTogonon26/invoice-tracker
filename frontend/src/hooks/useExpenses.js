@@ -113,6 +113,12 @@ export function useExpensesMutations() {
       mutationFn: expensesApi.clearFlag,
       onSuccess: invalidate,
     }),
+    // Admin review notes (ExpenseDetailsModal draft card);
+    // `updateNotes({ id, notes })` — blank clears the trail.
+    updateNotes: useMutation({
+      mutationFn: ({ id, notes }) => expensesApi.updateNotes(id, notes),
+      onSuccess: invalidate,
+    }),
     // Deletes a category (UNIQUE-style feedback comes back as a 409).
     removeCategory: useMutation({
       mutationFn: expensesApi.removeCategory,

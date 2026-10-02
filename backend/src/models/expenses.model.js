@@ -355,6 +355,20 @@ class Expenses {
     return result.rows[0] ?? null;
   }
 
+  // Admin review notes (ExpenseDetailsModal, draft rows) — overwrites the
+  // notes column with the full reviewed text (blank clears it to NULL).
+  static async updateExpenseNotes(id, notes) {
+    const result = await query(
+      `UPDATE expenses
+          SET notes = $2, updated_at = NOW()
+        WHERE id = $1
+        RETURNING id, notes, total_amount::float8 AS total_amount,
+                  status, image_url`,
+      [id, notes],
+    );
+    return result.rows[0] ?? null;
+  }
+
   // How many expense rows still point at the same stored image. One scan can
   // back several lines (each line of a confirmed receipt carries the same
   // `image_url`), so the file may only be deleted once the last reference is

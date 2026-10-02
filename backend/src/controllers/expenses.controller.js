@@ -6,6 +6,7 @@ import {
   createExpensesSchema,
   updateExpenseStatusSchema,
   updateExpenseDescriptionSchema,
+  updateExpenseNotesSchema,
 } from "../validations/expenses.validation.js";
 import { deleteReceiptImage, saveReceiptImage } from "../utils/receiptImage.js";
 
@@ -426,6 +427,37 @@ export const updateDescription = async (req, res, next) => {
     return res.status(200).json({
       expense,
       message: "Description updated.",
+    });
+  } catch (err) {
+    next(err);
+  }
+};
+
+// Update expense notes — the admin review trail in ExpenseDetailsModal
+// (draft rows only in the UI). Admin-only via the route middleware, so no
+// ownership check is needed here beyond the row existing.
+export const updateNotes = async (req, res, next) => {
+  try {
+    const { id } = req.params;
+    if (!UUID_RE.test(id || ""))
+      throw ApiError.badRequest("Invalid expense id", "VALIDATION_ERROR");
+
+    const payload = validate(updateExpenseNotesSchema, req.body);
+
+    const existing = await Expenses.findExpenseById(id);
+    if (!existing)
+      throw ApiError.notFound("Expense not found", "EXPENSE_NOT_FOUND");
+
+    const expense = await Expenses.updateExpenseNotes(
+      id,
+      payload.notes ?? null,
+    );
+    if (!expense)
+      throw ApiError.notFound("Expense not found", "EXPENSE_NOT_FOUND");
+
+    return res.status(200).json({
+      expense,
+      message: "Review notes saved.",
     });
   } catch (err) {
     next(err);

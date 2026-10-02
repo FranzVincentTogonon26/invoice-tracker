@@ -85,6 +85,15 @@ router.patch(
 // Update expense description (inline editing from transaction sheet)
 router.patch("/:id/description", authMiddleware, expensesController.updateDescription);
 
+// Admin review notes (ExpenseDetailsModal, draft rows) — free-form comment
+// trail for suspicious lines. Admin-only.
+router.patch(
+  "/:id/notes",
+  authMiddleware,
+  requireAdminAccess,
+  expensesController.updateNotes,
+);
+
 router.delete("/:id", authMiddleware, expensesController.remove);
 
 export default router;

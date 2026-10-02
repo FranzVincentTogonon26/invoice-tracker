@@ -66,19 +66,48 @@ class Employee {
     return result.rows[0] ?? null;
   }
 
+  // How many `budget_issued_reference` rows point at this user — the delete
+  // guard. Anything above zero means issuance history exists and the account
+  // must be kept (deactivate instead of delete).
+  static async countIssuedReferences(id) {
+    const result = await query(
+      `SELECT COUNT(*)::int AS count
+         FROM budget_issued_reference
+        WHERE user_id = $1`,
+      [id],
+    );
+    return result.rows[0]?.count ?? 0;
+  }
+
   //   Find Employee List (admin management view).
   //   Optional filters:
   //     - `search`: matched against name and email (ILIKE)
   //     - `status`: 'active' | 'pending' | 'inactive' | 'all'; when omitted
   //       (the budget page calls this with no args) it defaults to 'active'
   //       so the "Budget Issued" employee picker only lists active accounts.
-  //   Each row carries the employee's issued-budget total (issued_budget rows
-  //   joined through open budget_issued_reference rows) plus the total they
-  //   actually spent — SUM(expenses.total_amount) of PAID rows only, so a
-  //   soft-deleted row parked in 'draft' or a voided one in 'cancel' never
-  //   reads as spent (same rule as the employee overview aggregates). The UI
-  //   uses the pair to show funding handed out vs. funding consumed and derive
-  //   the real remaining balance.
+  //   Each row carries the employee's budget figures, every one of them keyed
+  //   on that row's `user_id` and computed with the SAME definitions the
+  //   employee's own Overview page uses — models/employee.overview.model.js is
+  //   the canonical reference for all five:
+  //     - `issued_budget`: SUM(issued_budget.amount) through the employee's
+  //                        OPEN budget_issued_reference rows ("Issued Budget")
+  //     - `total_spent`:   SUM(expenses.total_amount) of PAID rows only, so a
+  //                        soft-deleted row parked in 'draft' or a voided one
+  //                        in 'cancel' never reads as spent ("Total Spent")
+  //     - `total_abono`:   SUM(employee_abono.amount) of OPEN rows only — a
+  //                        settled (reimbursed) or draft abono no longer funds
+  //                        spending
+  //     - `total_sent` / `total_received`: SUCCESS budget_transfer rows sent
+  //                        by / received for this employee (a 'cancel' row is
+  //                        an audit trail and never counts)
+  //     - `remaining_balance`: issued + OPEN abono − PAID expenses − sent
+  //                        transfers + received transfers — the SAME balance
+  //                        the employee sees on their own Overview page. The
+  //                        old `issued − spent` shortcut ignored abono and
+  //                        transfers, so an employee who received a transfer
+  //                        (or still holds an unsettled abono) showed a
+  //                        different Remaining figure here than on their own
+  //                        Overview.
   //   `issued_references` (the table's "Transactions" column) counts the
   //   employee's `issued_budget` rows — the real issuance transactions,
   //   wired through their parents via
@@ -127,12 +156,66 @@ class Employee {
             FROM expenses e
             WHERE e.user_id = u.user_id AND e.status = 'paid'
           ), 0)::float8 AS total_spent,
+          COALESCE((
+            SELECT SUM(ea.amount)
+            FROM employee_abono ea
+            WHERE ea.user_id = u.user_id AND ea.status = 'open'
+          ), 0)::float8 AS total_abono,
+          COALESCE((
+            SELECT SUM(bt.amount)
+            FROM budget_transfer bt
+            WHERE bt.user_id = u.user_id AND bt.status = 'success'
+          ), 0)::float8 AS total_sent,
+          COALESCE((
+            SELECT SUM(btr.amount)
+            FROM budget_transfer btr
+            WHERE btr.transfer_to = u.user_id AND btr.status = 'success'
+          ), 0)::float8 AS total_received,
+          -- Same formula as EmployeeOverview.totalBalance over the same five
+          -- per-user aggregates above, so the admin "Remaining" column and the
+          -- employee's own Overview balance can never disagree.
+          (
+            COALESCE((
+              SELECT SUM(ib.amount)
+              FROM issued_budget ib
+              JOIN budget_issued_reference bir ON ib.issued_ref_id = bir.id
+              WHERE bir.user_id = u.user_id AND bir.status = 'open'
+            ), 0)
+            + COALESCE((
+              SELECT SUM(ea.amount)
+              FROM employee_abono ea
+              WHERE ea.user_id = u.user_id AND ea.status = 'open'
+            ), 0)
+            - COALESCE((
+              SELECT SUM(e.total_amount)
+              FROM expenses e
+              WHERE e.user_id = u.user_id AND e.status = 'paid'
+            ), 0)
+            - COALESCE((
+              SELECT SUM(bt.amount)
+              FROM budget_transfer bt
+              WHERE bt.user_id = u.user_id AND bt.status = 'success'
+            ), 0)
+            + COALESCE((
+              SELECT SUM(btr.amount)
+              FROM budget_transfer btr
+              WHERE btr.transfer_to = u.user_id AND btr.status = 'success'
+            ), 0)
+          )::float8 AS remaining_balance,
           (
             SELECT COUNT(*)
             FROM issued_budget ib2
             JOIN budget_issued_reference bir2 ON ib2.issued_ref_id = bir2.id
             WHERE bir2.user_id = u.user_id
-          )::int AS issued_references
+          )::int AS issued_references,
+          -- Parent issuance rows for this user, any status — the delete guard:
+          -- an employee who was ever issued budget keeps their history, so the
+          -- account must not be removable (the menu hides Delete for them).
+          (
+            SELECT COUNT(*)
+            FROM budget_issued_reference bir3
+            WHERE bir3.user_id = u.user_id
+          )::int AS issued_reference_count
        FROM users u
        WHERE ${where.join(" AND ")}
        ORDER BY u.created_at DESC`,

@@ -65,6 +65,11 @@ export const expensesApi = {
   updateDescription: (id, description) =>
     apiClient.patch(`/expenses/${id}/description`, { description }).then((r) => r.data),
 
+  // Admin review notes (ExpenseDetailsModal, draft rows) — overwrites the
+  // notes trail; blank clears it. Admin-only on the server.
+  updateNotes: (id, notes) =>
+    apiClient.patch(`/expenses/${id}/notes`, { notes }).then((r) => r.data),
+
   // Admin approval for a flagged expense: clears `expenses.flag` back to 0.
   // Called by the "Approve flag" action inside the flaggedNotice of the View
   // expense modal. Admin-only on the server.

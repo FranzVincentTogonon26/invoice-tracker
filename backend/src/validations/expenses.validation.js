@@ -233,3 +233,16 @@ export const updateExpenseDescriptionSchema = z.object({
     .min(2, { message: "Description must be at least 2 characters" })
     .max(200, { message: "Description is too long" }),
 });
+
+// Admin review notes on a draft expense (ExpenseDetailsModal) — free-form
+// comment trail for suspicious lines. Blank clears the notes (stored NULL).
+export const updateExpenseNotesSchema = z.object({
+  notes: z.preprocess(
+    (v) => (typeof v === "string" && v.trim() === "" ? undefined : v),
+    z
+      .string()
+      .trim()
+      .max(1000, { message: "Notes are too long (max 1000 characters)" })
+      .optional(),
+  ),
+});

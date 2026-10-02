@@ -60,6 +60,7 @@ const EmployeeOverview = () => {
   const totalBudget = Number(data?.totalBudget) || 0;
   const totalExpenses = Number(data?.totalExpenses) || 0;
   const totalAbono = Number(data?.totalAbono) || 0;
+  const totalReceived = Number(data?.totalReceived) || 0;
   const totalBalance = Number(data?.totalBalance) || 0;
   const expenseCount = Number(data?.expenseCount) || 0;
   const transactions = data?.transactions ?? [];
@@ -184,6 +185,9 @@ const EmployeeOverview = () => {
                       {spentPct}% spent
                       {expenseCount > 0
                         ? ` · ${expenseCount} ${expenseCount === 1 ? "expense" : "expenses"}`
+                        : ""}
+                      {totalReceived > 0
+                        ? ` · ${formatMoney(totalReceived)} received budget`
                         : ""}
                     </p>
                   </div>
