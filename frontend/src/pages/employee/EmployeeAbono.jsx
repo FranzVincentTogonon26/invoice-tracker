@@ -34,7 +34,7 @@ const MiniStat = ({ icon: Icon, label, value, loading, iconClass, title }) => (
       >
         <Icon size={14} strokeWidth={2.2} />
       </span>
-      <p className="type-eyebrow truncate text-[9px] text-[var(--ink-muted)] sm:text-[10px]">
+      <p className="type-eyebrow truncate text-[10px] text-[var(--ink-muted)] sm:text-[11px]">
         {label}
       </p>
     </div>
@@ -48,26 +48,10 @@ const MiniStat = ({ icon: Icon, label, value, loading, iconClass, title }) => (
   </div>
 );
 
-// Maps an abono row from the API into the shape the ledger renders. Kept in
-// one place so local state and server sync stay identical (mirrors the
-// toTransaction helper on EmployeeExpenses).
-const toTransaction = (row) => ({
-  kind: "abono",
-  id: row.id,
-  description: row.description,
-  date: row.created_at,
-  timeDate: row.created_at,
-  amount: Number(row.amount) || 0,
-  status: row.status,
-  reference_label: row.reference_label || "",
-  // Raw `date_settled` — lets the details sheet render its "Date Settled"
-  // row for settled rows (other statuses leave it null).
-  dateSettled: row.date_settled,
-  notes: "",
-  method: "cash",
-  flag: 0,
-  flagged: false,
-});
+// Maps an abono row from the API into the shape the ledger renders —
+// shared with the Admin → Employee Details tab (lib/employeeLedger.js) so
+// both pages render identical rows from the same endpoint payload.
+import { abonoToTransaction as toTransaction } from "../../lib/employeeLedger";
 
 const EmployeeAbono = () => {
   const { data, isLoading } = useEmployeeAbono();

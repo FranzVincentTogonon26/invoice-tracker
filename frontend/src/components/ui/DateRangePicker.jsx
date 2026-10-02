@@ -236,7 +236,7 @@ export function DateRangePicker({
         type="button"
         variant="soft"
         className={cn(
-          "max-w-full px-5",
+          "max-w-full px-5 text-xs",
           // Solid hairline + card shadow in both states, matching SearchInput
           // and the rest of the filter row (no more dashed trigger).
           hasValue
@@ -280,10 +280,7 @@ export function DateRangePicker({
           <CalendarOff
             size={15}
             aria-hidden
-            className={cn(
-              "shrink-0",
-              compactOnMobile && "hidden sm:block",
-            )}
+            className={cn("shrink-0", compactOnMobile && "hidden sm:block")}
           />
         )}
         <span
@@ -328,167 +325,176 @@ export function DateRangePicker({
                   "sm:max-h-[calc(100dvh-96px)] sm:overflow-y-auto",
                 )}
               >
-            <div className="flex items-baseline justify-between gap-3 border-b border-[var(--border)] px-5 py-3">
-              <span className="font-display text-lg font-semibold tracking-tight text-[var(--ink)]">
-                Date range
-              </span>
-              <span className="truncate text-sm font-semibold text-[var(--ink-muted)]">
-                {formatDateRange(
-                  draft,
-                  hasValue
-                    ? "Pick a start and end date"
-                    : "No range set — all records",
-                )}
-              </span>
-            </div>
-
-            <div className="grid gap-4 p-4 sm:grid-cols-[172px_1fr] sm:gap-5 sm:p-5">
-              <div
-                role="group"
-                aria-label="Quick ranges"
-                className="flex flex-wrap gap-1.5 sm:flex-col sm:flex-nowrap"
-              >
-                {PRESETS.map((preset) => {
-                  const active = isSameRange(draft, preset.rangeFor(today));
-                  return (
-                    <button
-                      key={preset.key}
-                      type="button"
-                      onClick={() => pickPreset(preset)}
-                      aria-pressed={active}
-                      className={cn(
-                        "h-8 shrink-0 rounded-full px-3 text-sm font-medium transition-colors sm:text-left",
-                        active
-                          ? "bg-[var(--accent-soft)] text-[var(--accent-strong)]"
-                          : "text-[var(--ink-muted)] hover:bg-[var(--surface-2)] hover:text-[var(--ink)]",
-                      )}
-                    >
-                      {preset.label}
-                    </button>
-                  );
-                })}
-              </div>
-
-              <div className="min-w-0" onMouseLeave={() => setHover(null)}>
-                <div className="mb-2 flex items-center justify-between">
-                  <NavButton
-                    label="Previous month"
-                    onClick={() => shiftMonth(-1)}
-                  >
-                    <ChevronLeft size={16} aria-hidden />
-                  </NavButton>
-                  <span className="text-sm font-semibold text-[var(--ink)]">
-                    {viewMonth.toLocaleDateString("en-US", {
-                      month: "long",
-                      year: "numeric",
-                    })}
+                <div className="flex items-baseline justify-between gap-3 border-b border-[var(--border)] px-5 py-3">
+                  <span className="font-display text-lg font-semibold tracking-tight text-[var(--ink)]">
+                    Date range
                   </span>
-                  <NavButton label="Next month" onClick={() => shiftMonth(1)}>
-                    <ChevronRight size={16} aria-hidden />
-                  </NavButton>
+                  <span className="truncate text-sm font-semibold text-[var(--ink-muted)]">
+                    {formatDateRange(
+                      draft,
+                      hasValue
+                        ? "Pick a start and end date"
+                        : "No range set — all records",
+                    )}
+                  </span>
                 </div>
 
-                <div className="grid grid-cols-7">
-                  {WEEKDAYS.map((day) => (
-                    <span
-                      key={day}
-                      aria-hidden
-                      className="flex h-7 items-center justify-center type-eyebrow text-[var(--ink-muted)]"
-                    >
-                      {day}
-                    </span>
-                  ))}
-                </div>
+                <div className="grid gap-4 p-4 sm:grid-cols-[172px_1fr] sm:gap-5 sm:p-5">
+                  <div
+                    role="group"
+                    aria-label="Quick ranges"
+                    className="flex flex-wrap gap-1.5 sm:flex-col sm:flex-nowrap"
+                  >
+                    {PRESETS.map((preset) => {
+                      const active = isSameRange(draft, preset.rangeFor(today));
+                      return (
+                        <button
+                          key={preset.key}
+                          type="button"
+                          onClick={() => pickPreset(preset)}
+                          aria-pressed={active}
+                          className={cn(
+                            "h-8 shrink-0 rounded-full px-3 text-sm font-medium transition-colors sm:text-left",
+                            active
+                              ? "bg-[var(--accent-soft)] text-[var(--accent-strong)]"
+                              : "text-[var(--ink-muted)] hover:bg-[var(--surface-2)] hover:text-[var(--ink)]",
+                          )}
+                        >
+                          {preset.label}
+                        </button>
+                      );
+                    })}
+                  </div>
 
-                <div className="relative">
-                  <AnimatePresence mode="popLayout" initial={false}>
-                    <motion.div
-                      key={`${viewMonth.getFullYear()}-${viewMonth.getMonth()}`}
-                      initial={{
-                        opacity: 0,
-                        x: slide > 0 ? 14 : -14,
-                      }}
-                      animate={{ opacity: 1, x: 0 }}
-                      exit={{
-                        opacity: 0,
-                        x: slide > 0 ? -14 : 14,
-                      }}
-                      transition={{
-                        duration: 0.18,
-                        ease: DIALOG_EASE,
-                      }}
-                      className="grid grid-cols-7 gap-y-1"
-                    >
-                      {cells.map((day, index) => {
-                        if (!day) {
-                          return <span key={`pad-${index}`} className="h-9" />;
-                        }
+                  <div className="min-w-0" onMouseLeave={() => setHover(null)}>
+                    <div className="mb-2 flex items-center justify-between">
+                      <NavButton
+                        label="Previous month"
+                        onClick={() => shiftMonth(-1)}
+                      >
+                        <ChevronLeft size={16} aria-hidden />
+                      </NavButton>
+                      <span className="text-sm font-semibold text-[var(--ink)]">
+                        {viewMonth.toLocaleDateString("en-US", {
+                          month: "long",
+                          year: "numeric",
+                        })}
+                      </span>
+                      <NavButton
+                        label="Next month"
+                        onClick={() => shiftMonth(1)}
+                      >
+                        <ChevronRight size={16} aria-hidden />
+                      </NavButton>
+                    </div>
 
-                        const isStart = isSameDay(day, draft.start);
-                        const isEnd = isSameDay(day, draft.end);
-                        const isEdge = isStart || isEnd;
-                        const inRange =
-                          !isEdge &&
-                          painted.start &&
-                          painted.end &&
-                          day > painted.start &&
-                          day < painted.end;
-                        const isToday = isSameDay(day, today);
+                    <div className="grid grid-cols-7">
+                      {WEEKDAYS.map((day) => (
+                        <span
+                          key={day}
+                          aria-hidden
+                          className="flex h-7 items-center justify-center type-eyebrow text-[var(--ink-muted)]"
+                        >
+                          {day}
+                        </span>
+                      ))}
+                    </div>
 
-                        return (
-                          <button
-                            key={day.toDateString()}
-                            type="button"
-                            onClick={() => pickDay(day)}
-                            onMouseEnter={() => setHover(day)}
-                            onFocus={() => setHover(day)}
-                            aria-label={formatDate(day)}
-                            aria-pressed={isEdge}
-                            aria-current={isToday ? "date" : undefined}
-                            className={cn(
-                              "flex h-9 items-center justify-center text-sm font-medium tabular-nums transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)]/40",
-                              isEdge
-                                ? cn(
-                                    "bg-[var(--accent)] text-white hover:bg-[var(--accent-strong)]",
-                                    isStart && "rounded-l-lg",
-                                    isEnd && "rounded-r-lg",
-                                  )
-                                : inRange
-                                  ? "bg-[var(--accent-soft)] text-[var(--accent-strong)]"
-                                  : "rounded-full text-[var(--ink)] hover:bg-[var(--surface-2)]",
+                    <div className="relative">
+                      <AnimatePresence mode="popLayout" initial={false}>
+                        <motion.div
+                          key={`${viewMonth.getFullYear()}-${viewMonth.getMonth()}`}
+                          initial={{
+                            opacity: 0,
+                            x: slide > 0 ? 14 : -14,
+                          }}
+                          animate={{ opacity: 1, x: 0 }}
+                          exit={{
+                            opacity: 0,
+                            x: slide > 0 ? -14 : 14,
+                          }}
+                          transition={{
+                            duration: 0.18,
+                            ease: DIALOG_EASE,
+                          }}
+                          className="grid grid-cols-7 gap-y-1"
+                        >
+                          {cells.map((day, index) => {
+                            if (!day) {
+                              return (
+                                <span key={`pad-${index}`} className="h-9" />
+                              );
+                            }
+
+                            const isStart = isSameDay(day, draft.start);
+                            const isEnd = isSameDay(day, draft.end);
+                            const isEdge = isStart || isEnd;
+                            const inRange =
                               !isEdge &&
-                                isToday &&
-                                "ring-1 ring-inset ring-[var(--accent)]/40",
-                            )}
-                          >
-                            {day.getDate()}
-                          </button>
-                        );
-                      })}
-                    </motion.div>
-                  </AnimatePresence>
-                </div>
-              </div>
-            </div>
+                              painted.start &&
+                              painted.end &&
+                              day > painted.start &&
+                              day < painted.end;
+                            const isToday = isSameDay(day, today);
 
-            <div className="flex items-center justify-between gap-3 border-t border-[var(--border)] p-4">
-              <Button type="button" variant="outline" onClick={reset}>
-                <RotateCcw size={14} aria-hidden /> Reset
-              </Button>
-              <div className="flex items-center gap-2">
-                <Button type="button" variant="outline" onClick={() => close()}>
-                  Cancel
-                </Button>
-                <Button
-                  type="button"
-                  variant="accent"
-                  onClick={draftComplete ? apply : clearRange}
-                  disabled={!draftComplete && !canClear}
-                >
-                  {canClear ? "Show all dates" : "Apply"}
-                </Button>
-              </div>
-            </div>
+                            return (
+                              <button
+                                key={day.toDateString()}
+                                type="button"
+                                onClick={() => pickDay(day)}
+                                onMouseEnter={() => setHover(day)}
+                                onFocus={() => setHover(day)}
+                                aria-label={formatDate(day)}
+                                aria-pressed={isEdge}
+                                aria-current={isToday ? "date" : undefined}
+                                className={cn(
+                                  "flex h-9 items-center justify-center text-sm font-medium tabular-nums transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)]/40",
+                                  isEdge
+                                    ? cn(
+                                        "bg-[var(--accent)] text-white hover:bg-[var(--accent-strong)]",
+                                        isStart && "rounded-l-lg",
+                                        isEnd && "rounded-r-lg",
+                                      )
+                                    : inRange
+                                      ? "bg-[var(--accent-soft)] text-[var(--accent-strong)]"
+                                      : "rounded-full text-[var(--ink)] hover:bg-[var(--surface-2)]",
+                                  !isEdge &&
+                                    isToday &&
+                                    "ring-1 ring-inset ring-[var(--accent)]/40",
+                                )}
+                              >
+                                {day.getDate()}
+                              </button>
+                            );
+                          })}
+                        </motion.div>
+                      </AnimatePresence>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="flex items-center justify-between gap-3 border-t border-[var(--border)] p-4">
+                  <Button type="button" variant="outline" onClick={reset}>
+                    <RotateCcw size={14} aria-hidden /> Reset
+                  </Button>
+                  <div className="flex items-center gap-2">
+                    <Button
+                      type="button"
+                      variant="outline"
+                      onClick={() => close()}
+                    >
+                      Cancel
+                    </Button>
+                    <Button
+                      type="button"
+                      variant="accent"
+                      onClick={draftComplete ? apply : clearRange}
+                      disabled={!draftComplete && !canClear}
+                    >
+                      {canClear ? "Show all dates" : "Apply"}
+                    </Button>
+                  </div>
+                </div>
               </motion.div>
             )}
           </AnimatePresence>,

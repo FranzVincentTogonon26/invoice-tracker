@@ -171,7 +171,7 @@ const BudgetTransaction = ({ valueRemaining }) => {
                   key={t.key}
                   onClick={() => updateStatus(t.key)}
                   className={cn(
-                    "h-8 flex-1 rounded-full px-2 text-sm font-semibold transition-colors sm:flex-none sm:px-4",
+                    "h-8 flex-1 rounded-full px-2 text-xs font-semibold transition-colors sm:flex-none sm:px-4",
                     status === t.key
                       ? "bg-[var(--ink)] text-[var(--bg)]"
                       : "text-[var(--ink-muted)] hover:text-[var(--ink)]",

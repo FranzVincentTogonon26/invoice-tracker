@@ -33,7 +33,7 @@ const MiniStat = ({ icon: Icon, label, value, loading, iconClass, title }) => (
       >
         <Icon size={14} strokeWidth={2.2} />
       </span>
-      <p className="type-eyebrow truncate text-[9px] text-[var(--ink-muted)] sm:text-[10px]">
+      <p className="type-eyebrow truncate text-[10px] text-[var(--ink-muted)] sm:text-[11px]">
         {label}
       </p>
     </div>
@@ -47,36 +47,10 @@ const MiniStat = ({ icon: Icon, label, value, loading, iconClass, title }) => (
   </div>
 );
 
-// Maps an expense row from the API into the shape the ledger renders.
-// Kept in one place so local state and server sync stay identical.
-const toTransaction = (exp) => ({
-  kind: "expense",
-  id: exp.id,
-  description: exp.description,
-  date: exp.expense_date,
-  timeDate: exp.created_at,
-  amount: Number(exp.total_amount) || 0,
-  method: exp.payment_method,
-  status: exp.status,
-  // Backdated marker set by the backend (`expenses.flag = 1` when an
-  // employee line is dated before their first issued budget). Exposed as
-  // both `flag` (raw) and `flagged` (boolean) so the ledger can highlight
-  // the row with a warning tone.
-  flag: Number(exp.flag) || 0,
-  flagged: Number(exp.flag) === 1,
-  reference_label: exp.reference_label || "",
-  notes: exp.notes || "",
-  category: exp.category_name || "",
-  category_name: exp.category_name,
-  // Everything the View expense modal needs: receipt (image + line items
-  // are fetched by id) and the source-of-funds label.
-  receiptId: exp.receipt_id,
-  imageUrl: exp.image_url || "",
-  sourceOfFunds: exp.reference_label || "",
-  employee: exp.created_by,
-  employeeRole: exp.created_by_role,
-  employeeAvatar: exp.created_by_avatar,
-});
+// Maps an expense row from the API into the shape the ledger renders —
+// shared with the Admin → Employee Details tab (lib/employeeLedger.js) so
+// both pages render identical rows from the same endpoint payload.
+import { expenseToTransaction as toTransaction } from "../../lib/employeeLedger";
 
 const EmployeeExpenses = () => {
   const nav = useNavigate();

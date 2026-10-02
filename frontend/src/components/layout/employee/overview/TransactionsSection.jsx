@@ -171,6 +171,43 @@ const isCancelledIssued = (row) =>
 const isDraftExpense = (row) =>
   row?.kind === "expense" && row?.status === "draft";
 
+// Ledger TYPE badge (the "Type" column): pure kind + transfer-direction
+// mapping — never status. Draft / cancelled / settled states stay in the
+// Status column, so the two columns can't contradict each other:
+//   - issued (live or cancelled) → "Budget Received" (accent, money in)
+//   - expense (paid, draft or cancelled) → "Expenses" (neutral)
+//   - transfer sent → "Transfer Budget" (neutral; the danger amount already
+//     signals money-out, mirroring the sheet's neutral "Sent")
+//   - transfer received → "Received Budget Transfer" (success, money in,
+//     mirroring the sheet's success "Received")
+//   - abono (open, settled or draft) → "Abono" (warning, the universal
+//     abono tone; settled state stays in the Status column)
+const getTypeBadge = (row) => {
+  if (isTransfer(row)) {
+    return isSentTransfer(row)
+      ? { label: "Transfer Budget", tone: "neutral", Icon: ArrowLeftRight }
+      : {
+          label: "Received Budget Transfer",
+          tone: "success",
+          Icon: ArrowLeftRight,
+        };
+  }
+  switch (row?.kind) {
+    case "issued":
+      return { label: "Budget Received", tone: "accent", Icon: Wallet };
+    case "expense":
+      return { label: "Expenses", tone: "neutral", Icon: ReceiptText };
+    case "abono":
+      return { label: "Abono", tone: "warning", Icon: HandCoins };
+    default:
+      return {
+        label: TYPE_CONFIG[row?.kind]?.label ?? "Other",
+        tone: "neutral",
+        Icon: Layers,
+      };
+  }
+};
+
 /* ── Mobile detail sheet body — amount hero + summary rows per kind ── */
 // Mirrors the budget ledger's IssuedDetailsBody: one amount hero on top,
 // then type-specific summaries below. Read-only — overview never edits.
@@ -353,6 +390,9 @@ const OverviewDetailsBody = ({ row, meta }) => {
 };
 
 function getDateGroupLabel(date) {
+  // Unparseable dates render "—" instead of silently falling into Today
+  // (startOfDay falls back to now for nullish input).
+  if (!toDate(date)) return "—";
   const txDate = startOfDay(toDate(date));
   const today = startOfDay(new Date());
   const yesterday = addDays(today, -1);
@@ -485,7 +525,8 @@ function OverviewSheet({ row, onClose }) {
   );
 }
 
-const COLUMN_WIDTHS = ["16%", "28%", "18%", "16%", "22%"];
+// Seven columns: Date, Description, Type, Method, Status, Day, Amount.
+const COLUMN_WIDTHS = ["12%", "24%", "14%", "10%", "11%", "12%", "17%"];
 
 export const TransactionsSection = ({
   transactions = [],
@@ -526,6 +567,7 @@ export const TransactionsSection = ({
     return sortedTransactions.filter((tx) => {
       if (!inRange(tx)) return false;
       const typeLabel = TYPE_CONFIG[tx.kind]?.label?.toLowerCase() || "";
+      const typeBadgeLabel = getTypeBadge(tx).label.toLowerCase();
       const desc = (tx.description || "").toLowerCase();
       const refLabel = (tx.reference_label || "").toLowerCase();
       const notes = (tx.notes || "").toLowerCase();
@@ -540,6 +582,7 @@ export const TransactionsSection = ({
         refLabel.includes(q) ||
         notes.includes(q) ||
         typeLabel.includes(q) ||
+        typeBadgeLabel.includes(q) ||
         method.includes(q) ||
         status.includes(q) ||
         direction.includes(q) ||
@@ -651,7 +694,7 @@ export const TransactionsSection = ({
           />
         ) : (
           <div className="overflow-x-auto rounded-2xl border border-[var(--border)] bg-[var(--surface)] shadow-card">
-            <table className="w-full min-w-[720px] table-fixed border-collapse text-left">
+            <table className="w-full min-w-[960px] table-fixed border-collapse text-left">
               <caption className="sr-only">
                 Employee all transactions list
               </caption>
@@ -670,10 +713,16 @@ export const TransactionsSection = ({
                     Description
                   </th>
                   <th className="whitespace-nowrap border-b border-[var(--border)] px-4 py-3 type-eyebrow text-[var(--ink-muted)]">
+                    Type
+                  </th>
+                  <th className="whitespace-nowrap border-b border-[var(--border)] px-4 py-3 type-eyebrow text-[var(--ink-muted)]">
                     Method
                   </th>
                   <th className="whitespace-nowrap border-b border-[var(--border)] px-4 py-3 type-eyebrow text-[var(--ink-muted)]">
-                    Type
+                    Status
+                  </th>
+                  <th className="whitespace-nowrap border-b border-[var(--border)] px-4 py-3 type-eyebrow text-[var(--ink-muted)]">
+                    Day
                   </th>
                   <th className="whitespace-nowrap border-b border-[var(--border)] px-4 py-3 text-right type-eyebrow text-[var(--ink-muted)] last:pr-5">
                     Amount
@@ -687,6 +736,8 @@ export const TransactionsSection = ({
                   const transfer = isTransfer(tx);
                   const sent = isSentTransfer(tx);
                   const negative = isNegative(tx);
+                  const typeBadge = getTypeBadge(tx);
+                  const TypeIcon = typeBadge.Icon;
                   const amountColor = negative
                     ? "text-[var(--danger)]"
                     : tx.kind === "issued" || (!sent && transfer)
@@ -728,10 +779,16 @@ export const TransactionsSection = ({
 
                       <td className="px-4 py-3 align-middle">
                         <p
-                          className="truncate text-[13px] font-semibold leading-snug text-[var(--ink)]"
-                          title={tx.reference_label || tx.description}
+                          className=" text-[13px] font-medium leading-snug text-[var(--ink)]"
+                          title={
+                            transfer
+                              ? tx.reference_label || tx.description
+                              : tx.description
+                          }
                         >
-                          {tx.reference_label || tx.description || "—"}
+                          {transfer
+                            ? tx.reference_label || tx.description || "—"
+                            : tx.description || "—"}
                         </p>
                         {flagged ? (
                           <span className="mt-1.5 inline-flex">
@@ -750,19 +807,27 @@ export const TransactionsSection = ({
                           </span>
                         ) : transfer && tx.notes && transferCounterparty(tx) ? (
                           <p
-                            className="mt-0.5 truncate text-[11px] leading-snug text-[var(--ink-muted)]"
+                            className="mt-0.5 text-[11px] leading-snug text-[var(--ink-muted)]"
                             title={transferCounterparty(tx)}
                           >
                             {transferCounterparty(tx)}
                           </p>
-                        ) : tx.reference_label && tx.description ? (
-                          <p
-                            className="mt-0.5 truncate text-[11px] leading-snug text-[var(--ink-muted)]"
-                            title={tx.description}
-                          >
-                            {tx.description}
-                          </p>
                         ) : null}
+                      </td>
+                      <td className="px-4 py-3 align-middle">
+                        <Badge
+                          tone={typeBadge.tone}
+                          className="max-w-full gap-1.5 px-2 py-1 text-[11px]"
+                          title={typeBadge.label}
+                        >
+                          <TypeIcon
+                            size={12}
+                            strokeWidth={2.2}
+                            aria-hidden
+                            className="shrink-0"
+                          />
+                          <span className="truncate">{typeBadge.label}</span>
+                        </Badge>
                       </td>
                       <td className="px-4 py-3 align-middle">
                         <MethodBadge
@@ -802,6 +867,28 @@ export const TransactionsSection = ({
                               {sent ? "Sent" : "Transfer"}
                             </span>
                           </Badge>
+                        ) : tx?.kind === "abono" && tx?.status === "settled" ? (
+                          // Settled abono is closed out — accent "Settled"
+                          // badge with the settled date below. Unsettled
+                          // abono keeps the type badge below.
+                          <>
+                            <Badge
+                              tone="accent"
+                              className="max-w-full gap-1.5 px-2 py-1 text-[11px]"
+                            >
+                              <span className="h-2 w-2 rounded-full bg-current opacity-80" />
+                              <span className="truncate">Settled</span>
+                            </Badge>
+                            {tx?.date_settled && (
+                              <p
+                                className="mt-1.5 truncate whitespace-nowrap text-[11px] leading-none tabular-nums text-[var(--ink-muted)]"
+                                title={`Settled on ${formatDate(tx.date_settled)} at ${formatTime(tx.date_settled)}`}
+                              >
+                                {formatDate(tx.date_settled)} ·{" "}
+                                {formatTime(tx.date_settled)}
+                              </p>
+                            )}
+                          </>
                         ) : (
                           <Badge
                             tone={meta.badgeTone}
@@ -815,6 +902,20 @@ export const TransactionsSection = ({
                             <span className="truncate">{meta.label}</span>
                           </Badge>
                         )}
+                      </td>
+                      <td className="px-4 py-3 align-middle">
+                        <p
+                          className="whitespace-nowrap text-left text-[13px] font-medium leading-none text-[var(--ink)]"
+                          title={`${formatDate(tx.date)} at ${formatTime(tx.date)}`}
+                        >
+                          {getDateGroupLabel(tx.date)}
+                          <span aria-hidden className="mx-1.5 opacity-40">
+                            ·
+                          </span>
+                          <span className="text-[11px] tabular-nums text-[var(--ink-muted)]">
+                            {formatTime(tx.date)}
+                          </span>
+                        </p>
                       </td>
                       <td className="px-4 py-3 text-right last:pr-5 align-middle">
                         <span

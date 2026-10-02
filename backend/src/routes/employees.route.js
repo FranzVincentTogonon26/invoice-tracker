@@ -18,6 +18,34 @@ router.get(
   requireAdminAccess,
   employeesController.employees,
 );
+
+// Admin → Employees → Details tabs — one selected employee's records
+// (read-only). Declared before the destructive "/:id" routes; every handler
+// re-validates the target account (exists, any status) server-side.
+router.get(
+  "/:id/overview",
+  authMiddleware,
+  requireAdminAccess,
+  employeesController.detailsOverview,
+);
+router.get(
+  "/:id/budget",
+  authMiddleware,
+  requireAdminAccess,
+  employeesController.detailsBudget,
+);
+router.get(
+  "/:id/expenses",
+  authMiddleware,
+  requireAdminAccess,
+  employeesController.detailsExpenses,
+);
+router.get(
+  "/:id/abono",
+  authMiddleware,
+  requireAdminAccess,
+  employeesController.detailsAbono,
+);
 router.post(
   "/",
   authMiddleware,

@@ -44,12 +44,12 @@ export const employeeListboxProps = (placeholder = "All Employee") => ({
     option ? (
       <span className="flex min-w-0 flex-1 items-center gap-2 text-left">
         <EmployeeAvatar option={option} />
-        <span className="min-w-0 truncate text-sm font-semibold text-[var(--ink-muted)]">
+        <span className="min-w-0 truncate text-xs font-semibold text-[var(--ink-muted)]">
           {option.label}
         </span>
       </span>
     ) : (
-      <span className="min-w-0 flex-1 truncate text-left text-sm font-semibold text-[var(--ink-muted)]">
+      <span className="min-w-0 flex-1 truncate text-left text-xs font-semibold text-[var(--ink-muted)]">
         {placeholder}
       </span>
     ),

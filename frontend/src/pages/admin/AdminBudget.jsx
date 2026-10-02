@@ -372,7 +372,9 @@ export default function AdminBudget() {
                   className="grow px-2.5 sm:grow-0 sm:px-4"
                 >
                   <Icon size={14} aria-hidden className="shrink-0" />
-                  <span className="whitespace-nowrap">{label}</span>
+                  <span className="whitespace-nowrap type-eyebrow">
+                    {label}
+                  </span>
                 </TabsTrigger>
               ))}
             </TabsList>
@@ -391,7 +393,7 @@ export default function AdminBudget() {
             <EmployeeBudget
               employeeIssuedBudget={budgets}
               isLoading={isLoading}
-              onOpen={(id) => nav(`/employee/${id}`)}
+              onOpen={(id) => nav(`/admin/employees/${id}`)}
             />
           </TabsContent>
           <TabsContent value="budget_transaction">

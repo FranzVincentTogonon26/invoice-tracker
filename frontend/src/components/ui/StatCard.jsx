@@ -223,7 +223,7 @@ export function StatCard({
               {label}
             </span>
           </div>
-          <div className="flex items-baseline gap-1 min-w-0 items-center">
+          <div className="flex min-w-0 items-center gap-1">
             <span
               className={cn(
                 "font-display tabular-nums text-2xl sm:text-3xl font-semibold tracking-tight truncate",
@@ -258,20 +258,6 @@ export function StatCard({
               </span>
             )}
           </div>
-          {/* {status?.label != null &&
-            (() => {
-              return (
-                <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
-                  <Badge
-                    role="status"
-                    tone={status.tone ?? "neutral"}
-                    className={cn(accent && "bg-white/15 text-white")}
-                  >
-                    {status.label}vvggggg
-                  </Badge>
-                </div>
-              );
-            })()} */}
           {delta != null && (
             <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
               <Badge
@@ -301,7 +287,7 @@ export function StatCard({
           {hasCaption && (
             <p
               className={cn(
-                "text-sm leading-relaxed",
+                "text-xs leading-relaxed",
                 accent ? "text-white/60" : "text-[var(--ink-muted)]",
               )}
             >
@@ -341,7 +327,7 @@ export function StatCard({
               {breakdown.length === 0 ? (
                 <p
                   className={cn(
-                    "text-sm italic py-1",
+                    "text-sm  py-1",
                     accent ? "text-white/60" : "text-[var(--ink-muted)]",
                   )}
                 >
@@ -370,7 +356,7 @@ export function StatCard({
                            it (same pattern as SelectReference rows) */}
                         <span
                           className={cn(
-                            "min-w-0 truncate",
+                            "min-w-0 truncate text-xs",
                             accent
                               ? "text-white/90"
                               : "text-[var(--ink-muted)]",

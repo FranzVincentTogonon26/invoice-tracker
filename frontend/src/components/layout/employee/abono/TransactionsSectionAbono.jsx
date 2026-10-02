@@ -178,6 +178,17 @@ function TransactionCard({ tx, meta, disabled, onOpen }) {
               {methodLabel(tx.method)}
             </span>
           </span>
+          {tx?.status === "settled" && tx?.dateSettled && (
+            <span className="mt-1.5 flex min-w-0 items-center text-[11px] font-medium leading-none text-[var(--ink-muted)]">
+              <span
+                className="truncate tabular-nums"
+                title={`Settled on ${formatDate(tx.dateSettled)} at ${formatTime(tx.dateSettled)}`}
+              >
+                Settled {formatDate(tx.dateSettled)} ·{" "}
+                {formatTime(tx.dateSettled)}
+              </span>
+            </span>
+          )}
         </div>
       </div>
       <div className="flex shrink-0 items-center gap-1.5">
@@ -197,9 +208,13 @@ function TransactionSheet({
   onView,
   onDelete,
   onUpdate,
+  // Read-only rendering (Admin → Employee Details): drops the delete action
+  // and disables inline description editing.
+  canManage = true,
+  canEdit = true,
 }) {
   const sheetRef = useRef(null);
-  const actionable = isSheetActionable(row);
+  const actionable = isSheetActionable(row) && canManage;
   const meta = TYPE_CONFIG[row?.kind] ?? TYPE_CONFIG.abono;
   const Icon = meta.icon;
   const title = row?.description || meta.label || "Abono";
@@ -269,6 +284,7 @@ function TransactionSheet({
               onView={onView}
               onDelete={onDelete}
               onUpdate={onUpdate}
+              canEdit={canEdit}
             />
           </motion.div>
         </motion.div>
@@ -289,6 +305,7 @@ function TransactionSheetBody({
   close,
   onDelete,
   onUpdate,
+  canEdit = true,
 }) {
   // Non-null only while the description is being edited — the displayed text
   // derives from `title` (the row) otherwise, so an updated row always shows
@@ -386,7 +403,7 @@ function TransactionSheetBody({
               <p className="type-eyebrow text-[var(--ink-muted)]">
                 Description
               </p>
-              {!isSettled && (
+              {canEdit && !isSettled && (
                 <span className="ml-2 text-[10px] text-[var(--ink-muted)]">
                   Double-click to edit
                 </span>
@@ -406,18 +423,22 @@ function TransactionSheetBody({
               />
             ) : (
               <p
-                onDoubleClick={handleDoubleClick}
-                onTouchEnd={(e) => {
-                  // Handle double tap on mobile
-                  const now = Date.now();
-                  if (
-                    e.target.dataset.lastTap &&
-                    now - e.target.dataset.lastTap < 300
-                  ) {
-                    handleDoubleClick();
-                  }
-                  e.target.dataset.lastTap = now;
-                }}
+                onDoubleClick={canEdit ? handleDoubleClick : undefined}
+                onTouchEnd={
+                  canEdit
+                    ? (e) => {
+                        // Handle double tap on mobile
+                        const now = Date.now();
+                        if (
+                          e.target.dataset.lastTap &&
+                          now - e.target.dataset.lastTap < 300
+                        ) {
+                          handleDoubleClick();
+                        }
+                        e.target.dataset.lastTap = now;
+                      }
+                    : undefined
+                }
                 className={cn(
                   "mt-1.5 text-sm text-[var(--ink)]",
                   actionable &&
@@ -631,6 +652,9 @@ export const TransactionsSectionAbono = ({
   isLoading = false,
   totalBalance = null,
   onTransactionUpdate,
+  // Admin → Employee Details renders the section as a read-only record view:
+  // no delete action, no inline description editing.
+  readOnly = false,
 }) => {
   const [search, setSearch] = useState("");
   const [debouncedSearch, setDebouncedSearch] = useState("");
@@ -865,7 +889,7 @@ export const TransactionsSectionAbono = ({
                     <tr
                       key={`${tx.kind}-${tx.id}`}
                       className={cn(
-                        "relative cursor-pointer transition-colors duration-150 hover:bg-[var(--accent)]/[0.05]",
+                        "relative  transition-colors duration-150 hover:bg-[var(--accent)]/[0.05]",
                         flagged &&
                           "bg-[var(--warning)]/[0.08] hover:bg-[var(--warning)]/[0.12]",
                       )}
@@ -883,7 +907,7 @@ export const TransactionsSectionAbono = ({
                             flagged ? "bg-[var(--warning)]" : "bg-transparent",
                           )}
                         />
-                        <p className="whitespace-nowrap text-[13px] font-semibold leading-none tabular-nums text-[var(--ink)]">
+                        <p className="whitespace-nowrap text-[13px] font-medium leading-none tabular-nums text-[var(--ink)]">
                           {formatDate(tx.date)}
                         </p>
                         <p className="mt-1 whitespace-nowrap text-[11px] leading-none tabular-nums text-[var(--ink-muted)]">
@@ -892,7 +916,7 @@ export const TransactionsSectionAbono = ({
                       </td>
                       <td className="px-4 py-3 align-middle">
                         <p
-                          className="truncate text-[13px] font-semibold leading-snug text-[var(--ink)]"
+                          className=" text-[13px] font-medium leading-snug text-[var(--ink)]"
                           title={tx.reference_label || tx.description}
                         >
                           {tx.description}
@@ -933,6 +957,15 @@ export const TransactionsSectionAbono = ({
                             <span className="truncate">{meta.label}</span>
                           </Badge>
                         )}
+                        {tx?.status === "settled" && tx?.dateSettled && (
+                          <p
+                            className="mt-1.5 truncate whitespace-nowrap text-[11px] leading-none tabular-nums text-[var(--ink-muted)]"
+                            title={`Settled on ${formatDate(tx.dateSettled)} at ${formatTime(tx.dateSettled)}`}
+                          >
+                            Settled {formatDate(tx.dateSettled)} ·{" "}
+                            {formatTime(tx.dateSettled)}
+                          </p>
+                        )}
                       </td>
                       <td className="px-4 py-3 text-right last:pr-5 align-middle">
                         <span
@@ -949,7 +982,8 @@ export const TransactionsSectionAbono = ({
                               (already covered by expenses) is locked — the
                               delete menu stays hidden (mirrors the mobile
                               sheet above). */}
-                          {tx?.status !== "settled" &&
+                          {!readOnly &&
+                            tx?.status !== "settled" &&
                             !isAbonoSpent(tx, totalBalance) && (
                               <RowActions
                                 row={tx}
@@ -1059,6 +1093,8 @@ export const TransactionsSectionAbono = ({
           // Let the page replace its local row so the ledger reflects the edit
           onTransactionUpdate?.(updatedRow);
         }}
+        canManage={!readOnly}
+        canEdit={!readOnly}
       />
 
       <ConfirmActionDialog

@@ -5,7 +5,7 @@ export const IconButton = forwardRef(({ className, dot, ...props }, ref) => (
   <button
     ref={ref}
     className={cn(
-      "relative inline-flex items-center justify-center h-11 w-11 rounded-full bg-[var(--surface)] border border-[var(--border)] text-[var(--ink)] shadow-card transition-all hover:shadow-hover hover:-translate-y-px focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)]/30",
+      "relative inline-flex items-center justify-center h-11 w-11 rounded-full bg-[var(--surface)] border border-[var(--border)] text-[var(--ink)] shadow-card transition-all hover:shadow-hover hover:-translate-y-px focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)]/30 disabled:pointer-events-none disabled:opacity-50",
       className,
     )}
     {...props}

@@ -1,5 +1,6 @@
 import { HandCoins } from "lucide-react";
 import { Badge, StatusBadge } from "../../../ui/Badge";
+import { STATUS } from "../../../../constants";
 import { MethodIcon } from "../../../ui/Select";
 import { cn, formatDate, formatMoney, formatTime } from "../../../../lib/utils";
 import { methodLabel } from "./PaymentMethod";
@@ -82,10 +83,10 @@ function NotesCell({ notes }) {
 function DateIssuedCell({ date }) {
   return (
     <>
-      <p className="text-sm leading-none tabular-nums text-[var(--ink)]">
+      <p className="text-[13px] leading-none  text-[var(--ink)]">
         {formatDate(date)}
       </p>
-      <p className="mt-1 text-xs leading-none tabular-nums text-[var(--ink-muted)]">
+      <p className="mt-1 text-xs leading-none  text-[var(--ink-muted)]">
         {formatTime(date)}
       </p>
     </>
@@ -143,7 +144,9 @@ export function IssuedTransactionRow({ transaction: t, onAction }) {
         <DateIssuedCell date={t.date_issued} />
       </td>
       <td className="px-4 py-3.5 text-center align-middle">
-        <StatusBadge status={t.status} />
+        <Badge tone="success" className="capitalize">
+          {STATUS[t.status]?.label ?? t.status ?? "—"}
+        </Badge>
       </td>
       <td className="px-4 py-3.5 pr-5 align-middle">
         <div className="flex justify-end">

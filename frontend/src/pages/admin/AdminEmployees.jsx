@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import { motion } from "framer-motion";
 import {
   BadgeCheck,
@@ -37,7 +38,6 @@ import {
 
 import EmployeesModal from "../../components/layout/admin/employees/EmployeesModal";
 import EmployeesTable from "../../components/layout/admin/employees/EmployeesTable";
-import EmployeeProfileModal from "../../components/layout/admin/employees/EmployeeProfileModal";
 
 // Client-side page size — the API returns the full filtered list.
 const PAGE_SIZE = 100;
@@ -51,6 +51,7 @@ const EMPLOYEE_STATUS_TABS = [
 ];
 
 export default function AdminEmployees() {
+  const nav = useNavigate();
   const { data: overview, isLoading: overviewLoading } = useEmployeesOverview();
   const {
     create,
@@ -58,7 +59,6 @@ export default function AdminEmployees() {
     remove,
   } = useEmployeesMutations();
   const [addOpen, setAddOpen] = useState(false);
-  const [viewEmployee, setViewEmployee] = useState(null);
 
   const [status, setStatus] = useState("all");
   const [search, setSearch] = useState("");
@@ -117,9 +117,10 @@ export default function AdminEmployees() {
     setAccountStatus.isPending || remove.isPending || create.isPending;
 
   const handleAction = async (action, employee) => {
-    // Read-only preview — no request, just opens the profile modal.
+    // "View employee" leaves the roster for the read-only detail route —
+    // no mutation involved, so navigate immediately.
     if (action === "view") {
-      setViewEmployee(employee);
+      nav(`/admin/employees/${employee.user_id}`);
       return;
     }
     try {
@@ -287,7 +288,7 @@ export default function AdminEmployees() {
                 type="button"
                 onClick={() => updateStatus(t.key)}
                 className={cn(
-                  "h-8 rounded-full px-4 text-sm font-semibold transition-colors",
+                  "h-8 rounded-full px-4 text-xs font-semibold transition-colors",
                   status === t.key
                     ? "bg-[var(--ink)] text-[var(--bg)]"
                     : "text-[var(--ink-muted)] hover:text-[var(--ink)]",
@@ -373,12 +374,6 @@ export default function AdminEmployees() {
         open={addOpen}
         create={create}
         onClose={() => setAddOpen(false)}
-      />
-
-      <EmployeeProfileModal
-        employee={viewEmployee}
-        open={Boolean(viewEmployee)}
-        onClose={() => setViewEmployee(null)}
       />
     </div>
   );

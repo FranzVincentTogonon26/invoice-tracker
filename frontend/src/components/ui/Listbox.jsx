@@ -341,7 +341,7 @@ export default function Listbox({
         ) : (
           <span
             className={cn(
-              "min-w-0 flex-1 truncate text-sm font-semibold text-[var(--ink-muted)] transition-colors text-left",
+              "min-w-0 flex-1 truncate text-xs font-semibold text-[var(--ink-muted)] transition-colors text-left",
               !selectedOption && "text-[var(--ink-muted)]",
             )}
           >

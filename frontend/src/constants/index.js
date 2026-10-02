@@ -1,57 +1,32 @@
-export const USER_ROLES = {
-  ADMIN: "admin",
-  EMPLOYEE: "employee",
-};
-
-// Payment methods accepted by `POST /budgets` (`budget.method`)
+export const USER_ROLES = { ADMIN: "admin", EMPLOYEE: "employee" };
 export const PAYMENT_METHODS = [
   { value: "cash", label: "Cash" },
   { value: "bank_transfer", label: "Bank Transfer" },
   { value: "e_wallet", label: "E-Wallet" },
 ];
-
 export const BUDGET_STATUS_TABS = [
   { key: "all", label: "All" },
   { key: "added", label: "Added" },
   { key: "closed", label: "Closed" },
   { key: "cancelled", label: "Cancelled" },
 ];
-
 export const STATUS = {
   closed: { tone: "accent", label: "Closed" },
   sent: { tone: "accent", label: "Sent" },
   paid: { tone: "success", label: "Paid" },
   overdue: { tone: "danger", label: "Overdue" },
-  // "pending" is an actionable, queued state — it reads amber (warning) the same
-  // way the Employees list does. Red (danger) is reserved for failures/overdue.
   pending: { tone: "warning", label: "Pending" },
   added: { tone: "accent", label: "Added" },
   cancelled: { tone: "danger", label: "Cancelled" },
-  // budget_issued_reference.status values (Budget Issued Transaction tab).
-  // `open` reads amber (warning) — an open issuance is live money still waiting
-  // to be closed out, an actionable state — not the decorative accent teal.
-  // `close` stays amber as its resolved twin and `cancel` keeps danger, so a
-  // cancelled line is never amber while an expense Cancelled is red.
   open: { tone: "warning", label: "Open" },
   cancel: { tone: "danger", label: "Cancelled" },
   close: { tone: "warning", label: "Closed" },
-  // users.status values (Employees tab)
   active: { tone: "success", label: "Active" },
   inactive: { tone: "neutral", label: "Inactive" },
 };
-
-// Shared constants + factory for the ExpensesModal family. Kept in one place
-// so the panels, the modal and the scan engine all quote the same values.
-
 export const ERROR_VISIBLE_MS = 5000;
-
-// Max receipt upload size — kept in sync with the backend multer limit
-// (middleware/upload.js, 10MB). Files only reach the server when the Add
-// Expenses form is saved (deferred batch upload), so this cap is about what
-// the AI can read, not about what fits in localStorage.
 export const MAX_RECEIPT_BYTES = 10 * 1024 * 1024;
 export const MAX_RECEIPT_LABEL = "10MB";
-
 export const MODAL_COPY = {
   category: {
     title: "Expense Categories",
@@ -66,12 +41,6 @@ export const MODAL_COPY = {
     maxWidth: "max-w-[880px]",
   },
 };
-
-// Scan-panel state. `file`/`localPreviewUrl` hold the picked receipt locally
-// (nothing is uploaded yet): `file` is what "Save expenses" later ships to
-// `POST /expenses/receipt-images`, and `localPreviewUrl` is the object URL
-// that previews it. `imageUrl` stays for legacy drafts that carry an
-// already-stored server URL.
 export const blankReceipt = () => ({
   file: null,
   localPreviewUrl: "",
@@ -87,21 +56,38 @@ export const blankReceipt = () => ({
   total: 0,
   suggestedCategory: "",
 });
-
-// Exactly the set the scan engine validates against (PNG/JPG/WEBP + PDF) —
-// a broad "image/*" would let GIF/BMP/SVG through the picker only to fail
-// the scan.
-// Exactly the set the avatar picker validates against — photos only. The
-// backend enforces the same list (middleware/upload.js + utils/avatarImage.js)
-// and, unlike receipts, there is NO size cap: any photo size is accepted.
 export const AVATAR_EXTENSIONS = ["png", "jpg", "jpeg", "webp", "heic", "heif"];
 export const AVATAR_ACCEPT = ".png,.jpg,.jpeg,.webp,.heic,.heif";
 export const AVATAR_UPLOAD_HINT =
   "Any photo size — PNG, JPG, JPEG, WEBP, HEIC or HEIF.";
-
 export const RECEIPT_ACCEPT = {
   "image/png": [".png"],
   "image/jpeg": [".jpg", ".jpeg"],
   "image/webp": [".webp"],
   "application/pdf": [".pdf"],
 };
+const toMoney = (value) => Math.round((Number(value) || 0) * 100) / 100;
+export function budgetBreakdown(employee) {
+  const issued = Math.max(0, toMoney(employee?.issued_budget));
+  const spent = Math.max(0, toMoney(employee?.total_spent));
+  const received = Math.max(0, toMoney(employee?.total_received));
+  const abono = Math.max(0, toMoney(employee?.total_abono));
+  const sent = Math.max(0, toMoney(employee?.total_sent));
+  const funded = toMoney(issued + abono + received);
+  const remaining = toMoney(received + abono + issued - spent - sent);
+  const share =
+    funded > 0 ? Number(((remaining / funded) * 100).toFixed(2)) : 0;
+  const spentShare =
+    funded > 0 ? Number(Math.min(100, Math.max(0, 100 - share)).toFixed(2)) : 0;
+  return {
+    issued,
+    spent,
+    remaining,
+    received,
+    abono,
+    sent,
+    funded,
+    share,
+    spentShare,
+  };
+}

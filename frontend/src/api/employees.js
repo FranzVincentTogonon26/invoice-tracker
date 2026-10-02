@@ -16,4 +16,18 @@ export const employeesApi = {
     apiClient.patch(`/employees/${id}/status`, { status }).then((r) => r.data),
   // Removes an employee account (cascades their issued budget references).
   remove: (id) => apiClient.delete(`/employees/${id}`).then((r) => r.data),
+
+  /* ── Admin → Employee Details tabs (`/admin/employees/:id`) ──
+   * One SELECTED employee's records, read-only. Each endpoint re-validates
+   * the id against the users table server-side (any account status) and
+   * returns the same payload shape the employee-facing endpoint returns, so
+   * the shared transaction sections render identically. */
+  detailsOverview: (id, params = {}) =>
+    apiClient.get(`/employees/${id}/overview`, { params }).then((r) => r.data),
+  detailsBudget: (id, params = {}) =>
+    apiClient.get(`/employees/${id}/budget`, { params }).then((r) => r.data),
+  detailsExpenses: (id, params = {}) =>
+    apiClient.get(`/employees/${id}/expenses`, { params }).then((r) => r.data),
+  detailsAbono: (id, params = {}) =>
+    apiClient.get(`/employees/${id}/abono`, { params }).then((r) => r.data),
 };

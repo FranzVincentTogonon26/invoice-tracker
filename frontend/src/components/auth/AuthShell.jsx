@@ -106,12 +106,7 @@ function BrandPanel({ headline, subhead }) {
           </div>
 
           <h2
-            className="font-serif text-[clamp(38px,3.2vw,44px)] xl:text-[clamp(44px,3.4vw,52px)] leading-[1.02] text-white mt-8 max-w-[540px]"
-            style={{
-              fontStyle: "italic",
-              fontWeight: 500,
-              letterSpacing: "-0.01em",
-            }}
+            className="font-display text-[clamp(38px,3.2vw,44px)] font-semibold tracking-tight xl:text-[clamp(44px,3.4vw,52px)] leading-[1.02] text-white mt-8 max-w-[540px]"
           >
             {headline}
           </h2>

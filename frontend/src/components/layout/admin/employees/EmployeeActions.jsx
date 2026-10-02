@@ -86,7 +86,9 @@ const MENU_GROUPS = ["view", "status", "danger"];
  * Row-level actions for the Employees table, collapsed into one dropdown to
  * keep the Actions column narrow. The trigger follows the account
  * status (all reversible except delete):
- *   - view      → "View employee" (read-only profile modal)
+ *   - view      → "View employee" (navigates to the read-only
+ *                 `employees/:id` detail route; the page handles the
+ *                 `onAction("view", employee)` event)
  *   - pending   → "Approve"    (pending -> active)
  *   - active    → "Deactivate" (active -> inactive)
  *   - inactive  → "Activate"   (inactive -> active)

@@ -158,8 +158,7 @@ function RowActions({
       group: "view",
       onSelect: () => onView?.(row),
     },
-    ...(isEmployeeRow &&
-    (row?.status === "paid" || row?.status === "cancel")
+    ...(isEmployeeRow && (row?.status === "paid" || row?.status === "cancel")
       ? [
           {
             key: "draft",
@@ -363,7 +362,7 @@ function LedgerRow({
               : "bg-[var(--accent-strong)] opacity-0 group-hover:opacity-100",
           )}
         />
-        <p className="text-sm leading-none tabular-nums text-[var(--ink)]">
+        <p className="text-[13px] leading-none text-[var(--ink)]">
           {formatDate(row.timeDate)}
         </p>
         <p className="mt-1.5 text-xs leading-none tabular-nums text-[var(--ink-muted)]">
@@ -374,7 +373,7 @@ function LedgerRow({
       <td className="px-4 py-4 align-middle">
         <p
           title={row.description}
-          className="truncate text-sm font-semibold leading-snug text-[var(--ink)]"
+          className="truncate text-[13px] font-semibold leading-snug text-[var(--ink)]"
         >
           {row.description || "Untitled"}
         </p>

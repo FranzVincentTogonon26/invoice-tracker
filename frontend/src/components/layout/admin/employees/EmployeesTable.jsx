@@ -4,13 +4,8 @@ import { Badge } from "../../../ui/Badge";
 import { EmployeeAvatar } from "../../../ui/SelectEmployee";
 import { cn, formatDate, formatMoney, formatTime } from "../../../../lib/utils";
 import EmployeeActions from "./EmployeeActions";
-import { budgetBreakdown } from "./employeeBudget";
+import { budgetBreakdown } from "../../../../constants/index";
 
-// Column proportions — Employee anchors the row (avatar + name + email) and
-// Remaining carries the value, pill and progress bar, so those two take the
-// room freed by Actions (now a single dropdown trigger, not a button row).
-// Percentages sum to 100% so `table-fixed` never overflows the scroll
-// container (sizing verified against the 1080px min-width).
 const COLUMN_WIDTHS = [
   "24%", // Employee
   "11%", // Status
@@ -60,7 +55,7 @@ export function EmployeeStatusBadge({ status, className }) {
 // (./employeeBudget) — the shared helper the profile modal uses too, so the
 // table and the modal can never disagree.
 
-function RemainingProgress({
+export function RemainingProgress({
   remaining,
   funded,
   spentShare,
@@ -138,7 +133,13 @@ function RemainingProgress({
   );
 }
 
-function SharePill({ remaining, funded, spentShare, overSpent, className }) {
+export function SharePill({
+  remaining,
+  funded,
+  spentShare,
+  overSpent,
+  className,
+}) {
   const fullySpent = funded > 0 && remaining <= 0;
   // Exact spent share from the shared breakdown (2 decimals, e.g. 99.05) —
   // the pill prints the same figure the bar fills, both derived from
@@ -181,7 +182,7 @@ function EmployeeCell({ employee }) {
       <EmployeeAvatar
         name={employee.name}
         avatarUrl={employee.avatar_url}
-        className="h-11 w-11 rounded-full text-sm ring-1 ring-inset ring-[var(--accent)]/15"
+        className="h-9 w-9 rounded-full text-sm ring-1 ring-inset ring-[var(--accent)]/15"
       />
       <div className="min-w-0">
         <p className="truncate font-display text-sm font-semibold leading-snug tracking-tight text-[var(--ink)] transition-colors duration-150 group-hover:text-[var(--accent-strong)]">
@@ -300,10 +301,10 @@ function EmployeeRow({ employee, pending, onAction }) {
       <td className="px-3 py-3.5 align-middle">
         {employee.created_at ? (
           <div>
-            <p className="whitespace-nowrap text-[13px] font-medium leading-none tabular-nums text-[var(--ink)]">
+            <p className="whitespace-nowrap text-[13px] font-medium leading-none text-[var(--ink)]">
               {formatDate(employee.created_at)}
             </p>
-            <p className="mt-1 text-xs leading-none tabular-nums text-[var(--ink-muted)]">
+            <p className="mt-1 text-xs leading-none  text-[var(--ink-muted)]">
               {formatTime(employee.created_at)}
             </p>
           </div>

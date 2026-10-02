@@ -118,7 +118,10 @@ const SHEET_EASE = [0.16, 1, 0.3, 1];
 const PAGE_SIZE = 50;
 const COLUMN_WIDTHS = ["14%", "24%", "14%", "12%", "14%"];
 
-const TransferDetailsBody = ({ row, pending, onCancel }) => {
+// `actionable` is false when the section renders read-only (Admin → Employee
+// Details): the cancel affordance disappears while every other detail still
+// renders.
+const TransferDetailsBody = ({ row, pending, onCancel, actionable = true }) => {
   const sent = isSentTransfer(row);
   const counterparty = rowCounterparty(row);
   return (
@@ -186,7 +189,7 @@ const TransferDetailsBody = ({ row, pending, onCancel }) => {
       {/* Only the sender can take a transfer back — received rows offer no
           action. Cancelling asks for confirmation first, then deletes the
           `budget_transfer` record server-side. */}
-      {sent && (
+      {sent && actionable && (
         <div className="mt-4 space-y-2">
           <Button
             type="button"
@@ -340,7 +343,13 @@ function TransactionCard({ tx, onOpen }) {
 }
 
 /* ── Mobile bottom sheet — same slide-up animation as the expenses sheet ── */
-function TransactionSheet({ row, pending, onClose, onCancel }) {
+function TransactionSheet({
+  row,
+  pending,
+  onClose,
+  onCancel,
+  actionable = true,
+}) {
   const sheetRef = useRef(null);
   const close = useCallback(() => {
     if (pending) return;
@@ -442,6 +451,7 @@ function TransactionSheet({ row, pending, onClose, onCancel }) {
                 row={row}
                 pending={pending}
                 onCancel={onCancel}
+                actionable={actionable}
               />
             ) : (
               <IssuedDetailsBody row={row} />
@@ -457,6 +467,10 @@ function TransactionSheet({ row, pending, onClose, onCancel }) {
 export const TransactionsSectionBudget = ({
   transactions = [],
   isLoading = false,
+  // Admin → Employee Details renders the section as a read-only record view:
+  // the cancel-transfer action is hidden (the admin ledger owns those rows,
+  // the employee-facing mutation must not run from here).
+  readOnly = false,
 }) => {
   const [search, setSearch] = useState("");
   const [debouncedSearch, setDebouncedSearch] = useState("");
@@ -703,7 +717,7 @@ export const TransactionsSectionBudget = ({
                         </p>
                         {subline && (
                           <p
-                            className="mt-0.5 truncate text-[11px] leading-snug text-[var(--ink-muted)]"
+                            className="mt-0.5 text-[11px] leading-snug text-[var(--ink-muted)]"
                             title={subline}
                           >
                             {subline}
@@ -821,6 +835,7 @@ export const TransactionsSectionBudget = ({
         pending={cancelPending}
         onClose={() => setSheetRow(null)}
         onCancel={requestCancel}
+        actionable={!readOnly}
       />
 
       <ConfirmActionDialog

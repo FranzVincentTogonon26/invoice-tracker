@@ -216,9 +216,13 @@ function TransactionSheet({
   onView,
   onDelete,
   onUpdate,
+  // Read-only rendering (Admin → Employee Details): drops the delete action
+  // and disables inline description editing.
+  canManage = true,
+  canEdit = true,
 }) {
   const sheetRef = useRef(null);
-  const actionable = isSheetActionable(row);
+  const actionable = isSheetActionable(row) && canManage;
   const meta = TYPE_CONFIG[row?.kind] ?? TYPE_CONFIG.expense;
   const Icon = meta.icon;
   const close = useCallback(() => {
@@ -288,6 +292,7 @@ function TransactionSheet({
               onView={onView}
               onDelete={onDelete}
               onUpdate={onUpdate}
+              canEdit={canEdit}
             />
           </motion.div>
         </motion.div>
@@ -309,6 +314,7 @@ function TransactionSheetBody({
   onView,
   onDelete,
   onUpdate,
+  canEdit = true,
 }) {
   const [isEditing, setIsEditing] = useState(false);
   const [description, setDescription] = useState(title || "");
@@ -428,9 +434,11 @@ function TransactionSheetBody({
               <p className="type-eyebrow text-[var(--ink-muted)]">
                 Description
               </p>
-              <span className="ml-2 text-[10px] text-[var(--ink-muted)]">
-                Double-click to edit
-              </span>
+              {canEdit && (
+                <span className="ml-2 text-[10px] text-[var(--ink-muted)]">
+                  Double-click to edit
+                </span>
+              )}
             </div>
 
             {isEditing ? (
@@ -446,18 +454,22 @@ function TransactionSheetBody({
               />
             ) : (
               <p
-                onDoubleClick={handleDoubleClick}
-                onTouchEnd={(e) => {
-                  // Handle double tap on mobile
-                  const now = Date.now();
-                  if (
-                    e.target.dataset.lastTap &&
-                    now - e.target.dataset.lastTap < 300
-                  ) {
-                    handleDoubleClick();
-                  }
-                  e.target.dataset.lastTap = now;
-                }}
+                onDoubleClick={canEdit ? handleDoubleClick : undefined}
+                onTouchEnd={
+                  canEdit
+                    ? (e) => {
+                        // Handle double tap on mobile
+                        const now = Date.now();
+                        if (
+                          e.target.dataset.lastTap &&
+                          now - e.target.dataset.lastTap < 300
+                        ) {
+                          handleDoubleClick();
+                        }
+                        e.target.dataset.lastTap = now;
+                      }
+                    : undefined
+                }
                 className={cn(
                   "mt-1.5 text-sm text-[var(--ink)] normal-case",
                   actionable && !pending && "cursor-pointer hover:underline",
@@ -515,7 +527,7 @@ function TransactionSheetBody({
   );
 }
 
-function RowActions({ row, pending, onView, onDelete }) {
+function RowActions({ row, pending, onView, onDelete, canDelete = true }) {
   const [open, setOpen] = useState(false);
   const [position, setPosition] = useState(null);
   const btnRef = useRef(null);
@@ -568,13 +580,19 @@ function RowActions({ row, pending, onView, onDelete }) {
       danger: false,
       onSelect: () => onView?.(row),
     },
-    {
-      key: "delete",
-      label: "Delete expense",
-      Icon: Trash2,
-      danger: true,
-      onSelect: () => onDelete?.(row),
-    },
+    // Read-only mode (Admin → Employee Details) keeps the menu for viewing
+    // but drops the destructive entry.
+    ...(canDelete
+      ? [
+          {
+            key: "delete",
+            label: "Delete expense",
+            Icon: Trash2,
+            danger: true,
+            onSelect: () => onDelete?.(row),
+          },
+        ]
+      : []),
   ];
 
   const openMenu = () => {
@@ -648,6 +666,9 @@ export const TransactionsSectionExpenses = ({
   transactions = [],
   isLoading = false,
   onTransactionUpdate,
+  // Admin → Employee Details renders the section as a read-only record view:
+  // no soft delete, no inline description editing.
+  readOnly = false,
 }) => {
   const [search, setSearch] = useState("");
   const [debouncedSearch, setDebouncedSearch] = useState("");
@@ -879,7 +900,7 @@ export const TransactionsSectionExpenses = ({
                       }
                     >
                       <td className="relative px-4 py-3 first:pl-5 align-middle">
-                        <p className="whitespace-nowrap text-[13px] font-semibold leading-none tabular-nums text-[var(--ink)]">
+                        <p className="whitespace-nowrap text-[13px] font-medium leading-none tabular-nums text-[var(--ink)]">
                           {formatDate(tx.date)}
                         </p>
                         <p className="mt-1 whitespace-nowrap text-[11px] leading-none tabular-nums text-[var(--ink-muted)]">
@@ -888,7 +909,7 @@ export const TransactionsSectionExpenses = ({
                       </td>
                       <td className="px-4 py-3 align-middle">
                         <p
-                          className="normal-case truncate text-[13px] font-semibold leading-snug text-[var(--ink)]"
+                          className="normal-case text-[13px] font-medium leading-snug text-[var(--ink)]"
                           title={tx.reference_label || tx.description}
                         >
                           {tx.description}
@@ -952,6 +973,7 @@ export const TransactionsSectionExpenses = ({
                             pending={confirmPending}
                             onView={setViewRow}
                             onDelete={setDeleteRow}
+                            canDelete={!readOnly}
                           />
                         </div>
                       </td>
@@ -1062,6 +1084,8 @@ export const TransactionsSectionExpenses = ({
           // Let the page replace its local row so the ledger reflects the edit
           onTransactionUpdate?.(updatedRow);
         }}
+        canManage={!readOnly}
+        canEdit={!readOnly}
       />
 
       <ConfirmActionDialog

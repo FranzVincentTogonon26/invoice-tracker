@@ -36,7 +36,7 @@ const MiniStat = ({ icon: Icon, label, value, loading, iconClass, title }) => (
       >
         <Icon size={14} strokeWidth={2.2} />
       </span>
-      <p className="type-eyebrow truncate text-[9px] text-[var(--ink-muted)] sm:text-[10px]">
+      <p className="type-eyebrow truncate text-[10px] text-[var(--ink-muted)] sm:text-[11px]">
         {label}
       </p>
     </div>
@@ -187,7 +187,7 @@ const EmployeeOverview = () => {
                         ? ` · ${expenseCount} ${expenseCount === 1 ? "expense" : "expenses"}`
                         : ""}
                       {totalReceived > 0
-                        ? ` · ${formatMoney(totalReceived)} received budget`
+                        ? ` · ${formatMoney(totalReceived)} received`
                         : ""}
                     </p>
                   </div>

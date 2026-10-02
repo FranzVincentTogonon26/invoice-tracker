@@ -60,18 +60,20 @@ export function TransactionRow({
 
       {/* Date */}
       <td className="px-4 py-3.5 align-middle">
-        <p className="text-sm leading-none tabular-nums text-[var(--ink)]">
+        <p className="text-[13px] leading-none  text-[var(--ink)]">
           {formatDate(t.created_at)}
         </p>
 
-        <p className="mt-1 text-xs leading-none tabular-nums text-[var(--ink-muted)]">
+        <p className="mt-1 text-xs leading-none  text-[var(--ink-muted)]">
           {formatTime(t.created_at)}
         </p>
       </td>
 
       {/* Status */}
       <td className="px-4 py-3.5 text-center align-middle">
-        <StatusBadge status={t.status} />
+        <Badge tone="success" className="capitalize">
+          {t.status}
+        </Badge>
       </td>
 
       {/* Actions */}

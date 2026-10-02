@@ -14,18 +14,19 @@ import Register from "../pages/Register";
 
 import AdminDashboard from "../pages/admin/AdminDashboard";
 import AdminEmployees from "../pages/admin/AdminEmployees";
+import AdminEmployeesDetails from "../components/layout/admin/employees/AdminEmployeesDetails";
 import AdminBudget from "../pages/admin/AdminBudget";
 import AdminProfile from "../pages/admin/AdminProfile";
 import AdminTransaction from "../pages/admin/AdminTransaction";
 import AdminExpenses from "../pages/admin/AdminExpenses";
-
-import AddExpenses from "../components/layout/expenses/AddExpenses";
 
 import EmployeeOverview from "../pages/employee/EmployeeOverview";
 import EmployeeBudget from "../pages/employee/EmployeeBudget";
 import EmployeeExpenses from "../pages/employee/EmployeeExpenses";
 import EmployeeAbono from "../pages/employee/EmployeeAbono";
 import EmployeeSetting from "../pages/employee/EmployeeSetting";
+
+import AddExpenses from "../components/layout/expenses/AddExpenses";
 import BudgetTransfer from "../components/layout/budget_transfer/BudgetTransfer";
 
 export const router = createBrowserRouter([
@@ -55,6 +56,7 @@ export const router = createBrowserRouter([
               { path: "budget", element: <AdminBudget /> },
               { path: "transaction", element: <AdminTransaction /> },
               { path: "employees", element: <AdminEmployees /> },
+              { path: "employees/:id", element: <AdminEmployeesDetails /> },
               { path: "expenses", element: <AdminExpenses /> },
               { path: "expenses/add", element: <AddExpenses /> },
               { path: "budget-transfer", element: <BudgetTransfer /> },

@@ -1,4 +1,8 @@
 import Employee from "../models/employee.model.js";
+import EmployeeOverview from "../models/employee.overview.model.js";
+import Budget from "../models/budget.model.js";
+import Expenses from "../models/expenses.model.js";
+import Abono from "../models/abono.model.js";
 import ApiError from "../utils/ApiError.js";
 import { validate } from "../utils/validate.js";
 import {
@@ -100,6 +104,89 @@ export const remove = async (req, res, next) => {
     return res
       .status(200)
       .json({ employee, message: "Employee removed successfully." });
+  } catch (err) {
+    next(err);
+  }
+};
+
+/* ── Admin → Employees → Details tabs ──────────────────────────────────────
+ * Feeds /admin/employees/:id with ONE selected employee's records. Each
+ * handler resolves `:id` to a real `users` row first (ANY status — an admin
+ * must be able to inspect pending and inactive accounts too), then reuses the
+ * exact model call the employee-facing endpoint uses, only swapping in the
+ * target user_id. Read-only by design: nothing in this block can mutate the
+ * employee's rows, and the employee id never comes from the caller's token.
+ */
+const loadEmployee = async (id) => {
+  if (!UUID_RE.test(id || ""))
+    throw ApiError.badRequest("Invalid employee id", "VALIDATION_ERROR");
+
+  const employee = await Employee.findEmployeeById(id);
+  if (!employee)
+    throw ApiError.notFound("Employee not found", "EMPLOYEE_NOT_FOUND");
+
+  return employee;
+};
+
+// GET /employees/:id/overview — the employee's balance stats plus every
+// merged transaction (issued / expense / abono / transfer), exactly the
+// payload the employee's own Overview page renders.
+export const detailsOverview = async (req, res, next) => {
+  try {
+    const employee = await loadEmployee(req.params.id);
+    const employeeOverview = await EmployeeOverview.employeeOverview(
+      employee.user_id,
+      req.query,
+    );
+    return res.status(200).json({ employeeOverview });
+  } catch (err) {
+    next(err);
+  }
+};
+
+// GET /employees/:id/budget — every issuance + transfer the employee holds,
+// with the balance overview (same payload as GET /budgets/employee).
+export const detailsBudget = async (req, res, next) => {
+  try {
+    const employee = await loadEmployee(req.params.id);
+    const { overview, transactions } = await Budget.employeeBudget(
+      employee.user_id,
+      req.query,
+    );
+    return res.status(200).json({ overview, transactions });
+  } catch (err) {
+    next(err);
+  }
+};
+
+// GET /employees/:id/expenses — the employee's expense ledger, categories,
+// source references and totals (same payload as GET /expenses/employee).
+export const detailsExpenses = async (req, res, next) => {
+  try {
+    const employee = await loadEmployee(req.params.id);
+    const {
+      categories,
+      expenses: rows,
+      overview,
+      references,
+    } = await Expenses.expensesOverviewEmployee(req.query, employee.user_id);
+    return res
+      .status(200)
+      .json({ expenses: rows, categories, overview, references });
+  } catch (err) {
+    next(err);
+  }
+};
+
+// GET /employees/:id/abono — the employee's abono rows plus the overview the
+// Abono page's hero/mini stats render (same payload as GET /abono/employee).
+export const detailsAbono = async (req, res, next) => {
+  try {
+    const employee = await loadEmployee(req.params.id);
+    const { abono: rows, overview } = await Abono.employeeAbonoOverview(
+      employee.user_id,
+    );
+    return res.status(200).json({ abono: rows, overview });
   } catch (err) {
     next(err);
   }

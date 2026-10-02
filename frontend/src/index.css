@@ -12,6 +12,9 @@
   --font-mono:
     "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
 
+  /* Weight scale caps at 600 — `font-bold` resolves to semibold everywhere. */
+  --font-weight-bold: 600;
+
   --color-bg: var(--bg);
   --color-surface: var(--surface);
   --color-surface-2: var(--surface-2);

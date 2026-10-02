@@ -43,7 +43,7 @@ export const SelectReference = ({
             {formatDate(option.createdAt)}
           </span>
           <span className="h-0.5 w-0.5 shrink-0 rounded-full bg-current opacity-60" />
-          <span className="truncate font-mono text-xs tracking-tight">{`${(option.referenceId ?? "").slice(0, 8)}-xxxxx`}</span>
+          <span className="truncate font-sans text-xs tabular-nums tracking-tight">{`${(option.referenceId ?? "").slice(0, 8)}-xxxxx`}</span>
         </span>
       </span>
       {isSelected && (

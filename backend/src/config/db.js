@@ -9,9 +9,12 @@ const pool = new Pool({
     ENV.NODE_ENV === "production"
       ? { rejectUnauthorized: true }
       : { rejectUnauthorized: false },
-  max: 10,
-  idleTimeoutMillis: 30000,
-  connectionTimeoutMillis: 10000,
+  max: 20,
+  idleTimeoutMillis: 10000,
+  connectionTimeoutMillis: 30000,
+  statement_timeout: 30000,
+  keepAlive: true,
+  keepAliveInitialDelayMillis: 10000,
 });
 
 pool.on("connect", () => {
@@ -19,8 +22,7 @@ pool.on("connect", () => {
 });
 
 pool.on("error", (err) => {
-  console.error("Unexpected error on idle client", err);
-  process.exit(1);
+  console.error("Database pool idle-client error (client discarded):", err);
 });
 
 const query = (text, params) => pool.query(text, params);
