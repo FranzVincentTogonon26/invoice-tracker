@@ -1,11 +1,14 @@
-import { Children, Fragment, useMemo, useState } from "react";
+import { Children, Fragment, useMemo, useRef, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { AnimatePresence, motion } from "framer-motion";
+import toast from "react-hot-toast";
 import {
   ArrowLeft,
   CalendarDays,
   Files,
   HandCoins,
+  Loader2,
+  Pencil,
   Receipt,
   UserX,
   Wallet,
@@ -23,9 +26,9 @@ import {
   RemainingProgress,
   SharePill,
 } from "./EmployeesTable";
-import { budgetBreakdown } from "@/constants";
-import { cn, formatDate, formatMoney } from "@/lib/utils";
-import { useEmployees } from "@/hooks/useEmployees";
+import { AVATAR_ACCEPT, AVATAR_EXTENSIONS, budgetBreakdown } from "@/constants";
+import { cn, fileExtension, formatDate, formatMoney } from "@/lib/utils";
+import { useEmployees, useEmployeesMutations } from "@/hooks/useEmployees";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/Tabs";
 import EmployeeTransaction from "./EmployeeTransaction";
 import EmployeeBudget from "./EmployeeBudget";
@@ -109,12 +112,41 @@ export default function AdminEmployeesDetails() {
     refetch,
   } = useEmployees({ status: "all" });
 
+  const { updateAvatar } = useEmployeesMutations();
+  const uploadingAvatar = updateAvatar.isPending;
+  const avatarFileRef = useRef(null);
+
   const employee = useMemo(
     () => employees.find((e) => String(e.user_id) === String(id)),
     [employees, id],
   );
 
   const backToList = () => nav("/admin/employees");
+
+  const openAvatarPicker = () => {
+    if (!uploadingAvatar) avatarFileRef.current?.click();
+  };
+
+  // Pencil-button photo change: pick → validate → auto-save. Same photo
+  // rules as the employee's own Account tab (extensions only, no size cap).
+  const onAvatarPick = async (event) => {
+    const picked = event.target.files?.[0];
+    // Reset the input so re-picking the SAME file still fires onChange.
+    event.target.value = "";
+    if (!picked || !employee) return;
+
+    if (!AVATAR_EXTENSIONS.includes(fileExtension(picked.name))) {
+      toast.error("Photos only — PNG, JPG, JPEG, WEBP, HEIC or HEIF.");
+      return;
+    }
+
+    try {
+      await updateAvatar.mutateAsync({ id: employee.user_id, file: picked });
+      toast.success(`Updated photo for ${employee.name}.`);
+    } catch (err) {
+      toast.error(err?.message || "Couldn't update the photo. Please try again.");
+    }
+  };
 
   // Direction-aware tab switch: the panel animation matches the tab order.
   const changeTab = (value) => {
@@ -199,11 +231,37 @@ export default function AdminEmployeesDetails() {
         />
         <div className="relative flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
           <div className="flex min-w-0 items-center gap-3">
-            <EmployeeAvatar
-              name={employee.name}
-              avatarUrl={employee.avatar_url}
-              className="h-12 w-12 shrink-0 rounded-2xl text-lg ring-1 ring-inset ring-[var(--accent)]/15"
-            />
+            <div className="relative shrink-0">
+              <EmployeeAvatar
+                key={employee.avatar_url ?? "none"}
+                name={employee.name}
+                avatarUrl={employee.avatar_url}
+                className="h-13 w-13 shrink-0 rounded-2xl text-lg ring-1 ring-inset ring-[var(--accent)]/15"
+              />
+              <button
+                type="button"
+                onClick={openAvatarPicker}
+                disabled={uploadingAvatar}
+                aria-label={`Change photo for ${employee.name}`}
+                title="Change photo"
+                className="absolute -bottom-1 -right-1 flex h-7 w-7 items-center justify-center rounded-full border border-[var(--border)] bg-[var(--surface)] text-[var(--ink-muted)] shadow-card transition-colors hover:bg-[var(--surface-2)] hover:text-[var(--ink)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)]/30 disabled:pointer-events-none disabled:opacity-60"
+              >
+                {uploadingAvatar ? (
+                  <Loader2 size={13} aria-hidden className="animate-spin" />
+                ) : (
+                  <Pencil size={13} aria-hidden />
+                )}
+              </button>
+              <input
+                ref={avatarFileRef}
+                type="file"
+                accept={AVATAR_ACCEPT}
+                onChange={onAvatarPick}
+                className="hidden"
+                aria-hidden
+                tabIndex={-1}
+              />
+            </div>
             <div className="min-w-0">
               <p className="truncate font-display text-lg font-semibold tracking-tight text-[var(--ink)]">
                 {employee.name}
@@ -356,10 +414,6 @@ export default function AdminEmployeesDetails() {
   );
 }
 
-// Compact breadcrumb header — back circle plus a small "Employees / Profile"
-// trail with status badges pinned right. The employee's name already leads
-// the hero card, so the header stays a quiet small label instead of a second
-// large title.
 function DetailsHeader({ onBack, actions, description }) {
   return (
     <div className="flex items-center gap-3">

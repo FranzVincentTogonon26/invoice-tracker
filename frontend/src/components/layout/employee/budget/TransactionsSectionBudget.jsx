@@ -32,6 +32,9 @@ import {
   matchesDayRange,
   methodLabel,
   toDate,
+  startOfDay,
+  isSameDay,
+  addDays,
 } from "../../../../lib/utils";
 import DateRangePicker from "../../../ui/DateRangePicker";
 import ConfirmActionDialog from "../../admin/expenses/ConfirmActionDialog";
@@ -41,6 +44,20 @@ const formatShortDate = (value) => {
   const parsed = toDate(value);
   if (!parsed) return "—";
   return parsed.toLocaleDateString("en-GB", { day: "numeric", month: "short" });
+};
+
+// Relative-day identifier for the "Days" column — Today / Yesterday /
+// Last days by calendar day (local time). Unparseable dates render "—"
+// instead of silently falling into Today.
+const getDaysLabel = (date) => {
+  if (!toDate(date)) return "—";
+  const txDate = startOfDay(toDate(date));
+  const today = startOfDay(new Date());
+  const yesterday = addDays(today, -1);
+
+  if (isSameDay(txDate, today)) return "Today";
+  if (isSameDay(txDate, yesterday)) return "Yesterday";
+  return "Last days";
 };
 
 const METHOD_BADGE = {
@@ -115,8 +132,8 @@ const rowAmountClass = (tx) =>
     : "text-[var(--ink)]";
 
 const SHEET_EASE = [0.16, 1, 0.3, 1];
-const PAGE_SIZE = 50;
-const COLUMN_WIDTHS = ["14%", "24%", "14%", "12%", "14%"];
+const PAGE_SIZE = 100;
+const COLUMN_WIDTHS = ["12%", "24%", "12%", "12%", "14%", "26%"];
 
 // `actionable` is false when the section renders read-only (Admin → Employee
 // Details): the cancel affordance disappears while every other detail still
@@ -661,7 +678,7 @@ export const TransactionsSectionBudget = ({
           />
         ) : (
           <div className="overflow-x-auto rounded-2xl border border-[var(--border)] bg-[var(--surface)] shadow-card">
-            <table className="w-full table-fixed border-collapse text-left">
+            <table className="w-full min-w-[840px] table-fixed border-collapse text-left">
               <caption className="sr-only">Employee issued budget list</caption>
               <colgroup>
                 {COLUMN_WIDTHS.map((width, i) => (
@@ -682,6 +699,9 @@ export const TransactionsSectionBudget = ({
                   <th className="whitespace-nowrap border-b border-[var(--border)] px-4 py-3 type-eyebrow text-[var(--ink-muted)]">
                     Status
                   </th>
+                  <th className="whitespace-nowrap border-b border-[var(--border)] px-4 py-3 type-eyebrow text-[var(--ink-muted)]">
+                    Days
+                  </th>
                   <th className="whitespace-nowrap border-b border-[var(--border)] px-4 py-3 text-right type-eyebrow text-[var(--ink-muted)]">
                     Amount
                   </th>
@@ -693,7 +713,7 @@ export const TransactionsSectionBudget = ({
                   const sent = isSentTransfer(tx);
                   const counterparty = rowCounterparty(tx);
                   const subline = transfer
-                    ? [counterparty, tx.notes].filter(Boolean).join(" · ")
+                    ? [counterparty].filter(Boolean).join(" · ")
                     : tx.notes;
                   return (
                     <tr
@@ -710,7 +730,7 @@ export const TransactionsSectionBudget = ({
                       </td>
                       <td className="px-4 py-3 align-middle">
                         <p
-                          className="truncate text-[13px] font-semibold leading-snug text-[var(--ink)]"
+                          className=" text-[13px] font-semibold leading-snug text-[var(--ink)]"
                           title={rowTitle(tx)}
                         >
                           {rowTitle(tx)}
@@ -748,6 +768,20 @@ export const TransactionsSectionBudget = ({
                             Received
                           </Badge>
                         )}
+                      </td>
+                      <td className="px-4 py-3 align-middle">
+                        <p
+                          className="whitespace-nowrap text-left text-[13px] font-medium leading-none text-[var(--ink)]"
+                          title={`${formatDate(tx.date)} at ${formatTime(tx.date)}`}
+                        >
+                          {getDaysLabel(tx.date)}
+                          <span aria-hidden className="mx-1.5 opacity-40">
+                            ·
+                          </span>
+                          <span className="text-[11px] tabular-nums text-[var(--ink-muted)]">
+                            {formatTime(tx.date)}
+                          </span>
+                        </p>
                       </td>
                       <td className="px-4 py-3 text-right align-middle">
                         <span

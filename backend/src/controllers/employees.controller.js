@@ -1,10 +1,12 @@
 import Employee from "../models/employee.model.js";
+import User from "../models/user.model.js";
 import EmployeeOverview from "../models/employee.overview.model.js";
 import Budget from "../models/budget.model.js";
 import Expenses from "../models/expenses.model.js";
 import Abono from "../models/abono.model.js";
 import ApiError from "../utils/ApiError.js";
 import { validate } from "../utils/validate.js";
+import { deleteAvatarImage, saveAvatarImage } from "../utils/avatarImage.js";
 import {
   createEmployeeSchema,
   updateEmployeeStatusSchema,
@@ -105,6 +107,57 @@ export const remove = async (req, res, next) => {
       .status(200)
       .json({ employee, message: "Employee removed successfully." });
   } catch (err) {
+    next(err);
+  }
+};
+
+// PATCH /employees/:id/avatar — admin replaces one employee's photo.
+// Multipart `avatar` file with the same photo rules as the employee's own
+// Account tab (uploadAvatar middleware). Any account status is fine: the
+// route is admin-only and :id is re-validated against the users table.
+export const updateAvatar = async (req, res, next) => {
+  // Same orphan discipline as the Account save: the file is written first,
+  // so track it and clean it up if anything after that fails.
+  let uploadedAvatarUrl = null;
+  let committed = false;
+
+  try {
+    const employee = await loadEmployee(req.params.id);
+
+    if (!req.file) {
+      throw ApiError.badRequest("No photo uploaded.", "NO_AVATAR_FILE");
+    }
+
+    uploadedAvatarUrl = await saveAvatarImage({
+      buffer: req.file.buffer,
+      mimeType: req.file.mimetype,
+      originalName: req.file.originalname,
+    });
+
+    const updated = await User.updateUserAvatar({
+      id: employee.user_id,
+      avatarUrl: uploadedAvatarUrl,
+    });
+    if (!updated) {
+      throw ApiError.notFound("Employee not found", "EMPLOYEE_NOT_FOUND");
+    }
+
+    // The previous photo is unreferenced now — remove it from disk only
+    // after the new value is safely stored.
+    if (employee.avatar_url && employee.avatar_url !== updated.avatar_url) {
+      await deleteAvatarImage(employee.avatar_url);
+    }
+
+    committed = true;
+
+    return res.status(200).json({
+      employee: updated,
+      message: "Photo updated successfully.",
+    });
+  } catch (err) {
+    if (uploadedAvatarUrl && !committed) {
+      await deleteAvatarImage(uploadedAvatarUrl);
+    }
     next(err);
   }
 };

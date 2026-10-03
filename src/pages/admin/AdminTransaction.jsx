@@ -50,11 +50,7 @@ import {
   LoadingSkeleton,
 } from "../../components/ui/DataState";
 import { Pager } from "../../components/ui/Pager";
-import {
-  Tabs,
-  TabsList,
-  TabsTrigger,
-} from "../../components/ui/Tabs";
+import { Tabs, TabsList, TabsTrigger } from "../../components/ui/Tabs";
 import {
   cn,
   emptyDateRange,
@@ -76,7 +72,7 @@ import TransactionDetailsModal from "../../components/layout/admin/transactions/
 import TransactionsMobileFilters from "../../components/layout/admin/transactions/TransactionsMobileFilters";
 import ConfirmActionDialog from "../../components/layout/admin/expenses/ConfirmActionDialog";
 
-// ── Animation ────────────────────────────────────────────────────────────────
+// ── Animation variants ───────────────────────────────────────────────────────
 const container = {
   hidden: {},
   show: { transition: { staggerChildren: 0.07, delayChildren: 0.02 } },
@@ -96,48 +92,41 @@ const PAGE_SIZE = 50;
 const FILTER_GAP = 8;
 const MIN_FILTER_WIDTH = 150;
 const SYSTEM_EMPLOYEE_VALUE = "__system";
-const DAY_MS = 86_400_000;
+const DAY_MS = 24 * 60 * 60 * 1000;
 
-const FILTER_KEYS = [
-  "direction",
-  "employee",
-  "reference",
-  "category",
-  "status",
-];
+const FILTER_KEYS = ["direction", "employee", "reference", "category", "status"];
 
 const TYPE_TABS = [
-  { value: "all", label: "All", Icon: ClipboardList },
-  { value: "budget", label: "Budget Given", Icon: Plus },
-  { value: "issued", label: "Budget Issued", Icon: HandCoins },
-  { value: "expense", label: "Expenses", Icon: ReceiptText },
-  { value: "abono", label: "Abono", Icon: Wallet },
-  { value: "transfer", label: "Transfers", Icon: ArrowLeftRight },
+  { value: "all",      label: "All",           Icon: ClipboardList },
+  { value: "budget",   label: "Budget Given",  Icon: Plus },
+  { value: "issued",   label: "Budget Issued", Icon: HandCoins },
+  { value: "expense",  label: "Expenses",      Icon: ReceiptText },
+  { value: "abono",    label: "Abono",         Icon: Wallet },
+  { value: "transfer", label: "Transfers",     Icon: ArrowLeftRight },
 ];
 
 const TYPE_OPTIONS = [
-  { value: "all", label: "All types" },
-  { value: "budget", label: "Budget Given" },
-  { value: "issued", label: "Budget Issued" },
-  { value: "expense", label: "Expenses" },
-  { value: "abono", label: "Abono" },
+  { value: "all",      label: "All types" },
+  { value: "budget",   label: "Budget Given" },
+  { value: "issued",   label: "Budget Issued" },
+  { value: "expense",  label: "Expenses" },
+  { value: "abono",    label: "Abono" },
   { value: "transfer", label: "Transfers" },
 ];
 
 const DIRECTION_OPTIONS = [
-  { value: "all", label: "All flows" },
-  { value: "in", label: "Money In" },
-  { value: "out", label: "Money Out" },
+  { value: "all",  label: "All flows" },
+  { value: "in",   label: "Money In" },
+  { value: "out",  label: "Money Out" },
   { value: "void", label: "No movement" },
 ];
 
-// ── Confirmation dialog copy (one entry per destructive action) ──────────────
+// ── Confirmation dialog copy ─────────────────────────────────────────────────
 const CONFIRM_COPY = {
   "cancel-budget": {
     icon: <Ban size={20} aria-hidden />,
     title: "Cancel this budget transaction?",
-    description:
-      "Status moves to Cancelled — the amount stops counting as Money In. You can restore it afterwards.",
+    description: "Status moves to Cancelled — the amount stops counting as Money In. You can restore it afterwards.",
     cancelLabel: "Keep",
     confirmLabel: "Yes, cancel it",
     pendingLabel: "Cancelling…",
@@ -145,8 +134,7 @@ const CONFIRM_COPY = {
   "cancel-issued": {
     icon: <Ban size={20} aria-hidden />,
     title: "Cancel this budget issuance?",
-    description:
-      "Status moves to Cancelled — the amount stops counting as Money Out. You can restore it afterwards.",
+    description: "Status moves to Cancelled — the amount stops counting as Money Out. You can restore it afterwards.",
     cancelLabel: "Keep",
     confirmLabel: "Yes, cancel it",
     pendingLabel: "Cancelling…",
@@ -154,8 +142,7 @@ const CONFIRM_COPY = {
   "delete-expense": {
     icon: <Trash2 size={20} aria-hidden />,
     title: "Delete this expense?",
-    description:
-      "Permanently removes the expense record and its receipt. This can't be undone.",
+    description: "Permanently removes the expense record. This can't be undone.",
     cancelLabel: "Keep",
     confirmLabel: "Yes, delete it",
     pendingLabel: "Deleting…",
@@ -163,8 +150,7 @@ const CONFIRM_COPY = {
   "expense-draft": {
     icon: <RotateCcw size={20} aria-hidden />,
     title: "Move this expense to draft?",
-    description:
-      "Status moves back to Draft — only paid expenses count as Money Out.",
+    description: "Status moves back to Draft — only paid expenses count as Money Out.",
     cancelLabel: "Keep as paid",
     confirmLabel: "Yes, move to draft",
     pendingLabel: "Moving…",
@@ -182,8 +168,7 @@ const CONFIRM_COPY = {
   "expense-cancel": {
     icon: <XCircle size={20} aria-hidden />,
     title: "Cancel this expense?",
-    description:
-      "Status moves to Cancelled — it is void and never counts as Money Out.",
+    description: "Status moves to Cancelled — it is void and never counts as Money Out.",
     cancelLabel: "Keep",
     confirmLabel: "Yes, cancel it",
     pendingLabel: "Cancelling…",
@@ -191,8 +176,7 @@ const CONFIRM_COPY = {
   "delete-abono": {
     icon: <Trash2 size={20} aria-hidden />,
     title: "Delete this abono?",
-    description:
-      "Permanently removes the abono record. Refused when the amount has already been spent.",
+    description: "Permanently removes the abono record. The server refuses the delete when its amount has already been spent.",
     cancelLabel: "Keep",
     confirmLabel: "Yes, delete it",
     pendingLabel: "Deleting…",
@@ -200,8 +184,7 @@ const CONFIRM_COPY = {
   "cancel-transfer": {
     icon: <Ban size={20} aria-hidden />,
     title: "Cancel this transfer?",
-    description:
-      "Removes both legs of the transfer. Refused when the recipient has already spent the amount.",
+    description: "Permanently removes both legs of the transfer. The server refuses when the recipient has already spent the amount.",
     cancelLabel: "Keep",
     confirmLabel: "Yes, cancel it",
     pendingLabel: "Cancelling…",
@@ -209,19 +192,19 @@ const CONFIRM_COPY = {
 };
 
 const ACTION_ERROR = {
-  "cancel-budget": "Couldn't cancel budget transaction",
-  "restore-budget": "Couldn't restore budget transaction",
-  "cancel-issued": "Couldn't cancel budget issuance",
-  "restore-issued": "Couldn't restore budget issuance",
-  "delete-expense": "Couldn't delete expense",
-  "expense-draft": "Couldn't move expense to draft",
+  "cancel-budget":   "Couldn't cancel budget transaction",
+  "restore-budget":  "Couldn't restore budget transaction",
+  "cancel-issued":   "Couldn't cancel budget issuance",
+  "restore-issued":  "Couldn't restore budget issuance",
+  "delete-expense":  "Couldn't delete expense",
+  "expense-draft":   "Couldn't move expense to draft",
   "expense-restore": "Couldn't mark expense as paid",
-  "expense-cancel": "Couldn't cancel expense",
-  "delete-abono": "Couldn't delete abono",
+  "expense-cancel":  "Couldn't cancel expense",
+  "delete-abono":    "Couldn't delete abono",
   "cancel-transfer": "Couldn't cancel transfer",
 };
 
-// ── Pure helpers (outside component — no closure over state) ─────────────────
+// ── Pure helpers ─────────────────────────────────────────────────────────────
 const matchesTypeTab = (row, tab) => {
   if (tab === "all") return true;
   if (tab === "transfer")
@@ -254,14 +237,14 @@ const rowsWindow = (rows) => {
     if (!day) continue;
     const mid = startOfDay(day);
     if (!start || mid < start) start = mid;
-    if (!end || mid > end) end = mid;
+    if (!end   || mid > end)   end   = mid;
   }
   return start && end ? { start, end } : null;
 };
 
 const buildRangeSeries = (range, rows, measure) => {
   const start = range?.start ? startOfDay(range.start) : null;
-  const end = range?.end ? startOfDay(range.end) : null;
+  const end   = range?.end   ? startOfDay(range.end)   : null;
   if (!start || !end || end < start) return [];
 
   const days = countDays(start, end);
@@ -273,18 +256,16 @@ const buildRangeSeries = (range, rows, measure) => {
     if (!day) continue;
     const mid = startOfDay(day);
     if (mid < start || mid > end) continue;
-    totals[Math.floor((countDays(start, mid) - 1) / bucketDays)] +=
-      measure(row);
+    const bucket = Math.floor((countDays(start, mid) - 1) / bucketDays);
+    totals[bucket] += measure(row);
   }
 
   return totals.map((v) => ({ v }));
 };
 
-/** Pure filter predicate — no React state dependency. */
 const matchesFilters = (row, draft, query) => {
   if (!matchesTypeTab(row, draft.type)) return false;
-  if (draft.direction !== "all" && row.direction !== draft.direction)
-    return false;
+  if (draft.direction !== "all" && row.direction !== draft.direction) return false;
   if (draft.employee !== "all") {
     if (draft.employee === SYSTEM_EMPLOYEE_VALUE) {
       if (row.employeeId) return false;
@@ -294,9 +275,8 @@ const matchesFilters = (row, draft, query) => {
     const val = row.referenceId ?? `label:${row.referenceLabel}`;
     if (val !== draft.reference) return false;
   }
-  if (draft.category !== "all" && row.categoryId !== draft.category)
-    return false;
-  if (draft.status !== "all" && row.status !== draft.status) return false;
+  if (draft.category !== "all" && row.categoryId !== draft.category) return false;
+  if (draft.status   !== "all" && row.status     !== draft.status)   return false;
   if (!query) return true;
 
   return [
@@ -309,11 +289,8 @@ const matchesFilters = (row, draft, query) => {
     row.approvedBy,
     row.method ? methodLabel(row.method) : "",
     TRANSACTION_KIND_META[row.kind]?.label,
-    row.direction === "in"
-      ? "money in"
-      : row.direction === "out"
-        ? "money out"
-        : "",
+    row.direction === "in"  ? "money in"  :
+    row.direction === "out" ? "money out" : "",
   ]
     .filter(Boolean)
     .some((v) => String(v).toLowerCase().includes(query));
@@ -326,23 +303,23 @@ const AdminTransaction = () => {
   const mutations = useTransactionsMutations();
 
   // Filters
-  const [dateRange, setDateRange] = useState(() => emptyDateRange());
-  const [tab, setTab] = useState("all");
-  const [search, setSearch] = useState("");
+  const [dateRange,  setDateRange]  = useState(() => emptyDateRange());
+  const [tab,        setTab]        = useState("all");
+  const [search,     setSearch]     = useState("");
   const [debouncedSearch, setDebouncedSearch] = useState("");
-  const [direction, setDirection] = useState("all");
-  const [employee, setEmployee] = useState("all");
-  const [reference, setReference] = useState("all");
-  const [category, setCategory] = useState("all");
-  const [status, setStatus] = useState("all");
-  const [page, setPage] = useState(0);
+  const [direction,  setDirection]  = useState("all");
+  const [employee,   setEmployee]   = useState("all");
+  const [reference,  setReference]  = useState("all");
+  const [category,   setCategory]   = useState("all");
+  const [status,     setStatus]     = useState("all");
+  const [page,       setPage]       = useState(0);
 
   // UI state
-  const [filtersOpen, setFiltersOpen] = useState(false);
-  const [viewRow, setViewRow] = useState(null);
-  const [viewOpen, setViewOpen] = useState(false);
-  const [confirmAction, setConfirmAction] = useState(null);
-  const [confirmOpen, setConfirmOpen] = useState(false);
+  const [filtersOpen,  setFiltersOpen]  = useState(false);
+  const [viewRow,      setViewRow]      = useState(null);
+  const [viewOpen,     setViewOpen]     = useState(false);
+  const [confirmAction,setConfirmAction]= useState(null);
+  const [confirmOpen,  setConfirmOpen]  = useState(false);
 
   const hasDateRange = Boolean(dateRange?.start && dateRange?.end);
 
@@ -372,9 +349,7 @@ const AdminTransaction = () => {
     }
     return [
       { value: "all", label: "All employees" },
-      ...(hasSystem
-        ? [{ value: SYSTEM_EMPLOYEE_VALUE, label: "System (allocations)" }]
-        : []),
+      ...(hasSystem ? [{ value: SYSTEM_EMPLOYEE_VALUE, label: "System (allocations)" }] : []),
       ...[...seen.values()].sort((a, b) => a.label.localeCompare(b.label)),
     ];
   }, [allRows]);
@@ -384,10 +359,7 @@ const AdminTransaction = () => {
     for (const row of allRows) {
       const val = row.referenceId ?? `label:${row.referenceLabel}`;
       if (!val || seen.has(val)) continue;
-      seen.set(val, {
-        value: val,
-        label: row.referenceLabel || "No source of funds",
-      });
+      seen.set(val, { value: val, label: row.referenceLabel || "No source of funds" });
     }
     return [
       { value: "all", label: "All references" },
@@ -399,10 +371,7 @@ const AdminTransaction = () => {
     const seen = new Map();
     for (const row of allRows) {
       if (!row.categoryId || seen.has(row.categoryId)) continue;
-      seen.set(row.categoryId, {
-        value: row.categoryId,
-        label: row.categoryName || "Uncategorized",
-      });
+      seen.set(row.categoryId, { value: row.categoryId, label: row.categoryName || "Uncategorized" });
     }
     return [
       { value: "all", label: "All categories" },
@@ -433,10 +402,7 @@ const AdminTransaction = () => {
   );
 
   const dateFilteredRows = useMemo(
-    () =>
-      allRows.filter((row) =>
-        matchesDayRange(row.date, dateRange?.start, dateRange?.end),
-      ),
+    () => allRows.filter((row) => matchesDayRange(row.date, dateRange?.start, dateRange?.end)),
     [allRows, dateRange],
   );
 
@@ -445,147 +411,60 @@ const AdminTransaction = () => {
     return dateFilteredRows.filter((row) => matchesFilters(row, draft, query));
   }, [dateFilteredRows, draft, debouncedSearch]);
 
-  // ── Stats rows (ignore the type tab) ────────────────────────────────────
-  // Money In / Money Out / Net Flow react to every filter EXCEPT the tab.
-  // Only the Records card (and the table) react to the tab.
-  const statsDraft = useMemo(
-    () => ({
-      type: "all",
-      direction,
-      employee,
-      reference,
-      category,
-      status,
-    }),
-    [direction, employee, reference, category, status],
-  );
-
-  const statsRows = useMemo(() => {
-    const query = debouncedSearch.trim().toLowerCase();
-    return dateFilteredRows.filter((row) =>
-      matchesFilters(row, statsDraft, query),
-    );
-  }, [dateFilteredRows, statsDraft, debouncedSearch]);
-
   const countLedgerMatches = useCallback(
     (candidate) => {
       const query = debouncedSearch.trim().toLowerCase();
-      return dateFilteredRows.filter((row) =>
-        matchesFilters(row, candidate, query),
-      ).length;
+      return dateFilteredRows.filter((row) => matchesFilters(row, candidate, query)).length;
     },
     [dateFilteredRows, debouncedSearch],
   );
 
-  // ── Aggregated totals (ignore the type tab) ─────────────────────────────
-  // Money In = Budget Given + open Abono only (transfer_received excluded).
-  // Money Out = Issued + admin Expenses only
-  // (transfer_sent + employee-authored expenses excluded — same rule as the
-  // AdminExpenses "Spent" figure: created_by_role !== "employee").
+  // ── Aggregated totals (reflect current filter) ────────────────────────────
   const totals = useMemo(() => {
-    let given = 0;
-    let abonoIn = 0;
-    let abonoCount = 0;
-    let issued = 0;
-    let issuedCount = 0;
-    let spent = 0;
-    let spentCount = 0;
-    const givenSourceKeys = new Set();
-    for (const row of statsRows) {
-      if (row.kind === "budget") {
-        given += Number(row.moneyIn) || 0;
-        givenSourceKeys.add(row.referenceId ?? `label:${row.referenceLabel}`);
-      }
-      if (row.kind === "abono" && row.status === "open") {
-        abonoIn += Number(row.moneyIn) || 0;
-        abonoCount += 1;
-      }
-      if (row.kind === "issued") {
-        issued += Number(row.moneyOut) || 0;
-        issuedCount += 1;
-      }
-      if (row.kind === "expense" && row.employeeRole !== "employee") {
-        spent += Number(row.moneyOut) || 0;
-        spentCount += 1;
-      }
+    let moneyIn = 0, moneyOut = 0, given = 0, abonoIn = 0;
+    let received = 0, issued = 0, spent = 0, sent = 0;
+    for (const row of filteredRows) {
+      moneyIn  += Number(row.moneyIn)  || 0;
+      moneyOut += Number(row.moneyOut) || 0;
+      if (row.kind === "budget")            given    += Number(row.moneyIn)  || 0;
+      if (row.kind === "abono")             abonoIn  += Number(row.moneyIn)  || 0;
+      if (row.kind === "transfer_received") received += Number(row.moneyIn)  || 0;
+      if (row.kind === "issued")            issued   += Number(row.moneyOut) || 0;
+      if (row.kind === "expense")           spent    += Number(row.moneyOut) || 0;
+      if (row.kind === "transfer_sent")     sent     += Number(row.moneyOut) || 0;
     }
     const r = (n) => Math.round(n * 100) / 100;
-    const moneyIn = r(given + abonoIn);
-    const moneyOut = r(issued + spent);
     return {
-      moneyIn,
-      moneyOut,
-      given: r(given),
-      givenSources: givenSourceKeys.size,
-      abonoIn: r(abonoIn),
-      abonoCount,
-      issued: r(issued),
-      issuedCount,
-      spent: r(spent),
-      spentCount,
+      moneyIn: r(moneyIn), moneyOut: r(moneyOut), net: r(moneyIn - moneyOut),
+      given: r(given), abonoIn: r(abonoIn), received: r(received),
+      issued: r(issued), spent: r(spent), sent: r(sent),
     };
-  }, [statsRows]);
+  }, [filteredRows]);
 
   const kindCounts = useMemo(() => {
     const counts = {};
-    for (const row of filteredRows)
-      counts[row.kind] = (counts[row.kind] ?? 0) + 1;
+    for (const row of filteredRows) counts[row.kind] = (counts[row.kind] ?? 0) + 1;
     return counts;
   }, [filteredRows]);
 
-  // Chart series — money charts ignore the tab, count chart follows the tab.
-  // Each money chart is windowed to the dates of the rows it actually
-  // measures, so unrelated activity (e.g. expenses months apart) can't
-  // stretch the range flat with empty buckets.
-  // Money In chart = Budget Given + open Abono only (transfer_received excluded).
-  // Money Out chart = Issued + admin Expenses only (transfer_sent + employee expenses excluded).
+  // Chart series
   const recordWindow = useMemo(() => rowsWindow(filteredRows), [filteredRows]);
-  const inRows = useMemo(
-    () =>
-      statsRows.filter(
-        (r) =>
-          r.kind === "budget" || (r.kind === "abono" && r.status === "open"),
-      ),
-    [statsRows],
-  );
-  const outRows = useMemo(
-    () =>
-      statsRows.filter(
-        (r) =>
-          r.kind === "issued" ||
-          (r.kind === "expense" && r.employeeRole !== "employee"),
-      ),
-    [statsRows],
-  );
-  const inWindow = useMemo(() => rowsWindow(inRows), [inRows]);
-  const outWindow = useMemo(() => rowsWindow(outRows), [outRows]);
-  const inSeries = useMemo(
-    () => buildRangeSeries(inWindow, inRows, (r) => Number(r.moneyIn) || 0),
-    [inWindow, inRows],
-  );
-  const outSeries = useMemo(
-    () => buildRangeSeries(outWindow, outRows, (r) => Number(r.moneyOut) || 0),
-    [outWindow, outRows],
-  );
-  const countSeries = useMemo(
-    () => buildRangeSeries(recordWindow, filteredRows, () => 1),
-    [recordWindow, filteredRows],
-  );
+  const inSeries    = useMemo(() => buildRangeSeries(recordWindow, filteredRows, (r) => r.moneyIn  || 0), [recordWindow, filteredRows]);
+  const outSeries   = useMemo(() => buildRangeSeries(recordWindow, filteredRows, (r) => r.moneyOut || 0), [recordWindow, filteredRows]);
+  const countSeries = useMemo(() => buildRangeSeries(recordWindow, filteredRows, () => 1),                [recordWindow, filteredRows]);
 
-  const rangeLabel = shortRangeLabel(dateRange);
+  const rangeLabel    = shortRangeLabel(dateRange);
+  const isNetNegative = totals.net < -0.004;
 
   // ── Desktop filter slider ─────────────────────────────────────────────────
   const filtersRef = useRef(null);
   const [filtersWidth, setFiltersWidth] = useState(0);
-  const [slideIndex, setSlideIndex] = useState(0);
+  const [slideIndex,   setSlideIndex]   = useState(0);
 
   useLayoutEffect(() => {
     const el = filtersRef.current;
     if (!el) return undefined;
-    const measure = () => {
-      const w = el.clientWidth;
-      if (w > 0) setFiltersWidth(w);
-    };
+    const measure = () => { const w = el.clientWidth; if (w > 0) setFiltersWidth(w); };
     measure();
     window.addEventListener("resize", measure);
     let obs;
@@ -593,88 +472,59 @@ const AdminTransaction = () => {
       obs = new ResizeObserver(measure);
       obs.observe(el);
     }
-    return () => {
-      window.removeEventListener("resize", measure);
-      obs?.disconnect();
-    };
+    return () => { window.removeEventListener("resize", measure); obs?.disconnect(); };
   }, []);
 
   const filterCapacity = useMemo(() => {
     if (filtersWidth <= 0) return FILTER_KEYS.length;
-    return Math.min(
-      FILTER_KEYS.length,
-      Math.max(
-        1,
-        Math.floor(
-          (filtersWidth + FILTER_GAP) / (MIN_FILTER_WIDTH + FILTER_GAP),
-        ),
-      ),
-    );
+    return Math.min(FILTER_KEYS.length, Math.max(1, Math.floor((filtersWidth + FILTER_GAP) / (MIN_FILTER_WIDTH + FILTER_GAP))));
   }, [filtersWidth]);
 
   const filterItemWidth = useMemo(
-    () =>
-      filtersWidth <= 0
-        ? 0
-        : (filtersWidth - FILTER_GAP * (filterCapacity - 1)) / filterCapacity,
+    () => (filtersWidth <= 0 ? 0 : (filtersWidth - FILTER_GAP * (filterCapacity - 1)) / filterCapacity),
     [filtersWidth, filterCapacity],
   );
 
-  const slideMax = FILTER_KEYS.length - filterCapacity;
-  const slideAt = Math.min(Math.max(slideIndex, 0), Math.max(slideMax, 0));
+  const slideMax  = FILTER_KEYS.length - filterCapacity;
+  const slideAt   = Math.min(Math.max(slideIndex, 0), Math.max(slideMax, 0));
   const trackOffset = slideAt * (filterItemWidth + FILTER_GAP);
-  const showSlider = slideMax > 0;
+  const showSlider  = slideMax > 0;
 
   // ── Pagination ────────────────────────────────────────────────────────────
-  const pageCount = Math.max(1, Math.ceil(filteredRows.length / PAGE_SIZE));
+  const pageCount   = Math.max(1, Math.ceil(filteredRows.length / PAGE_SIZE));
   const currentPage = Math.min(page, pageCount - 1);
-  const pageRows = useMemo(
-    () =>
-      filteredRows.slice(
-        currentPage * PAGE_SIZE,
-        (currentPage + 1) * PAGE_SIZE,
-      ),
+  const pageRows    = useMemo(
+    () => filteredRows.slice(currentPage * PAGE_SIZE, (currentPage + 1) * PAGE_SIZE),
     [filteredRows, currentPage],
   );
-  const rangeStart =
-    filteredRows.length === 0 ? 0 : currentPage * PAGE_SIZE + 1;
-  const rangeEnd = Math.min(filteredRows.length, (currentPage + 1) * PAGE_SIZE);
+  const rangeStart = filteredRows.length === 0 ? 0 : currentPage * PAGE_SIZE + 1;
+  const rangeEnd   = Math.min(filteredRows.length, (currentPage + 1) * PAGE_SIZE);
 
   // ── Active filter helpers ─────────────────────────────────────────────────
   const hasActiveFilters =
-    hasDateRange ||
-    tab !== "all" ||
+    hasDateRange     ||
+    tab       !== "all" ||
     direction !== "all" ||
-    employee !== "all" ||
+    employee  !== "all" ||
     reference !== "all" ||
-    category !== "all" ||
-    status !== "all" ||
+    category  !== "all" ||
+    status    !== "all" ||
     search.trim().length > 0;
 
   const clearFilters = () => {
     setDateRange(emptyDateRange());
-    setTab("all");
-    setDirection("all");
-    setEmployee("all");
-    setReference("all");
-    setCategory("all");
-    setStatus("all");
-    setSearch("");
-    setPage(0);
+    setTab("all"); setDirection("all"); setEmployee("all");
+    setReference("all"); setCategory("all"); setStatus("all");
+    setSearch(""); setPage(0);
   };
 
   // ── Mutation pending state ────────────────────────────────────────────────
   const confirmPending =
-    mutations.cancelBudget.isPending ||
-    mutations.restoreBudget.isPending ||
-    mutations.cancelIssued.isPending ||
-    mutations.restoreIssued.isPending ||
-    mutations.removeExpense.isPending ||
-    mutations.markExpenseDraft.isPending ||
-    mutations.markExpensePaid.isPending ||
-    mutations.cancelExpense.isPending ||
-    mutations.removeAbono.isPending ||
-    mutations.cancelTransfer.isPending;
+    mutations.cancelBudget.isPending   || mutations.restoreBudget.isPending  ||
+    mutations.cancelIssued.isPending   || mutations.restoreIssued.isPending  ||
+    mutations.removeExpense.isPending  || mutations.markExpenseDraft.isPending ||
+    mutations.markExpensePaid.isPending|| mutations.cancelExpense.isPending  ||
+    mutations.removeAbono.isPending    || mutations.cancelTransfer.isPending;
 
   // ── Row actions ───────────────────────────────────────────────────────────
   const handleAction = async (action, row) => {
@@ -683,13 +533,10 @@ const AdminTransaction = () => {
       setViewOpen(true);
       return;
     }
-    // One-click restores (no confirm dialog)
+    // One-click restores (no confirm dialog needed)
     if (action === "restore-budget") {
       try {
-        await mutations.restoreBudget.mutateAsync({
-          id: row.id,
-          status: "added",
-        });
+        await mutations.restoreBudget.mutateAsync({ id: row.id, status: "added" });
         toast.success("Transaction restored");
       } catch (err) {
         toast.error(err?.message || ACTION_ERROR["restore-budget"]);
@@ -698,57 +545,32 @@ const AdminTransaction = () => {
     }
     if (action === "restore-issued") {
       try {
-        await mutations.restoreIssued.mutateAsync({
-          id: row.id,
-          status: "open",
-        });
+        await mutations.restoreIssued.mutateAsync({ id: row.id, status: "open" });
         toast.success("Issuance restored");
       } catch (err) {
         toast.error(err?.message || ACTION_ERROR["restore-issued"]);
       }
       return;
     }
-    // Everything else opens the confirm dialog
+    // All other actions open the confirm dialog
     setConfirmAction({ row, action });
     setConfirmOpen(true);
   };
 
-  const closeConfirm = () => {
-    if (!confirmPending) setConfirmOpen(false);
-  };
+  const closeConfirm = () => { if (!confirmPending) setConfirmOpen(false); };
 
   const runConfirmedAction = async () => {
     if (!confirmAction) return;
     const { action, row } = confirmAction;
     try {
-      if (action === "cancel-budget") {
-        await mutations.cancelBudget.mutateAsync(row.id);
-        toast.success("Budget transaction cancelled");
-      } else if (action === "cancel-issued") {
-        await mutations.cancelIssued.mutateAsync(row.id);
-        toast.success("Budget issuance cancelled");
-      } else if (action === "delete-expense") {
-        await mutations.removeExpense.mutateAsync(row.id);
-        toast.success("Expense deleted");
-      } else if (action === "expense-draft") {
-        await mutations.markExpenseDraft.mutateAsync(row.id);
-        toast.success("Expense moved to draft");
-      } else if (action === "expense-restore") {
-        await mutations.markExpensePaid.mutateAsync(row.id);
-        toast.success("Expense marked as paid");
-      } else if (action === "expense-cancel") {
-        await mutations.cancelExpense.mutateAsync({
-          id: row.id,
-          status: "cancel",
-        });
-        toast.success("Expense cancelled");
-      } else if (action === "delete-abono") {
-        await mutations.removeAbono.mutateAsync(row.id);
-        toast.success("Abono deleted");
-      } else if (action === "cancel-transfer") {
-        await mutations.cancelTransfer.mutateAsync(row.id);
-        toast.success("Transfer cancelled");
-      }
+      if (action === "cancel-budget")   { await mutations.cancelBudget.mutateAsync(row.id);                               toast.success("Budget transaction cancelled"); }
+      else if (action === "cancel-issued")  { await mutations.cancelIssued.mutateAsync(row.id);                           toast.success("Budget issuance cancelled"); }
+      else if (action === "delete-expense") { await mutations.removeExpense.mutateAsync(row.id);                           toast.success("Expense deleted"); }
+      else if (action === "expense-draft")  { await mutations.markExpenseDraft.mutateAsync(row.id);                       toast.success("Expense moved to draft"); }
+      else if (action === "expense-restore"){ await mutations.markExpensePaid.mutateAsync(row.id);                        toast.success("Expense marked as paid"); }
+      else if (action === "expense-cancel") { await mutations.cancelExpense.mutateAsync({ id: row.id, status: "cancel" }); toast.success("Expense cancelled"); }
+      else if (action === "delete-abono")   { await mutations.removeAbono.mutateAsync(row.id);                            toast.success("Abono deleted"); }
+      else if (action === "cancel-transfer"){ await mutations.cancelTransfer.mutateAsync(row.id);                         toast.success("Transfer cancelled"); }
       setConfirmOpen(false);
     } catch (err) {
       toast.error(err?.message || ACTION_ERROR[action] || "Couldn't proceed");
@@ -756,8 +578,7 @@ const AdminTransaction = () => {
   };
 
   // ── Derived UI values ─────────────────────────────────────────────────────
-  const confirmCopy =
-    CONFIRM_COPY[confirmAction?.action] ?? CONFIRM_COPY["delete-expense"];
+  const confirmCopy = CONFIRM_COPY[confirmAction?.action] ?? CONFIRM_COPY["delete-expense"];
 
   const confirmSummary = confirmAction ? (
     <div className="mt-4 flex items-center gap-3 rounded-2xl border border-[var(--border)] bg-[var(--surface-2)]/60 px-4 py-3">
@@ -766,8 +587,7 @@ const AdminTransaction = () => {
           {confirmAction.row.description || "Untitled transaction"}
         </p>
         <p className="mt-0.5 truncate text-xs text-[var(--ink-muted)]">
-          {TRANSACTION_KIND_META[confirmAction.row.kind]?.label ?? ""} ·{" "}
-          {formatDate(confirmAction.row.date)}
+          {TRANSACTION_KIND_META[confirmAction.row.kind]?.label ?? ""} · {formatDate(confirmAction.row.date)}
         </p>
       </div>
       <span className="shrink-0 text-sm font-semibold tabular-nums text-[var(--ink)]">
@@ -779,61 +599,29 @@ const AdminTransaction = () => {
   // Filter labels for mobile chips
   const filterLabels = {
     direction: DIRECTION_OPTIONS.find((o) => o.value === direction)?.label,
-    employee: employeeOptions.find((o) => o.value === employee)?.label,
+    employee:  employeeOptions.find((o) => o.value === employee)?.label,
     reference: referenceOptions.find((o) => o.value === reference)?.label,
-    category: categoryOptions.find((o) => o.value === category)?.label,
-    status: statusOptions.find((o) => o.value === status)?.label,
+    category:  categoryOptions.find((o) => o.value === category)?.label,
+    status:    statusOptions.find((o) => o.value === status)?.label,
   };
 
   const mobileFilterChips = useMemo(() => {
     const chips = [];
-    if (tab !== "all") {
-      chips.push({
-        key: "type",
-        label: TYPE_TABS.find((t) => t.value === tab)?.label ?? "Type",
-        onClear: () => {
-          setTab("all");
-          setPage(0);
-        },
-      });
-    }
+    if (tab !== "all")
+      chips.push({ key: "type", label: TYPE_TABS.find((t) => t.value === tab)?.label ?? "Type", onClear: () => { setTab("all"); setPage(0); } });
     for (const key of FILTER_KEYS) {
       const active =
-        key === "direction"
-          ? direction
-          : key === "employee"
-            ? employee
-            : key === "reference"
-              ? reference
-              : key === "category"
-                ? category
-                : status;
+        key === "direction" ? direction :
+        key === "employee"  ? employee  :
+        key === "reference" ? reference :
+        key === "category"  ? category  : status;
       if (active === "all") continue;
       const onClear =
-        key === "direction"
-          ? () => {
-              setDirection("all");
-              setPage(0);
-            }
-          : key === "employee"
-            ? () => {
-                setEmployee("all");
-                setPage(0);
-              }
-            : key === "reference"
-              ? () => {
-                  setReference("all");
-                  setPage(0);
-                }
-              : key === "category"
-                ? () => {
-                    setCategory("all");
-                    setPage(0);
-                  }
-                : () => {
-                    setStatus("all");
-                    setPage(0);
-                  };
+        key === "direction" ? () => { setDirection("all"); setPage(0); } :
+        key === "employee"  ? () => { setEmployee("all");  setPage(0); } :
+        key === "reference" ? () => { setReference("all"); setPage(0); } :
+        key === "category"  ? () => { setCategory("all");  setPage(0); } :
+                              () => { setStatus("all");    setPage(0); };
       chips.push({ key, label: filterLabels[key] ?? key, onClear });
     }
     return chips;
@@ -841,98 +629,29 @@ const AdminTransaction = () => {
   }, [tab, direction, employee, reference, category, status]);
 
   const applyMobileFilters = (next) => {
-    setTab(next.type);
-    setDirection(next.direction);
-    setEmployee(next.employee);
-    setReference(next.reference);
-    setCategory(next.category);
-    setStatus(next.status);
+    setTab(next.type); setDirection(next.direction); setEmployee(next.employee);
+    setReference(next.reference); setCategory(next.category); setStatus(next.status);
     setPage(0);
   };
 
   const renderFilter = (key) => {
     const shared = { portal: true };
     switch (key) {
-      case "direction":
-        return (
-          <Listbox
-            {...shared}
-            options={DIRECTION_OPTIONS}
-            value={direction}
-            onChange={(v) => {
-              setDirection(v);
-              setPage(0);
-            }}
-            placeholder="All flows"
-          />
-        );
-      case "employee":
-        return (
-          <Listbox
-            {...shared}
-            searchable
-            options={employeeOptions}
-            value={employee}
-            onChange={(v) => {
-              setEmployee(v);
-              setPage(0);
-            }}
-            placeholder="All employees"
-          />
-        );
-      case "reference":
-        return (
-          <Listbox
-            {...shared}
-            searchable
-            options={referenceOptions}
-            value={reference}
-            onChange={(v) => {
-              setReference(v);
-              setPage(0);
-            }}
-            placeholder="All references"
-          />
-        );
-      case "category":
-        return (
-          <Listbox
-            {...shared}
-            options={categoryOptions}
-            value={category}
-            onChange={(v) => {
-              setCategory(v);
-              setPage(0);
-            }}
-            placeholder="All categories"
-          />
-        );
-      case "status":
-        return (
-          <Listbox
-            {...shared}
-            options={statusOptions}
-            value={status}
-            onChange={(v) => {
-              setStatus(v);
-              setPage(0);
-            }}
-            placeholder="All statuses"
-          />
-        );
-      default:
-        return null;
+      case "direction": return <Listbox {...shared} options={DIRECTION_OPTIONS} value={direction} onChange={(v) => { setDirection(v); setPage(0); }} placeholder="All flows" />;
+      case "employee":  return <Listbox {...shared} searchable options={employeeOptions}  value={employee}  onChange={(v) => { setEmployee(v);  setPage(0); }} placeholder="All employees" />;
+      case "reference": return <Listbox {...shared} searchable options={referenceOptions} value={reference} onChange={(v) => { setReference(v); setPage(0); }} placeholder="All references" />;
+      case "category":  return <Listbox {...shared} options={categoryOptions} value={category} onChange={(v) => { setCategory(v); setPage(0); }} placeholder="All categories" />;
+      case "status":    return <Listbox {...shared} options={statusOptions}   value={status}   onChange={(v) => { setStatus(v);   setPage(0); }} placeholder="All statuses" />;
+      default:          return null;
     }
   };
 
   const mobileFiltersLabel =
     mobileFilterChips.length > 0
-      ? `Filter ledger — ${mobileFilterChips.length} ${
-          mobileFilterChips.length === 1 ? "filter" : "filters"
-        } active`
+      ? `Filter ledger — ${mobileFilterChips.length} ${mobileFilterChips.length === 1 ? "filter" : "filters"} active`
       : "Filter ledger";
 
-  // ── Search + date picker bar ──────────────────────────────────────────────
+  // ── Shared search + date bar ──────────────────────────────────────────────
   const searchField = (
     <div className="flex w-full items-center gap-2">
       <SearchInput
@@ -940,19 +659,13 @@ const AdminTransaction = () => {
         placeholder="Search transactions…"
         aria-label="Search transactions"
         value={search}
-        onChange={(e) => {
-          setSearch(e.target.value);
-          setPage(0);
-        }}
-        className="min-w-0 flex-1"
+        onChange={(e) => { setSearch(e.target.value); setPage(0); }}
+        className="h-11 min-w-0 flex-1 sm:h-10"
         rightSlot={
           search ? (
             <button
               type="button"
-              onClick={() => {
-                setSearch("");
-                setPage(0);
-              }}
+              onClick={() => { setSearch(""); setPage(0); }}
               aria-label="Clear search"
               className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-[var(--ink-muted)] transition-colors hover:bg-[var(--surface-2)] hover:text-[var(--ink)]"
             >
@@ -961,13 +674,9 @@ const AdminTransaction = () => {
           ) : null
         }
       />
-
       <DateRangePicker
         value={dateRange}
-        onChange={(r) => {
-          setDateRange(r);
-          setPage(0);
-        }}
+        onChange={(r) => { setDateRange(r); setPage(0); }}
         placeholder="All dates"
         align="end"
         compactOnMobile
@@ -989,10 +698,10 @@ const AdminTransaction = () => {
           variants={container}
           initial="hidden"
           animate="show"
-          className="grid grid-cols-1 items-stretch gap-3 sm:grid-cols-2 sm:gap-4 xl:grid-cols-3"
+          className="grid grid-cols-1 items-stretch gap-3 sm:grid-cols-2 sm:gap-4 xl:grid-cols-4"
         >
           {/* Money In */}
-          <motion.div variants={item} className="min-w-0 [&>div]:h-full">
+          <motion.div variants={item} className="h-full min-w-0 [&>div]:h-full">
             <StatCard
               label="Money In"
               value={formatMoney(totals.moneyIn)}
@@ -1002,24 +711,15 @@ const AdminTransaction = () => {
               chart="bars"
               data={inSeries}
               stats={[
-                {
-                  key: "given",
-                  label: "Budget Given",
-                  value: formatMoney(totals.given),
-                  hint: `${totals.givenSources} ${totals.givenSources === 1 ? "source" : "sources"}`,
-                },
-                {
-                  key: "abono",
-                  label: "Abono",
-                  value: formatMoney(totals.abonoIn),
-                  hint: `${totals.abonoCount} ${totals.abonoCount === 1 ? "abono" : "abonos"}`,
-                },
+                { key: "given",    label: "Budget Given", value: formatMoney(totals.given) },
+                { key: "abono",    label: "Abono",        value: formatMoney(totals.abonoIn) },
+                { key: "received", label: "Received",     value: formatMoney(totals.received) },
               ]}
             />
           </motion.div>
 
           {/* Money Out */}
-          <motion.div variants={item} className="min-w-0 [&>div]:h-full">
+          <motion.div variants={item} className="h-full min-w-0 [&>div]:h-full">
             <StatCard
               label="Money Out"
               value={formatMoney(totals.moneyOut)}
@@ -1029,27 +729,30 @@ const AdminTransaction = () => {
               chart="bars"
               data={outSeries}
               stats={[
-                {
-                  key: "issued",
-                  label: "Total Issued",
-                  value: formatMoney(totals.issued),
-                  hint: `${totals.issuedCount} issued`,
-                },
-                {
-                  key: "spent",
-                  label: "Expenses",
-                  value: formatMoney(totals.spent),
-                  hint: `${totals.spentCount} ${totals.spentCount === 1 ? "expense" : "expenses"}`,
-                },
+                { key: "issued", label: "Issued",   value: formatMoney(totals.issued) },
+                { key: "spent",  label: "Expenses", value: formatMoney(totals.spent) },
+                { key: "sent",   label: "Sent",     value: formatMoney(totals.sent) },
               ]}
             />
           </motion.div>
 
-          {/* Records — full-width strip on tablet, third column on desktop */}
-          <motion.div
-            variants={item}
-            className="min-w-0 sm:col-span-2 xl:col-span-1 [&>div]:h-full"
-          >
+          {/* Net Flow */}
+          <motion.div variants={item} className="h-full min-w-0 [&>div]:h-full">
+            <StatCard
+              label="Net Flow"
+              value={formatMoney(totals.net)}
+              icon={Wallet}
+              loading={isLoading}
+              tone={isNetNegative ? "danger" : "success"}
+              stats={[
+                { key: "in",  label: "In",  value: formatMoney(totals.moneyIn) },
+                { key: "out", label: "Out", value: formatMoney(totals.moneyOut) },
+              ]}
+            />
+          </motion.div>
+
+          {/* Record Count */}
+          <motion.div variants={item} className="h-full min-w-0 [&>div]:h-full">
             <StatCard
               label="Records"
               value={filteredRows.length}
@@ -1058,22 +761,12 @@ const AdminTransaction = () => {
               chart="bars"
               data={countSeries}
               stats={[
-                {
-                  key: "given-count",
-                  label: "Given",
-                  value: kindCounts.budget ?? 0,
-                },
-                {
-                  key: "expense-count",
-                  label: "Expenses",
-                  value: kindCounts.expense ?? 0,
-                },
+                { key: "given-count",    label: "Given",     value: kindCounts.budget  ?? 0 },
+                { key: "expense-count",  label: "Expenses",  value: kindCounts.expense ?? 0 },
                 {
                   key: "transfer-count",
                   label: "Transfers",
-                  value:
-                    (kindCounts.transfer_sent ?? 0) +
-                    (kindCounts.transfer_received ?? 0),
+                  value: (kindCounts.transfer_sent ?? 0) + (kindCounts.transfer_received ?? 0),
                 },
               ]}
             />
@@ -1082,11 +775,11 @@ const AdminTransaction = () => {
       </section>
 
       {/* ── Ledger table ───────────────────────────────────────────────────── */}
-      <Card padding="lg" radius="lg" className="relative overflow-visible">
-        <CardHeader className="mb-3">
-          <div className="min-w-0">
+      <Card padding="lg" className="relative rounded-3xl px-2 sm:px-6">
+        <CardHeader>
+          <div>
             <CardTitle className="text-lg">All Transactions</CardTitle>
-            <CardDescription className="mt-0.5">
+            <CardDescription className="text-sm">
               <span className="inline-flex flex-wrap items-center gap-1.5">
                 {hasDateRange ? (
                   <Badge tone="accent" className="font-semibold">
@@ -1100,49 +793,21 @@ const AdminTransaction = () => {
                   </Badge>
                 )}
                 <span>
-                  {hasDateRange
-                    ? "· transactions in this range"
-                    : "· showing all transactions"}
+                  {hasDateRange ? "· transactions in this range" : "· showing all transactions"}
                 </span>
               </span>
             </CardDescription>
           </div>
-
-          {!isLoading && !error && (
-            <Badge
-              tone="neutral"
-              className="hidden shrink-0 tabular-nums sm:inline-flex"
-            >
-              {filteredRows.length}{" "}
-              {filteredRows.length === 1 ? "record" : "records"}
-            </Badge>
-          )}
         </CardHeader>
 
         {/* Type tabs */}
-        <Tabs
-          value={tab}
-          onValueChange={(v) => {
-            setTab(v);
-            setPage(0);
-          }}
-        >
+        <Tabs value={tab} onValueChange={(v) => { setTab(v); setPage(0); }}>
           <div className="mb-4">
             <TabsList className="w-full max-w-full gap-1 overflow-x-auto rounded-full p-1 sm:w-auto">
               {TYPE_TABS.map(({ value, label, Icon }) => (
-                <TabsTrigger
-                  key={value}
-                  value={value}
-                  className="grow px-3 sm:grow-0 sm:px-4"
-                >
-                  <Icon
-                    size={13}
-                    aria-hidden
-                    className="hidden shrink-0 sm:block"
-                  />
-                  <span className="whitespace-nowrap text-xs font-semibold">
-                    {label}
-                  </span>
+                <TabsTrigger key={value} value={value} className="grow px-2.5 sm:grow-0 sm:px-4">
+                  <Icon size={14} aria-hidden className="shrink-0" />
+                  <span className="whitespace-nowrap type-eyebrow">{label}</span>
                 </TabsTrigger>
               ))}
             </TabsList>
@@ -1154,17 +819,16 @@ const AdminTransaction = () => {
           {/* Mobile: search + filter button */}
           <div className="flex items-center gap-2 lg:hidden">
             <div className="min-w-0 flex-1">{searchField}</div>
-
             <IconButton
               type="button"
+              title="Filter"
               aria-label={mobileFiltersLabel}
               aria-haspopup="dialog"
               aria-expanded={filtersOpen}
               onClick={() => setFiltersOpen(true)}
               className={cn(
                 "shrink-0 sm:h-10 sm:w-10",
-                mobileFilterChips.length > 0 &&
-                  "border-[var(--accent)]/40 bg-[var(--accent-soft)] text-[var(--accent-strong)]",
+                mobileFilterChips.length > 0 && "border-[var(--accent)]/40 bg-[var(--accent-soft)] text-[var(--accent-strong)]",
               )}
             >
               <SlidersHorizontal size={16} aria-hidden />
@@ -1193,30 +857,20 @@ const AdminTransaction = () => {
                 <ChevronLeft size={18} aria-hidden />
               </IconButton>
             )}
-
-            <div
-              ref={filtersRef}
-              className="relative min-w-0 flex-1 overflow-hidden"
-            >
+            <div ref={filtersRef} className="relative min-w-0 flex-1 overflow-hidden">
               <div
                 className="flex transition-transform duration-300 ease-out"
                 style={{
                   gap: FILTER_GAP,
-                  width: `${
-                    FILTER_KEYS.length * filterItemWidth +
-                    (FILTER_KEYS.length - 1) * FILTER_GAP
-                  }px`,
+                  width: `${FILTER_KEYS.length * filterItemWidth + (FILTER_KEYS.length - 1) * FILTER_GAP}px`,
                   transform: `translateX(-${trackOffset}px)`,
                 }}
               >
                 {FILTER_KEYS.map((key) => (
-                  <div key={key} className="min-w-0 flex-1">
-                    {renderFilter(key)}
-                  </div>
+                  <div key={key} className="min-w-0 flex-1">{renderFilter(key)}</div>
                 ))}
               </div>
             </div>
-
             {showSlider && (
               <IconButton
                 type="button"
@@ -1240,12 +894,8 @@ const AdminTransaction = () => {
         <FilterChips
           chips={mobileFilterChips}
           onClearAll={() => {
-            setTab("all");
-            setDirection("all");
-            setEmployee("all");
-            setReference("all");
-            setCategory("all");
-            setStatus("all");
+            setTab("all"); setDirection("all"); setEmployee("all");
+            setReference("all"); setCategory("all"); setStatus("all");
             setPage(0);
           }}
         />
@@ -1263,16 +913,12 @@ const AdminTransaction = () => {
         ) : pageRows.length === 0 ? (
           <EmptyState
             icon={ClipboardList}
-            title={
-              hasActiveFilters
-                ? "No records match your filters"
-                : "No transactions yet"
-            }
+            title={hasActiveFilters ? "No records match your filters" : "No transactions yet"}
             message={
               hasActiveFilters
                 ? hasDateRange
                   ? "Try a wider date range, another tab, or a different search term."
-                  : "Try another tab, filter, or search term."
+                  : "Try another tab, another filter, or a different search term."
                 : "Records appear here as soon as budgets, expenses, abono or transfers are created."
             }
             onClear={hasActiveFilters ? clearFilters : undefined}
@@ -1286,29 +932,15 @@ const AdminTransaction = () => {
             />
 
             {/* Pagination footer */}
-            <div className="mt-5 flex flex-col gap-3 border-t border-[var(--border)] pt-4 sm:flex-row sm:items-center sm:justify-between">
-              <p className="text-xs tabular-nums text-[var(--ink-muted)]">
-                Showing{" "}
-                <span className="font-semibold text-[var(--ink)]">
-                  {rangeStart}–{rangeEnd}
-                </span>{" "}
-                of{" "}
-                <span className="font-semibold text-[var(--ink)]">
-                  {filteredRows.length}
-                </span>{" "}
+            <div className="mt-4 flex flex-col gap-2 border-t border-[var(--border)] pt-4 sm:flex-row sm:items-center">
+              <p className="text-sm text-[var(--ink-muted)]">
+                Showing {rangeStart}–{rangeEnd} of {filteredRows.length}{" "}
                 {filteredRows.length === 1 ? "record" : "records"}
-                {hasDateRange && (
-                  <span className="ml-1.5 opacity-60">· {rangeLabel}</span>
-                )}
+                {hasDateRange && <span className="ml-1 text-xs opacity-70">· {rangeLabel}</span>}
               </p>
-
               {pageCount > 1 && (
                 <div className="sm:ml-auto">
-                  <Pager
-                    page={currentPage}
-                    pageCount={pageCount}
-                    onChange={setPage}
-                  />
+                  <Pager page={currentPage} pageCount={pageCount} onChange={setPage} />
                 </div>
               )}
             </div>

@@ -13,7 +13,7 @@ import IssuedTransactionFilters from "./IssuedTransactionFilters";
 import IssuedTransactionTable from "./IssuedTransactionTable";
 import { formatMoney } from "../../../../lib/utils";
 
-const PAGE_SIZE = 50;
+const PAGE_SIZE = 100;
 
 /**
  * Dropdown predicate for the issued-transaction list — one source of truth so

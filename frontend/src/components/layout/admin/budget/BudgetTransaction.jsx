@@ -22,7 +22,7 @@ import {
 
 import TransactionTable from "./TransactionTable";
 
-const PAGE_SIZE = 50;
+const PAGE_SIZE = 100;
 const UNDO_WINDOW_MS = 6000;
 
 const METHOD_FILTER_OPTIONS = [

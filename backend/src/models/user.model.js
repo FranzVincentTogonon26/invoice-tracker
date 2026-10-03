@@ -66,6 +66,21 @@ class User {
     return result.rows[0] ?? null;
   }
 
+  // Admin avatar change (Admin → Employee Details): replaces ONLY avatar_url.
+  // No active-status gate — an admin may manage accounts of any status, and
+  // the route is already admin-only with the target id re-validated.
+  static async updateUserAvatar({ id, avatarUrl }) {
+    const result = await query(
+      `UPDATE users
+          SET avatar_url = $2,
+              updated_at = NOW()
+        WHERE user_id = $1
+        RETURNING ${SAFE_COLUMNS}`,
+      [id, avatarUrl],
+    );
+    return result.rows[0] ?? null;
+  }
+
   // Replace the user's password — hashed with the SAME procedure and cost as
   // createUser (bcrypt, SALT_ROUNDS), so a password set here is verified by
   // the existing login flow with `bcrypt.compare`. The plaintext never

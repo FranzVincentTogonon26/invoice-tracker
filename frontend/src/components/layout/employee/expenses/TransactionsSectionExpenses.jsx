@@ -4,6 +4,7 @@ import { AnimatePresence, motion } from "framer-motion";
 import toast from "react-hot-toast";
 import {
   Banknote,
+  CircleCheck,
   CreditCard,
   Eye,
   Flag,
@@ -15,6 +16,7 @@ import {
   Inbox,
   Wallet,
   ReceiptText,
+  RotateCcw,
   HandCoins,
   Wallet as MethodWalletIcon,
   EllipsisVertical,
@@ -45,6 +47,9 @@ import { ExpenseStatusBadge } from "../../admin/expenses/ExpensesTable";
 import EmployeeExpenseDetailsModal from "./EmployeeExpenseDetailsModal";
 import { useExpensesMutations } from "../../../../hooks/useExpenses";
 import { expensesApi } from "../../../../api/expenses";
+import { useQueryClient } from "@tanstack/react-query";
+import { useAuth } from "../../../../context/AuthContext";
+import { USER_ROLES } from "../../../../constants";
 
 const formatShortDate = (value) => {
   const parsed = toDate(value);
@@ -103,9 +108,24 @@ const hasSheetReceipt = (row) => Boolean(row?.receiptId || row?.imageUrl);
 // column and the mapped `flagged` boolean so desktop + mobile render from any
 // shape the ledger passes in.
 const isFlagged = (row) => row?.flagged === true || Number(row?.flag) === 1;
-const PAGE_SIZE = 50;
+const PAGE_SIZE = 100;
 
 function getDateGroupLabel(date) {
+  const txDate = startOfDay(toDate(date));
+  const today = startOfDay(new Date());
+  const yesterday = addDays(today, -1);
+
+  if (isSameDay(txDate, today)) return "Today";
+  if (isSameDay(txDate, yesterday)) return "Yesterday";
+  return "Last days";
+}
+
+// Relative-day identifier for the desktop "Days" column — Today / Yesterday /
+// Last days by calendar day (local time), mirroring the admin ledger. An
+// unparseable date renders "—" instead of silently falling into Today
+// (`startOfDay` would fold a bad value into now).
+function getDaysLabel(date) {
+  if (!toDate(date)) return "—";
   const txDate = startOfDay(toDate(date));
   const today = startOfDay(new Date());
   const yesterday = addDays(today, -1);
@@ -130,7 +150,7 @@ function groupTransactionsByDate(rows) {
     .map((label) => ({ label, transactions: groups.get(label) }));
 }
 
-const COLUMN_WIDTHS = ["16%", "28%", "18%", "16%", "22%", "5%"];
+const COLUMN_WIDTHS = ["13%", "23%", "13%", "12%", "17%", "16%", "6%"];
 
 function TransactionCard({ tx, meta, disabled, onOpen }) {
   const actionable = isSheetActionable(tx);
@@ -527,7 +547,18 @@ function TransactionSheetBody({
   );
 }
 
-function RowActions({ row, pending, onView, onDelete, canDelete = true }) {
+function RowActions({
+  row,
+  pending,
+  onView,
+  onDelete,
+  canDelete = true,
+  // Admin-only draft lifecycle (mirrors the admin expenses ledger): parked
+  // through onAddToDraft / restored through onRestoreFromDraft.
+  canManageDraft = false,
+  onAddToDraft,
+  onRestoreFromDraft,
+}) {
   const [open, setOpen] = useState(false);
   const [position, setPosition] = useState(null);
   const btnRef = useRef(null);
@@ -580,6 +611,32 @@ function RowActions({ row, pending, onView, onDelete, canDelete = true }) {
       danger: false,
       onSelect: () => onView?.(row),
     },
+    // Admin-only, one at a time based on status: a paid expense can be parked
+    // in draft ("Add to draft"), a draft can be put back to paid ("Restore
+    // from draft"). Expense rows only — issuance/abono ledger entries carry
+    // no draft lifecycle.
+    ...(canManageDraft && row?.kind === "expense" && row?.status === "paid"
+      ? [
+          {
+            key: "draft",
+            label: "Add to draft",
+            Icon: RotateCcw,
+            danger: false,
+            onSelect: () => onAddToDraft?.(row),
+          },
+        ]
+      : []),
+    ...(canManageDraft && row?.kind === "expense" && row?.status === "draft"
+      ? [
+          {
+            key: "restore",
+            label: "Restore from draft",
+            Icon: CircleCheck,
+            danger: false,
+            onSelect: () => onRestoreFromDraft?.(row),
+          },
+        ]
+      : []),
     // Read-only mode (Admin → Employee Details) keeps the menu for viewing
     // but drops the destructive entry.
     ...(canDelete
@@ -678,8 +735,18 @@ export const TransactionsSectionExpenses = ({
   const [viewRow, setViewRow] = useState(null);
   const [deleteRow, setDeleteRow] = useState(null);
   const [sheetRow, setSheetRow] = useState(null);
-  const { setStatus } = useExpensesMutations();
-  const confirmPending = setStatus.isPending;
+  // Pending admin draft move: { row, to: "draft" | "paid" } — one shared
+  // confirm flow serves both directions (see runDraftMove).
+  const [draftRow, setDraftRow] = useState(null);
+  const { user } = useAuth();
+  const isAdmin = user?.role === USER_ROLES.ADMIN;
+  const qc = useQueryClient();
+  const { setStatus, markEmployeeDraft, markEmployeePaid } =
+    useExpensesMutations();
+  const confirmPending =
+    setStatus.isPending ||
+    markEmployeeDraft.isPending ||
+    markEmployeePaid.isPending;
 
   const closeConfirm = () => {
     if (!confirmPending) setDeleteRow(null);
@@ -697,6 +764,76 @@ export const TransactionsSectionExpenses = ({
       toast.error(err?.message || "Couldn’t move expense to draft");
     }
   };
+
+  // Shared function between "Add to draft" (paid → draft) and "Restore from
+  // draft" (draft → paid): the pending `draftRow.to` decides which admin
+  // endpoint runs. Both endpoints are admin-only and guarded server-side to
+  // employee-authored rows. The admin details queries (["employeeDetails", …])
+  // sit outside the shared hook's invalidation, so they are refreshed here
+  // explicitly and the row updates without a manual reload.
+  const runDraftMove = async () => {
+    if (!draftRow) return;
+
+    try {
+      if (draftRow.to === "draft") {
+        await markEmployeeDraft.mutateAsync(draftRow.row.id);
+        toast.success("Expense moved to draft");
+      } else {
+        await markEmployeePaid.mutateAsync(draftRow.row.id);
+        toast.success("Expense restored to paid");
+      }
+      qc.invalidateQueries({ queryKey: ["employeeDetails"] });
+      setDraftRow(null);
+      setSheetRow(null);
+    } catch (err) {
+      toast.error(err?.message || "Couldn’t update expense");
+    }
+  };
+
+  const closeDraftConfirm = () => {
+    if (!markEmployeeDraft.isPending && !markEmployeePaid.isPending)
+      setDraftRow(null);
+  };
+
+  const draftSummary = draftRow ? (
+    <div className="mt-4 flex items-center gap-3 rounded-2xl border border-[var(--border)] bg-[var(--surface-2)]/60 px-4 py-3">
+      <div className="min-w-0 flex-1">
+        <p className="truncate text-base font-semibold text-[var(--ink)]">
+          {draftRow.row.description || "Untitled expense"}
+        </p>
+        <p className="mt-0.5 truncate text-xs text-[var(--ink-muted)]">
+          {`${draftRow.row.category || "Uncategorized"} · ${formatDate(draftRow.row.date)}`}
+        </p>
+      </div>
+      <span className="shrink-0 text-sm font-semibold tabular-nums text-[var(--ink)]">
+        {formatMoney(draftRow.row.amount)}
+      </span>
+    </div>
+  ) : null;
+
+  const draftCopy =
+    draftRow?.to === "paid"
+      ? {
+          icon: <CircleCheck size={20} aria-hidden />,
+          iconClassName: "bg-[var(--success)]/12 text-[var(--success)]",
+          title: "Restore this expense from draft?",
+          description:
+            "The record leaves Draft and counts against the employee's balance again — exactly as it did before it was parked there.",
+          cancelLabel: "Keep as draft",
+          confirmLabel: "Yes, mark as paid",
+          confirmVariant: "accent",
+          pendingLabel: "Restoring…",
+        }
+      : {
+          icon: <RotateCcw size={20} aria-hidden />,
+          title: "Add this expense to draft?",
+          description:
+            "The record stays in the employee's ledger, but its status moves back to Draft — only paid expenses count against the employee's balance, so this amount returns to their available balance until it is paid again.",
+          cancelLabel: "Keep as paid",
+          confirmLabel: "Yes, move to draft",
+          confirmVariant: "danger",
+          pendingLabel: "Moving…",
+        };
 
   const confirmSummary = deleteRow ? (
     <div className="mt-4 flex items-center gap-3 rounded-2xl border border-[var(--border)] bg-[var(--surface-2)]/60 px-4 py-3">
@@ -737,6 +874,7 @@ export const TransactionsSectionExpenses = ({
       const method = methodLabel(tx.method || "").toLowerCase();
       const status = (tx.status || "").toLowerCase();
       const amountStr = String(tx.amount || "");
+      const dayLabel = getDaysLabel(tx.date).toLowerCase();
 
       return (
         desc.includes(q) ||
@@ -745,6 +883,7 @@ export const TransactionsSectionExpenses = ({
         typeLabel.includes(q) ||
         method.includes(q) ||
         status.includes(q) ||
+        dayLabel.includes(q) ||
         amountStr.includes(q)
       );
     });
@@ -848,9 +987,9 @@ export const TransactionsSectionExpenses = ({
           />
         ) : (
           <div className="overflow-x-auto rounded-2xl border border-[var(--border)] bg-[var(--surface)] shadow-card">
-            <table className="w-full min-w-[720px] table-fixed border-collapse text-left">
+            <table className="w-full min-w-[980px] table-fixed border-collapse text-left">
               <caption className="sr-only">
-                Employee all transactions list
+                Employee all transactions list with relative day and time
               </caption>
               <colgroup>
                 {COLUMN_WIDTHS.map((width, i) => (
@@ -871,6 +1010,9 @@ export const TransactionsSectionExpenses = ({
                   <th className="whitespace-nowrap border-b border-[var(--border)] px-4 py-3 type-eyebrow text-[var(--ink-muted)]">
                     Status
                   </th>
+                  <th className="whitespace-nowrap border-b border-[var(--border)] px-4 py-3 type-eyebrow text-[var(--ink-muted)]">
+                    Days
+                  </th>
                   <th className="whitespace-nowrap border-b border-[var(--border)] px-4 py-3 text-right type-eyebrow text-[var(--ink-muted)] last:pr-5">
                     Amount
                   </th>
@@ -884,6 +1026,7 @@ export const TransactionsSectionExpenses = ({
                   const meta = TYPE_CONFIG[tx.kind] ?? TYPE_CONFIG.expense;
                   const Icon = meta.icon;
                   const flagged = isFlagged(tx);
+                  const daysLabel = getDaysLabel(tx.date);
 
                   return (
                     <tr
@@ -957,6 +1100,32 @@ export const TransactionsSectionExpenses = ({
                           </Badge>
                         )}
                       </td>
+                      <td className="px-4 py-3 align-middle">
+                        <p
+                          className="flex flex-row items-center gap-1.5 whitespace-nowrap leading-none"
+                          title={`${formatDate(tx.date)} at ${formatTime(tx.date)}`}
+                        >
+                          <span
+                            className={cn(
+                              "text-[13px] font-medium",
+                              daysLabel === "Today"
+                                ? "text-[var(--accent-strong)]"
+                                : "text-[var(--ink)]",
+                            )}
+                          >
+                            {daysLabel}
+                          </span>
+                          <span
+                            aria-hidden
+                            className="shrink-0 text-[var(--ink-muted)] opacity-40"
+                          >
+                            ·
+                          </span>
+                          <span className="shrink-0 text-[11px] tabular-nums text-[var(--ink-muted)]">
+                            {formatTime(tx.date)}
+                          </span>
+                        </p>
+                      </td>
                       <td className="px-4 py-3 text-right last:pr-5 align-middle">
                         <span
                           className={cn(
@@ -974,6 +1143,13 @@ export const TransactionsSectionExpenses = ({
                             onView={setViewRow}
                             onDelete={setDeleteRow}
                             canDelete={!readOnly}
+                            canManageDraft={isAdmin}
+                            onAddToDraft={(row) =>
+                              setDraftRow({ row, to: "draft" })
+                            }
+                            onRestoreFromDraft={(row) =>
+                              setDraftRow({ row, to: "paid" })
+                            }
                           />
                         </div>
                       </td>
@@ -1100,6 +1276,22 @@ export const TransactionsSectionExpenses = ({
         pending={confirmPending}
         onCancel={closeConfirm}
         onConfirm={runMarkDraft}
+      />
+
+      <ConfirmActionDialog
+        open={Boolean(draftRow)}
+        icon={draftCopy.icon}
+        iconClassName={draftCopy.iconClassName}
+        title={draftCopy.title}
+        description={draftCopy.description}
+        summary={draftSummary}
+        cancelLabel={draftCopy.cancelLabel}
+        confirmLabel={draftCopy.confirmLabel}
+        confirmVariant={draftCopy.confirmVariant}
+        pendingLabel={draftCopy.pendingLabel}
+        pending={markEmployeeDraft.isPending || markEmployeePaid.isPending}
+        onCancel={closeDraftConfirm}
+        onConfirm={runDraftMove}
       />
     </Card>
   );

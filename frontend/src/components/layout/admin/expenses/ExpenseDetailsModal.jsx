@@ -1,11 +1,10 @@
-import { useEffect, useId, useMemo, useState } from "react";
+import { useEffect, useId, useMemo, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import { useQueryClient } from "@tanstack/react-query";
 import { AnimatePresence, motion } from "framer-motion";
 import {
   AlertCircle,
   Banknote,
-  Calendar,
-  CalendarClock,
   ChevronDown,
   CreditCard,
   Eye,
@@ -17,10 +16,7 @@ import {
   ReceiptText,
   RotateCcw,
   ShieldCheck,
-  Store,
-  Tag,
   TriangleAlert,
-  UserRound,
   Wallet,
   X,
   ZoomIn,
@@ -28,7 +24,6 @@ import {
 } from "lucide-react";
 import toast from "react-hot-toast";
 import { Button } from "../../../ui/Button";
-import { Badge } from "../../../ui/Badge";
 import { TextArea } from "../../../ui/Input";
 import { EmployeeAvatar } from "../../../ui/SelectEmployee";
 import {
@@ -48,6 +43,7 @@ import { ExpenseStatusBadge } from "./ExpensesTable";
 import ConfirmActionDialog from "./ConfirmActionDialog";
 
 const DIALOG_EASE = [0.16, 1, 0.3, 1];
+const REVIEW_NOTES_MAX = 1000;
 
 const toNumber = (value) => {
   const n = Number(value);
@@ -62,48 +58,36 @@ const formatQty = (value) => {
 const getMethodIcon = (method) => {
   switch (method) {
     case "cash":
-      return <Banknote size={14} aria-hidden />;
+      return <Banknote size={13} aria-hidden />;
     case "bank_transfer":
-      return <Landmark size={14} aria-hidden />;
+      return <Landmark size={13} aria-hidden />;
     case "e_wallet":
-      return <Wallet size={14} aria-hidden />;
+      return <Wallet size={13} aria-hidden />;
     case "cheque":
-      return <FileText size={14} aria-hidden />;
+      return <FileText size={13} aria-hidden />;
     default:
-      return <CreditCard size={14} aria-hidden />;
+      return <CreditCard size={13} aria-hidden />;
   }
 };
 
-// Eyebrow label with a leading glyph — every detail card shares it so the
-// rows read as one family.
-const FieldLabel = ({ icon, children }) => (
-  <p className="flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-[0.08em] text-[var(--ink-muted)]">
-    {icon}
-    <span>{children}</span>
-  </p>
-);
-
-// One boxed detail row (label + value). `span` stretches it across the grid
-// on `sm:` and up — single column on mobile.
-const DetailItem = ({ icon, label, span = false, children }) => (
-  <div
-    className={cn(
-      "min-w-0 space-y-1.5 rounded-xl border border-[var(--border)] bg-[var(--surface)] p-3",
-      span && "sm:col-span-2",
-    )}
-  >
-    <FieldLabel icon={icon}>{label}</FieldLabel>
-    {children}
+const CreatorRow = ({ row }) => (
+  <div className="flex items-center gap-2.5 rounded-xl border border-[var(--border)] bg-[var(--surface)] p-2.5">
+    <EmployeeAvatar
+      name={row?.employee}
+      avatarUrl={row?.employeeAvatar}
+      className="h-8 w-8 shrink-0 text-xs"
+    />
+    <div className="min-w-0 flex-1">
+      <p className="truncate text-xs font-semibold leading-tight text-[var(--ink)]">
+        {row?.employee || "Unknown"}
+      </p>
+      <p className="mt-0.5 truncate text-[11px] capitalize text-[var(--ink-muted)]">
+        {row?.employeeRole || "Submitted by"}
+      </p>
+    </div>
   </div>
 );
 
-const REVIEW_NOTES_MAX = 1000;
-
-// Admin review trail — rendered ONLY for draft rows (replacing the read-only
-// Notes / remarks card). A textarea pre-filled with the current notes plus an
-// explicit Save, so suspicious lines can carry review comments. Saving writes
-// the whole text (blank clears the trail); the button stays disabled until
-// the text differs from what is stored.
 const ReviewNotesCard = ({ row }) => {
   const { updateNotes } = useExpensesMutations();
   const saving = updateNotes.isPending;
@@ -111,7 +95,6 @@ const ReviewNotesCard = ({ row }) => {
   const [committed, setCommitted] = useState(null);
   const [error, setError] = useState(null);
 
-  // New expense selected while open → re-seed the editor from that row.
   const [notesFor, setNotesFor] = useState(row?.id);
   if (notesFor !== row?.id) {
     setNotesFor(row?.id);
@@ -143,22 +126,13 @@ const ReviewNotesCard = ({ row }) => {
   };
 
   return (
-    <div className="min-w-0 space-y-2 rounded-xl border border-[var(--border)] bg-[var(--surface)] p-3 sm:col-span-2">
-      <FieldLabel
-        icon={
-          <FileText
-            size={13}
-            aria-hidden
-            className="shrink-0 text-[var(--ink-muted)]"
-          />
-        }
-      >
-        Review notes
-      </FieldLabel>
-      <p className="text-[11px] leading-snug text-[var(--ink-muted)]">
-        Draft only — comment here when something looks suspicious. Saving
-        overwrites the notes trail.
-      </p>
+    <div className="min-w-0 space-y-2 pt-1">
+      <div className="flex items-center justify-between">
+        <p className="type-eyebrow text-[var(--ink-muted)]">Review Notes</p>
+        <span className="text-[10px] text-[var(--ink-muted)]">
+          Draft review comments
+        </span>
+      </div>
       <TextArea
         value={notes}
         onChange={(e) => setNotes(e.target.value)}
@@ -167,7 +141,7 @@ const ReviewNotesCard = ({ row }) => {
         disabled={saving}
         placeholder="e.g. Receipt total doesn't match the scanned items — verify with the employee."
         aria-label="Admin review notes"
-        aria-invalid={Boolean(error) || undefined}
+        className="w-full text-xs"
       />
       {error ? (
         <p
@@ -177,197 +151,23 @@ const ReviewNotesCard = ({ row }) => {
           {error}
         </p>
       ) : null}
-      <div className="flex items-center justify-between gap-2">
-        <span className="text-[11px] tabular-nums text-[var(--ink-muted)]">
+      <div className="flex items-center justify-between gap-2 pt-1">
+        <span className="text-[10px] tabular-nums text-[var(--ink-muted)]">
           {notes.length}/{REVIEW_NOTES_MAX}
         </span>
         <Button
           type="button"
-          variant="accent"
+          variant="soft"
           size="sm"
           onClick={handleSave}
           disabled={saving || !dirty}
+          className="h-7 text-xs"
         >
-          {saving && <Loader2 size={13} className="animate-spin" aria-hidden />}
+          {saving && <Loader2 size={12} className="animate-spin" aria-hidden />}
           {saving ? "Saving…" : "Save notes"}
         </Button>
       </div>
     </div>
-  );
-};
-
-const CreatorRow = ({ row }) => (
-  <div className="flex items-center gap-3 rounded-2xl border border-[var(--border)] bg-[var(--surface)] p-3 shadow-xs">
-    <EmployeeAvatar
-      name={row?.employee}
-      avatarUrl={row?.employeeAvatar}
-      className="h-10 w-10 text-xs"
-    />
-    <div className="min-w-0 flex-1">
-      <p className="truncate text-sm font-semibold leading-tight text-[var(--ink)]">
-        {row?.employee || "Unknown"}
-      </p>
-      {row?.employeeRole ? (
-        <p className="mt-0.5 truncate text-xs capitalize text-[var(--ink-muted)]">
-          {row.employeeRole}
-        </p>
-      ) : (
-        <p className="mt-0.5 text-xs text-[var(--ink-muted)]">Submitted by</p>
-      )}
-    </div>
-  </div>
-);
-
-// Green confirmation shown after the admin clears the flag — the
-// "Approved by admin" label. Same card size/padding as the red notice so the
-// layout doesn't shift, only the tone changes.
-const ApprovedFlagNotice = () => (
-  <div
-    role="status"
-    className="flex items-start gap-3 rounded-2xl border border-emerald-500/30 bg-emerald-500/10 p-3.5"
-  >
-    <ShieldCheck
-      size={16}
-      aria-hidden
-      className="mt-0.5 shrink-0 text-emerald-600"
-    />
-    <div className="min-w-0 flex-1">
-      <p className="text-xs font-bold text-emerald-700">Approved by admin</p>
-      <p className="mt-1 text-xs leading-relaxed text-emerald-700/90">
-        Flag cleared — this expense is no longer marked for review.
-      </p>
-    </div>
-  </div>
-);
-
-// ── Flagged notice + admin approval ─────────────────────────────────────
-// Same red card the modal always rendered — only an action row is added
-// inside it (button + "Action needed" hint). Approving asks for a
-// confirmation first (ConfirmActionDialog) and only THEN PATCHes
-// /expenses/:id/clear-flag (flag = 0), swapping this card for the green
-// "Approved by admin" label. Rendered ONLY when row.flagged is truthy, so a
-// non-flagged expense keeps the original design untouched.
-const FlaggedNotice = ({
-  expenseId,
-  expense,
-  onCleared,
-  onConfirmOpenChange,
-}) => {
-  const qc = useQueryClient();
-  const [confirmOpen, setConfirmOpen] = useState(false);
-  const [approving, setApproving] = useState(false);
-  const [approved, setApproved] = useState(false);
-  const [error, setError] = useState(null);
-
-  // Keep the parent modal in the loop: its Escape handler must stand down
-  // while this confirmation floats above it (see ExpenseDetailsModal).
-  const setConfirm = (next) => {
-    setConfirmOpen(next);
-    onConfirmOpenChange?.(next);
-  };
-
-  const handleApprove = async () => {
-    if (!expenseId || approving || approved) return;
-    setApproving(true);
-    setError(null);
-    try {
-      await expensesApi.clearFlag(expenseId);
-      setApproved(true);
-      setConfirm(false);
-      qc.invalidateQueries({ queryKey: ["expenses"] });
-      qc.invalidateQueries({ queryKey: ["employeeExpenses"] });
-      onCleared?.(expenseId);
-    } catch (err) {
-      setError(err?.message || "Couldn’t approve flag. Try again.");
-      // Close the dialog so the inline error on the notice stays visible.
-      setConfirm(false);
-    } finally {
-      setApproving(false);
-    }
-  };
-
-  if (approved) {
-    return <ApprovedFlagNotice />;
-  }
-
-  // Expense recap inside the confirmation — same summary card the admin
-  // ledger's confirm dialogs render, so the admin can verify WHICH receipt
-  // they are approving before the flag is cleared.
-  const summary = expense ? (
-    <div className="mt-4 flex items-center gap-3 rounded-2xl border border-[var(--border)] bg-[var(--surface-2)]/60 px-4 py-3">
-      <div className="min-w-0 flex-1">
-        <p className="truncate text-base font-semibold text-[var(--ink)]">
-          {expense.description || "Untitled expense"}
-        </p>
-        <p className="mt-0.5 truncate text-xs text-[var(--ink-muted)]">
-          {`${expense.category || "Uncategorized"} · ${formatDate(expense.date)}`}
-        </p>
-      </div>
-      <span className="shrink-0 text-sm font-semibold tabular-nums text-[var(--ink)]">
-        {formatMoney(expense.amount)}
-      </span>
-    </div>
-  ) : null;
-
-  return (
-    <>
-      <div
-        role="note"
-        className="flex items-start gap-3 rounded-2xl border border-[var(--danger)]/30 bg-[var(--danger)]/10 p-3.5"
-      >
-        <TriangleAlert
-          size={16}
-          aria-hidden
-          className="mt-0.5 shrink-0 text-[var(--danger)]"
-        />
-        <div className="min-w-0 flex-1">
-          <p className="text-xs font-bold text-[var(--danger)]">
-            Receipt date predates the budget issuance date
-          </p>
-          <p className="mt-1 text-xs leading-relaxed text-[var(--danger)]/90">
-            This receipt is dated before the budget was issued to the employee.
-            Please verify the receipt details and legitimacy before approving.
-          </p>
-          <div className="mt-2.5 flex flex-row items-center justify-end gap-2 border-t border-[var(--danger)]/20 pt-2.5">
-            <Button
-              type="button"
-              variant="outline"
-              size="sm"
-              onClick={() => setConfirm(true)}
-              disabled={approving || !expenseId}
-              className="h-7 rounded-full px-3 text-xs"
-            >
-              <ShieldCheck size={16} aria-hidden />
-              Approve
-            </Button>
-          </div>
-          {error ? (
-            <p
-              role="alert"
-              className="mt-1.5 text-[11px] font-medium text-[var(--danger)]"
-            >
-              {error}
-            </p>
-          ) : null}
-        </div>
-      </div>
-
-      <ConfirmActionDialog
-        open={confirmOpen}
-        icon={<ShieldCheck size={20} aria-hidden />}
-        iconClassName="bg-[var(--accent-soft)] text-[var(--accent-strong)]"
-        title="Approve this flagged expense?"
-        description="This clears the review flag and marks the receipt as approved. Only approve after the receipt details and legitimacy have been verified."
-        summary={summary}
-        cancelLabel="Keep flagged"
-        confirmLabel="Yes, approve"
-        confirmVariant="accent"
-        pendingLabel="Approving…"
-        pending={approving}
-        onCancel={() => setConfirm(false)}
-        onConfirm={handleApprove}
-      />
-    </>
   );
 };
 
@@ -497,12 +297,12 @@ const LineItemsSection = ({
         onClick={onToggle}
         aria-expanded={open}
         aria-controls={regionId}
-        className="flex w-full items-center justify-between gap-3 px-4 py-3.5 text-left transition-colors hover:bg-[var(--surface-2)]/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)]/30"
+        className="flex w-full items-center justify-between gap-3 px-4 py-3 text-left transition-colors hover:bg-[var(--surface-2)]/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)]/30"
       >
         <div className="min-w-0 flex-1">
           <div className="flex flex-wrap items-center gap-2">
             <span className="text-xs font-semibold uppercase tracking-wide text-[var(--ink)]">
-              Receipt items
+              Scanned line items
             </span>
             <span className="inline-flex items-center rounded-full bg-[var(--surface-2)] px-2 py-0.5 text-[11px] font-medium text-[var(--ink-muted)]">
               {lines.length} {lines.length === 1 ? "item" : "items"}
@@ -540,7 +340,7 @@ const LineItemsSection = ({
             transition={{ duration: 0.22, ease: DIALOG_EASE }}
             className="overflow-hidden border-t border-[var(--border)]"
           >
-            <div className="scrollbar-slim max-h-[280px] overflow-y-auto">
+            <div className="scrollbar-slim max-h-[260px] overflow-y-auto">
               <table className="w-full border-collapse text-[13px]">
                 <thead className="sticky top-0 z-[1]">
                   <tr className="border-b border-[var(--border)] bg-[var(--surface-2)]">
@@ -586,28 +386,26 @@ const ExpenseDetailsModal = ({
   onClose,
   onFlagCleared,
 }) => {
-  const titleId = useId();
+  const dialogRef = useRef(null);
   const itemsRegionId = useId();
+  const qc = useQueryClient();
+
+  const [activeTab, setActiveTab] = useState("details");
   const [failedUrl, setFailedUrl] = useState(null);
   const [itemsOpen, setItemsOpen] = useState(false);
   const [zoomLevel, setZoomLevel] = useState(1);
-  // Expense id whose flag was just approved in this session — keeps the green
-  // "Approved by admin" label visible after the parent flips row.flagged to
-  // false (otherwise the notice would unmount and the confirmation would flash
-  // away). Reset per expense / per open below.
   const [clearedFlagId, setClearedFlagId] = useState(null);
-  // True while the flag-approval confirmation floats above this modal — the
-  // modal's Escape handler stands down so Escape closes only that dialog
-  // (see FlaggedNotice's onConfirmOpenChange).
   const [flagConfirmOpen, setFlagConfirmOpen] = useState(false);
+  const [approving, setApproving] = useState(false);
+  const [approveError, setApproveError] = useState(null);
+
   const row = expense;
 
-  // Reset the view (zoom level + items panel) on every open. Adjusting state
-  // during render is the documented alternative to a setState-in-effect — the
-  // same pattern BudgetModal / ReferencesModal use.
+  // Reset state on open or row change
   const [prevOpen, setPrevOpen] = useState(open);
   if (prevOpen !== open) {
     setPrevOpen(open);
+    setActiveTab("details");
     setZoomLevel(1);
     setItemsOpen(false);
     if (!open) {
@@ -615,11 +413,11 @@ const ExpenseDetailsModal = ({
       setFlagConfirmOpen(false);
     }
   }
-  // New expense selected while open → drop the previous approval label so a
-  // non-flagged expense keeps the original design untouched.
+
   const [prevRowId, setPrevRowId] = useState(row?.id);
   if (prevRowId !== row?.id) {
     setPrevRowId(row?.id);
+    setActiveTab("details");
     setClearedFlagId(null);
     setFlagConfirmOpen(false);
   }
@@ -628,8 +426,6 @@ const ExpenseDetailsModal = ({
     if (!open) return undefined;
     const onKeyDown = (e) => {
       if (e.key !== "Escape") return;
-      // The flag-approval confirmation owns Escape while it's open — let it
-      // close just the dialog instead of tearing down this whole modal.
       if (flagConfirmOpen) return;
       e.stopPropagation();
       setFailedUrl(null);
@@ -668,8 +464,8 @@ const ExpenseDetailsModal = ({
     [receiptItems],
   );
 
-  const recordedTotal = toNumber(row?.amount);
   const vendorName = String(detailVendor ?? "").trim();
+  const title = vendorName || row?.description || "Expense details";
 
   const handleClose = () => {
     setFailedUrl(null);
@@ -683,437 +479,524 @@ const ExpenseDetailsModal = ({
     setZoomLevel((z) => Math.max(0.75, Number((z - 0.25).toFixed(2))));
   const zoomReset = () => setZoomLevel(1);
 
-  const flaggedNotice = row?.flagged ? (
-    <FlaggedNotice
-      key={row?.id}
-      expenseId={row?.id}
-      expense={row}
-      onCleared={(id) => {
-        setClearedFlagId(id);
-        onFlagCleared?.(id);
-      }}
-      onConfirmOpenChange={setFlagConfirmOpen}
-    />
-  ) : clearedFlagId && clearedFlagId === row?.id ? (
-    <ApprovedFlagNotice />
+  const handleApproveFlag = async () => {
+    if (!row?.id || approving) return;
+    setApproving(true);
+    setApproveError(null);
+    try {
+      await expensesApi.clearFlag(row.id);
+      setClearedFlagId(row.id);
+      setFlagConfirmOpen(false);
+      qc.invalidateQueries({ queryKey: ["expenses"] });
+      qc.invalidateQueries({ queryKey: ["employeeExpenses"] });
+      onFlagCleared?.(row.id);
+      toast.success("Flag approved");
+    } catch (err) {
+      setApproveError(err?.message || "Couldn’t approve flag. Try again.");
+      setFlagConfirmOpen(false);
+    } finally {
+      setApproving(false);
+    }
+  };
+
+  const confirmSummary = row ? (
+    <div className="mt-4 flex items-center gap-3 rounded-2xl border border-[var(--border)] bg-[var(--surface-2)]/60 px-4 py-3">
+      <div className="min-w-0 flex-1">
+        <p className="truncate text-base font-semibold text-[var(--ink)]">
+          {row.description || "Untitled expense"}
+        </p>
+        <p className="mt-0.5 truncate text-xs text-[var(--ink-muted)]">
+          {`${row.category || "Uncategorized"} · ${formatDate(row.date)}`}
+        </p>
+      </div>
+      <span className="shrink-0 text-sm font-semibold tabular-nums text-[var(--ink)]">
+        {formatMoney(row.amount)}
+      </span>
+    </div>
   ) : null;
 
-  const detailRows = (
-    <dl className="grid grid-cols-1 gap-x-4 gap-y-4 sm:grid-cols-2">
-      <DetailItem
-        icon={
-          <Calendar
-            size={13}
-            aria-hidden
-            className="shrink-0 text-[var(--accent-strong)]"
-          />
-        }
-        label="Expense date"
-      >
-        <p className="text-sm font-semibold text-[var(--ink)]">
-          {formatDate(row?.date)}
-          {row?.timeDate ? (
-            <span className="font-normal text-[var(--ink-muted)]">
-              {" "}
-              · {formatTime(row?.timeDate)}
-            </span>
-          ) : null}
-        </p>
-      </DetailItem>
-
-      {row?.receiptDate ? (
-        <DetailItem
-          icon={
-            <CalendarClock
-              size={13}
-              aria-hidden
-              className="shrink-0 text-[var(--accent-strong)]"
-            />
-          }
-          label="Entry date"
-        >
-          <p className="text-sm font-semibold text-[var(--ink)]">
-            {formatDate(row.timeDate)}
-          </p>
-        </DetailItem>
-      ) : null}
-
-      <DetailItem
-        icon={
-          <Wallet
-            size={13}
-            aria-hidden
-            className="shrink-0 text-[var(--accent-strong)]"
-          />
-        }
-        label="Payment method"
-      >
-        <p className="flex items-center gap-1.5 text-sm font-semibold text-[var(--ink)]">
-          <span className="text-[var(--ink-muted)]">
-            {getMethodIcon(row?.method)}
-          </span>
-          {methodLabel(row?.method)}
-        </p>
-      </DetailItem>
-
-      {row?.category ? (
-        <DetailItem
-          icon={
-            <Tag
-              size={13}
-              aria-hidden
-              className="shrink-0 text-[var(--accent-strong)]"
-            />
-          }
-          label="Category"
-        >
-          <p className="truncate text-sm font-semibold text-[var(--ink)]">
-            {row.category}
-          </p>
-        </DetailItem>
-      ) : null}
-
-      {referenceLabel ? (
-        <DetailItem
-          icon={
-            <Tag
-              size={13}
-              aria-hidden
-              className="shrink-0 text-[var(--accent-strong)]"
-            />
-          }
-          label="Source of funds"
-          span
-        >
-          <p className="truncate text-sm font-semibold text-[var(--ink)]">
-            {referenceLabel}
-          </p>
-        </DetailItem>
-      ) : null}
-
-      <div className="min-w-0 space-y-1.5 sm:col-span-2">
-        <FieldLabel
-          icon={
-            <UserRound
-              size={13}
-              aria-hidden
-              className="shrink-0 text-[var(--accent-strong)]"
-            />
-          }
-        >
-          Submitted by
-        </FieldLabel>
-        <CreatorRow row={row} />
-      </div>
-
-      {row?.status === "draft" ? (
-        <ReviewNotesCard row={row} />
-      ) : row?.notes ? (
-        <DetailItem
-          icon={
-            <FileText
-              size={13}
-              aria-hidden
-              className="shrink-0 text-[var(--ink-muted)]"
-            />
-          }
-          label="Notes / remarks"
-          span
-        >
-          <p className="break-words text-sm leading-relaxed text-[var(--ink)]">
-            {row.notes}
-          </p>
-        </DetailItem>
-      ) : null}
-    </dl>
-  );
-
-  const titleBlock = (
-    <div className="min-w-0 space-y-1.5 rounded-2xl border border-[var(--border)] bg-[var(--surface)] p-4 shadow-xs">
-      <FieldLabel
-        icon={
-          <Store
-            size={13}
-            aria-hidden
-            className="shrink-0 text-[var(--accent-strong)]"
-          />
-        }
-      >
-        Vendor / description
-      </FieldLabel>
-      <p className="break-words font-display text-base font-semibold leading-snug text-[var(--ink)]">
-        {vendorName || row?.description || "Untitled expense"}
-      </p>
-      {vendorName && row?.description && vendorName !== row.description ? (
-        <p className="break-words text-xs leading-relaxed text-[var(--ink-muted)]">
-          {row.description}
-        </p>
-      ) : null}
-    </div>
-  );
-
-  const amountBlock = (
-    <div className="rounded-2xl border border-[var(--border)] bg-[var(--surface)] p-4 shadow-xs">
-      <div className="flex items-start justify-between gap-3">
-        <div className="min-w-0">
-          <FieldLabel
-            icon={
-              <ReceiptText
-                size={13}
-                aria-hidden
-                className="shrink-0 text-[var(--accent-strong)]"
-              />
-            }
-          >
-            Total amount
-          </FieldLabel>
-          <p className="mt-1.5 font-display text-3xl font-bold leading-none tracking-tight tabular-nums text-[var(--ink)] sm:text-4xl">
-            {formatMoney(recordedTotal)}
-          </p>
-        </div>
-        <ExpenseStatusBadge status={row?.status} className="mt-0.5 shrink-0" />
-      </div>
-    </div>
-  );
-
-  const receiptPreview = canPreviewImage ? (
-    <div className="flex flex-col bg-[#0b100f]">
-      {/* ── Viewer toolbar: zoom controls + open full size ── */}
-      <div className="flex flex-wrap items-center justify-between gap-2 border-b border-white/10 bg-black/40 px-3 py-2">
-        <span className="flex min-w-0 items-center gap-1.5 text-[11px] font-medium text-white/70">
-          <ImageIcon size={13} aria-hidden className="shrink-0" />
-          <span className="truncate">Receipt image</span>
-          {zoomLevel !== 1 ? (
-            <span className="rounded bg-white/20 px-1.5 py-0.5 text-[10px] font-bold tabular-nums text-white">
-              {Math.round(zoomLevel * 100)}%
-            </span>
-          ) : null}
-        </span>
-        <div className="flex shrink-0 items-center gap-1">
-          <button
-            type="button"
-            onClick={zoomOut}
-            disabled={zoomLevel <= 0.75}
-            title="Zoom out"
-            aria-label="Zoom out receipt image"
-            className="flex h-7 w-7 items-center justify-center rounded-lg bg-white/10 text-white transition-colors hover:bg-white/20 disabled:opacity-40"
-          >
-            <ZoomOut size={13} aria-hidden />
-          </button>
-          <button
-            type="button"
-            onClick={zoomReset}
-            disabled={zoomLevel === 1}
-            title="Reset zoom"
-            aria-label="Reset receipt zoom"
-            className="flex h-7 w-7 items-center justify-center rounded-lg bg-white/10 text-white transition-colors hover:bg-white/20 disabled:opacity-40"
-          >
-            <RotateCcw size={12} aria-hidden />
-          </button>
-          <button
-            type="button"
-            onClick={zoomIn}
-            disabled={zoomLevel >= 2.2}
-            title="Zoom in"
-            aria-label="Zoom in receipt image"
-            className="flex h-7 w-7 items-center justify-center rounded-lg bg-white/10 text-white transition-colors hover:bg-white/20 disabled:opacity-40"
-          >
-            <ZoomIn size={13} aria-hidden />
-          </button>
-          <span aria-hidden className="mx-1 h-3 w-px bg-white/20" />
-          <button
-            type="button"
-            onClick={() => openReceiptFile(receiptUrl)}
-            className="inline-flex items-center gap-1 rounded-lg bg-[var(--accent-strong)] px-2.5 py-1 text-xs font-semibold text-white transition-opacity hover:opacity-90"
-          >
-            <Maximize2 size={12} aria-hidden />
-            Full size
-          </button>
-        </div>
-      </div>
-
-      {/* ── Large, legible receipt viewport ── */}
-      <div className="scrollbar-slim relative max-h-[560px] min-h-[280px] overflow-auto p-3 sm:min-h-[380px] sm:p-4 lg:max-h-[640px]">
-        <img
-          src={receiptUrl}
-          alt="Scanned receipt"
-          onError={() => setFailedUrl(receiptUrl)}
-          style={{ transform: `scale(${zoomLevel})` }}
-          className="mx-auto block w-auto max-w-full rounded-lg bg-white object-contain shadow-2xl transition-transform duration-150"
-        />
-      </div>
-    </div>
-  ) : receiptUrl ? (
-    <div className="flex min-h-[280px] w-full flex-col items-center justify-center gap-4 bg-[var(--surface-2)]/50 p-6 text-center sm:min-h-[340px] sm:p-8">
-      <span className="flex h-16 w-16 items-center justify-center rounded-2xl bg-[var(--accent-soft)] text-[var(--accent-strong)]">
-        {receiptIsPdf ? (
-          <FileText size={28} aria-hidden />
-        ) : (
-          <ImageIcon size={28} aria-hidden />
-        )}
-      </span>
-      <div className="max-w-[320px] space-y-1">
-        <p className="text-sm font-semibold text-[var(--ink)]">
-          {receiptIsPdf ? "PDF document receipt" : "Receipt attachment"}
-        </p>
-        <p className="text-xs leading-relaxed text-[var(--ink-muted)]">
-          {receiptIsPdf
-            ? "This expense is linked to a PDF document. Open it to inspect the full receipt."
-            : "A preview can't be shown here. Open the original file to view it."}
-        </p>
-      </div>
-      <Button
-        type="button"
-        variant="accent"
-        size="sm"
-        onClick={() => openReceiptFile(receiptUrl)}
-        className="gap-1.5"
-      >
-        <Eye size={14} aria-hidden />
-        {receiptIsPdf ? "Open PDF document" : "Open file"}
-      </Button>
-    </div>
-  ) : (
-    <div className="flex min-h-[240px] w-full flex-col items-center justify-center gap-3 bg-[var(--surface-2)]/40 px-6 py-10 text-center sm:min-h-[300px]">
-      <span className="flex h-14 w-14 items-center justify-center rounded-2xl bg-[var(--surface-2)] text-[var(--ink-muted)]">
-        <ReceiptText size={24} aria-hidden />
-      </span>
-      <span className="max-w-[240px] text-[13px] font-medium leading-snug text-[var(--ink-muted)]">
-        No receipt image attached to this expense
-      </span>
-    </div>
-  );
-
-  return (
+  return createPortal(
     <AnimatePresence>
-      {open && (
+      {open && row && (
         <motion.div
+          key="overview-dialog"
+          className="fixed inset-0 z-[70] flex items-center justify-center p-4"
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           exit={{ opacity: 0 }}
-          className="fixed inset-0 z-[70] flex items-end justify-center bg-[var(--ink)]/45 backdrop-blur-md sm:items-center sm:p-5"
-          onClick={handleClose}
+          transition={{ duration: 0.2, ease: "easeOut" }}
         >
           <motion.div
-            initial={{ opacity: 0, scale: 0.96, y: 16 }}
-            animate={{ opacity: 1, scale: 1, y: 0 }}
-            exit={{ opacity: 0, scale: 0.96, y: 12 }}
-            transition={{ duration: 0.28, ease: DIALOG_EASE }}
+            className="absolute inset-0 bg-[var(--ink)]/40 backdrop-blur-sm"
+            onClick={handleClose}
+            aria-hidden="true"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: 0.22, ease: "easeOut" }}
+          />
+
+          <motion.div
+            ref={dialogRef}
+            tabIndex={-1}
             role="dialog"
             aria-modal="true"
-            aria-labelledby={titleId}
-            onClick={(e) => e.stopPropagation()}
+            aria-label={title}
+            initial={{ opacity: 0, y: 14, scale: 0.97 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            exit={{ opacity: 0, y: 8, scale: 0.97 }}
+            transition={{ duration: 0.22, ease: DIALOG_EASE }}
             className={cn(
-              "relative flex max-h-[calc(100dvh-1rem)] w-full flex-col overflow-hidden rounded-t-3xl border border-[var(--border)] bg-[var(--surface)] shadow-2xl shadow-black/15 sm:mx-3 sm:max-h-[calc(100dvh-2rem)] sm:rounded-3xl",
-              hasReceipt ? "max-w-[1120px]" : "max-w-[520px]",
+              "relative max-h-[85dvh] w-full overflow-y-auto scrollbar-slim rounded-3xl border border-[var(--border)] bg-[var(--surface)] p-5 shadow-hover outline-none sm:p-6 transition-all duration-200",
+              hasReceipt && activeTab === "receipt" ? "max-w-2xl" : "max-w-lg",
             )}
           >
-            <div className="flex shrink-0 items-center justify-between gap-3 border-b border-[var(--border)]/70 px-4 py-3 sm:px-5 sm:py-4">
-              <div className="flex min-w-0 items-center gap-3">
-                <div className="min-w-0">
-                  <h3
-                    id={titleId}
-                    className="font-display truncate text-base font-semibold tracking-tight text-[var(--ink)] sm:text-lg"
-                  >
-                    Expense details
-                  </h3>
-                  <p className="mt-0.5 truncate text-xs text-[var(--ink-muted)] sm:text-sm">
-                    {hasReceipt
-                      ? "Receipt & items on the left · expense details on the right"
-                      : "Recorded expense without a receipt scan"}
-                  </p>
-                </div>
+            {/* ── Dialog Header matching Overview design ── */}
+            <div className="flex items-center gap-3">
+              <span
+                aria-hidden
+                className={cn(
+                  "flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl",
+                  row?.flagged && clearedFlagId !== row?.id
+                    ? "bg-[var(--warning)]/15 text-[var(--warning)]"
+                    : "bg-[var(--accent-soft)] text-[var(--accent-strong)]",
+                )}
+              >
+                <ReceiptText size={20} />
+              </span>
+              <div className="min-w-0 flex-1">
+                <p className="truncate font-display text-base font-semibold tracking-tight text-[var(--ink)]">
+                  Expense details
+                </p>
+                <p className="mt-0.5 truncate text-xs tabular-nums text-[var(--ink-muted)]">
+                  {formatDate(row?.date)}
+                  {row?.date ? ` · ${formatTime(row.date)}` : ""}
+                </p>
               </div>
-              <div className="flex shrink-0 items-center gap-2">
+              <button
+                type="button"
+                onClick={handleClose}
+                aria-label="Close transaction details"
+                className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-[var(--surface-2)] text-[var(--ink-muted)] transition-colors hover:text-[var(--ink)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)]/30"
+              >
+                <X size={16} aria-hidden />
+              </button>
+            </div>
+
+            {/* ── Optional tabs if receipt exists ── */}
+            {hasReceipt && (
+              <div className="mt-4 flex rounded-xl bg-[var(--surface-2)] p-1">
                 <button
                   type="button"
-                  onClick={handleClose}
-                  aria-label="Close expense details"
-                  className="flex h-9 w-9 items-center justify-center rounded-full text-[var(--ink-muted)] transition-colors hover:bg-[var(--surface-2)] hover:text-[var(--ink)]"
+                  onClick={() => setActiveTab("details")}
+                  className={cn(
+                    "flex-1 rounded-lg py-1.5 text-xs font-semibold transition-all",
+                    activeTab === "details"
+                      ? "bg-[var(--surface)] text-[var(--ink)] shadow-xs"
+                      : "text-[var(--ink-muted)] hover:text-[var(--ink)]",
+                  )}
                 >
-                  <X size={16} aria-hidden />
+                  Overview
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setActiveTab("receipt")}
+                  className={cn(
+                    "flex-1 flex items-center justify-center gap-1.5 rounded-lg py-1.5 text-xs font-semibold transition-all",
+                    activeTab === "receipt"
+                      ? "bg-[var(--surface)] text-[var(--ink)] shadow-xs"
+                      : "text-[var(--ink-muted)] hover:text-[var(--ink)]",
+                  )}
+                >
+                  {receiptIsPdf ? (
+                    <FileText size={13} aria-hidden />
+                  ) : (
+                    <ImageIcon size={13} aria-hidden />
+                  )}
+                  <span>Receipt & Items</span>
+                  {receiptLines.length > 0 && (
+                    <span className="rounded-full bg-[var(--surface-2)] px-1.5 py-0.2 text-[10px] font-bold tabular-nums text-[var(--ink)]">
+                      {receiptLines.length}
+                    </span>
+                  )}
                 </button>
               </div>
-            </div>
+            )}
 
-            <div className="scrollbar-slim min-h-0 flex-1 overflow-y-auto overscroll-contain p-4 sm:p-6">
-              {hasReceipt ? (
-                <div className="grid grid-cols-1 items-start gap-4 sm:gap-6 lg:grid-cols-[minmax(0,1.15fr)_minmax(0,1fr)]">
-                  {/* ── Left: receipt document + toggleable items ── */}
-                  <div className="min-w-0 space-y-4">
-                    <section
-                      aria-label="Receipt document"
-                      className="overflow-hidden rounded-2xl border border-[var(--border)] bg-[var(--surface)] shadow-xs"
-                    >
-                      <div className="flex items-center justify-between gap-2 border-b border-[var(--border)] bg-[var(--surface-2)]/30 px-4 py-3">
-                        <div className="flex min-w-0 items-center gap-2">
-                          <p className="truncate text-[11px] font-semibold uppercase tracking-[0.08em] text-[var(--ink-muted)]">
-                            Receipt document
-                          </p>
-                          {receiptIsPdf ? (
-                            <Badge
-                              tone="accent"
-                              className="px-1.5 py-0.5 text-[10px]"
-                            >
-                              PDF
-                            </Badge>
-                          ) : null}
-                        </div>
-                        {!receiptIsPdf && receiptUrl ? (
-                          <span className="hidden shrink-0 text-[11px] text-[var(--ink-muted)] sm:inline">
-                            Zoom to read details
-                          </span>
-                        ) : null}
-                      </div>
-                      {receiptPreview}
-                    </section>
-
-                    <LineItemsSection
-                      lines={receiptLines}
-                      open={itemsOpen}
-                      onToggle={() => setItemsOpen((prev) => !prev)}
-                      loading={linesLoading}
-                      error={linesError}
-                      onRetry={() => refetchLines()}
-                      refetching={linesRefetching}
-                      regionId={itemsRegionId}
-                    />
-                  </div>
-
-                  {/* ── Right: recorded expense details ── */}
-                  <section
-                    aria-label="Expense details"
-                    className="min-w-0 space-y-4 rounded-2xl border border-[var(--border)] bg-[var(--surface-2)]/35 p-4 shadow-xs sm:p-5"
+            {/* ── Dialog Body ── */}
+            {activeTab === "details" ? (
+              <div className="mt-4 space-y-3">
+                {/* Flagged Banner */}
+                {row?.flagged && clearedFlagId !== row?.id ? (
+                  <div
+                    role="note"
+                    className="flex items-start gap-2.5 rounded-2xl border border-[var(--warning)]/40 bg-[var(--warning)]/[0.1] px-4 py-3"
                   >
-                    {flaggedNotice}
-                    {amountBlock}
-                    {titleBlock}
-                    <div className="border-t border-[var(--border)] pt-4">
-                      {detailRows}
+                    <TriangleAlert
+                      size={16}
+                      aria-hidden
+                      className="mt-0.5 shrink-0 text-[var(--warning)]"
+                    />
+                    <div className="min-w-0 flex-1">
+                      <p className="text-xs font-bold text-[var(--warning)]">
+                        Receipt date predates the budget issuance date
+                      </p>
+                      <p className="mt-0.5 text-xs leading-relaxed text-[var(--warning)]/90">
+                        This receipt is dated before the budget was issued to
+                        the employee. Please verify details before approving.
+                      </p>
+                      <div className="mt-2.5 flex items-center justify-end gap-2 border-t border-[var(--warning)]/20 pt-2.5">
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          onClick={() => setFlagConfirmOpen(true)}
+                          disabled={approving}
+                          className="h-7 rounded-full border-[var(--warning)]/40 px-3 text-xs hover:bg-[var(--warning)]/15"
+                        >
+                          <ShieldCheck size={14} aria-hidden />
+                          Approve flag
+                        </Button>
+                      </div>
+                      {approveError ? (
+                        <p
+                          role="alert"
+                          className="mt-1 text-[11px] font-medium text-[var(--danger)]"
+                        >
+                          {approveError}
+                        </p>
+                      ) : null}
                     </div>
-                  </section>
-                </div>
-              ) : (
-                <section
-                  aria-label="Expense details"
-                  className="mx-auto max-w-[460px] space-y-4"
-                >
-                  {flaggedNotice}
-                  {amountBlock}
-                  {titleBlock}
-                  <div className="border-t border-[var(--border)] pt-4">
-                    {detailRows}
                   </div>
-                </section>
-              )}
-            </div>
+                ) : clearedFlagId === row?.id ? (
+                  <div
+                    role="status"
+                    className="flex items-start gap-2.5 rounded-2xl border border-emerald-500/30 bg-emerald-500/10 px-4 py-3"
+                  >
+                    <ShieldCheck
+                      size={16}
+                      aria-hidden
+                      className="mt-0.5 shrink-0 text-emerald-600"
+                    />
+                    <div className="min-w-0 flex-1">
+                      <p className="text-xs font-bold text-emerald-700">
+                        Approved by admin
+                      </p>
+                      <p className="mt-0.5 text-xs leading-relaxed text-emerald-700/90">
+                        Flag cleared — this expense is no longer marked for
+                        review.
+                      </p>
+                    </div>
+                  </div>
+                ) : null}
 
-            <div className="flex shrink-0 items-center justify-end gap-3 border-t border-[var(--border)]/70 px-4 py-3.5 sm:px-6">
+                {/* Amount Hero Card */}
+                <div className="flex items-center justify-between gap-3 rounded-2xl border border-[var(--border)] bg-[var(--surface-2)]/60 px-4 py-3.5">
+                  <div className="min-w-0">
+                    <p className="type-eyebrow text-[var(--ink-muted)]">
+                      Amount
+                    </p>
+                    <p className="mt-1 font-display text-2xl font-semibold leading-none tracking-tight tabular-nums text-[var(--ink)]">
+                      {formatMoney(row?.amount)}
+                    </p>
+                    <p className="mt-1.5 truncate text-xs text-[var(--ink-muted)]">
+                      {[row?.category, methodLabel(row?.method)]
+                        .filter(Boolean)
+                        .join(" · ")}
+                    </p>
+                  </div>
+                  <ExpenseStatusBadge
+                    status={row?.status}
+                    className="shrink-0"
+                  />
+                </div>
+
+                {/* Details Section */}
+                <div className="space-y-2 rounded-2xl border border-[var(--border)] bg-[var(--surface-2)]/60 px-4 py-3.5">
+                  {/* Vendor / Description */}
+                  <div className="border-b border-[var(--border)] py-2.5 first:pt-0">
+                    <p className="type-eyebrow text-[var(--ink-muted)]">
+                      Vendor / Description
+                    </p>
+                    <p className="mt-1 break-words text-sm font-medium leading-snug text-[var(--ink)] normal-case">
+                      {vendorName || row?.description || "—"}
+                    </p>
+                    {vendorName &&
+                    row?.description &&
+                    vendorName !== row.description ? (
+                      <p className="mt-0.5 break-words text-xs text-[var(--ink-muted)]">
+                        {row.description}
+                      </p>
+                    ) : null}
+                  </div>
+
+                  {/* Date, Time, Method */}
+                  <div className="grid grid-cols-3 gap-3 border-b border-[var(--border)] py-2.5">
+                    <div className="min-w-0">
+                      <p className="type-eyebrow text-[var(--ink-muted)]">
+                        Date
+                      </p>
+                      <p className="mt-1 truncate text-sm font-medium tabular-nums text-[var(--ink)]">
+                        {formatDate(row?.date)}
+                      </p>
+                    </div>
+                    <div className="min-w-0">
+                      <p className="type-eyebrow text-[var(--ink-muted)]">
+                        Time
+                      </p>
+                      <p className="mt-1 truncate text-sm font-medium tabular-nums text-[var(--ink)]">
+                        {formatTime(row?.date || row?.timeDate)}
+                      </p>
+                    </div>
+                    <div className="min-w-0">
+                      <p className="type-eyebrow text-[var(--ink-muted)]">
+                        Method
+                      </p>
+                      <p className="mt-1 flex items-center gap-1.5 truncate text-sm font-medium text-[var(--ink)]">
+                        <span className="text-[var(--ink-muted)]">
+                          {getMethodIcon(row?.method)}
+                        </span>
+                        <span className="truncate">
+                          {methodLabel(row?.method)}
+                        </span>
+                      </p>
+                    </div>
+                  </div>
+
+                  {/* Category & Source of Funds */}
+                  {(row?.category || referenceLabel) && (
+                    <div className="grid grid-cols-2 gap-3 border-b border-[var(--border)] py-2.5">
+                      {row?.category ? (
+                        <div className="min-w-0">
+                          <p className="type-eyebrow text-[var(--ink-muted)]">
+                            Category
+                          </p>
+                          <p className="mt-1 truncate text-sm font-medium text-[var(--ink)]">
+                            {row.category}
+                          </p>
+                        </div>
+                      ) : null}
+                      {referenceLabel ? (
+                        <div className="min-w-0">
+                          <p className="type-eyebrow text-[var(--ink-muted)]">
+                            Source of Funds
+                          </p>
+                          <p className="mt-1 truncate text-sm font-medium text-[var(--ink)]">
+                            {referenceLabel}
+                          </p>
+                        </div>
+                      ) : null}
+                    </div>
+                  )}
+
+                  {/* Submitted By */}
+                  <div className="border-b border-[var(--border)] py-2.5">
+                    <p className="mb-2 type-eyebrow text-[var(--ink-muted)]">
+                      Submitted By
+                    </p>
+                    <CreatorRow row={row} />
+                  </div>
+
+                  {/* Review Notes (for draft) or Notes */}
+                  {row?.status === "draft" ? (
+                    <div className="pt-2">
+                      <ReviewNotesCard row={row} />
+                    </div>
+                  ) : row?.notes ? (
+                    <div className="pt-2">
+                      <p className="type-eyebrow text-[var(--ink-muted)]">
+                        Notes
+                      </p>
+                      <p className="mt-1 break-words text-sm text-[var(--ink)]">
+                        {row.notes}
+                      </p>
+                    </div>
+                  ) : null}
+                </div>
+
+                {/* Receipt Quick Preview Link Card */}
+                {hasReceipt && (
+                  <button
+                    type="button"
+                    onClick={() => setActiveTab("receipt")}
+                    className="flex w-full items-center justify-between gap-3 rounded-2xl border border-[var(--border)] bg-[var(--surface-2)]/60 p-3.5 text-left transition-colors hover:bg-[var(--surface-2)]/90"
+                  >
+                    <div className="flex items-center gap-3">
+                      <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-[var(--accent-soft)] text-[var(--accent-strong)]">
+                        {receiptIsPdf ? (
+                          <FileText size={16} />
+                        ) : (
+                          <ImageIcon size={16} />
+                        )}
+                      </span>
+                      <div>
+                        <p className="text-xs font-semibold text-[var(--ink)]">
+                          {receiptIsPdf
+                            ? "PDF receipt document attached"
+                            : "Receipt image attached"}
+                        </p>
+                        <p className="text-[11px] text-[var(--ink-muted)]">
+                          {receiptLines.length > 0
+                            ? `${receiptLines.length} itemized lines scanned · View receipt`
+                            : "Click to inspect receipt document"}
+                        </p>
+                      </div>
+                    </div>
+                    <span className="rounded-full border border-[var(--border)] bg-[var(--surface)] px-2.5 py-1 text-xs font-medium text-[var(--ink)] shadow-2xs">
+                      View receipt →
+                    </span>
+                  </button>
+                )}
+              </div>
+            ) : (
+              /* ── Receipt & Scanned Items View ── */
+              <div className="mt-4 space-y-4">
+                <section
+                  aria-label="Receipt document"
+                  className="overflow-hidden rounded-2xl border border-[var(--border)] bg-[var(--surface)] shadow-xs"
+                >
+                  <div className="flex flex-wrap items-center justify-between gap-2 border-b border-[var(--border)] bg-[var(--surface-2)]/60 px-3.5 py-2.5">
+                    <span className="flex min-w-0 items-center gap-1.5 text-[11px] font-medium text-[var(--ink)]">
+                      <ImageIcon size={13} aria-hidden className="shrink-0" />
+                      <span className="truncate">Receipt preview</span>
+                      {zoomLevel !== 1 ? (
+                        <span className="rounded bg-[var(--accent-soft)] px-1.5 py-0.5 text-[10px] font-bold tabular-nums text-[var(--accent-strong)]">
+                          {Math.round(zoomLevel * 100)}%
+                        </span>
+                      ) : null}
+                    </span>
+                    <div className="flex shrink-0 items-center gap-1">
+                      <button
+                        type="button"
+                        onClick={zoomOut}
+                        disabled={zoomLevel <= 0.75}
+                        title="Zoom out"
+                        aria-label="Zoom out receipt image"
+                        className="flex h-7 w-7 items-center justify-center rounded-lg bg-[var(--surface)] text-[var(--ink-muted)] transition-colors hover:text-[var(--ink)] disabled:opacity-40"
+                      >
+                        <ZoomOut size={13} aria-hidden />
+                      </button>
+                      <button
+                        type="button"
+                        onClick={zoomReset}
+                        disabled={zoomLevel === 1}
+                        title="Reset zoom"
+                        aria-label="Reset receipt zoom"
+                        className="flex h-7 w-7 items-center justify-center rounded-lg bg-[var(--surface)] text-[var(--ink-muted)] transition-colors hover:text-[var(--ink)] disabled:opacity-40"
+                      >
+                        <RotateCcw size={12} aria-hidden />
+                      </button>
+                      <button
+                        type="button"
+                        onClick={zoomIn}
+                        disabled={zoomLevel >= 2.2}
+                        title="Zoom in"
+                        aria-label="Zoom in receipt image"
+                        className="flex h-7 w-7 items-center justify-center rounded-lg bg-[var(--surface)] text-[var(--ink-muted)] transition-colors hover:text-[var(--ink)] disabled:opacity-40"
+                      >
+                        <ZoomIn size={13} aria-hidden />
+                      </button>
+                      <span
+                        aria-hidden
+                        className="mx-1 h-3 w-px bg-[var(--border)]"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => openReceiptFile(receiptUrl)}
+                        className="inline-flex items-center gap-1 rounded-lg bg-[var(--accent-soft)] px-2.5 py-1 text-xs font-semibold text-[var(--accent-strong)] transition-opacity hover:opacity-90"
+                      >
+                        <Maximize2 size={12} aria-hidden />
+                        Full size
+                      </button>
+                    </div>
+                  </div>
+
+                  {canPreviewImage ? (
+                    <div className="scrollbar-slim relative max-h-[460px] min-h-[240px] overflow-auto bg-[var(--surface-2)]/30 p-3 sm:p-4">
+                      <img
+                        src={receiptUrl}
+                        alt="Scanned receipt"
+                        onError={() => setFailedUrl(receiptUrl)}
+                        style={{ transform: `scale(${zoomLevel})` }}
+                        className="mx-auto block w-auto max-w-full rounded-lg bg-white object-contain shadow-md transition-transform duration-150"
+                      />
+                    </div>
+                  ) : receiptUrl ? (
+                    <div className="flex min-h-[220px] w-full flex-col items-center justify-center gap-3 bg-[var(--surface-2)]/40 p-6 text-center">
+                      <span className="flex h-12 w-12 items-center justify-center rounded-2xl bg-[var(--accent-soft)] text-[var(--accent-strong)]">
+                        {receiptIsPdf ? (
+                          <FileText size={24} aria-hidden />
+                        ) : (
+                          <ImageIcon size={24} aria-hidden />
+                        )}
+                      </span>
+                      <div className="max-w-[280px] space-y-1">
+                        <p className="text-sm font-semibold text-[var(--ink)]">
+                          {receiptIsPdf
+                            ? "PDF document receipt"
+                            : "Receipt attachment"}
+                        </p>
+                        <p className="text-xs leading-relaxed text-[var(--ink-muted)]">
+                          {receiptIsPdf
+                            ? "This expense is linked to a PDF file."
+                            : "Open the original file to view it."}
+                        </p>
+                      </div>
+                      <Button
+                        type="button"
+                        variant="accent"
+                        size="sm"
+                        onClick={() => openReceiptFile(receiptUrl)}
+                        className="gap-1.5"
+                      >
+                        <Eye size={14} aria-hidden />
+                        {receiptIsPdf ? "Open PDF document" : "Open file"}
+                      </Button>
+                    </div>
+                  ) : (
+                    <div className="flex min-h-[200px] w-full flex-col items-center justify-center gap-2 p-6 text-center">
+                      <ReceiptText
+                        size={22}
+                        className="text-[var(--ink-muted)]"
+                      />
+                      <p className="text-xs text-[var(--ink-muted)]">
+                        No receipt image attached
+                      </p>
+                    </div>
+                  )}
+                </section>
+
+                <LineItemsSection
+                  lines={receiptLines}
+                  open={itemsOpen}
+                  onToggle={() => setItemsOpen((prev) => !prev)}
+                  loading={linesLoading}
+                  error={linesError}
+                  onRetry={() => refetchLines()}
+                  refetching={linesRefetching}
+                  regionId={itemsRegionId}
+                />
+              </div>
+            )}
+
+            {/* ── Dialog Footer ── */}
+            <div className="mt-5 flex items-center justify-between border-t border-[var(--border)] pt-4">
+              {hasReceipt && activeTab === "receipt" ? (
+                <button
+                  type="button"
+                  onClick={() => setActiveTab("details")}
+                  className="text-xs font-semibold text-[var(--accent-strong)] hover:underline"
+                >
+                  ← Back to overview
+                </button>
+              ) : (
+                <span />
+              )}
               <Button
                 type="button"
                 variant="outline"
                 onClick={handleClose}
-                className="w-full rounded-full px-5 text-xs font-semibold sm:w-auto"
+                className="rounded-full px-5 text-xs font-semibold"
               >
                 Close
               </Button>
@@ -1121,7 +1004,25 @@ const ExpenseDetailsModal = ({
           </motion.div>
         </motion.div>
       )}
-    </AnimatePresence>
+
+      {/* Confirmation Dialog for Approving Flagged Expense */}
+      <ConfirmActionDialog
+        open={flagConfirmOpen}
+        icon={<ShieldCheck size={20} aria-hidden />}
+        iconClassName="bg-[var(--accent-soft)] text-[var(--accent-strong)]"
+        title="Approve this flagged expense?"
+        description="This clears the review flag and marks the receipt as approved. Only approve after the receipt details and legitimacy have been verified."
+        summary={confirmSummary}
+        cancelLabel="Keep flagged"
+        confirmLabel="Yes, approve"
+        confirmVariant="accent"
+        pendingLabel="Approving…"
+        pending={approving}
+        onCancel={() => setFlagConfirmOpen(false)}
+        onConfirm={handleApproveFlag}
+      />
+    </AnimatePresence>,
+    document.body,
   );
 };
 

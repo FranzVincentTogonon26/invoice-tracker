@@ -16,6 +16,16 @@ export const employeesApi = {
     apiClient.patch(`/employees/${id}/status`, { status }).then((r) => r.data),
   // Removes an employee account (cascades their issued budget references).
   remove: (id) => apiClient.delete(`/employees/${id}`).then((r) => r.data),
+  // Admin replaces one employee's profile photo (multipart `avatar` file).
+  updateAvatar: (id, file) => {
+    const form = new FormData();
+    form.append("avatar", file);
+    return apiClient
+      .patch(`/employees/${id}/avatar`, form, {
+        headers: { "Content-Type": "multipart/form-data" },
+      })
+      .then((r) => r.data);
+  },
 
   /* ── Admin → Employee Details tabs (`/admin/employees/:id`) ──
    * One SELECTED employee's records, read-only. Each endpoint re-validates

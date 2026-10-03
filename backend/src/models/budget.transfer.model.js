@@ -509,6 +509,56 @@ class BudgetTransfer {
     });
   }
 
+  // Admin ledger: every `budget_transfer` row across all senders, newest
+  // first — the unified Transactions page splits each row into its "sent" and
+  // "received" legs. Sender + recipient accounts are joined (never the
+  // password hash) together with the source-of-funds label, so the ledger can
+  // show exactly who moved money to whom and from which reference.
+  // Optional filter:
+  //   - `search`: matched against notes, method and both account names (ILIKE)
+  static async listAll({ search } = {}) {
+    const params = [];
+    let where = "";
+    if (search && search.trim()) {
+      params.push(`%${search.trim()}%`);
+      where = `WHERE (bt.notes ILIKE $1
+                    OR bt.method ILIKE $1
+                    OR su.name ILIKE $1
+                    OR ru.name ILIKE $1
+                    OR br.label ILIKE $1)`;
+    }
+
+    const result = await query(
+      `SELECT bt.id,
+              bt.reference_id,
+              br.label AS reference_label,
+              bt.user_id AS sender_id,
+              su.name AS sender_name,
+              su.email AS sender_email,
+              su.role AS sender_role,
+              su.avatar_url AS sender_avatar,
+              bt.transfer_to AS recipient_id,
+              ru.name AS recipient_name,
+              ru.email AS recipient_email,
+              ru.role AS recipient_role,
+              ru.avatar_url AS recipient_avatar,
+              bt.amount::float8 AS amount,
+              bt.notes,
+              bt.method,
+              bt.status,
+              bt.created_at,
+              bt.updated_at
+         FROM budget_transfer bt
+         LEFT JOIN budget_reference br ON br.reference_id = bt.reference_id
+         LEFT JOIN users su ON su.user_id = bt.user_id
+         LEFT JOIN users ru ON ru.user_id = bt.transfer_to
+         ${where}
+        ORDER BY bt.created_at DESC`,
+      params,
+    );
+    return result.rows;
+  }
+
   // Row lookup for the cancel endpoint. Ownership is enforced in the
   // controller — same pattern as Abono.findById + canTouchRow.
   static async findById(id) {

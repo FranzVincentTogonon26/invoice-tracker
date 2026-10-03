@@ -1,18 +1,18 @@
-import { useState, useMemo, useEffect, useRef, useCallback } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { AnimatePresence, motion } from "framer-motion";
 import toast from "react-hot-toast";
 import {
+  EllipsisVertical,
   Flag,
+  HandCoins,
+  Inbox,
   Layers,
+  ReceiptText,
   Search,
   Trash2,
-  X,
-  Inbox,
   Wallet,
-  ReceiptText,
-  HandCoins,
-  EllipsisVertical,
+  X,
 } from "lucide-react";
 import { Card } from "../../../ui/Card";
 import { Badge } from "../../../ui/Badge";
@@ -21,6 +21,7 @@ import { SearchInput } from "../../../ui/Input";
 import { Pager } from "../../../ui/Pager";
 import { EmptyState, LoadingSkeleton } from "../../../ui/DataState";
 import {
+  addDays,
   cn,
   emptyDateRange,
   formatDate,
@@ -32,11 +33,12 @@ import {
   methodLabel,
   startOfDay,
   toDate,
-  addDays,
 } from "../../../../lib/utils";
 import DateRangePicker from "../../../ui/DateRangePicker";
 import ConfirmActionDialog from "../../admin/expenses/ConfirmActionDialog";
 import { AbonoStatusBadge } from "./AbonoStatusBadge";
+import { USER_ROLES } from "../../../../constants";
+import { useAuth } from "../../../../context/AuthContext";
 
 import { useAbonoMutations } from "../../../../hooks/useAbono";
 import { abonoApi } from "../../../../api/abono";
@@ -89,7 +91,7 @@ const isAbonoSpent = (row, totalBalance) => {
   if (totalBalance == null || Number.isNaN(Number(totalBalance))) return false;
   return toMoney(totalBalance) - toMoney(row?.amount) < -0.004;
 };
-const PAGE_SIZE = 50;
+const PAGE_SIZE = 100;
 
 function getDateGroupLabel(date) {
   const txDate = startOfDay(toDate(date));
@@ -117,7 +119,7 @@ function groupTransactionsByDate(rows) {
 }
 
 // Five columns: Date, Description, Status, Amount, Actions.
-const COLUMN_WIDTHS = ["18%", "34%", "16%", "18%", "14%"];
+const COLUMN_WIDTHS = ["16%", "28%", "36%", "15%", "5%"];
 
 function TransactionCard({ tx, meta, disabled, onOpen }) {
   const actionable = isSheetActionable(tx);
@@ -490,7 +492,7 @@ function TransactionSheetBody({
           covered by expenses) is also locked: deleting it would overdraw the
           remaining balance. */}
       {actionable &&
-        row?.status !== "settled" &&
+        row?.status === "open" &&
         !isAbonoSpent(row, totalBalance) && (
           <div className="mt-4 space-y-2">
             <Button
@@ -665,6 +667,12 @@ export const TransactionsSectionAbono = ({
   const [sheetRow, setSheetRow] = useState(null);
   const { remove } = useAbonoMutations();
   const confirmPending = remove.isPending;
+
+  // Actions (delete menu) are strictly employee-only: hidden in the
+  // read-only admin detail view AND for any non-employee role. Row-level
+  // code additionally requires an open, unspent row.
+  const { user } = useAuth();
+  const showActions = !readOnly && user?.role === USER_ROLES.EMPLOYEE;
 
   const closeConfirm = () => {
     if (!confirmPending) setDeleteRow(null);
@@ -853,10 +861,15 @@ export const TransactionsSectionAbono = ({
           />
         ) : (
           <div className="overflow-x-auto rounded-2xl border border-[var(--border)] bg-[var(--surface)] shadow-card">
-            <table className="w-full min-w-[720px] table-fixed border-collapse text-left">
+            <table className="w-full min-w-[820px] table-fixed border-collapse text-left">
               <caption className="sr-only">Employee abono list</caption>
               <colgroup>
-                {COLUMN_WIDTHS.map((width, i) => (
+                {/* Actions column hidden for admins → its width share goes
+                    back to the remaining columns so no gap trails at the end. */}
+                {(showActions
+                  ? COLUMN_WIDTHS
+                  : ["18%", "30%", "38%", "14%"]
+                ).map((width, i) => (
                   <col key={i} style={{ width }} />
                 ))}
               </colgroup>
@@ -874,9 +887,11 @@ export const TransactionsSectionAbono = ({
                   <th className="whitespace-nowrap border-b border-[var(--border)] px-4 py-3 text-right type-eyebrow text-[var(--ink-muted)] last:pr-5">
                     Amount
                   </th>
-                  <th className="whitespace-nowrap border-b border-[var(--border)] px-4 py-3 text-right type-eyebrow text-[var(--ink-muted)] last:pr-5">
-                    <span className="sr-only">Actions</span>
-                  </th>
+                  {showActions && (
+                    <th className="whitespace-nowrap border-b border-[var(--border)] px-4 py-3 text-right type-eyebrow text-[var(--ink-muted)]">
+                      <span className="sr-only">Actions</span>
+                    </th>
+                  )}
                 </tr>
               </thead>
               <tbody className="divide-y divide-[var(--border)]">
@@ -939,34 +954,46 @@ export const TransactionsSectionAbono = ({
                         )}
                       </td>
                       <td className="px-4 py-3 align-middle">
-                        {tx.status ? (
-                          <AbonoStatusBadge
-                            status={tx.status}
-                            className="max-w-full px-2 py-1 text-[11px]"
-                          />
-                        ) : (
-                          <Badge
-                            tone={meta.badgeTone}
-                            className="max-w-full gap-1.5 px-2 py-1 text-[11px]"
-                          >
-                            <Icon
-                              size={12}
-                              strokeWidth={2.2}
-                              className="shrink-0"
+                        <div className="flex w-full flex-row flex-nowrap items-center gap-2.5">
+                          {tx.status ? (
+                            <AbonoStatusBadge
+                              status={tx.status}
+                              className="shrink-0 px-2 py-1 text-[11px]"
                             />
-                            <span className="truncate">{meta.label}</span>
-                          </Badge>
-                        )}
-                        {tx?.status === "settled" && tx?.dateSettled && (
-                          <p
-                            className="mt-1.5 truncate whitespace-nowrap text-[11px] leading-none tabular-nums text-[var(--ink-muted)]"
-                            title={`Settled on ${formatDate(tx.dateSettled)} at ${formatTime(tx.dateSettled)}`}
-                          >
-                            Settled {formatDate(tx.dateSettled)} ·{" "}
-                            {formatTime(tx.dateSettled)}
-                          </p>
-                        )}
+                          ) : (
+                            <Badge
+                              tone={meta.badgeTone}
+                              className="shrink-0 gap-1.5 px-2 py-1 text-[11px]"
+                            >
+                              <Icon
+                                size={12}
+                                strokeWidth={2.2}
+                                className="shrink-0"
+                              />
+                              <span className="truncate">{meta.label}</span>
+                            </Badge>
+                          )}
+
+                          {tx?.status === "settled" && tx?.dateSettled ? (
+                            <div className="mr-auto flex shrink-0 flex-row flex-nowrap items-center gap-2">
+                              <p className="whitespace-nowrap text-[13px] font-medium leading-none  text-[var(--ink)]">
+                                {formatDate(tx.dateSettled)}
+                              </p>
+                              <span
+                                aria-hidden
+                                className="text-xs leading-none text-[var(--ink-muted)]/40"
+                              >
+                                ·
+                              </span>
+                              <p className="whitespace-nowrap text-[11px] leading-none  text-[var(--ink-muted)]">
+                                {getDateGroupLabel(tx.dateSettled)} -{" "}
+                                {formatTime(tx.dateSettled)}
+                              </p>
+                            </div>
+                          ) : null}
+                        </div>
                       </td>
+
                       <td className="px-4 py-3 text-right last:pr-5 align-middle">
                         <span
                           className={cn(
@@ -976,23 +1003,20 @@ export const TransactionsSectionAbono = ({
                           {formatMoney(tx.amount)}
                         </span>
                       </td>
-                      <td className="px-4 py-4 pr-5 text-right align-middle">
-                        <div className="flex justify-end">
-                          {/* Settled abono is closed out and a spent OPEN abono
-                              (already covered by expenses) is locked — the
-                              delete menu stays hidden (mirrors the mobile
-                              sheet above). */}
-                          {!readOnly &&
-                            tx?.status !== "settled" &&
-                            !isAbonoSpent(tx, totalBalance) && (
-                              <RowActions
-                                row={tx}
-                                pending={confirmPending}
-                                onDelete={requestDelete}
-                              />
-                            )}
-                        </div>
-                      </td>
+                      {showActions && (
+                        <td className="px-4 py-4 text-right align-middle">
+                          <div className="flex justify-end">
+                            {tx?.status === "open" &&
+                              !isAbonoSpent(tx, totalBalance) && (
+                                <RowActions
+                                  row={tx}
+                                  pending={confirmPending}
+                                  onDelete={requestDelete}
+                                />
+                              )}
+                          </div>
+                        </td>
+                      )}
                     </tr>
                   );
                 })}
@@ -1093,7 +1117,7 @@ export const TransactionsSectionAbono = ({
           // Let the page replace its local row so the ledger reflects the edit
           onTransactionUpdate?.(updatedRow);
         }}
-        canManage={!readOnly}
+        canManage={showActions}
         canEdit={!readOnly}
       />
 

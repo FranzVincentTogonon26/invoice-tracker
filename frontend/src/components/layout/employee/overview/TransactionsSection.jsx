@@ -5,6 +5,8 @@ import {
   ArrowLeftRight,
   Banknote,
   CreditCard,
+  EllipsisVertical,
+  Eye,
   Flag,
   Landmark,
   Layers,
@@ -79,13 +81,13 @@ const METHOD_BADGE = {
 
 const MethodBadge = ({ method, className }) => {
   const config = METHOD_BADGE[method] ?? { tone: "neutral", icon: CreditCard };
-  const BadgeIcon = config.icon;
+  // const BadgeIcon = config.icon;
   return (
     <Badge
       tone={config.tone}
-      className={cn("shrink-0 px-2 py-1 text-[12px]", className)}
+      className={cn("truncate shrink-0 px-2 py-1 text-[12px]", className)}
     >
-      <BadgeIcon size={11} aria-hidden />
+      {/* <BadgeIcon size={11} aria-hidden /> */}
       {methodLabel(method)}
     </Badge>
   );
@@ -122,7 +124,7 @@ const TYPE_CONFIG = {
   },
 };
 
-const PAGE_SIZE = 50;
+const PAGE_SIZE = 100;
 
 const SHEET_EASE = [0.16, 1, 0.3, 1];
 
@@ -242,7 +244,7 @@ const OverviewDetailsBody = ({ row, meta }) => {
       ) : (
         <Badge tone="warning">
           <span className="h-2 w-2 rounded-full bg-current opacity-80" />
-          Abono
+          Open
         </Badge>
       )
     ) : transfer ? (
@@ -437,14 +439,8 @@ function OverviewSheet({ row, onClose }) {
 
   const meta = TYPE_CONFIG[row?.kind] ?? TYPE_CONFIG.expense;
   const Icon = meta.icon;
-  // Title by item type (see TYPE_ITEM_TITLE) — same wording the details body's
-  // "Type" row shows, so the header reads "Budget" / "Expenses" / "Abono" /
-  // "Transfer" instead of the row's description. The one exception is a
-  // received transfer: money came in, so it reads "Budget Received".
-  const title =
-    row?.kind === "transfer" && row?.direction === "received"
-      ? "Budget Received"
-      : (TYPE_ITEM_TITLE[row?.kind] ?? meta.label ?? "Transaction");
+  // Shared with the desktop dialog so both headers read identically.
+  const title = overviewTitle(row, meta);
 
   return createPortal(
     <AnimatePresence>
@@ -525,8 +521,221 @@ function OverviewSheet({ row, onClose }) {
   );
 }
 
-// Seven columns: Date, Description, Type, Method, Status, Day, Amount.
-const COLUMN_WIDTHS = ["12%", "24%", "14%", "10%", "11%", "12%", "17%"];
+// Detail-view title for a transaction, shared by the mobile sheet and the
+// desktop dialog so both headers read identically: by item type
+// (Budget / Expenses / Abono / Transfer), except a received transfer which
+// reads "Budget Received" since money came in.
+const overviewTitle = (row, meta) =>
+  row?.kind === "transfer" && row?.direction === "received"
+    ? "Budget Received"
+    : (TYPE_ITEM_TITLE[row?.kind] ?? meta?.label ?? "Transaction");
+
+// Desktop row-actions dropdown — a single "View" entry that opens the
+// centered detail dialog below. Floating portal menu with the same
+// dismiss behavior as the other ledger row menus.
+function DesktopRowActions({ onView }) {
+  const [open, setOpen] = useState(false);
+  const [position, setPosition] = useState(null);
+  const btnRef = useRef(null);
+  const menuRef = useRef(null);
+
+  useEffect(() => {
+    if (!open) return undefined;
+
+    const close = () => {
+      setOpen(false);
+      btnRef.current?.focus();
+    };
+
+    const handlePointerDown = (e) => {
+      if (
+        !btnRef.current?.contains(e.target) &&
+        !menuRef.current?.contains(e.target)
+      )
+        close();
+    };
+
+    const handleKeyDown = (e) => {
+      if (e.key === "Escape") {
+        e.stopPropagation();
+        close();
+      }
+    };
+
+    window.addEventListener("pointerdown", handlePointerDown);
+    window.addEventListener("keydown", handleKeyDown);
+    window.addEventListener("scroll", close, {
+      capture: true,
+      passive: true,
+    });
+    window.addEventListener("resize", close);
+
+    return () => {
+      window.removeEventListener("pointerdown", handlePointerDown);
+      window.removeEventListener("keydown", handleKeyDown);
+      window.removeEventListener("scroll", close, { capture: true });
+      window.removeEventListener("resize", close);
+    };
+  }, [open]);
+
+  const openMenu = () => {
+    const rect = btnRef.current?.getBoundingClientRect();
+    if (rect) {
+      const MENU_H = 80;
+      const roomBelow = window.innerHeight - rect.bottom;
+      const flipUp = roomBelow < MENU_H + 8 && rect.top > MENU_H + 8;
+
+      setPosition({
+        ...(flipUp
+          ? { bottom: window.innerHeight - rect.top + 6 }
+          : { top: rect.bottom + 6 }),
+        right: window.innerWidth - rect.right,
+      });
+    }
+    setOpen(true);
+  };
+
+  return (
+    <>
+      <button
+        ref={btnRef}
+        type="button"
+        onClick={() => (open ? setOpen(false) : openMenu())}
+        aria-haspopup="menu"
+        aria-expanded={open}
+        aria-label="Row actions"
+        className="inline-flex h-8 w-8 items-center justify-center rounded-full text-[var(--ink-muted)] transition-colors hover:bg-[var(--surface-2)] hover:text-[var(--ink)]"
+      >
+        <EllipsisVertical size={16} aria-hidden />
+      </button>
+      {open &&
+        position &&
+        createPortal(
+          <div
+            ref={menuRef}
+            role="menu"
+            aria-label="Row actions"
+            style={{ ...position }}
+            className="fixed z-[70] min-w-[11rem] overflow-hidden rounded-2xl border border-[var(--border)] bg-[var(--surface)] py-1 shadow-hover"
+          >
+            <button
+              type="button"
+              role="menuitem"
+              onClick={() => {
+                setOpen(false);
+                onView?.();
+              }}
+              className="flex w-full items-center gap-2.5 px-3.5 py-2 text-sm font-medium text-[var(--ink)] transition-colors hover:bg-[var(--surface-2)]"
+            >
+              <Eye size={15} aria-hidden />
+              View details
+            </button>
+          </div>,
+          document.body,
+        )}
+    </>
+  );
+}
+
+// Desktop detail dialog (createPortal) — centered modal for wide screens.
+// Reuses OverviewDetailsBody, so the content always depends on the row's
+// type + status exactly like the mobile sheet does.
+function OverviewDialog({ row, onClose }) {
+  const dialogRef = useRef(null);
+  const close = useCallback(() => onClose?.(), [onClose]);
+
+  useEffect(() => {
+    if (!row) return undefined;
+    const onKeyDown = (event) => {
+      if (event.key !== "Escape") return;
+      event.stopPropagation();
+      close();
+    };
+    window.addEventListener("keydown", onKeyDown, true);
+    return () => window.removeEventListener("keydown", onKeyDown, true);
+  }, [row, close]);
+
+  useEffect(() => {
+    if (row) dialogRef.current?.focus();
+  }, [row]);
+
+  const meta = TYPE_CONFIG[row?.kind] ?? TYPE_CONFIG.expense;
+  const Icon = meta.icon;
+  const title = overviewTitle(row, meta);
+
+  return createPortal(
+    <AnimatePresence>
+      {row && (
+        <motion.div
+          key="overview-dialog"
+          className="fixed inset-0 z-[70] flex items-center justify-center p-4"
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          exit={{ opacity: 0 }}
+          transition={{ duration: 0.2, ease: "easeOut" }}
+        >
+          <motion.div
+            className="absolute inset-0 bg-[var(--ink)]/40 backdrop-blur-sm"
+            onClick={close}
+            aria-hidden="true"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: 0.22, ease: "easeOut" }}
+          />
+          <motion.div
+            ref={dialogRef}
+            tabIndex={-1}
+            role="dialog"
+            aria-modal="true"
+            aria-label={title}
+            initial={{ opacity: 0, y: 14, scale: 0.97 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            exit={{ opacity: 0, y: 8, scale: 0.97 }}
+            transition={{ duration: 0.22, ease: SHEET_EASE }}
+            className="relative max-h-[85dvh] w-full max-w-lg overflow-y-auto scrollbar-slim rounded-3xl border border-[var(--border)] bg-[var(--surface)] p-5 shadow-hover outline-none sm:p-6"
+          >
+            <div className="flex items-center gap-3">
+              <span
+                aria-hidden
+                className={cn(
+                  "flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl",
+                  isFlagged(row)
+                    ? "bg-[var(--warning)]/15 text-[var(--warning)]"
+                    : meta.iconWrapperClass,
+                )}
+              >
+                <Icon size={20} />
+              </span>
+              <div className="min-w-0 flex-1">
+                <p className="truncate font-display text-base font-semibold tracking-tight text-[var(--ink)]">
+                  {title}
+                </p>
+                <p className="mt-0.5 truncate text-xs tabular-nums text-[var(--ink-muted)]">
+                  {formatDate(row?.date)}
+                  {row?.date ? ` · ${formatTime(row.date)}` : ""}
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={close}
+                aria-label="Close transaction details"
+                className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-[var(--surface-2)] text-[var(--ink-muted)] transition-colors hover:text-[var(--ink)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)]/30"
+              >
+                <X size={16} aria-hidden />
+              </button>
+            </div>
+            <OverviewDetailsBody row={row} meta={meta} />
+          </motion.div>
+        </motion.div>
+      )}
+    </AnimatePresence>,
+    document.body,
+  );
+}
+
+// Eight columns: Date, Description, Type, Method, Status, Day, Amount, Actions.
+const COLUMN_WIDTHS = ["11%", "22%", "13%", "9%", "10%", "11%", "18%", "6%"];
 
 export const TransactionsSection = ({
   transactions = [],
@@ -535,8 +744,10 @@ export const TransactionsSection = ({
   const [search, setSearch] = useState("");
   const [debouncedSearch, setDebouncedSearch] = useState("");
   const [page, setPage] = useState(0);
-  // Mobile-only detail portal: the tapped card's row. Desktop has no dialog.
+  // Mobile-only detail portal: the tapped card's row.
   const [sheetRow, setSheetRow] = useState(null);
+  // Desktop detail dialog: opened from the row-actions "View" menu.
+  const [viewRow, setViewRow] = useState(null);
   // Date window applied on top of the text search (client-side; the hook
   // keeps fetching everything so clearing the range restores all rows).
   const [dateRange, setDateRange] = useState(emptyDateRange);
@@ -694,7 +905,7 @@ export const TransactionsSection = ({
           />
         ) : (
           <div className="overflow-x-auto rounded-2xl border border-[var(--border)] bg-[var(--surface)] shadow-card">
-            <table className="w-full min-w-[960px] table-fixed border-collapse text-left">
+            <table className="w-full min-w-[1040px] table-fixed border-collapse text-left">
               <caption className="sr-only">
                 Employee all transactions list
               </caption>
@@ -724,8 +935,11 @@ export const TransactionsSection = ({
                   <th className="whitespace-nowrap border-b border-[var(--border)] px-4 py-3 type-eyebrow text-[var(--ink-muted)]">
                     Day
                   </th>
-                  <th className="whitespace-nowrap border-b border-[var(--border)] px-4 py-3 text-right type-eyebrow text-[var(--ink-muted)] last:pr-5">
+                  <th className="whitespace-nowrap border-b border-[var(--border)] px-4 py-3 text-right type-eyebrow text-[var(--ink-muted)]">
                     Amount
+                  </th>
+                  <th className="whitespace-nowrap border-b border-[var(--border)] px-4 py-3 text-right type-eyebrow text-[var(--ink-muted)] last:pr-5">
+                    <span className="sr-only">Actions</span>
                   </th>
                 </tr>
               </thead>
@@ -889,16 +1103,19 @@ export const TransactionsSection = ({
                               </p>
                             )}
                           </>
+                        ) : tx?.kind === "abono" && tx?.status === "open" ? (
+                          <Badge
+                            tone="warning"
+                            className="max-w-full gap-1.5 px-2 py-1 text-[11px]"
+                          >
+                            <span className="h-2 w-2 rounded-full bg-current opacity-80" />
+                            <span className="truncate">Open</span>
+                          </Badge>
                         ) : (
                           <Badge
                             tone={meta.badgeTone}
                             className="max-w-full gap-1.5 px-2 py-1 text-[11px]"
                           >
-                            <Icon
-                              size={12}
-                              strokeWidth={2.2}
-                              className="shrink-0"
-                            />
                             <span className="truncate">{meta.label}</span>
                           </Badge>
                         )}
@@ -917,7 +1134,7 @@ export const TransactionsSection = ({
                           </span>
                         </p>
                       </td>
-                      <td className="px-4 py-3 text-right last:pr-5 align-middle">
+                      <td className="px-4 py-3 text-right align-middle">
                         <span
                           className={cn(
                             "whitespace-nowrap font-display text-[15px] font-semibold tabular-nums",
@@ -930,6 +1147,11 @@ export const TransactionsSection = ({
                             ? `-${formatMoney(tx.amount)}`
                             : `+${formatMoney(tx.amount)}`}
                         </span>
+                      </td>
+                      <td className="px-4 py-3 pr-5 text-right align-middle">
+                        <div className="flex justify-end">
+                          <DesktopRowActions onView={() => setViewRow(tx)} />
+                        </div>
                       </td>
                     </tr>
                   );
@@ -1141,6 +1363,7 @@ export const TransactionsSection = ({
       )}
 
       <OverviewSheet row={sheetRow} onClose={() => setSheetRow(null)} />
+      <OverviewDialog row={viewRow} onClose={() => setViewRow(null)} />
     </Card>
   );
 };

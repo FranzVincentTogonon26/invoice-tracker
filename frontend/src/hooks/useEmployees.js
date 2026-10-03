@@ -57,5 +57,10 @@ export function useEmployeesMutations() {
       mutationFn: employeesApi.remove,
       onSuccess: invalidate,
     }),
+    // Replaces an employee's profile photo; `updateAvatar({ id, file })`.
+    updateAvatar: useMutation({
+      mutationFn: ({ id, file }) => employeesApi.updateAvatar(id, file),
+      onSuccess: invalidate,
+    }),
   };
 }

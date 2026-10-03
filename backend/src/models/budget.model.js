@@ -662,6 +662,7 @@ class Budget {
     const result = await query(
       `SELECT
           b.id,
+          b.reference_id,
           b.description,
           b.amount::float8 AS amount,
           b.method,

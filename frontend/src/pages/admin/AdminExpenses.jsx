@@ -79,7 +79,7 @@ const item = {
   },
 };
 
-const PAGE_SIZE = 50;
+const PAGE_SIZE = 100;
 const emptyRange = () => ({ start: null, end: null });
 
 const STATUS_OPTIONS = [
@@ -1027,7 +1027,7 @@ const AdminExpenses = () => {
 
           <motion.div variants={item} className="h-full min-w-0 [&>div]:h-full">
             <StatCard
-              label="Transactions"
+              label="Total Expenses Transactions"
               value={allLedgerRows.length}
               icon={ClipboardList}
               loading={isLoading}

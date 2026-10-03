@@ -17,9 +17,13 @@ import {
   formatMoney,
   formatTime,
   methodLabel,
+  toDate,
+  startOfDay,
+  isSameDay,
+  addDays,
 } from "../../../../lib/utils";
 
-const COLUMN_WIDTHS = ["11%", "27%", "19%", "14%", "14%", "24%", "5%"];
+const COLUMN_WIDTHS = ["10%", "22%", "15%", "11%", "10%", "12%", "16%", "5%"];
 
 const HEADERS = [
   { label: "Date" },
@@ -27,6 +31,7 @@ const HEADERS = [
   { label: "Employee" },
   { label: "Source of Funds" },
   { label: "Status" },
+  { label: "Days" },
   { label: "Amount", align: "right" },
   { label: "Actions", srOnly: true, align: "right" },
 ];
@@ -38,6 +43,20 @@ const EXPENSE_STATUS = {
 };
 
 const EMPLOYEE_SOURCE_LABEL = "Employee balance";
+
+// Relative-day identifier for the "Days" column — Today / Yesterday /
+// Last days by calendar day (local time). Unparseable dates render "—"
+// instead of silently falling into Today.
+function getDaysLabel(date) {
+  if (!toDate(date)) return "—";
+  const txDate = startOfDay(toDate(date));
+  const today = startOfDay(new Date());
+  const yesterday = addDays(today, -1);
+
+  if (isSameDay(txDate, today)) return "Today";
+  if (isSameDay(txDate, yesterday)) return "Yesterday";
+  return "Last days";
+}
 
 export function ExpenseStatusBadge({ status, className }) {
   const s = EXPENSE_STATUS[status] ?? {
@@ -158,11 +177,27 @@ function RowActions({
       group: "view",
       onSelect: () => onView?.(row),
     },
-    ...(isEmployeeRow && (row?.status === "paid" || row?.status === "cancel")
+    ...(isEmployeeRow && row?.status === "paid"
       ? [
           {
             key: "draft",
             label: "Add to draft",
+            Icon: RotateCcw,
+            danger: false,
+            group: "lifecycle",
+            onSelect: () => onAddToDraft?.(row),
+          },
+        ]
+      : []),
+    // Cancelled rows get their own revoke action — same draft endpoint as
+    // "Add to draft" (the server accepts 'paid' and 'cancel'), but labelled
+    // for what it undoes. Clicking moves the row back to 'draft' through the
+    // existing confirm flow.
+    ...(isEmployeeRow && row?.status === "cancel"
+      ? [
+          {
+            key: "restore-draft",
+            label: "Restore to draft",
             Icon: RotateCcw,
             danger: false,
             group: "lifecycle",
@@ -300,7 +335,7 @@ function EmployeeCell({ name, role, avatarUrl, size = "md" }) {
           alt=""
           className={cn(
             "shrink-0 rounded-full object-cover ring-1 ring-[var(--border)]",
-            compact ? "h-8 w-8" : "h-9 w-9",
+            compact ? "h-8 w-8" : "h-8 w-8",
           )}
         />
       ) : (
@@ -382,7 +417,7 @@ function LedgerRow({
             title={row.category || undefined}
             className="min-w-0 truncate text-xs leading-snug text-[var(--ink-muted)]"
           >
-            {row.category || "—"}
+            {row.category || "General"}
           </p>
           {row.flagged && <FlaggedBadge className="shrink-0" />}
         </div>
@@ -410,6 +445,23 @@ function LedgerRow({
 
       <td className="px-4 py-4 align-middle">
         <ExpenseStatusBadge status={row.status} />
+      </td>
+
+      <td className="px-4 py-4 align-middle">
+        <div className="flex justify-left">
+          <p
+            className="whitespace-nowrap text-left text-[13px] font-medium leading-none  text-[var(--ink-muted)]"
+            title={`${formatDate(row.timeDate)} at ${formatTime(row.timeDate)}`}
+          >
+            {getDaysLabel(row.timeDate)}
+            <span aria-hidden className="mx-1.5 opacity-40">
+              ·
+            </span>
+            <span className="text-[11px]  text-[var(--ink-muted)]">
+              {formatTime(row.timeDate)}
+            </span>
+          </p>
+        </div>
       </td>
 
       <td className="px-4 py-4 text-right align-middle">
@@ -523,7 +575,7 @@ const ExpensesTable = ({
       tabIndex={0}
       aria-label="Expenses"
     >
-      <div className="relative min-w-[1020px] overflow-hidden rounded-3xl border border-[var(--border)] bg-[var(--surface)] shadow-card">
+      <div className="relative min-w-[1120px] overflow-hidden rounded-3xl border border-[var(--border)] bg-[var(--surface)] shadow-card">
         <div
           aria-hidden
           className="pointer-events-none absolute inset-x-6 top-0 z-10 h-px bg-[linear-gradient(90deg,transparent,var(--accent)/65,transparent)]"
@@ -532,7 +584,8 @@ const ExpensesTable = ({
         <table className="w-full table-fixed border-collapse text-left">
           <caption className="sr-only">
             Expense records with date, description and category, employee,
-            source of funds, status, and amount with payment method
+            source of funds, status, relative day and time, and amount with
+            payment method
           </caption>
 
           <colgroup>

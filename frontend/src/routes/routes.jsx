@@ -14,7 +14,7 @@ import Register from "../pages/Register";
 
 import AdminDashboard from "../pages/admin/AdminDashboard";
 import AdminEmployees from "../pages/admin/AdminEmployees";
-import AdminEmployeesDetails from "../components/layout/admin/employees/AdminEmployeesDetails";
+import AdminEmployeesDetails from "../components/layout/admin/employees/EmployeesDetails";
 import AdminBudget from "../pages/admin/AdminBudget";
 import AdminProfile from "../pages/admin/AdminProfile";
 import AdminTransaction from "../pages/admin/AdminTransaction";
