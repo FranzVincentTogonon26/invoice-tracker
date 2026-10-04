@@ -1,6 +1,12 @@
 # Logs
 logs
 *.log
+# Transaction audit trail (backend/logs/*-transactions.md) holds real names +
+# amounts, so daily logs stay LOCAL-ONLY and are never committed. The folder
+# skeleton (README + .gitkeep) is kept so a fresh clone boots cleanly.
+!backend/logs/
+!backend/logs/README.md
+!backend/logs/.gitkeep
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*

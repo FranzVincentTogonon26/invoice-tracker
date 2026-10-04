@@ -20,6 +20,30 @@ const OTP_TTL_MS = OTP_EXPIRY_MINUTES * 60 * 1000;
 const OTP_RESEND_COOLDOWN_MS = 45 * 1000;
 const OTP_SALT_ROUNDS = 10;
 
+// In-memory OTP guess counter (per email): 5 wrong codes burn the code and
+// force a fresh issue, so the 6-digit space can't be brute-forced within its
+// 10-minute window. Single-instance guard like the route rate limits — the
+// code row itself stays the source of truth (expiry + one-time delete).
+const OTP_MAX_ATTEMPTS = 5;
+const otpAttempts = new Map();
+
+const otpAttemptKey = (email) => String(email ?? "").toLowerCase();
+
+const registerOtpAttempt = (email) => {
+  const key = otpAttemptKey(email);
+  const count = (otpAttempts.get(key) ?? 0) + 1;
+  otpAttempts.set(key, count);
+  return count;
+};
+
+const clearOtpAttempts = (email) => {
+  otpAttempts.delete(otpAttemptKey(email));
+};
+
+// Burn the same bcrypt work on the unknown-user path as a real password
+// check — otherwise the timing difference reveals whether the email exists.
+const burnBcryptWork = (password) => bcrypt.hash(String(password ?? ""), 10);
+
 // Each request must generate a FRESH code. A module-level code would be shared
 // by every user, and its expiry would be frozen at server boot — after ~10
 // minutes every verification would fail until the next restart.
@@ -60,6 +84,21 @@ const buildAuthResponse = (user) => {
 export const issuedOtp = async (req, res, next) => {
   try {
     const { email, name } = validate(resendOtpSchema, req.body);
+
+    // Same 45s anti-spam cooldown as resend — without it this public
+    // endpoint can flood any inbox and burn the mail quota.
+    const existing = await Otp.findByEmail(email);
+    if (
+      existing &&
+      Date.now() - new Date(existing.created_at).getTime() <
+        OTP_RESEND_COOLDOWN_MS
+    ) {
+      throw ApiError.tooManyRequests(
+        "Please wait a moment before requesting another code.",
+        "OTP_RATE_LIMITED",
+      );
+    }
+
     const { code, otpHash, expiresAt } = await generateOtp();
 
     await Otp.upsert({
@@ -67,6 +106,8 @@ export const issuedOtp = async (req, res, next) => {
       otpHash,
       expiresAt,
     });
+    // A fresh code resets the wrong-guess counter for this email.
+    clearOtpAttempts(email);
 
     await sendOtpEmail({
       to: email,
@@ -89,6 +130,9 @@ export const login = async (req, res, next) => {
     const user = await User.findUserByEmail(email);
 
     if (!user) {
+      // Same bcrypt cost as a real check (see burnBcryptWork) so the
+      // response time never reveals whether the email exists.
+      await burnBcryptWork(password);
       throw ApiError.unauthorized("Invalid email or password.");
     }
 
@@ -115,7 +159,12 @@ export const register = async (req, res, next) => {
     const existingUser = await User.findUserByEmail(email);
 
     if (existingUser) {
-      throw ApiError.conflict("User with this email already exists.");
+      // Generic on purpose — confirming "already exists" would let anyone
+      // enumerate registered emails (same convention as resendOtp).
+      throw ApiError.conflict(
+        "If this email is new, a verification code is on its way.",
+        "REGISTRATION_NOTICE",
+      );
     }
 
     const user = await User.createUser({
@@ -146,15 +195,29 @@ export const verifyOtp = async (req, res, next) => {
     const record = await Otp.findByEmail(email);
 
     if (!record || new Date(record.expires_at) <= new Date()) {
+      clearOtpAttempts(email);
       throw ApiError.badRequest("Expired verification code.", "OTP_EXPIRED");
     }
 
     const matches = await bcrypt.compare(otp, record.otp);
 
     if (!matches) {
+      const attempts = registerOtpAttempt(email);
+      if (attempts >= OTP_MAX_ATTEMPTS) {
+        // Burn the code after too many wrong guesses — the 6-digit space
+        // can't be brute-forced within its window. A fresh code must be
+        // issued (which resets this counter via clearOtpAttempts below).
+        clearOtpAttempts(email);
+        await Otp.deleteByEmail(email);
+        throw ApiError.tooManyRequests(
+          "Too many incorrect attempts. Please request a new code.",
+          "OTP_ATTEMPTS_EXCEEDED",
+        );
+      }
       throw ApiError.badRequest("Invalid verification code.", "OTP_INVALID");
     }
 
+    clearOtpAttempts(email);
     await Otp.deleteByEmail(email);
     return res.json({
       message: "Email verified successfully.",
@@ -188,6 +251,8 @@ export const resendOtp = async (req, res, next) => {
       // Send first, then persist — if sending fails, the previous (still
       // valid) code is not lost, and the user can retry the resend.
       await Otp.upsert({ email, otpHash, expiresAt });
+      // A fresh code resets the wrong-guess counter for this email.
+      clearOtpAttempts(email);
       await sendOtpEmail({ to: email, name, otp: code });
 
       return res.json({

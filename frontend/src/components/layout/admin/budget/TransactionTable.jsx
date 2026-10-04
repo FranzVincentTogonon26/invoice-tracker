@@ -22,8 +22,12 @@ const HEADERS = [
  * Desktop: semantic `<table>` with a soft mint header, generous row padding
  * and horizontal scrolling when space is tight (keyboard/touch reachable).
  * Mobile: stacked transaction cards so nothing becomes unreadable.
+ *
+ * `remainingForRow(row)` resolves the per-row cancel-take-back figure
+ * (`{ value, label }`) so each row's actions compare against its own
+ * source — never a shared total.
  */
-const TransactionTable = ({ rows, role, onAction, valueRemaining }) => (
+const TransactionTable = ({ rows, role, onAction, remainingForRow }) => (
   <>
     {/* Desktop — semantic table with fixed column proportions */}
     <div
@@ -72,15 +76,19 @@ const TransactionTable = ({ rows, role, onAction, valueRemaining }) => (
             </tr>
           </thead>
           <tbody>
-            {rows.map((t) => (
-              <TransactionRow
-                key={t.id}
-                transaction={t}
-                role={role}
-                onAction={onAction}
-                valueRemaining={valueRemaining}
-              />
-            ))}
+            {rows.map((t) => {
+              const remaining = remainingForRow?.(t) ?? {};
+              return (
+                <TransactionRow
+                  key={t.id}
+                  transaction={t}
+                  role={role}
+                  onAction={onAction}
+                  valueRemaining={remaining.value}
+                  remainingLabel={remaining.label}
+                />
+              );
+            })}
           </tbody>
         </table>
       </div>
@@ -88,15 +96,19 @@ const TransactionTable = ({ rows, role, onAction, valueRemaining }) => (
 
     {/* Mobile — stacked transaction cards */}
     <div className="flex flex-col gap-3 md:hidden">
-      {rows.map((t) => (
-        <TransactionCard
-          key={t.id}
-          transaction={t}
-          role={role}
-          onAction={onAction}
-          valueRemaining={valueRemaining}
-        />
-      ))}
+      {rows.map((t) => {
+        const remaining = remainingForRow?.(t) ?? {};
+        return (
+          <TransactionCard
+            key={t.id}
+            transaction={t}
+            role={role}
+            onAction={onAction}
+            valueRemaining={remaining.value}
+            remainingLabel={remaining.label}
+          />
+        );
+      })}
     </div>
   </>
 );

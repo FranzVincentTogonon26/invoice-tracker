@@ -25,6 +25,16 @@ app.use(
 app.use(express.json({ limit: "32mb" }));
 app.use(express.urlencoded({ extended: true }));
 
+// Dependency-free hardening headers (no helmet package): deny framing
+// (clickjacking), block MIME sniffing, and stop the browser from leaking
+// URLs (which can carry unguessable /api/uploads filenames) in Referer.
+app.use((req, res, next) => {
+  res.setHeader("X-Content-Type-Options", "nosniff");
+  res.setHeader("X-Frame-Options", "DENY");
+  res.setHeader("Referrer-Policy", "no-referrer");
+  next();
+});
+
 // Scanned receipts are stored on disk (utils/receiptImage.js) and referenced by
 // `expenses.image_url` as `/api/uploads/receipts/<file>`. Served without auth on
 // purpose — the browser loads these from <img> tags and window.open, which can't

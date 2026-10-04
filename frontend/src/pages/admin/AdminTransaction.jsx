@@ -1,19 +1,10 @@
-import {
-  useCallback,
-  useEffect,
-  useLayoutEffect,
-  useMemo,
-  useRef,
-  useState,
-} from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { motion } from "framer-motion";
 import {
   ArrowLeftRight,
   Ban,
   CalendarOff,
   CalendarRange,
-  ChevronLeft,
-  ChevronRight,
   CircleCheck,
   ClipboardList,
   HandCoins,
@@ -85,10 +76,11 @@ const item = {
   },
 };
 const PAGE_SIZE = 100;
-const FILTER_GAP = 8;
-const MIN_FILTER_WIDTH = 150;
 const SYSTEM_EMPLOYEE_VALUE = "__system";
 const DAY_MS = 86_400_000;
+// Desktop filter order — rendered as a pure CSS grid (no JS measuring, no
+// sliding track) so resizing never creates a transient horizontal scrollbar
+// and the visible set of filters never shifts under the user's cursor.
 const FILTER_KEYS = [
   "direction",
   "employee",
@@ -331,9 +323,7 @@ const AdminTransaction = () => {
     }
     return [
       { value: "all", label: "All employees" },
-      ...(hasSystem
-        ? [{ value: SYSTEM_EMPLOYEE_VALUE, label: "System (allocations)" }]
-        : []),
+      ...(hasSystem ? [{ value: SYSTEM_EMPLOYEE_VALUE, label: "Boss" }] : []),
       ...[...seen.values()].sort((a, b) => a.label.localeCompare(b.label)),
     ];
   }, [allRows]);
@@ -504,51 +494,6 @@ const AdminTransaction = () => {
     [recordWindow, filteredRows],
   );
   const rangeLabel = shortRangeLabel(dateRange);
-  const filtersRef = useRef(null);
-  const [filtersWidth, setFiltersWidth] = useState(0);
-  const [slideIndex, setSlideIndex] = useState(0);
-  useLayoutEffect(() => {
-    const el = filtersRef.current;
-    if (!el) return undefined;
-    const measure = () => {
-      const w = el.clientWidth;
-      if (w > 0) setFiltersWidth(w);
-    };
-    measure();
-    window.addEventListener("resize", measure);
-    let obs;
-    if (typeof ResizeObserver !== "undefined") {
-      obs = new ResizeObserver(measure);
-      obs.observe(el);
-    }
-    return () => {
-      window.removeEventListener("resize", measure);
-      obs?.disconnect();
-    };
-  }, []);
-  const filterCapacity = useMemo(() => {
-    if (filtersWidth <= 0) return FILTER_KEYS.length;
-    return Math.min(
-      FILTER_KEYS.length,
-      Math.max(
-        1,
-        Math.floor(
-          (filtersWidth + FILTER_GAP) / (MIN_FILTER_WIDTH + FILTER_GAP),
-        ),
-      ),
-    );
-  }, [filtersWidth]);
-  const filterItemWidth = useMemo(
-    () =>
-      filtersWidth <= 0
-        ? 0
-        : (filtersWidth - FILTER_GAP * (filterCapacity - 1)) / filterCapacity,
-    [filtersWidth, filterCapacity],
-  );
-  const slideMax = FILTER_KEYS.length - filterCapacity;
-  const slideAt = Math.min(Math.max(slideIndex, 0), Math.max(slideMax, 0));
-  const trackOffset = slideAt * (filterItemWidth + FILTER_GAP);
-  const showSlider = slideMax > 0;
   const pageCount = Math.max(1, Math.ceil(filteredRows.length / PAGE_SIZE));
   const currentPage = Math.min(page, pageCount - 1);
   const pageRows = useMemo(
@@ -1039,8 +984,8 @@ const AdminTransaction = () => {
             </TabsList>
           </div>
         </Tabs>
-        <div className="mb-5 flex flex-col gap-3 lg:flex-row lg:items-center">
-          <div className="flex items-center gap-2 lg:hidden">
+        <div className="mb-5 flex flex-col gap-3 2xl:flex-row 2xl:items-start">
+          <div className="flex items-center gap-2 2xl:hidden">
             <div className="min-w-0 flex-1">{searchField}</div>
             <IconButton
               type="button"
@@ -1062,57 +1007,37 @@ const AdminTransaction = () => {
               )}
             </IconButton>
           </div>
+          {/* Desktop filters — pure CSS grid: every filter is always mounted
+              and always visible, columns just reflow as the card narrows. No
+              measuring, no sliding track, no translateX, so resizing can never
+              flash a horizontal scrollbar or shuffle which filters are on
+              screen. Same records stay mounted. */}
           <div
             role="group"
             aria-label="Transaction filters"
-            className="hidden lg:flex lg:min-w-0 lg:flex-1 lg:items-center lg:gap-2"
+            className="hidden min-w-0 flex-1 grid-cols-5 gap-2 2xl:grid"
           >
-            {showSlider && (
-              <IconButton
-                type="button"
-                aria-label="Show previous filters"
-                onClick={() => setSlideIndex(Math.max(slideAt - 1, 0))}
-                disabled={slideAt <= 0}
-                className="h-10 w-10 shrink-0 disabled:pointer-events-none disabled:opacity-40"
-              >
-                <ChevronLeft size={18} aria-hidden />
-              </IconButton>
-            )}
-            <div
-              ref={filtersRef}
-              className="relative min-w-0 flex-1 overflow-hidden"
-            >
-              <div
-                className="flex transition-transform duration-300 ease-out"
-                style={{
-                  gap: FILTER_GAP,
-                  width: `${
-                    FILTER_KEYS.length * filterItemWidth +
-                    (FILTER_KEYS.length - 1) * FILTER_GAP
-                  }px`,
-                  transform: `translateX(-${trackOffset}px)`,
-                }}
-              >
-                {FILTER_KEYS.map((key) => (
-                  <div key={key} className="min-w-0 flex-1">
-                    {renderFilter(key)}
-                  </div>
-                ))}
+            {FILTER_KEYS.map((key) => (
+              <div key={key} className="min-w-0">
+                {renderFilter(key)}
               </div>
-            </div>
-            {showSlider && (
-              <IconButton
-                type="button"
-                aria-label="Show more filters"
-                onClick={() => setSlideIndex(Math.min(slideAt + 1, slideMax))}
-                disabled={slideAt >= slideMax}
-                className="h-10 w-10 shrink-0 disabled:pointer-events-none disabled:opacity-40"
-              >
-                <ChevronRight size={18} aria-hidden />
-              </IconButton>
-            )}
+            ))}
           </div>
-          <div className="hidden lg:ml-auto lg:block lg:w-[600px] lg:max-w-[45%] lg:min-w-[240px]">
+
+          {/* Mid widths (lg–2xl): filters get their own full-width row above
+              search so nothing squeezes into a shrunken sliding window. */}
+          <div
+            role="group"
+            aria-label="Transaction filters"
+            className="hidden min-w-0 grid-cols-2 gap-2 sm:grid-cols-3 lg:grid xl:grid-cols-5 2xl:hidden"
+          >
+            {FILTER_KEYS.map((key) => (
+              <div key={key} className="min-w-0">
+                {renderFilter(key)}
+              </div>
+            ))}
+          </div>
+          <div className="hidden min-w-0 2xl:ml-auto 2xl:block 2xl:w-[420px] 2xl:shrink-0">
             {searchField}
           </div>
         </div>

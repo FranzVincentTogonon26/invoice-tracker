@@ -15,6 +15,7 @@ export function TransactionRow({
   role,
   onAction,
   valueRemaining,
+  remainingLabel,
 }) {
   return (
     <tr className="group border-b border-[var(--border)] transition-colors duration-150 last:border-b-0 hover:bg-[var(--accent)]/[0.04]">
@@ -71,7 +72,10 @@ export function TransactionRow({
 
       {/* Status */}
       <td className="px-4 py-3.5 text-center align-middle">
-        <Badge tone="success" className="capitalize">
+        <Badge
+          tone={t.status === "cancelled" ? "danger" : "success"}
+          className="capitalize"
+        >
           {t.status}
         </Badge>
       </td>
@@ -84,6 +88,7 @@ export function TransactionRow({
             role={role}
             onAction={onAction}
             valueRemaining={valueRemaining}
+            remainingLabel={remainingLabel}
             variant="menu"
           />
         </div>
@@ -101,6 +106,7 @@ export function TransactionCard({
   role,
   onAction,
   valueRemaining,
+  remainingLabel,
 }) {
   return (
     <div className="relative overflow-hidden rounded-3xl border border-[var(--border)] bg-[var(--surface)] p-4 shadow-card transition-shadow hover:shadow-hover">
@@ -124,6 +130,7 @@ export function TransactionCard({
           role={role}
           onAction={onAction}
           valueRemaining={valueRemaining}
+          remainingLabel={remainingLabel}
         />
       </div>
 

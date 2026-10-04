@@ -2,6 +2,7 @@ import Expenses from "../models/expenses.model.js";
 import Budget from "../models/budget.model.js";
 import ApiError from "../utils/ApiError.js";
 import { validate } from "../utils/validate.js";
+import { emitTransaction } from "../realtime/index.js";
 import {
   createExpensesSchema,
   updateExpenseStatusSchema,
@@ -43,6 +44,12 @@ export const expenses = async (req, res, next) => {
         .json({ expenses: rows, categories, overview, gemini_model, references });
     }
 
+    // Deny by default: only admins get the full ledger — any other
+    // (current or future) role must not inherit it silently.
+    if (req.user.role !== "admin") {
+      throw ApiError.forbidden("Admin access required.", "ADMIN_ACCESS_REQUIRED");
+    }
+
     const {
       categories,
       expenses: rows,
@@ -73,6 +80,9 @@ export const create = async (req, res, next) => {
   try {
     const payload = validate(createExpensesSchema, req.body);
     if (payload.type === "category") {
+      // Categories are shared by every ledger — any active user (admin or
+      // employee) may add new ones; only deletion is admin-restricted.
+      // authMiddleware already guarantees the caller is active and exists.
       const existing = await Expenses.findCategoryByName(payload.category_name);
       if (existing) {
         throw ApiError.conflict(
@@ -82,6 +92,13 @@ export const create = async (req, res, next) => {
       }
       const category = await Expenses.createCategory({
         category_name: payload.category_name,
+      });
+      emitTransaction({
+        action: "create",
+        entity: "category",
+        actor: req.user,
+        message: `Added expense category "${category.category_name}".`,
+        metadata: { categoryId: category?.id ?? null, category_name: category.category_name },
       });
       return res
         .status(201)
@@ -146,6 +163,17 @@ export const create = async (req, res, next) => {
       receipt_date: payload.receipt_date ?? null,
       first_issued_at: firstIssuedAt,
     });
+    {
+      const total = rows.reduce((s, r) => s + (Number(r.amount) || 0), 0);
+      emitTransaction({
+        action: "create",
+        entity: "expense",
+        actor: req.user,
+        message: `${req.user.role === "employee" ? "Employee spent" : "Recorded"} ${rows.length} expense line${rows.length === 1 ? "" : "s"} (${new Intl.NumberFormat("en-US", { style: "currency", currency: "PHP" }).format(total)}).`,
+        metadata: { count: rows.length, amount: total, userId: req.user.id, reference_id: referenceId, ids: rows.map((r) => r.id ?? null).filter(Boolean) },
+        notifyUserIds: req.user.role === "employee" ? [] : rows.map((r) => r.user_id ?? null).filter(Boolean),
+      });
+    }
     return res.status(201).json({
       expenses: rows,
       message: `${rows.length} expense line${rows.length === 1 ? "" : "s"} saved.`,
@@ -195,6 +223,13 @@ export const removeCategory = async (req, res, next) => {
     const category = await Expenses.removeCategory(id);
     if (!category)
       throw ApiError.notFound("Category not found", "CATEGORY_NOT_FOUND");
+    emitTransaction({
+      action: "delete",
+      entity: "category",
+      actor: req.user,
+      message: `Removed expense category "${category.category_name ?? id}".`,
+      metadata: { categoryId: id },
+    });
     return res
       .status(200)
       .json({ category, message: "Category removed successfully." });
@@ -256,6 +291,15 @@ export const remove = async (req, res, next) => {
       if (stillReferenced === 0) await deleteReceiptImage(expense.image_url);
     }
 
+    emitTransaction({
+      action: "delete",
+      entity: "expense",
+      actor: req.user,
+      message: `Deleted expense "${expense.description ?? expense.id}" (${expense.amount ?? "?"}).`,
+      metadata: { id, amount: expense.amount ?? null, userId: expense.user_id ?? null },
+      notifyUserIds: expense.user_id ? [expense.user_id] : [],
+    });
+
     return res
       .status(200)
       .json({ expense, message: "Expense removed successfully." });
@@ -287,6 +331,15 @@ export const updateStatus = async (req, res, next) => {
     if (!expense)
       throw ApiError.notFound("Expense not found", "EXPENSE_NOT_FOUND");
 
+    emitTransaction({
+      action: "status",
+      entity: "expense",
+      actor: req.user,
+      message: `Expense status updated to ${payload.status} (${expense.description ?? id}).`,
+      metadata: { id, status: payload.status, amount: expense.amount ?? null, userId: expense.user_id ?? existing?.user_id ?? null },
+      notifyUserIds: (expense.user_id ?? existing?.user_id) ? [expense.user_id ?? existing.user_id] : [],
+    });
+
     return res.status(200).json({
       expense,
       message: `Expense status updated to ${payload.status}.`,
@@ -311,6 +364,14 @@ export const markEmployeeDraft = async (req, res, next) => {
 
     const expense = await Expenses.markEmployeeExpenseDraft(id);
     if (expense) {
+      emitTransaction({
+        action: "status",
+        entity: "expense",
+        actor: req.user,
+        message: `Moved employee expense back to draft (${expense.description ?? id}).`,
+        metadata: { id, status: "draft", amount: expense.amount ?? null, userId: expense.user_id ?? null },
+        notifyUserIds: expense.user_id ? [expense.user_id] : [],
+      });
       return res.status(200).json({
         expense,
         message: "Expense moved back to draft.",
@@ -349,6 +410,14 @@ export const markEmployeePaid = async (req, res, next) => {
 
     const expense = await Expenses.markEmployeeExpensePaid(id);
     if (expense) {
+      emitTransaction({
+        action: "status",
+        entity: "expense",
+        actor: req.user,
+        message: `Moved employee expense back to paid (${expense.description ?? id}).`,
+        metadata: { id, status: "paid", amount: expense.amount ?? null, userId: expense.user_id ?? null },
+        notifyUserIds: expense.user_id ? [expense.user_id] : [],
+      });
       return res.status(200).json({
         expense,
         message: "Expense moved back to paid.",
@@ -395,6 +464,13 @@ export const clearFlag = async (req, res, next) => {
     }
 
     const expense = await Expenses.clearExpenseFlag(id);
+    emitTransaction({
+      action: "update",
+      entity: "expense",
+      actor: req.user,
+      message: `Approved flag on expense (${expense?.description ?? id}).`,
+      metadata: { id, userId: expense?.user_id ?? existing?.user_id ?? null },
+    });
     return res.status(200).json({
       expense,
       message: "Flag approved and cleared.",
@@ -423,6 +499,14 @@ export const updateDescription = async (req, res, next) => {
     const expense = await Expenses.updateExpenseDescription(id, payload.description);
     if (!expense)
       throw ApiError.notFound("Expense not found", "EXPENSE_NOT_FOUND");
+
+    emitTransaction({
+      action: "update",
+      entity: "expense",
+      actor: req.user,
+      message: `Updated expense description (${id}).`,
+      metadata: { id, userId: expense.user_id ?? existing?.user_id ?? null },
+    });
 
     return res.status(200).json({
       expense,
@@ -454,6 +538,14 @@ export const updateNotes = async (req, res, next) => {
     );
     if (!expense)
       throw ApiError.notFound("Expense not found", "EXPENSE_NOT_FOUND");
+
+    emitTransaction({
+      action: "update",
+      entity: "expense",
+      actor: req.user,
+      message: `Saved review notes on expense (${id}).`,
+      metadata: { id, userId: expense.user_id ?? existing?.user_id ?? null },
+    });
 
     return res.status(200).json({
       expense,

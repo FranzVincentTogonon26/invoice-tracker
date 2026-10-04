@@ -1,6 +1,5 @@
 import { HandCoins } from "lucide-react";
 import { Badge, StatusBadge } from "../../../ui/Badge";
-import { STATUS } from "../../../../constants";
 import { MethodIcon } from "../../../ui/Select";
 import { cn, formatDate, formatMoney, formatTime } from "../../../../lib/utils";
 import { methodLabel } from "./PaymentMethod";
@@ -144,9 +143,9 @@ export function IssuedTransactionRow({ transaction: t, onAction }) {
         <DateIssuedCell date={t.date_issued} />
       </td>
       <td className="px-4 py-3.5 text-center align-middle">
-        <Badge tone="success" className="capitalize">
-          {STATUS[t.status]?.label ?? t.status ?? "—"}
-        </Badge>
+        {/* Shared StatusBadge so the tone follows the real status — a
+            cancelled issuance reads red, not the old hard-coded green. */}
+        <StatusBadge status={t.status} />
       </td>
       <td className="px-4 py-3.5 pr-5 align-middle">
         <div className="flex justify-end">

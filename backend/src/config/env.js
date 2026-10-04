@@ -12,7 +12,11 @@ export const ENV = {
   PORT: process.env.PORT || 8000,
   NODE_ENV: process.env.NODE_ENV || "development",
   CLIENT_URL: process.env.CLIENT_URL,
-  JWT_EXPIRES: process.env.JWT_EXPIRES || "7d",
+  // Sessions last a day by default: authMiddleware re-validates the user row
+  // (role + active status) on every request, but a stolen token is still
+  // fully usable until it expires — keep the window short. Override with
+  // JWT_EXPIRES when a longer session is a conscious choice.
+  JWT_EXPIRES: process.env.JWT_EXPIRES || "1d",
   JWT_SECRET: process.env.JWT_SECRET,
   DATABASE_URL: process.env.DATABASE_URL,
   RESEND_API_KEY: process.env.RESEND_API_KEY,

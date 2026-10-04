@@ -43,6 +43,11 @@ export const budgetsApi = {
   // `{ previousStatus, budget }` so the UI can offer an undo window.
   cancelTransaction: (id) =>
     apiClient.patch(`/budgets/${id}/cancel`).then((r) => r.data),
+  // Permanently deletes a cancelled budget transaction (hard delete).
+  // Admin-only server-side; live rows are refused with 409.
+  // Returns `{ budget }`.
+  removeTransaction: (id) =>
+    apiClient.delete(`/budgets/transaction/${id}`).then((r) => r.data),
   // Undo a cancellation — restores the transaction's previous status.
   restoreTransaction: (id, status) =>
     apiClient.patch(`/budgets/${id}/restore`, { status }).then((r) => r.data),
@@ -57,4 +62,9 @@ export const budgetsApi = {
     apiClient
       .patch(`/budgets/issued_transaction/${id}/restore`, { status })
       .then((r) => r.data),
+  // Permanently deletes a cancelled issued budget transaction (hard delete).
+  // Admin-only server-side; live rows and rows with linked expenses are
+  // refused with 409. Returns `{ issuedTransaction }`.
+  removeIssuedTransaction: (id) =>
+    apiClient.delete(`/budgets/issued_transaction/${id}`).then((r) => r.data),
 };

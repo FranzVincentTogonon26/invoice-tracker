@@ -2,6 +2,7 @@ import BudgetTransfer from "../models/budget.transfer.model.js";
 import User from "../models/user.model.js";
 import ApiError from "../utils/ApiError.js";
 import { validate } from "../utils/validate.js";
+import { emitTransaction } from "../realtime/index.js";
 import { createBudgetTransferSchema } from "../validations/budget.transfer.validation.js";
 
 // Both admins and active employees may move funds — the route stacks only
@@ -96,6 +97,15 @@ export const create = async (req, res, next) => {
       );
     }
 
+    emitTransaction({
+      action: "transfer",
+      entity: "transfer",
+      actor: req.user,
+      message: `${user.name} transferred ${payload.amount} to employee (${payload.transfer_to}).`,
+      metadata: { amount: payload.amount, senderId: user.user_id, transferTo: payload.transfer_to, transferId: result.transfer?.id ?? null, method: payload.method },
+      notifyUserIds: [user.user_id, payload.transfer_to],
+    });
+
     return res.status(201).json({
       transfer: result.transfer,
       requested: result.requested,
@@ -149,6 +159,15 @@ export const remove = async (req, res, next) => {
         "TRANSFER_ALREADY_SPENT",
       );
     }
+
+    emitTransaction({
+      action: "delete",
+      entity: "transfer",
+      actor: req.user,
+      message: `Cancelled budget transfer (${result.transfer?.id ?? id}).`,
+      metadata: { id, amount: result.transfer?.amount ?? existing?.amount ?? null, senderId: existing?.user_id ?? null, transferTo: existing?.transfer_to ?? null },
+      notifyUserIds: [existing?.user_id, existing?.transfer_to].filter(Boolean),
+    });
 
     return res.status(200).json({
       transfer: result.transfer,

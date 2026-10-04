@@ -55,3 +55,23 @@ export const sendOtpEmail = async ({ to, name, otp }) => {
 
   return data;
 };
+
+// Security tripwire: tells the PREVIOUS address when the account email is
+// changed, so a stolen session swapping the email can't do it silently.
+// Best-effort by design — a mail failure must never roll back the save, so
+// callers swallow errors and only log them.
+export const sendEmailChangedNotice = async ({ to, name, newEmail }) => {
+  const { error } = await resend.emails.send({
+    from: ENV.EMAIL_FROM,
+    to: [to],
+    subject: "Your account email was changed",
+    text:
+      `Hi ${name}, the email on your Invoice Tracker account was just ` +
+      `changed to ${newEmail}. If this wasn't you, contact an administrator ` +
+      `immediately.`,
+  });
+
+  if (error) {
+    console.error("Resend email error (change notice):", error);
+  }
+};

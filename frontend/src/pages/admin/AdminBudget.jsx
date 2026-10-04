@@ -178,7 +178,7 @@ export default function AdminBudget() {
               tone={isOverdrawn ? "danger" : isDepleted ? "warning" : undefined}
               status={
                 isOverdrawn
-                  ? {
+                  ? { 
                       tone: "danger",
                       label: "Overdrawn — over budget",
                       icon: CircleX,
@@ -406,7 +406,7 @@ export default function AdminBudget() {
             />
           </TabsContent>
           <TabsContent value="budget_transaction">
-            <BudgetTransaction valueRemaining={cashOnHand} />
+            <BudgetTransaction breakdown={cashOnHandBreakdown} />
           </TabsContent>
           <TabsContent value="budget_issued_transaction">
             <BudgetIssuedTransaction />

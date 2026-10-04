@@ -7,9 +7,15 @@ export const createEmployeeSchema = z.object({
   email: z.email({
     message: "Invalid email address",
   }),
-  password: z.string().min(8, {
-    message: "Password must be at least 8 characters",
-  }),
+  password: z
+    .string()
+    .min(8, {
+      message: "Password must be at least 8 characters",
+    })
+    // Same bcrypt cap as registration (see auth.validation.js).
+    .max(72, {
+      message: "Password must be at most 72 characters",
+    }),
 });
 
 export const updateEmployeeStatusSchema = z.object({

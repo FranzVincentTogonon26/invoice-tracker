@@ -86,13 +86,13 @@ export const uploadReceiptBatch = (req, res, next) => {
 
 // Setting → Account avatar photo (multipart field name: `avatar`).
 //
-// PHOTOS ONLY and — unlike receipts — deliberately NO byte cap: any photo
-// size is accepted, so `limits` only pins the file COUNT (one avatar per
-// request). The file filter checks BOTH the mime type and the file-name
-// extension against the shared allow-list in utils/avatarImage.js (the same
-// list the storage step re-checked when it mints the stored file name), so an
-// executable renamed `photo.png` still fails on its mime type while a
-// genuine camera photo passes regardless of how large it is.
+// PHOTOS ONLY, capped at 5MB (memoryStorage holds the whole file in RAM —
+// an uncapped photo endpoint is a trivial OOM vector). The file filter
+// checks BOTH the mime type and the file-name extension against the shared
+// allow-list in utils/avatarImage.js (the same list the storage step
+// re-checked when it mints the stored file name), so an executable renamed
+// `photo.png` still fails on its mime type.
+const AVATAR_MAX_BYTES = 5 * 1024 * 1024;
 const AVATAR_MIME_TYPES = new Set(AVATAR_ALLOWED_MIME_TYPES);
 const AVATAR_EXTENSIONS = new Set(AVATAR_ALLOWED_EXTENSIONS);
 
@@ -103,7 +103,7 @@ const extensionOf = (fileName) => {
 
 const uploadAvatarFile = multer({
   storage: multer.memoryStorage(),
-  limits: { files: 1 },
+  limits: { fileSize: AVATAR_MAX_BYTES, files: 1 },
   fileFilter: (req, file, cb) => {
     const accepted =
       AVATAR_MIME_TYPES.has(String(file.mimetype).toLowerCase()) &&
@@ -126,6 +126,14 @@ const uploadAvatarFile = multer({
 export const uploadAvatar = (req, res, next) => {
   uploadAvatarFile.single("avatar")(req, res, (err) => {
     if (err instanceof multer.MulterError) {
+      if (err.code === "LIMIT_FILE_SIZE") {
+        return next(
+          ApiError.badRequest(
+            "Avatar photo exceeds the 5MB limit.",
+            "INVALID_AVATAR_UPLOAD",
+          ),
+        );
+      }
       if (err.code === "LIMIT_FILE_COUNT" || err.code === "LIMIT_UNEXPECTED_FILE") {
         return next(
           ApiError.badRequest("Only one avatar photo can be uploaded at a time."),

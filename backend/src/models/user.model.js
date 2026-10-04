@@ -1,5 +1,5 @@
 import bcrypt from "bcryptjs";
-import { query } from "../config/db.js";
+import { query, withTransaction } from "../config/db.js";
 
 // Columns safe to return in API responses (never exposes password)
 const SAFE_COLUMNS = "user_id, name, email, avatar_url, role, status";
@@ -99,30 +99,37 @@ class User {
     return result.rows[0] ?? null;
   }
 
-  // Create User (hashes the plaintext password before storing)
+  // Create User (hashes the plaintext password before storing).
+  // The first-ever user becomes an active admin (initial bootstrap);
+  // everyone else starts as a pending employee awaiting approval. The
+  // bootstrap check runs under a transaction-scoped advisory lock so
+  // concurrent registrations serialize here — exactly one of them can
+  // observe zero users and mint admin (a plain COUNT-then-INSERT would let
+  // two racers both see zero).
   static async createUser({ name, email, password }) {
-    let role,
-      status = null;
     const hashedPassword = await bcrypt.hash(password, SALT_ROUNDS);
 
-    const countUsers = await query(`SELECT COUNT(*) FROM users`);
-    if (parseInt(countUsers.rows[0].count) === 0) {
-      // If this is the first user, make them an admin and active by default
-      role = "admin";
-      status = "active";
-    } else {
-      // Otherwise, new users are created with a pending status and no role
-      role = "employee";
-      status = "pending";
-    }
+    return withTransaction(async (client) => {
+      await client.query(
+        "SELECT pg_advisory_xact_lock(hashtext('user_bootstrap'))",
+      );
+      const countUsers = await client.query(`SELECT COUNT(*) FROM users`);
+      const isFirst = parseInt(countUsers.rows[0].count, 10) === 0;
 
-    const result = await query(
-      `INSERT INTO users (name, email, password, role, status)
-       VALUES ($1, $2, $3, $4, $5)
-       RETURNING ${SAFE_COLUMNS}`,
-      [name, email, hashedPassword, role, status],
-    );
-    return result.rows[0];
+      const result = await client.query(
+        `INSERT INTO users (name, email, password, role, status)
+         VALUES ($1, $2, $3, $4, $5)
+         RETURNING ${SAFE_COLUMNS}`,
+        [
+          name,
+          email,
+          hashedPassword,
+          isFirst ? "admin" : "employee",
+          isFirst ? "active" : "pending",
+        ],
+      );
+      return result.rows[0];
+    });
   }
 }
 

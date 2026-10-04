@@ -191,7 +191,7 @@ class Transactions {
         employeeId: row.user_id ?? null,
         employeeName: row.employee_name ?? null,
         employeeRole: "employee",
-        employeeAvatar: null,
+        employeeAvatar: row.employee_avatar ?? null,
         counterpartyName: null,
         counterpartyRole: null,
         approvedBy: null,

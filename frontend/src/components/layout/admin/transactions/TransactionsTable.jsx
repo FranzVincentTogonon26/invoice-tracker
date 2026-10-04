@@ -97,18 +97,18 @@ function PersonCell({ name, role, avatarUrl, fallback = "System" }) {
         <img
           src={avatarUrl}
           alt=""
-          className="h-8 w-8 shrink-0 rounded-full object-cover ring-1 ring-[var(--border)]"
+          className="h-7 w-7 shrink-0 rounded-full object-cover ring-1 ring-[var(--border)]"
         />
       ) : (
         <span
           aria-hidden
-          className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-[var(--accent-soft)] text-xs font-semibold text-[var(--accent-strong)]"
+          className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-[var(--accent-soft)] text-xs font-medium text-[var(--accent-strong)]"
         >
           {initialsOf(name || fallback)}
         </span>
       )}
       <div className="min-w-0">
-        <p className="truncate text-[13px] font-semibold leading-tight text-[var(--ink)]">
+        <p className="truncate text-[13px] font-medium leading-tight text-[var(--ink)]">
           {name || fallback}
         </p>
         {role && (
@@ -392,7 +392,7 @@ function LedgerRow({ row, pending, onAction }) {
         <p className="text-[13px] font-medium leading-none text-[var(--ink)]">
           {formatDate(row.date)}
         </p>
-        <p className="mt-1 text-xs leading-none tabular-nums text-[var(--ink-muted)]">
+        <p className="mt-1 text-xs leading-none  text-[var(--ink-muted)]">
           {formatTime(row.date)}
         </p>
       </td>
@@ -421,7 +421,7 @@ function LedgerRow({ row, pending, onAction }) {
           )}
           <p
             title={row.description}
-            className="min-w-0 flex-1 truncate text-[13px] font-semibold leading-snug text-[var(--ink)]"
+            className="min-w-0 flex-1 truncate text-[13px] font-medium leading-snug text-[var(--ink)]"
           >
             {row.description || "Untitled"}
           </p>
@@ -464,21 +464,21 @@ function LedgerRow({ row, pending, onAction }) {
       </td>
 
       {/* 5. Account / Person */}
-      <td className="px-4 py-3.5 align-middle">
+      <td className="min-w-0 max-w-0 px-4 py-3.5 align-middle">
         {row.employeeId || row.employeeName ? (
-          <div>
+          <div className="min-w-0">
             <PersonCell
               name={row.employeeName}
               role={row.employeeRole}
               avatarUrl={row.employeeAvatar}
             />
             {row.counterpartyName && (
-              <p className="mt-1 flex items-center gap-1 pl-10 text-xs text-[var(--ink-muted)]">
+              <p className="mt-1 flex min-w-0 items-center gap-1 pl-10 text-xs text-[var(--ink-muted)]">
                 <ArrowLeftRight
                   size={11}
                   className="shrink-0 text-[var(--accent)]"
                 />
-                <span className="truncate">
+                <span className="min-w-0 truncate">
                   {row.kind === "transfer_sent" ? "To" : "From"}:{" "}
                   <strong className="font-medium text-[var(--ink)]">
                     {row.counterpartyName}
@@ -489,16 +489,16 @@ function LedgerRow({ row, pending, onAction }) {
             )}
           </div>
         ) : (
-          <div className="flex items-center gap-2.5">
+          <div className="flex min-w-0 items-center gap-2.5">
             <span
               aria-hidden
               className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-[var(--surface-2)] text-xs font-semibold text-[var(--ink-muted)]"
             >
-              SYS
+              B
             </span>
-            <div className="min-w-0">
+            <div className="min-w-0 flex-1">
               <p className="truncate text-[13px] font-semibold leading-tight text-[var(--ink)]">
-                System
+                Boss
               </p>
               <p className="mt-0.5 truncate text-xs text-[var(--ink-muted)]">
                 {row.approvedBy ? `By ${row.approvedBy}` : "Allocation"}
@@ -509,30 +509,20 @@ function LedgerRow({ row, pending, onAction }) {
       </td>
 
       {/* 6. Reference */}
-      <td className="px-4 py-3.5 align-middle">
+      <td className="min-w-0 max-w-0 px-4 py-3.5 align-middle">
         <SourceFundsBadge source={row.referenceLabel} />
       </td>
 
       {/* 7. Status */}
       <td className="px-3 py-3.5 align-middle">
         <StatusBadge status={row.status} />
-        {row.expenseDate && (
-          <p className="mt-1 text-[11px] tabular-nums text-[var(--ink-muted)]">
-            Exp: {formatDate(row.expenseDate)}
-          </p>
-        )}
-        {row.dateSettled && (
-          <p className="mt-1 text-[11px] tabular-nums text-[var(--ink-muted)]">
-            Settled: {formatDate(row.dateSettled)}
-          </p>
-        )}
       </td>
 
       {/* 8. Amount & Flow */}
-      <td className="px-4 py-3.5 text-right align-middle">
+      <td className="min-w-0 max-w-0 px-4 py-3.5 text-right align-middle">
         <p
           className={cn(
-            "text-sm font-semibold tabular-nums",
+            "truncate text-sm font-semibold tabular-nums",
             isIn && "text-[var(--success)]",
             isOut && "text-[var(--danger)]",
             isVoid &&
@@ -707,12 +697,19 @@ const HEADERS = [
 
 const TransactionsTable = ({ rows, pending = false, onAction }) => (
   <>
+    {/* Desktop — plain fluid wrapper, NOT a trapped scroll region.
+        `overflow-x-auto` + `overflow-y-clip` means: horizontal scroll only
+        appears if the 1120px floor ever exceeds the card (mid widths); vertical
+        wheel / touch can never scroll this box — it always bubbles to the
+        page, so the mouse wheel never gets "stuck" on the table. The bar
+        itself is hidden (`[scrollbar-width:none]` + hidden webkit scrollbar)
+        but keyboard/touch horizontal panning still works when overflow exists. */}
     <div
-      className="hidden overflow-x-auto rounded-3xl focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)]/30 md:block"
+      className="hidden overflow-x-auto overflow-y-clip overscroll-x-auto rounded-3xl [scrollbar-width:none] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)]/30 md:block [&::-webkit-scrollbar]:hidden"
       tabIndex={0}
       aria-label="All transactions"
     >
-      <div className="relative min-w-[1360px] overflow-hidden rounded-3xl border border-[var(--border)] bg-[var(--surface)] shadow-card">
+      <div className="relative min-w-0 overflow-hidden rounded-3xl border border-[var(--border)] bg-[var(--surface)] shadow-card lg:min-w-[1120px]">
         <div
           aria-hidden
           className="pointer-events-none absolute inset-x-6 top-0 z-10 h-px bg-[linear-gradient(90deg,transparent,var(--accent)/65,transparent)]"
@@ -730,7 +727,7 @@ const TransactionsTable = ({ rows, pending = false, onAction }) => (
             ))}
           </colgroup>
 
-          <thead className="sticky top-0 z-[1]">
+          <thead>
             <tr className="bg-[var(--surface-2)]/90 backdrop-blur">
               {HEADERS.map((h) => (
                 <th

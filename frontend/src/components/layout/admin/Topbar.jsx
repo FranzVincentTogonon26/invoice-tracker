@@ -4,6 +4,7 @@ import { UserHeader } from "@/components/ui/UserHeader";
 import { useTheme } from "@/context/ThemeContext";
 import { useAuth } from "@/context/AuthContext";
 import { NotificationsPopover } from "../../ui/NotificationsPopover";
+import { SocketStatus } from "@/components/ui/SocketStatus";
 
 export function Topbar({ onOpenPalette }) {
   const { theme, toggle } = useTheme();
@@ -19,6 +20,7 @@ export function Topbar({ onOpenPalette }) {
       <UserHeader user={user} />
 
       <div className="flex shrink-0 items-center gap-2 md:gap-3">
+        <SocketStatus />
         <button
           type="button"
           onClick={onOpenPalette}

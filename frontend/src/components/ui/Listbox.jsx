@@ -12,6 +12,69 @@ import { AnimatePresence, motion } from "framer-motion";
 import { Check, ChevronDown, Search } from "lucide-react";
 import { cn } from "@/lib/utils";
 
+function initialsOf(label) {
+  return (
+    String(label || "?")
+      .split(" ")
+      .filter(Boolean)
+      .slice(0, 2)
+      .map((part) => part[0].toUpperCase())
+      .join("") || "?"
+  );
+}
+
+// Employee avatar: real `<img>` when the option carries an `avatar` URL,
+// initials fallback when the key exists but is empty. Options without an
+// `avatar` key (e.g. "All employees", plain text filters) render nothing.
+// "Boss" gets a temporary gray "B" avatar (same look as the ledger's
+// Boss fallback block) until a real photo exists.
+function OptionAvatar({ option, size = "sm" }) {
+  if (!option) return null;
+  const sizing = size === "sm" ? "h-7 w-7 text-[10px]" : "h-7 w-7 text-[11px]";
+  if (
+    String(option.label ?? "")
+      .trim()
+      .toLowerCase() === "boss"
+  ) {
+    return (
+      <span
+        aria-hidden
+        className={cn(
+          "flex shrink-0 items-center justify-center rounded-full bg-[var(--surface-2)] font-semibold text-[var(--ink-muted)]",
+          sizing,
+        )}
+      >
+        B
+      </span>
+    );
+  }
+  if (!("avatar" in option)) return null;
+  if (option.avatar) {
+    return (
+      <img
+        src={option.avatar}
+        alt=""
+        aria-hidden
+        className={cn(
+          "shrink-0 rounded-full object-cover ring-1 ring-[var(--border)]",
+          sizing,
+        )}
+      />
+    );
+  }
+  return (
+    <span
+      aria-hidden
+      className={cn(
+        "flex shrink-0 items-center justify-center rounded-full bg-[var(--accent-soft)] font-medium text-[var(--accent-strong)]",
+        sizing,
+      )}
+    >
+      {initialsOf(option.label)}
+    </span>
+  );
+}
+
 export default function Listbox({
   options,
   value,
@@ -293,6 +356,7 @@ export default function Listbox({
                       renderOption(option, { selected })
                     ) : (
                       <>
+                        <OptionAvatar option={option} />
                         <span className="truncate flex-1">{option.label}</span>
                         {selected && (
                           <Check
@@ -339,13 +403,16 @@ export default function Listbox({
         {renderTrigger ? (
           renderTrigger(selectedOption)
         ) : (
-          <span
-            className={cn(
-              "min-w-0 flex-1 truncate text-xs font-semibold text-[var(--ink-muted)] transition-colors text-left",
-              !selectedOption && "text-[var(--ink-muted)]",
-            )}
-          >
-            {selectedOption ? selectedOption.label : placeholder}
+          <span className="flex min-w-0 flex-1 items-center gap-2 text-left">
+            <OptionAvatar option={selectedOption} size="sm" />
+            <span
+              className={cn(
+                "min-w-0 flex-1 truncate text-xs font-semibold text-[var(--ink-muted)] transition-colors",
+                !selectedOption && "text-[var(--ink-muted)]",
+              )}
+            >
+              {selectedOption ? selectedOption.label : placeholder}
+            </span>
           </span>
         )}
         <ChevronDown

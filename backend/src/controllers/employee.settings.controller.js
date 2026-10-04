@@ -3,7 +3,9 @@ import bcrypt from "bcryptjs";
 import User from "../models/user.model.js";
 import ApiError from "../utils/ApiError.js";
 import { validate } from "../utils/validate.js";
+import { emitTransaction } from "../realtime/index.js";
 import { deleteAvatarImage, saveAvatarImage } from "../utils/avatarImage.js";
+import { sendEmailChangedNotice } from "../utils/mailer.js";
 import {
   updateAccountSchema,
   updatePasswordSchema,
@@ -115,6 +117,30 @@ export const updateAccount = async (req, res, next) => {
     }
 
     committed = true;
+
+    emitTransaction({
+      action: "update",
+      entity: "employee",
+      actor: req.user,
+      message: `${updated?.name ?? "Employee"} updated their account profile.`,
+      metadata: { userId: updated?.user_id ?? user.user_id },
+      notifyUserIds: [updated?.user_id ?? user.user_id],
+      adminOnly: true,
+    });
+
+    // Tripwire for session theft: if the email itself moved, tell the
+    // PREVIOUS address (best-effort — a mail failure never fails the save).
+    if (user.email !== updated.email) {
+      try {
+        await sendEmailChangedNotice({
+          to: user.email,
+          name: updated.name ?? nextName,
+          newEmail: updated.email,
+        });
+      } catch (noticeErr) {
+        console.error("Email change notice failed:", noticeErr);
+      }
+    }
 
     return res.status(200).json({
       user: updated,

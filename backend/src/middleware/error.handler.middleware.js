@@ -41,6 +41,10 @@ export const errorHandler = (err, req, res, next) => {
     status: err.statusCode,
     code: err.code,
     message: err.message,
+    // Present on rate-limited (429) responses so clients know when to retry.
+    ...(Number.isFinite(err.retryAfter)
+      ? { retryAfter: err.retryAfter }
+      : null),
   });
 };
 

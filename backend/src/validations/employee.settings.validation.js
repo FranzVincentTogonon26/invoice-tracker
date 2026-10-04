@@ -18,11 +18,21 @@ export const updateAccountSchema = z.object({
 // schema's minimum and `new_password` the register schema's, so the rules the
 // account was created with stay the rules it is changed with.
 export const updatePasswordSchema = z.object({
-  current_password: z.string().min(6, {
-    message: "Current password must be at least 6 characters",
-  }),
+  current_password: z
+    .string()
+    .min(6, {
+      message: "Current password must be at least 6 characters",
+    })
+    .max(72, {
+      message: "Current password must be at most 72 characters",
+    }),
 
-  new_password: z.string().min(8, {
-    message: "New password must be at least 8 characters",
-  }),
+  new_password: z
+    .string()
+    .min(8, {
+      message: "New password must be at least 8 characters",
+    })
+    .max(72, {
+      message: "New password must be at most 72 characters",
+    }),
 });

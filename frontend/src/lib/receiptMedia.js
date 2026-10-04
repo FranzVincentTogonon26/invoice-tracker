@@ -14,9 +14,15 @@ export const isReceiptPdf = (url, fileName = "") =>
  * data URL (legacy draft) is converted to a Blob URL first — Chrome refuses
  * top-level navigation to `data:` URLs — and revoked once the tab has had time
  * to load it.
+ *
+ * Scheme-allowlisted: receipt values come from the database (`image_url`),
+ * so a compromised row must never turn this into script execution —
+ * `javascript:`/`vbscript:`/`data:text/html` and foreign schemes are refused.
  */
+const SAFE_URL = /^(blob:|https?:\/\/|\/(?!\/)|data:(image\/|application\/pdf))/i;
+
 export const openReceiptFile = (url) => {
-  if (!url) return;
+  if (!url || typeof url !== "string" || !SAFE_URL.test(url.trim())) return;
 
   if (!url.startsWith("data:")) {
     window.open(url, "_blank", "noopener");

@@ -4,6 +4,7 @@ import { AuthProvider } from "@/context/AuthContext";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { ThemeProvider } from "@/context/ThemeContext";
 import { Toaster } from "react-hot-toast";
+import { useRealtime } from "@/hooks/useRealtime";
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -15,11 +16,20 @@ const queryClient = new QueryClient({
   },
 });
 
+// Lives INSIDE QueryClientProvider + AuthProvider so it can invalidate
+// caches and read the session. One mount covers every page: admin ledger,
+// employee ledgers, dashboards — all stay in sync over socket.io.
+function RealtimeBridge() {
+  useRealtime();
+  return null;
+}
+
 function App() {
   return (
     <QueryClientProvider client={queryClient}>
       <ThemeProvider>
         <AuthProvider>
+          <RealtimeBridge />
           <RouterProvider router={router} />
           <Toaster
             position="top-center"

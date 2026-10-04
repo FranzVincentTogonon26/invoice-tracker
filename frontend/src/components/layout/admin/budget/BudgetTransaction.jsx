@@ -17,7 +17,6 @@ import { useAuth } from "../../../../context/AuthContext";
 import {
   BUDGET_STATUS_TABS,
   PAYMENT_METHODS,
-  USER_ROLES,
 } from "../../../../constants";
 
 import TransactionTable from "./TransactionTable";
@@ -30,9 +29,11 @@ const METHOD_FILTER_OPTIONS = [
   ...PAYMENT_METHODS,
 ];
 
-const BudgetTransaction = ({ valueRemaining }) => {
+const BudgetTransaction = ({ breakdown = [] }) => {
   const { user } = useAuth();
-  const role = user?.role ?? USER_ROLES.ADMIN;
+  // No admin fallback: outside an authenticated admin session the cancel
+  // affordances must stay off (fail closed, never fail open).
+  const role = user?.role;
   const [status, setStatus] = useState("all");
   const [method, setMethod] = useState("all");
   const [search, setSearch] = useState("");
@@ -57,12 +58,29 @@ const BudgetTransaction = ({ valueRemaining }) => {
     setPage(0);
   };
 
-  const { data, isLoading, error, refetch } = useBudgetTransaction({
-    status,
-    search: debouncedSearch.trim() || undefined,
-  });
+  const { data, isLoading, error, refetch } =
+    useBudgetTransaction({
+      status,
+      search: debouncedSearch.trim() || undefined,
+    });
 
   const rows = useMemo(() => data ?? [], [data]);
+
+  // Per-row cancel-take-back figure, read straight from the My Balance
+  // breakdown: the row's source entry (`t.label`) and its formatted
+  // `item.value`, parsed back to a number — so the dialog compares
+  // `t.amount` against the exact figure the card displays. No match (or an
+  // unparseable value) disables the pre-check and the server decides on
+  // confirm.
+  const remainingForRow = (row) => {
+    const item = (breakdown ?? []).find(
+      (b) => b.label === (row.label ?? "Untitled reference"),
+    );
+    if (!item) return {};
+    const value = Number(String(item.value ?? "").replace(/[^0-9.\-]/g, ""));
+    if (!Number.isFinite(value)) return {};
+    return { value, label: "remaining budget" };
+  };
 
   const filteredRows = useMemo(
     () => (method === "all" ? rows : rows.filter((r) => r.method === method)),
@@ -103,7 +121,8 @@ const BudgetTransaction = ({ valueRemaining }) => {
     updateSearch("");
   };
 
-  const { cancelTransaction, restoreTransaction } = useBudgetMutations();
+  const { cancelTransaction, restoreTransaction, removeTransaction } =
+    useBudgetMutations();
 
   const handleAction = async (action, transaction) => {
     if (action === "restore") {
@@ -115,6 +134,15 @@ const BudgetTransaction = ({ valueRemaining }) => {
         toast.success("Transaction restored");
       } catch (err) {
         toast.error(err?.message || "Couldn't restore transaction");
+      }
+      return;
+    }
+    if (action === "delete") {
+      try {
+        await removeTransaction.mutateAsync(transaction.id);
+        toast.success("Transaction record deleted");
+      } catch (err) {
+        toast.error(err?.message || "Couldn't delete transaction record");
       }
       return;
     }
@@ -243,7 +271,7 @@ const BudgetTransaction = ({ valueRemaining }) => {
               rows={pageRows}
               role={role}
               onAction={handleAction}
-              valueRemaining={valueRemaining}
+              remainingForRow={remainingForRow}
             />
 
             {/* Footer — "Showing X–Y of N", running total, and pagination */}

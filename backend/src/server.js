@@ -1,6 +1,10 @@
+import http from "http";
+
 import app from "./app.js";
 import { ENV } from "./config/env.js";
 import { pool } from "./config/db.js";
+
+import { initSocket } from "./socket/socket.io.js";
 
 // Neon (free tier) suspends compute after a few idle minutes, and the first
 // query after that pays a cold-start handshake (often 5–30s) — longer than a
@@ -31,7 +35,10 @@ const warmupDatabase = async (attempts = 12, delayMs = 5000) => {
   );
 };
 
-app.listen(ENV.PORT, () => {
+const server = http.createServer(app);
+initSocket(server);
+
+server.listen(ENV.PORT, () => {
   console.log(`🌐 API listening on port: ${ENV.PORT}`);
   void warmupDatabase();
 });

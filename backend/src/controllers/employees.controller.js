@@ -6,6 +6,7 @@ import Expenses from "../models/expenses.model.js";
 import Abono from "../models/abono.model.js";
 import ApiError from "../utils/ApiError.js";
 import { validate } from "../utils/validate.js";
+import { emitTransaction, emitForceLogout } from "../realtime/index.js";
 import { deleteAvatarImage, saveAvatarImage } from "../utils/avatarImage.js";
 import {
   createEmployeeSchema,
@@ -32,6 +33,15 @@ export const create = async (req, res, next) => {
       name: String(name).trim(),
       email: String(email).trim(),
       password,
+    });
+
+    emitTransaction({
+      action: "create",
+      entity: "employee",
+      actor: req.user,
+      message: `Added employee ${employee?.name ?? email}.`,
+      metadata: { userId: employee?.user_id ?? employee?.id ?? null, email },
+      adminOnly: true,
     });
 
     return res
@@ -73,6 +83,17 @@ export const updateStatus = async (req, res, next) => {
     if (!employee)
       throw ApiError.notFound("Employee not found", "EMPLOYEE_NOT_FOUND");
 
+    emitTransaction({
+      action: "status",
+      entity: "employee",
+      actor: req.user,
+      message: `Employee ${employee?.name ?? id} marked as ${status}.`,
+      metadata: { userId: id, status },
+      notifyUserIds: [id],
+      adminOnly: false,
+    });
+    if (status !== "active") emitForceLogout(id, `Your account was marked as ${status}.`);
+
     return res
       .status(200)
       .json({ employee, message: `Employee marked as ${status}.` });
@@ -102,6 +123,16 @@ export const remove = async (req, res, next) => {
     const employee = await Employee.removeEmployee(id);
     if (!employee)
       throw ApiError.notFound("Employee not found", "EMPLOYEE_NOT_FOUND");
+
+    emitTransaction({
+      action: "delete",
+      entity: "employee",
+      actor: req.user,
+      message: `Removed employee ${employee?.name ?? id}.`,
+      metadata: { userId: id },
+      adminOnly: true,
+    });
+    emitForceLogout(id, "Your account was removed by an administrator.");
 
     return res
       .status(200)
@@ -149,6 +180,16 @@ export const updateAvatar = async (req, res, next) => {
     }
 
     committed = true;
+
+    emitTransaction({
+      action: "update",
+      entity: "employee",
+      actor: req.user,
+      message: `Updated photo for employee ${updated?.name ?? employee.user_id}.`,
+      metadata: { userId: employee.user_id },
+      notifyUserIds: [employee.user_id],
+      adminOnly: true,
+    });
 
     return res.status(200).json({
       employee: updated,

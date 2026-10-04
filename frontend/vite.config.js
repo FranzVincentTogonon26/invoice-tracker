@@ -23,6 +23,16 @@ export default defineConfig({
         target: "http://localhost:8000",
         changeOrigin: true,
       },
+      // Same-origin socket path: lib/socket.js defaults to
+      // `window.location.origin` when VITE_SOCKET_URL is unset, so the
+      // websocket handshake rides this proxy in dev instead of bypassing it
+      // with a hardcoded :8000 URL (fewer CORS moving parts, and production
+      // same-origin deploys work with no extra env).
+      "/socket.io": {
+        target: "http://localhost:8000",
+        changeOrigin: true,
+        ws: true,
+      },
     },
   },
 });

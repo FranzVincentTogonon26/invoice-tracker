@@ -51,7 +51,8 @@ class Abono {
     const result = await query(
       `SELECT ${ABONO_COLUMNS},
               u.name AS employee_name,
-              u.email AS employee_email
+              u.email AS employee_email,
+              u.avatar_url AS employee_avatar
          FROM employee_abono ea
          LEFT JOIN budget_reference br ON br.reference_id = ea.reference_id
          LEFT JOIN users u ON u.user_id = ea.user_id

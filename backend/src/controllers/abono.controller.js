@@ -1,6 +1,7 @@
 import Abono from "../models/abono.model.js";
 import ApiError from "../utils/ApiError.js";
 import { validate } from "../utils/validate.js";
+import { emitTransaction } from "../realtime/index.js";
 import {
   createAbonoSchema,
   settleAbonoSchema,
@@ -33,6 +34,12 @@ export const abono = async (req, res, next) => {
         req.user.id,
       );
       return res.status(200).json({ abono: rows, overview });
+    }
+
+    // Deny by default: only admins get the full list — any other
+    // (current or future) role must not inherit it silently.
+    if (req.user.role !== "admin") {
+      throw ApiError.forbidden("Admin access required.", "ADMIN_ACCESS_REQUIRED");
     }
 
     const rows = await Abono.listAll(req.query);
@@ -91,6 +98,14 @@ export const create = async (req, res, next) => {
       amount: payload.amount,
       description: payload.description,
     });
+    emitTransaction({
+      action: "create",
+      entity: "abono",
+      actor: req.user,
+      message: `${req.user.name ?? "Employee"} recorded abono "${payload.description}" (${payload.amount}).`,
+      metadata: { amount: payload.amount, userId: req.user.id, reference_id: referenceId, abonoId: abono?.id ?? null },
+      notifyUserIds: [req.user.id],
+    });
     return res.status(201).json({ abono, message: "Abono added." });
   } catch (err) {
     next(err);
@@ -117,6 +132,15 @@ export const updateDescription = async (req, res, next) => {
     const abono = await Abono.updateDescription(id, payload.description);
     if (!abono)
       throw ApiError.notFound("Abono not found", "ABONO_NOT_FOUND");
+
+    emitTransaction({
+      action: "update",
+      entity: "abono",
+      actor: req.user,
+      message: `Updated abono description (${id}).`,
+      metadata: { id, userId: abono.user_id ?? existing?.user_id ?? null },
+      notifyUserIds: (abono.user_id ?? existing?.user_id) ? [abono.user_id ?? existing.user_id] : [],
+    });
 
     return res.status(200).json({ abono, message: "Description updated." });
   } catch (err) {
@@ -158,6 +182,15 @@ export const removeAbono = async (req, res, next) => {
     if (!abono)
       throw ApiError.notFound("Abono not found", "ABONO_NOT_FOUND");
 
+    emitTransaction({
+      action: "delete",
+      entity: "abono",
+      actor: req.user,
+      message: `Deleted abono "${abono.description ?? id}" (${abono.amount ?? "?"}).`,
+      metadata: { id, amount: abono.amount ?? null, userId: abono.user_id ?? existing?.user_id ?? null },
+      notifyUserIds: (abono.user_id ?? existing?.user_id) ? [abono.user_id ?? existing.user_id] : [],
+    });
+
     return res.status(200).json({ abono, message: "Abono deleted." });
   } catch (err) {
     next(err);
@@ -190,6 +223,15 @@ export const settleAbono = async (req, res, next) => {
         "NOTHING_TO_SETTLE",
       );
     }
+
+    emitTransaction({
+      action: "settle",
+      entity: "abono",
+      actor: req.user,
+      message: `${req.user.name ?? "Employee"} settled ${settled.length} abono (${requested ?? ""}).`,
+      metadata: { count: settled.length, amount: requested ?? null, userId: req.user.id, ids: settled.map((r) => r.id ?? null).filter(Boolean) },
+      notifyUserIds: [req.user.id],
+    });
 
     return res.status(200).json({
       settled,

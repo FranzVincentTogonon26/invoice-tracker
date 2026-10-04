@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useId, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { AnimatePresence, motion } from "framer-motion";
-import { Ban, CircleAlert, EllipsisVertical, Flag, Loader2, RefreshCcw } from "lucide-react";
+import { Ban, CircleAlert, EllipsisVertical, Flag, Loader2, RefreshCcw, Trash2 } from "lucide-react";
 import { cn, formatMoney } from "../../../../lib/utils";
 import { USER_ROLES } from "../../../../constants";
 import { Button } from "../../../ui/Button";
@@ -64,10 +64,16 @@ function DialogShell({
 /**
  * Row-level actions for the Budget Transaction table. The trigger follows the
  * transaction status:
- *   - 'cancelled' → a "Restore" pill that calls `onAction("restore", …)`.
+ *   - 'cancelled' → a "Restore" pill that calls `onAction("restore", …)`,
+ *                   plus a danger-toned "Delete record" trigger (separated
+ *                   in the menu) that opens a second confirmation dialog;
+ *                   confirming calls `onAction("delete", transaction)` for a
+ *                   permanent hard delete (admin-only, enforced server-side).
  *   - 'added'     → a "Cancel" pill (disabled for non-admins) that opens the
  *                   cancel dialog — or the "Invalid request" dialog when the
- *                   amount exceeds the remaining budget.
+ *                   amount exceeds the row's remaining figure (`valueRemaining`
+ *                   vs its `remainingLabel`, e.g. the source's remaining
+ *                   budget).
  *   - any other status → a non-interactive "Closed" chip.
  *
  * `variant="menu"` (used by the desktop `TransactionRow`) swaps the pills for
@@ -78,14 +84,19 @@ function DialogShell({
  */
 export function TransactionActions({
   transaction,
-  role = USER_ROLES.ADMIN,
+  // No default: callers must pass the verified role explicitly. Defaulting
+  // to ADMIN here would fail open (cancel affordances on) whenever the
+  // caller renders without a session.
+  role,
   onAction,
   className,
   valueRemaining,
+  remainingLabel = "remaining budget",
   pending = false,
   variant = "inline",
 }) {
   const [open, setOpen] = useState(false);
+  const [deleteOpen, setDeleteOpen] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
   const [position, setPosition] = useState(null);
   const triggerRef = useRef(null);
@@ -93,6 +104,8 @@ export function TransactionActions({
   const initialFocusRef = useRef(null);
   const titleId = useId();
   const descriptionId = useId();
+  const deleteTitleId = useId();
+  const deleteDescriptionId = useId();
 
   const canCancel = canCancelTransaction(transaction.status, role);
 
@@ -107,21 +120,29 @@ export function TransactionActions({
     triggerRef.current?.focus();
   }, [pending]);
 
-  useEffect(() => {
-    if (open) initialFocusRef.current?.focus();
-  }, [open]);
+  const closeDeleteDialog = useCallback(() => {
+    // Same no-dismiss-while-pending rule as the cancel dialog.
+    if (pending) return;
+    setDeleteOpen(false);
+    triggerRef.current?.focus();
+  }, [pending]);
 
   useEffect(() => {
-    if (!open) return undefined;
+    if (open || deleteOpen) initialFocusRef.current?.focus();
+  }, [open, deleteOpen]);
+
+  useEffect(() => {
+    if (!open && !deleteOpen) return undefined;
     const onKeyDown = (e) => {
       if (e.key === "Escape") {
         e.stopPropagation();
-        closeDialog();
+        if (deleteOpen) closeDeleteDialog();
+        else closeDialog();
       }
     };
     window.addEventListener("keydown", onKeyDown, true);
     return () => window.removeEventListener("keydown", onKeyDown, true);
-  }, [open, closeDialog]);
+  }, [open, deleteOpen, closeDialog, closeDeleteDialog]);
 
   // Kebab menu (variant="menu"): close on outside pointerdown, Escape, scroll
   // or resize, then hand focus back to the trigger — mirrors the behaviour of
@@ -187,6 +208,14 @@ export function TransactionActions({
     triggerRef.current?.focus();
   };
 
+  const confirmDelete = () => {
+    if (pending) return;
+    setDeleteOpen(false);
+    onAction?.("delete", transaction);
+    // Hand focus back to the trigger so keyboard users don't land on <body>.
+    triggerRef.current?.focus();
+  };
+
   const openMenu = () => {
     const rect = triggerRef.current?.getBoundingClientRect();
     if (rect)
@@ -240,21 +269,43 @@ export function TransactionActions({
                   className="fixed z-[70] min-w-[11rem] overflow-hidden rounded-2xl border border-[var(--border)] bg-[var(--surface)] py-1 shadow-hover"
                 >
                   {transaction.status === "cancelled" ? (
-                    <button
-                      type="button"
-                      role="menuitem"
-                      disabled={pending}
-                      onClick={() => {
-                        setMenuOpen(false);
-                        // Same path as the inline "Restore" pill:
-                        // onAction("restore", transaction) + focus hand-back.
-                        confirmRestore();
-                      }}
-                      className="flex w-full items-center gap-2.5 px-3.5 py-2 text-sm font-medium text-[var(--ink)] transition-colors hover:bg-[var(--surface-2)] disabled:pointer-events-none disabled:opacity-40"
-                    >
-                      <RefreshCcw size={15} aria-hidden />
-                      Restore transaction
-                    </button>
+                    <>
+                      <button
+                        type="button"
+                        role="menuitem"
+                        disabled={pending}
+                        onClick={() => {
+                          setMenuOpen(false);
+                          // Same path as the inline "Restore" pill:
+                          // onAction("restore", transaction) + focus hand-back.
+                          confirmRestore();
+                        }}
+                        className="flex w-full items-center gap-2.5 px-3.5 py-2 text-sm font-medium text-[var(--ink)] transition-colors hover:bg-[var(--surface-2)] disabled:pointer-events-none disabled:opacity-40"
+                      >
+                        <RefreshCcw size={15} aria-hidden />
+                        Restore transaction
+                      </button>
+                      <div
+                        role="separator"
+                        aria-hidden
+                        className="my-1 border-t border-[var(--border)]"
+                      />
+                      <button
+                        type="button"
+                        role="menuitem"
+                        disabled={pending}
+                        onClick={() => {
+                          setMenuOpen(false);
+                          // Opens the delete-confirm dialog; confirming calls
+                          // onAction("delete", transaction).
+                          setDeleteOpen(true);
+                        }}
+                        className="flex w-full items-center gap-2.5 px-3.5 py-2 text-sm font-medium text-[var(--danger)] transition-colors hover:bg-[var(--danger)]/10 disabled:pointer-events-none disabled:opacity-40"
+                      >
+                        <Trash2 size={15} aria-hidden />
+                        Delete record
+                      </button>
+                    </>
                   ) : (
                     <button
                       type="button"
@@ -281,19 +332,31 @@ export function TransactionActions({
           closedChip
         )
       ) : transaction.status === "cancelled" ? (
-        <button
-          ref={triggerRef}
-          type="button"
-          onClick={confirmRestore}
-          className={cn(
-            "inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-sm font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--danger)]/30",
-            "text-[var(--ink-muted)] hover:bg-[var(--ink)]/14 hover:text-[var(--ink)]",
-            className,
-          )}
-        >
-          <RefreshCcw size={13} strokeWidth={2.5} aria-hidden />
-          Restore
-        </button>
+        <span className="inline-flex items-center gap-1">
+          <button
+            ref={triggerRef}
+            type="button"
+            onClick={confirmRestore}
+            className={cn(
+              "inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-sm font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--danger)]/30",
+              "text-[var(--ink-muted)] hover:bg-[var(--ink)]/14 hover:text-[var(--ink)]",
+              className,
+            )}
+          >
+            <RefreshCcw size={13} strokeWidth={2.5} aria-hidden />
+            Restore
+          </button>
+          <button
+            type="button"
+            onClick={() => setDeleteOpen(true)}
+            aria-haspopup="dialog"
+            aria-expanded={deleteOpen}
+            className="inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-sm font-semibold text-[var(--ink-muted)] transition-colors hover:bg-[var(--danger)]/10 hover:text-[var(--danger)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--danger)]/30"
+          >
+            <Trash2 size={13} strokeWidth={2.5} aria-hidden />
+            Delete
+          </button>
+        </span>
       ) : transaction.status === "added" ? (
         <button
           ref={triggerRef}
@@ -343,7 +406,7 @@ export function TransactionActions({
                   <span className="font-semibold text-[var(--ink)] tabular-nums">
                     {formatMoney(amount)}
                   </span>{" "}
-                  is greater than the remaining budget{" "}
+                  is greater than the {remainingLabel}{" "}
                   <span className="font-semibold text-[var(--ink)] tabular-nums">
                     {formatMoney(remaining)}
                   </span>
@@ -406,28 +469,97 @@ export function TransactionActions({
                   </span>
                 </div>
 
-                <div className="mt-5 flex items-center justify-end gap-2">
-                  <Button
-                    variant="outline"
-                    onClick={closeDialog}
-                    disabled={pending}
-                  >
-                    Keep transaction
-                  </Button>
-                  <Button
-                    ref={initialFocusRef}
-                    variant="danger"
-                    onClick={confirmCancel}
-                    disabled={pending}
-                  >
-                    {pending && (
-                      <Loader2 size={13} className="animate-spin" aria-hidden />
-                    )}
-                    {pending ? "Cancelling…" : "Yes, cancel it"}
-                  </Button>
+              <div className="mt-5 flex items-center justify-end gap-2">
+                <Button
+                  variant="outline"
+                  onClick={closeDialog}
+                  disabled={pending}
+                >
+                  Keep transaction
+                </Button>
+                <Button
+                  ref={initialFocusRef}
+                  variant="danger"
+                  onClick={confirmCancel}
+                  disabled={pending}
+                >
+                  {pending && (
+                    <Loader2 size={13} className="animate-spin" aria-hidden />
+                  )}
+                  {pending ? "Cancelling…" : "Yes, cancel it"}
+                </Button>
+              </div>
+            </DialogShell>
+          ))}
+          {deleteOpen && (
+            <DialogShell
+              key="delete-confirm"
+              titleId={deleteTitleId}
+              descriptionId={deleteDescriptionId}
+              pending={pending}
+              onClose={closeDeleteDialog}
+              onKeyDown={handleDialogKeyDown}
+            >
+              <DialogIcon>
+                <Trash2 size={20} aria-hidden />
+              </DialogIcon>
+              <h2
+                id={deleteTitleId}
+                className="mt-4 font-display text-lg font-semibold tracking-tight text-[var(--ink)]"
+              >
+                Delete this transaction record?
+              </h2>
+              <p
+                id={deleteDescriptionId}
+                className="mt-1.5 text-sm leading-relaxed text-[var(--ink-muted)]"
+              >
+                This permanently removes the transaction record and{" "}
+                <span className="font-semibold text-[var(--danger)]">
+                  can&apos;t be undone
+                </span>
+                . Only cancelled transactions can be deleted.
+              </p>
+
+              {/* Record summary strip so admins confirm exactly what
+                  they're destroying. */}
+              <div className="mt-4 flex items-center gap-3 rounded-2xl border border-[var(--border)] bg-[var(--surface-2)]/60 px-4 py-3">
+                <div className="min-w-0 flex-1">
+                  <p className="truncate text-base font-semibold text-[var(--ink)]">
+                    {transaction.description || "Budget transaction"}
+                  </p>
+                  <p className="mt-0.5 truncate text-sm text-[var(--ink-muted)]">
+                    {[transaction.label, transaction.approved_by]
+                      .filter(Boolean)
+                      .join(" · ")}
+                  </p>
                 </div>
-              </DialogShell>
-            ))}
+                <span className="shrink-0 text-sm font-semibold text-[var(--ink)] tabular-nums">
+                  {formatMoney(amount)}
+                </span>
+              </div>
+
+              <div className="mt-5 flex items-center justify-end gap-2">
+                <Button
+                  variant="outline"
+                  onClick={closeDeleteDialog}
+                  disabled={pending}
+                >
+                  Keep record
+                </Button>
+                <Button
+                  ref={initialFocusRef}
+                  variant="danger"
+                  onClick={confirmDelete}
+                  disabled={pending}
+                >
+                  {pending && (
+                    <Loader2 size={13} className="animate-spin" aria-hidden />
+                  )}
+                  {pending ? "Deleting…" : "Yes, delete it"}
+                </Button>
+              </div>
+            </DialogShell>
+          )}
         </AnimatePresence>,
         document.body,
       )}

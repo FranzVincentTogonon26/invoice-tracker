@@ -61,6 +61,11 @@ export function useBudgetMutations() {
       mutationFn: budgetsApi.cancelTransaction,
       onSuccess: invalidate,
     }),
+    // Permanently deletes a cancelled budget transaction (hard delete)
+    removeTransaction: useMutation({
+      mutationFn: budgetsApi.removeTransaction,
+      onSuccess: invalidate,
+    }),
     // Undo a cancellation — restores the transaction's previous status
     restoreTransaction: useMutation({
       mutationFn: ({ id, status }) => budgetsApi.restoreTransaction(id, status),
@@ -75,6 +80,11 @@ export function useBudgetMutations() {
     restoreIssuedTransaction: useMutation({
       mutationFn: ({ id, status }) =>
         budgetsApi.restoreIssuedTransaction(id, status),
+      onSuccess: invalidate,
+    }),
+    // Permanently deletes a cancelled issued budget transaction (hard delete)
+    removeIssuedTransaction: useMutation({
+      mutationFn: budgetsApi.removeIssuedTransaction,
       onSuccess: invalidate,
     }),
   };

@@ -2,10 +2,21 @@ import express from "express";
 import authMiddleware from "../middleware/auth.middleware.js";
 import requireAdminAccess from "../middleware/admin.middleware.js";
 import requireEmployeeAccess from "../middleware/employee.middleware.js";
+import { rateLimit, userKey } from "../middleware/rateLimit.js";
 import { uploadReceiptBatch } from "../middleware/upload.js";
 import * as expensesController from "../controllers/expenses.controller.js";
 
 const router = express.Router();
+
+// File writes per user per hour: receipts are 10MB × 10 files max per call,
+// so an unbounded caller fills the disk. Legitimate saves stay far under it.
+const receiptUploadLimiter = rateLimit({
+  windowMs: 60 * 60 * 1000,
+  max: 60,
+  key: userKey("receipt-upload"),
+  message: "Too many uploads. Please try again later.",
+  code: "UPLOAD_RATE_LIMITED",
+});
 
 // Protected Routes
 
@@ -28,11 +39,14 @@ router.post("/", authMiddleware, expensesController.create);
 router.post(
   "/receipt-images",
   authMiddleware,
+  receiptUploadLimiter,
   uploadReceiptBatch,
   expensesController.uploadReceiptImages,
 );
 
 // Declared before "/:id" so the literal "category" segment wins the match.
+// Category deletion is open to any active user (admin or employee), same as
+// creation — authMiddleware still guarantees the caller exists and is active.
 router.delete(
   "/category/:id",
   authMiddleware,

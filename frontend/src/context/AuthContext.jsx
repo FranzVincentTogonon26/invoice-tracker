@@ -7,6 +7,7 @@ import {
 } from "react";
 
 import { authApi, clearToken, getToken, setToken } from "../api/auth";
+import { connectSocket, disconnectSocket } from "../lib/socket";
 
 const AuthContext = createContext(null);
 
@@ -17,6 +18,11 @@ export function AuthProvider({ children }) {
   const clearAuth = useCallback(() => {
     clearToken();
     setUser(null);
+    try {
+      disconnectSocket();
+    } catch {
+      // best-effort
+    }
   }, []);
 
   // Restores the session from a stored token (e.g. after a browser refresh)
@@ -31,6 +37,13 @@ export function AuthProvider({ children }) {
     try {
       const { user } = await authApi.me();
       setUser(user);
+      // Session restored (e.g. page refresh) — (re)open the realtime channel
+      // with the stored token so the ledger is live immediately.
+      try {
+        connectSocket();
+      } catch {
+        // socket failure must never break session restore
+      }
       return user;
     } catch (err) {
       // Only a definitive auth rejection invalidates the session. Server
@@ -55,10 +68,20 @@ export function AuthProvider({ children }) {
       await refresh();
     })();
 
+    // Socket transport rejected the token (expired / deactivated mid-session):
+    // mirror the HTTP 401 path — drop the session so a dead credential can't
+    // linger in storage while the realtime channel is already cut.
+    const onSocketAuthFailed = () => {
+      if (cancelled) return;
+      clearAuth();
+    };
+    window.addEventListener("socket:auth-failed", onSocketAuthFailed);
+
     return () => {
       cancelled = true;
+      window.removeEventListener("socket:auth-failed", onSocketAuthFailed);
     };
-  }, [refresh]);
+  }, [refresh, clearAuth]);
 
   const handleAuth = useCallback(({ user, token }) => {
     if (!token) {
@@ -66,6 +89,13 @@ export function AuthProvider({ children }) {
     }
     setToken(token);
     setUser(user);
+    // Fresh token — (re)connect the realtime channel with it. The socket
+    // singleton refreshes `auth` from storage on every (re)connect.
+    try {
+      connectSocket();
+    } catch {
+      // socket failure must never break login
+    }
   }, []);
 
   const login = useCallback(

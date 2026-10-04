@@ -52,11 +52,32 @@ router.patch(
   requireAdminAccess,
   budgetController.restoreIssuedTransaction,
 );
+// Permanently deletes a cancelled issued budget transaction (hard delete of
+// the row, parent pruned when childless). Admin-only at the route layer via
+// `requireAdminAccess` (auth + role re-checked from the token, so a forged
+// client or non-admin caller is rejected before the handler runs); the model
+// additionally refuses live rows and rows with linked expenses (409).
+router.delete(
+  "/issued_transaction/:id",
+  authMiddleware,
+  requireAdminAccess,
+  budgetController.removeIssuedTransaction,
+);
 router.patch(
   "/:id/cancel",
   authMiddleware,
   requireAdminAccess,
   budgetController.cancelBudget,
+);
+// Permanently deletes a cancelled budget transaction (hard delete of the
+// row). Admin-only at the route layer via `requireAdminAccess` (auth + role
+// re-checked from the token); the model additionally refuses live rows
+// (two-segment path, so it never collides with `/:referenceId` below).
+router.delete(
+  "/transaction/:id",
+  authMiddleware,
+  requireAdminAccess,
+  budgetController.removeTransaction,
 );
 // Undo a cancellation — restores the transaction's previous status.
 router.patch(

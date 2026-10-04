@@ -87,8 +87,11 @@ const BudgetIssuedTransaction = () => {
     search: debouncedSearch.trim() || undefined,
   });
 
-  const { cancelIssuedTransaction, restoreIssuedTransaction } =
-    useBudgetMutations();
+  const {
+    cancelIssuedTransaction,
+    restoreIssuedTransaction,
+    removeIssuedTransaction,
+  } = useBudgetMutations();
 
   const handleAction = async (action, transaction) => {
     if (action === "restore") {
@@ -100,6 +103,15 @@ const BudgetIssuedTransaction = () => {
         toast.success("Budget issuance restored");
       } catch (err) {
         toast.error(err?.message || "Couldn't restore budget issuance");
+      }
+      return;
+    }
+    if (action === "delete") {
+      try {
+        await removeIssuedTransaction.mutateAsync(transaction.id);
+        toast.success("Issued record deleted");
+      } catch (err) {
+        toast.error(err?.message || "Couldn't delete issued record");
       }
       return;
     }
@@ -118,15 +130,19 @@ const BudgetIssuedTransaction = () => {
   // ── Dropdown options (derived client-side from the loaded rows) ─────────
 
   const employeeOptions = useMemo(() => {
-    const names = [];
+    const seen = new Map();
     for (const r of rows) {
-      if (r.employee && !names.includes(r.employee)) names.push(r.employee);
+      if (!r.employee || seen.has(r.employee)) continue;
+      seen.set(r.employee, {
+        value: r.employee,
+        label: r.employee,
+        avatar_url: r.avatar_url || "",
+        employee_role: r.employee_role || "",
+      });
     }
     return [
       { value: "all", label: "All Employee" },
-      ...names
-        .sort((a, b) => a.localeCompare(b))
-        .map((name) => ({ value: name, label: name })),
+      ...[...seen.values()].sort((a, b) => a.label.localeCompare(b.label)),
     ];
   }, [rows]);
 
