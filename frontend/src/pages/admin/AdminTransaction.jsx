@@ -50,11 +50,7 @@ import {
   LoadingSkeleton,
 } from "../../components/ui/DataState";
 import { Pager } from "../../components/ui/Pager";
-import {
-  Tabs,
-  TabsList,
-  TabsTrigger,
-} from "../../components/ui/Tabs";
+import { Tabs, TabsList, TabsTrigger } from "../../components/ui/Tabs";
 import {
   cn,
   emptyDateRange,
@@ -76,12 +72,10 @@ import TransactionDetailsModal from "../../components/layout/admin/transactions/
 import TransactionsMobileFilters from "../../components/layout/admin/transactions/TransactionsMobileFilters";
 import ConfirmActionDialog from "../../components/layout/admin/expenses/ConfirmActionDialog";
 
-// ── Animation ────────────────────────────────────────────────────────────────
 const container = {
   hidden: {},
   show: { transition: { staggerChildren: 0.07, delayChildren: 0.02 } },
 };
-
 const item = {
   hidden: { opacity: 0, y: 14 },
   show: {
@@ -90,14 +84,11 @@ const item = {
     transition: { duration: 0.45, ease: [0.16, 1, 0.3, 1] },
   },
 };
-
-// ── Constants ────────────────────────────────────────────────────────────────
-const PAGE_SIZE = 50;
+const PAGE_SIZE = 100;
 const FILTER_GAP = 8;
 const MIN_FILTER_WIDTH = 150;
 const SYSTEM_EMPLOYEE_VALUE = "__system";
 const DAY_MS = 86_400_000;
-
 const FILTER_KEYS = [
   "direction",
   "employee",
@@ -105,7 +96,6 @@ const FILTER_KEYS = [
   "category",
   "status",
 ];
-
 const TYPE_TABS = [
   { value: "all", label: "All", Icon: ClipboardList },
   { value: "budget", label: "Budget Given", Icon: Plus },
@@ -114,7 +104,6 @@ const TYPE_TABS = [
   { value: "abono", label: "Abono", Icon: Wallet },
   { value: "transfer", label: "Transfers", Icon: ArrowLeftRight },
 ];
-
 const TYPE_OPTIONS = [
   { value: "all", label: "All types" },
   { value: "budget", label: "Budget Given" },
@@ -123,15 +112,12 @@ const TYPE_OPTIONS = [
   { value: "abono", label: "Abono" },
   { value: "transfer", label: "Transfers" },
 ];
-
 const DIRECTION_OPTIONS = [
   { value: "all", label: "All flows" },
   { value: "in", label: "Money In" },
   { value: "out", label: "Money Out" },
   { value: "void", label: "No movement" },
 ];
-
-// ── Confirmation dialog copy (one entry per destructive action) ──────────────
 const CONFIRM_COPY = {
   "cancel-budget": {
     icon: <Ban size={20} aria-hidden />,
@@ -207,7 +193,6 @@ const CONFIRM_COPY = {
     pendingLabel: "Cancelling…",
   },
 };
-
 const ACTION_ERROR = {
   "cancel-budget": "Couldn't cancel budget transaction",
   "restore-budget": "Couldn't restore budget transaction",
@@ -220,20 +205,15 @@ const ACTION_ERROR = {
   "delete-abono": "Couldn't delete abono",
   "cancel-transfer": "Couldn't cancel transfer",
 };
-
-// ── Pure helpers (outside component — no closure over state) ─────────────────
 const matchesTypeTab = (row, tab) => {
   if (tab === "all") return true;
   if (tab === "transfer")
     return row.kind === "transfer_sent" || row.kind === "transfer_received";
   return row.kind === tab;
 };
-
 const rowDay = (row) => toDate(row?.date);
-
 const countDays = (start, end) =>
   Math.round((startOfDay(end) - startOfDay(start)) / DAY_MS) + 1;
-
 const shortRangeLabel = (range) => {
   if (!range?.start || !range?.end) return "";
   const crossYear = range.start.getFullYear() !== range.end.getFullYear();
@@ -245,7 +225,6 @@ const shortRangeLabel = (range) => {
     });
   return `${fmt(range.start)} – ${fmt(range.end)}`;
 };
-
 const rowsWindow = (rows) => {
   let start = null;
   let end = null;
@@ -258,16 +237,13 @@ const rowsWindow = (rows) => {
   }
   return start && end ? { start, end } : null;
 };
-
 const buildRangeSeries = (range, rows, measure) => {
   const start = range?.start ? startOfDay(range.start) : null;
   const end = range?.end ? startOfDay(range.end) : null;
   if (!start || !end || end < start) return [];
-
   const days = countDays(start, end);
   const bucketDays = days <= 14 ? 1 : Math.ceil(days / 14);
   const totals = new Array(Math.ceil(days / bucketDays)).fill(0);
-
   for (const row of rows) {
     const day = rowDay(row);
     if (!day) continue;
@@ -276,11 +252,8 @@ const buildRangeSeries = (range, rows, measure) => {
     totals[Math.floor((countDays(start, mid) - 1) / bucketDays)] +=
       measure(row);
   }
-
   return totals.map((v) => ({ v }));
 };
-
-/** Pure filter predicate — no React state dependency. */
 const matchesFilters = (row, draft, query) => {
   if (!matchesTypeTab(row, draft.type)) return false;
   if (draft.direction !== "all" && row.direction !== draft.direction)
@@ -298,7 +271,6 @@ const matchesFilters = (row, draft, query) => {
     return false;
   if (draft.status !== "all" && row.status !== draft.status) return false;
   if (!query) return true;
-
   return [
     row.description,
     row.notes,
@@ -318,14 +290,9 @@ const matchesFilters = (row, draft, query) => {
     .filter(Boolean)
     .some((v) => String(v).toLowerCase().includes(query));
 };
-
-// ── Component ────────────────────────────────────────────────────────────────
 const AdminTransaction = () => {
-  // Data
   const { data, isLoading, error, refetch } = useTransactions();
   const mutations = useTransactionsMutations();
-
-  // Filters
   const [dateRange, setDateRange] = useState(() => emptyDateRange());
   const [tab, setTab] = useState("all");
   const [search, setSearch] = useState("");
@@ -336,25 +303,17 @@ const AdminTransaction = () => {
   const [category, setCategory] = useState("all");
   const [status, setStatus] = useState("all");
   const [page, setPage] = useState(0);
-
-  // UI state
   const [filtersOpen, setFiltersOpen] = useState(false);
   const [viewRow, setViewRow] = useState(null);
   const [viewOpen, setViewOpen] = useState(false);
   const [confirmAction, setConfirmAction] = useState(null);
   const [confirmOpen, setConfirmOpen] = useState(false);
-
   const hasDateRange = Boolean(dateRange?.start && dateRange?.end);
-
-  // Search debounce
   useEffect(() => {
     const t = setTimeout(() => setDebouncedSearch(search), 300);
     return () => clearTimeout(t);
   }, [search]);
-
   const allRows = useMemo(() => data?.transactions ?? [], [data]);
-
-  // ── Filter option lists (derived from live data) ──────────────────────────
   const employeeOptions = useMemo(() => {
     const seen = new Map();
     let hasSystem = false;
@@ -378,7 +337,6 @@ const AdminTransaction = () => {
       ...[...seen.values()].sort((a, b) => a.label.localeCompare(b.label)),
     ];
   }, [allRows]);
-
   const referenceOptions = useMemo(() => {
     const seen = new Map();
     for (const row of allRows) {
@@ -394,7 +352,6 @@ const AdminTransaction = () => {
       ...[...seen.values()].sort((a, b) => a.label.localeCompare(b.label)),
     ];
   }, [allRows]);
-
   const categoryOptions = useMemo(() => {
     const seen = new Map();
     for (const row of allRows) {
@@ -409,7 +366,6 @@ const AdminTransaction = () => {
       ...[...seen.values()].sort((a, b) => a.label.localeCompare(b.label)),
     ];
   }, [allRows]);
-
   const statusOptions = useMemo(() => {
     const seen = new Map();
     for (const row of allRows) {
@@ -425,13 +381,10 @@ const AdminTransaction = () => {
       ...[...seen.values()].sort((a, b) => a.label.localeCompare(b.label)),
     ];
   }, [allRows]);
-
-  // ── Filtering ─────────────────────────────────────────────────────────────
   const draft = useMemo(
     () => ({ type: tab, direction, employee, reference, category, status }),
     [tab, direction, employee, reference, category, status],
   );
-
   const dateFilteredRows = useMemo(
     () =>
       allRows.filter((row) =>
@@ -439,15 +392,10 @@ const AdminTransaction = () => {
       ),
     [allRows, dateRange],
   );
-
   const filteredRows = useMemo(() => {
     const query = debouncedSearch.trim().toLowerCase();
     return dateFilteredRows.filter((row) => matchesFilters(row, draft, query));
   }, [dateFilteredRows, draft, debouncedSearch]);
-
-  // ── Stats rows (ignore the type tab) ────────────────────────────────────
-  // Money In / Money Out / Net Flow react to every filter EXCEPT the tab.
-  // Only the Records card (and the table) react to the tab.
   const statsDraft = useMemo(
     () => ({
       type: "all",
@@ -459,14 +407,12 @@ const AdminTransaction = () => {
     }),
     [direction, employee, reference, category, status],
   );
-
   const statsRows = useMemo(() => {
     const query = debouncedSearch.trim().toLowerCase();
     return dateFilteredRows.filter((row) =>
       matchesFilters(row, statsDraft, query),
     );
   }, [dateFilteredRows, statsDraft, debouncedSearch]);
-
   const countLedgerMatches = useCallback(
     (candidate) => {
       const query = debouncedSearch.trim().toLowerCase();
@@ -476,12 +422,6 @@ const AdminTransaction = () => {
     },
     [dateFilteredRows, debouncedSearch],
   );
-
-  // ── Aggregated totals (ignore the type tab) ─────────────────────────────
-  // Money In = Budget Given + open Abono only (transfer_received excluded).
-  // Money Out = Issued + admin Expenses only
-  // (transfer_sent + employee-authored expenses excluded — same rule as the
-  // AdminExpenses "Spent" figure: created_by_role !== "employee").
   const totals = useMemo(() => {
     let given = 0;
     let abonoIn = 0;
@@ -525,20 +465,12 @@ const AdminTransaction = () => {
       spentCount,
     };
   }, [statsRows]);
-
   const kindCounts = useMemo(() => {
     const counts = {};
     for (const row of filteredRows)
       counts[row.kind] = (counts[row.kind] ?? 0) + 1;
     return counts;
   }, [filteredRows]);
-
-  // Chart series — money charts ignore the tab, count chart follows the tab.
-  // Each money chart is windowed to the dates of the rows it actually
-  // measures, so unrelated activity (e.g. expenses months apart) can't
-  // stretch the range flat with empty buckets.
-  // Money In chart = Budget Given + open Abono only (transfer_received excluded).
-  // Money Out chart = Issued + admin Expenses only (transfer_sent + employee expenses excluded).
   const recordWindow = useMemo(() => rowsWindow(filteredRows), [filteredRows]);
   const inRows = useMemo(
     () =>
@@ -571,14 +503,10 @@ const AdminTransaction = () => {
     () => buildRangeSeries(recordWindow, filteredRows, () => 1),
     [recordWindow, filteredRows],
   );
-
   const rangeLabel = shortRangeLabel(dateRange);
-
-  // ── Desktop filter slider ─────────────────────────────────────────────────
   const filtersRef = useRef(null);
   const [filtersWidth, setFiltersWidth] = useState(0);
   const [slideIndex, setSlideIndex] = useState(0);
-
   useLayoutEffect(() => {
     const el = filtersRef.current;
     if (!el) return undefined;
@@ -598,7 +526,6 @@ const AdminTransaction = () => {
       obs?.disconnect();
     };
   }, []);
-
   const filterCapacity = useMemo(() => {
     if (filtersWidth <= 0) return FILTER_KEYS.length;
     return Math.min(
@@ -611,7 +538,6 @@ const AdminTransaction = () => {
       ),
     );
   }, [filtersWidth]);
-
   const filterItemWidth = useMemo(
     () =>
       filtersWidth <= 0
@@ -619,13 +545,10 @@ const AdminTransaction = () => {
         : (filtersWidth - FILTER_GAP * (filterCapacity - 1)) / filterCapacity,
     [filtersWidth, filterCapacity],
   );
-
   const slideMax = FILTER_KEYS.length - filterCapacity;
   const slideAt = Math.min(Math.max(slideIndex, 0), Math.max(slideMax, 0));
   const trackOffset = slideAt * (filterItemWidth + FILTER_GAP);
   const showSlider = slideMax > 0;
-
-  // ── Pagination ────────────────────────────────────────────────────────────
   const pageCount = Math.max(1, Math.ceil(filteredRows.length / PAGE_SIZE));
   const currentPage = Math.min(page, pageCount - 1);
   const pageRows = useMemo(
@@ -639,8 +562,6 @@ const AdminTransaction = () => {
   const rangeStart =
     filteredRows.length === 0 ? 0 : currentPage * PAGE_SIZE + 1;
   const rangeEnd = Math.min(filteredRows.length, (currentPage + 1) * PAGE_SIZE);
-
-  // ── Active filter helpers ─────────────────────────────────────────────────
   const hasActiveFilters =
     hasDateRange ||
     tab !== "all" ||
@@ -650,7 +571,6 @@ const AdminTransaction = () => {
     category !== "all" ||
     status !== "all" ||
     search.trim().length > 0;
-
   const clearFilters = () => {
     setDateRange(emptyDateRange());
     setTab("all");
@@ -662,8 +582,6 @@ const AdminTransaction = () => {
     setSearch("");
     setPage(0);
   };
-
-  // ── Mutation pending state ────────────────────────────────────────────────
   const confirmPending =
     mutations.cancelBudget.isPending ||
     mutations.restoreBudget.isPending ||
@@ -675,15 +593,12 @@ const AdminTransaction = () => {
     mutations.cancelExpense.isPending ||
     mutations.removeAbono.isPending ||
     mutations.cancelTransfer.isPending;
-
-  // ── Row actions ───────────────────────────────────────────────────────────
   const handleAction = async (action, row) => {
     if (action === "view") {
       setViewRow(row);
       setViewOpen(true);
       return;
     }
-    // One-click restores (no confirm dialog)
     if (action === "restore-budget") {
       try {
         await mutations.restoreBudget.mutateAsync({
@@ -708,15 +623,12 @@ const AdminTransaction = () => {
       }
       return;
     }
-    // Everything else opens the confirm dialog
     setConfirmAction({ row, action });
     setConfirmOpen(true);
   };
-
   const closeConfirm = () => {
     if (!confirmPending) setConfirmOpen(false);
   };
-
   const runConfirmedAction = async () => {
     if (!confirmAction) return;
     const { action, row } = confirmAction;
@@ -754,11 +666,8 @@ const AdminTransaction = () => {
       toast.error(err?.message || ACTION_ERROR[action] || "Couldn't proceed");
     }
   };
-
-  // ── Derived UI values ─────────────────────────────────────────────────────
   const confirmCopy =
     CONFIRM_COPY[confirmAction?.action] ?? CONFIRM_COPY["delete-expense"];
-
   const confirmSummary = confirmAction ? (
     <div className="mt-4 flex items-center gap-3 rounded-2xl border border-[var(--border)] bg-[var(--surface-2)]/60 px-4 py-3">
       <div className="min-w-0 flex-1">
@@ -775,8 +684,6 @@ const AdminTransaction = () => {
       </span>
     </div>
   ) : null;
-
-  // Filter labels for mobile chips
   const filterLabels = {
     direction: DIRECTION_OPTIONS.find((o) => o.value === direction)?.label,
     employee: employeeOptions.find((o) => o.value === employee)?.label,
@@ -784,7 +691,6 @@ const AdminTransaction = () => {
     category: categoryOptions.find((o) => o.value === category)?.label,
     status: statusOptions.find((o) => o.value === status)?.label,
   };
-
   const mobileFilterChips = useMemo(() => {
     const chips = [];
     if (tab !== "all") {
@@ -837,9 +743,7 @@ const AdminTransaction = () => {
       chips.push({ key, label: filterLabels[key] ?? key, onClear });
     }
     return chips;
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [tab, direction, employee, reference, category, status]);
-
   const applyMobileFilters = (next) => {
     setTab(next.type);
     setDirection(next.direction);
@@ -849,7 +753,6 @@ const AdminTransaction = () => {
     setStatus(next.status);
     setPage(0);
   };
-
   const renderFilter = (key) => {
     const shared = { portal: true };
     switch (key) {
@@ -924,15 +827,12 @@ const AdminTransaction = () => {
         return null;
     }
   };
-
   const mobileFiltersLabel =
     mobileFilterChips.length > 0
       ? `Filter ledger — ${mobileFilterChips.length} ${
           mobileFilterChips.length === 1 ? "filter" : "filters"
         } active`
       : "Filter ledger";
-
-  // ── Search + date picker bar ──────────────────────────────────────────────
   const searchField = (
     <div className="flex w-full items-center gap-2">
       <SearchInput
@@ -961,7 +861,6 @@ const AdminTransaction = () => {
           ) : null
         }
       />
-
       <DateRangePicker
         value={dateRange}
         onChange={(r) => {
@@ -974,16 +873,12 @@ const AdminTransaction = () => {
       />
     </div>
   );
-
-  // ── Render ────────────────────────────────────────────────────────────────
   return (
     <div className="space-y-5 pb-2">
       <PageHeader
         title="Transactions"
         description="All budget, expense, abono and transfer activity in one ledger."
       />
-
-      {/* ── Stat cards ─────────────────────────────────────────────────────── */}
       <section aria-label="Transactions overview">
         <motion.div
           variants={container}
@@ -991,7 +886,6 @@ const AdminTransaction = () => {
           animate="show"
           className="grid grid-cols-1 items-stretch gap-3 sm:grid-cols-2 sm:gap-4 xl:grid-cols-3"
         >
-          {/* Money In */}
           <motion.div variants={item} className="min-w-0 [&>div]:h-full">
             <StatCard
               label="Money In"
@@ -1006,19 +900,21 @@ const AdminTransaction = () => {
                   key: "given",
                   label: "Budget Given",
                   value: formatMoney(totals.given),
-                  hint: `${totals.givenSources} ${totals.givenSources === 1 ? "source" : "sources"}`,
+                  hint: `${totals.givenSources} ${
+                    totals.givenSources === 1 ? "source" : "sources"
+                  }`,
                 },
                 {
                   key: "abono",
                   label: "Abono",
                   value: formatMoney(totals.abonoIn),
-                  hint: `${totals.abonoCount} ${totals.abonoCount === 1 ? "abono" : "abonos"}`,
+                  hint: `${totals.abonoCount} ${
+                    totals.abonoCount === 1 ? "abono" : "abonos"
+                  }`,
                 },
               ]}
             />
           </motion.div>
-
-          {/* Money Out */}
           <motion.div variants={item} className="min-w-0 [&>div]:h-full">
             <StatCard
               label="Money Out"
@@ -1039,13 +935,13 @@ const AdminTransaction = () => {
                   key: "spent",
                   label: "Expenses",
                   value: formatMoney(totals.spent),
-                  hint: `${totals.spentCount} ${totals.spentCount === 1 ? "expense" : "expenses"}`,
+                  hint: `${totals.spentCount} ${
+                    totals.spentCount === 1 ? "expense" : "expenses"
+                  }`,
                 },
               ]}
             />
           </motion.div>
-
-          {/* Records — full-width strip on tablet, third column on desktop */}
           <motion.div
             variants={item}
             className="min-w-0 sm:col-span-2 xl:col-span-1 [&>div]:h-full"
@@ -1060,7 +956,7 @@ const AdminTransaction = () => {
               stats={[
                 {
                   key: "given-count",
-                  label: "Given",
+                  label: "Budget Added",
                   value: kindCounts.budget ?? 0,
                 },
                 {
@@ -1080,8 +976,6 @@ const AdminTransaction = () => {
           </motion.div>
         </motion.div>
       </section>
-
-      {/* ── Ledger table ───────────────────────────────────────────────────── */}
       <Card padding="lg" radius="lg" className="relative overflow-visible">
         <CardHeader className="mb-3">
           <div className="min-w-0">
@@ -1107,7 +1001,6 @@ const AdminTransaction = () => {
               </span>
             </CardDescription>
           </div>
-
           {!isLoading && !error && (
             <Badge
               tone="neutral"
@@ -1118,8 +1011,6 @@ const AdminTransaction = () => {
             </Badge>
           )}
         </CardHeader>
-
-        {/* Type tabs */}
         <Tabs
           value={tab}
           onValueChange={(v) => {
@@ -1148,13 +1039,9 @@ const AdminTransaction = () => {
             </TabsList>
           </div>
         </Tabs>
-
-        {/* Toolbar */}
         <div className="mb-5 flex flex-col gap-3 lg:flex-row lg:items-center">
-          {/* Mobile: search + filter button */}
           <div className="flex items-center gap-2 lg:hidden">
             <div className="min-w-0 flex-1">{searchField}</div>
-
             <IconButton
               type="button"
               aria-label={mobileFiltersLabel}
@@ -1175,8 +1062,6 @@ const AdminTransaction = () => {
               )}
             </IconButton>
           </div>
-
-          {/* Desktop: sliding filter row */}
           <div
             role="group"
             aria-label="Transaction filters"
@@ -1193,7 +1078,6 @@ const AdminTransaction = () => {
                 <ChevronLeft size={18} aria-hidden />
               </IconButton>
             )}
-
             <div
               ref={filtersRef}
               className="relative min-w-0 flex-1 overflow-hidden"
@@ -1216,7 +1100,6 @@ const AdminTransaction = () => {
                 ))}
               </div>
             </div>
-
             {showSlider && (
               <IconButton
                 type="button"
@@ -1229,14 +1112,10 @@ const AdminTransaction = () => {
               </IconButton>
             )}
           </div>
-
-          {/* Desktop: search */}
           <div className="hidden lg:ml-auto lg:block lg:w-[600px] lg:max-w-[45%] lg:min-w-[240px]">
             {searchField}
           </div>
         </div>
-
-        {/* Mobile filter chips */}
         <FilterChips
           chips={mobileFilterChips}
           onClearAll={() => {
@@ -1249,8 +1128,6 @@ const AdminTransaction = () => {
             setPage(0);
           }}
         />
-
-        {/* Table / states */}
         {isLoading ? (
           <LoadingSkeleton rows={6} />
         ) : error ? (
@@ -1284,8 +1161,6 @@ const AdminTransaction = () => {
               pending={confirmPending}
               onAction={handleAction}
             />
-
-            {/* Pagination footer */}
             <div className="mt-5 flex flex-col gap-3 border-t border-[var(--border)] pt-4 sm:flex-row sm:items-center sm:justify-between">
               <p className="text-xs tabular-nums text-[var(--ink-muted)]">
                 Showing{" "}
@@ -1301,7 +1176,6 @@ const AdminTransaction = () => {
                   <span className="ml-1.5 opacity-60">· {rangeLabel}</span>
                 )}
               </p>
-
               {pageCount > 1 && (
                 <div className="sm:ml-auto">
                   <Pager
@@ -1315,14 +1189,11 @@ const AdminTransaction = () => {
           </>
         )}
       </Card>
-
-      {/* ── Modals ─────────────────────────────────────────────────────────── */}
       <TransactionDetailsModal
         open={viewOpen}
         row={viewRow}
         onClose={() => setViewOpen(false)}
       />
-
       <ConfirmActionDialog
         open={confirmOpen}
         icon={confirmCopy.icon}
@@ -1338,7 +1209,6 @@ const AdminTransaction = () => {
         onCancel={closeConfirm}
         onConfirm={runConfirmedAction}
       />
-
       <TransactionsMobileFilters
         open={filtersOpen}
         onClose={() => setFiltersOpen(false)}

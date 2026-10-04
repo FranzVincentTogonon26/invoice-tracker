@@ -5,11 +5,13 @@ import toast from "react-hot-toast";
 import {
   ArrowLeft,
   CalendarDays,
+  ClipboardList,
   Files,
   HandCoins,
   Loader2,
   Pencil,
   Receipt,
+  ReceiptText,
   UserX,
   Wallet,
 } from "lucide-react";
@@ -35,12 +37,14 @@ import EmployeeBudget from "./EmployeeBudget";
 import EmployeeExpenses from "./EmployeeExpenses";
 import EmployeeAbono from "./EmployeeAbono";
 
-// Tab order drives the panel slide direction.
+// Tab order drives the panel slide direction. Icons mirror the transaction-kind
+// vocabulary used across the app (issued → HandCoins, expense →
+// ReceiptText, abono → Wallet).
 const TAB_META = [
-  { value: "employee_transaction", label: "Overview" },
-  { value: "employee_budget", label: "Budget" },
-  { value: "employee_expenses", label: "Expenses" },
-  { value: "employee_abono", label: "Abono" },
+  { value: "employee_transaction", label: "Overview", Icon: ClipboardList },
+  { value: "employee_budget",      label: "Budget",   Icon: HandCoins },
+  { value: "employee_expenses",    label: "Expenses", Icon: ReceiptText },
+  { value: "employee_abono",       label: "Abono",    Icon: Wallet },
 ];
 
 // The curve the rest of the app animates with (shells, tab panels, dialogs).
@@ -367,20 +371,30 @@ export default function AdminEmployeesDetails() {
       </Card>
 
       <Tabs value={tab} onValueChange={changeTab} className="space-y-3">
-        <div className="sticky top-0 z-10 bg-[var(--bg)]/90 py-1 backdrop-blur-sm md:-mx-1 md:px-1">
-          <TabsList className="w-full max-w-full gap-1 overflow-x-auto rounded-full p-1 sm:w-auto sm:self-start">
-            {TAB_META.map(({ value, label }) => (
+        <div className="sticky top-0 z-10 bg-[var(--bg)]/90 py-2 backdrop-blur-sm md:-mx-1 md:px-1">
+          <TabsList className="scrollbar-slim w-full max-w-full gap-1 overflow-x-auto rounded-full p-1 sm:w-auto sm:self-start">
+            {TAB_META.map(({ value, label, Icon }) => (
               <TabsTrigger
                 key={value}
                 value={value}
-                className="grow justify-center px-2.5 sm:grow-0 sm:px-4"
+                className="grow px-3 sm:grow-0 sm:px-4"
               >
-                <span className="block w-full whitespace-nowrap text-center type-eyebrow">
+                <Icon
+                  size={14}
+                  aria-hidden
+                  className="hidden shrink-0 sm:block"
+                />
+                <span className="whitespace-nowrap text-xs font-semibold">
                   {label}
                 </span>
               </TabsTrigger>
             ))}
           </TabsList>
+          {/* Soft edge so content fades out beneath the frosted bar on scroll. */}
+          <span
+            aria-hidden
+            className="pointer-events-none absolute inset-x-0 top-full h-2 bg-[linear-gradient(to_bottom,var(--bg),transparent)]"
+          />
         </div>
 
         {/* Direct AnimatePresence control (not TabsContent) so the exit animation can play. */}

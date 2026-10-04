@@ -1,5 +1,6 @@
 import { motion } from "framer-motion";
 import {
+  ArrowLeftRight,
   CircleAlert,
   CircleCheck,
   CircleX,
@@ -8,6 +9,7 @@ import {
   Plus,
   ReceiptText,
   TrendingUp,
+  Users,
 } from "lucide-react";
 import { PageHeader } from "../../components/ui/PageHeader";
 
@@ -46,9 +48,9 @@ const item = {
 };
 
 const TAB_META = [
-  { value: "employee_budget", label: "Employees" },
-  { value: "budget_transaction", label: "Transactions" },
-  { value: "budget_issued_transaction", label: "Issued" },
+  { value: "employee_budget", label: "Employees", Icon: Users },
+  { value: "budget_transaction", label: "Transactions", Icon: ArrowLeftRight },
+  { value: "budget_issued_transaction", label: "Issued", Icon: HandCoins },
 ];
 
 export default function AdminBudget() {
@@ -360,22 +362,27 @@ export default function AdminBudget() {
       </section>
 
       <Tabs value={tab} onValueChange={setTab} className="space-y-4">
-        <div className="sticky top-0 z-10 bg-[var(--bg)]/90 py-1.5 backdrop-blur-sm md:-mx-1 md:px-1">
+        <div className="sticky top-0 z-10 bg-[var(--bg)]/90 py-2 backdrop-blur-sm md:-mx-1 md:px-1">
           <div className="flex flex-col gap-2.5 sm:flex-row sm:items-center sm:justify-between">
-            <TabsList className="w-full max-w-full gap-1 overflow-x-auto rounded-full p-1 sm:w-auto sm:self-start">
-              {TAB_META.map(({ value, label }) => (
+            <TabsList className="scrollbar-slim w-full max-w-full gap-1 overflow-x-auto rounded-full p-1 sm:w-auto sm:self-start">
+              {TAB_META.map(({ value, label, Icon }) => (
                 <TabsTrigger
                   key={value}
                   value={value}
-                  className="grow px-2.5 sm:grow-0 sm:px-4"
+                  className="grow px-3 sm:grow-0 sm:px-4"
                 >
-                  <span className="whitespace-nowrap type-eyebrow">
+                  <Icon
+                    size={14}
+                    aria-hidden
+                    className="hidden shrink-0 sm:block"
+                  />
+                  <span className="whitespace-nowrap text-xs font-semibold">
                     {label}
                   </span>
                 </TabsTrigger>
               ))}
             </TabsList>
-            <p className="hidden shrink-0 pl-2 text-sm text-[var(--ink-muted)] lg:block">
+            <p className="hidden shrink-0 pl-2 text-xs leading-relaxed text-[var(--ink-muted)] lg:block">
               {tab === "employee_budget" &&
                 "Click an employee to open profile."}
               {tab === "budget_transaction" && "Added + issued activity."}
@@ -383,6 +390,11 @@ export default function AdminBudget() {
                 "Every issuance handed out."}
             </p>
           </div>
+          {/* Soft edge so content fades out beneath the frosted bar on scroll. */}
+          <span
+            aria-hidden
+            className="pointer-events-none absolute inset-x-0 top-full h-2 bg-[linear-gradient(to_bottom,var(--bg),transparent)]"
+          />
         </div>
 
         <div>
