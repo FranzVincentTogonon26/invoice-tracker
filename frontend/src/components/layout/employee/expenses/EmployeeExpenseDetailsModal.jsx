@@ -194,7 +194,7 @@ const LineItemsSection = ({
             <span className="text-xs font-semibold uppercase tracking-wide text-[var(--ink)]">
               Scanned line items
             </span>
-            <span className="inline-flex items-center rounded-full bg-[var(--surface-2)] px-2 py-0.5 text-[11px] font-medium text-[var(--ink-muted)]">
+            <span className="inline-flex items-center rounded-full bg-[var(--surface-2)] px-2 py-0.5 text-[11px] font-normal text-[var(--ink-muted)]">
               {lines.length} {lines.length === 1 ? "item" : "items"}
             </span>
           </div>
@@ -457,7 +457,7 @@ const EmployeeExpenseDetailsModal = ({ open, expense, onClose }) => {
                   )}
                   <span>Receipt &amp; Items</span>
                   {receiptLines.length > 0 && (
-                    <span className="rounded-full bg-[var(--surface-2)] px-1.5 py-0.2 text-[10px] font-bold tabular-nums text-[var(--ink)]">
+                    <span className="rounded-full bg-[var(--surface-2)] px-1.5 py-0.2 text-[10px] font-normal tabular-nums text-[var(--ink)]">
                       {receiptLines.length}
                     </span>
                   )}
@@ -633,7 +633,7 @@ const EmployeeExpenseDetailsModal = ({ open, expense, onClose }) => {
                         </p>
                       </div>
                     </div>
-                    <span className="rounded-full border border-[var(--border)] bg-[var(--surface)] px-2.5 py-1 text-xs font-medium text-[var(--ink)] shadow-2xs">
+                    <span className="rounded-full border border-[var(--border)] bg-[var(--surface)] px-2.5 py-1 text-xs font-normal text-[var(--ink)] shadow-2xs">
                       View receipt →
                     </span>
                   </button>

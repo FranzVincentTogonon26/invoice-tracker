@@ -17,7 +17,6 @@ import {
   XCircle,
 } from "lucide-react";
 import { Badge, StatusBadge } from "../../../ui/Badge";
-import { MethodIcon } from "../../../ui/Select";
 import {
   cn,
   formatDate,
@@ -28,8 +27,8 @@ import {
 
 // Every kind the unified ledger carries: its badge tone, label and icon.
 export const TRANSACTION_KIND_META = {
-  budget: { tone: "accent", label: "Budget Given", Icon: Plus },
-  issued: { tone: "ink", label: "Budget Issued", Icon: HandCoins },
+  budget: { tone: "neutral", label: "Budget Given", Icon: Plus },
+  issued: { tone: "accent", label: "Budget Issued", Icon: HandCoins },
   expense: { tone: "warning", label: "Expense", Icon: ReceiptText },
   abono: { tone: "success", label: "Abono", Icon: Wallet },
   transfer_sent: {
@@ -52,9 +51,13 @@ export function TransactionKindBadge({ kind, className }) {
   };
   const { Icon } = meta;
   return (
-    <Badge tone={meta.tone} className={className} title={meta.label}>
+    <Badge
+      tone={meta.tone}
+      className={cn("max-w-full", className)}
+      title={meta.label}
+    >
       <Icon size={12} aria-hidden className="shrink-0" />
-      <span className="whitespace-nowrap">{meta.label}</span>
+      <span className="min-w-0 truncate">{meta.label}</span>
     </Badge>
   );
 }
@@ -371,6 +374,12 @@ function LedgerRow({ row, pending, onAction }) {
   const isIn = row.direction === "in";
   const isOut = row.direction === "out";
   const isVoid = row.direction === "void";
+  // Transfer legs carry system-generated memo text in `notes` — never show it
+  // inline; the counterparty line already explains the movement.
+  const showNotes =
+    Boolean(row.notes) &&
+    row.kind !== "transfer_sent" &&
+    row.kind !== "transfer_received";
 
   return (
     <tr className="group border-b border-[var(--border)] transition-colors duration-150 last:border-b-0 hover:bg-[var(--accent)]/[0.04]">
@@ -388,39 +397,45 @@ function LedgerRow({ row, pending, onAction }) {
         </p>
       </td>
 
-      {/* 2. Transaction Details */}
-      <td className="px-4 py-3.5 align-middle">
-        <div className="flex flex-wrap items-center gap-1.5">
-          <TransactionKindBadge kind={row.kind} />
+      {/* 2. Description */}
+      <td className="min-w-0 max-w-0 px-4 py-3.5 align-middle">
+        <div className="flex min-w-0 items-center gap-1.5">
           {row.flagged && (
-            <Badge tone="danger" className="gap-1 px-1.5 py-0.5 text-[10px]">
-              <Flag size={10} aria-hidden />
-              <span>Flagged</span>
-            </Badge>
+            <span
+              role="img"
+              aria-label="Flagged transaction"
+              title="Flagged"
+              className="relative flex h-5 w-5 shrink-0"
+            >
+              <span
+                aria-hidden
+                className="absolute inline-flex h-full w-full animate-ping rounded-full bg-[var(--danger)] opacity-40"
+              />
+              <Badge
+                tone="danger"
+                className="relative flex h-5 w-5 items-center justify-center rounded-full bg-[var(--danger)] p-0 text-white"
+              >
+                <Flag size={10} aria-hidden fill="currentColor" />
+              </Badge>
+            </span>
           )}
+          <p
+            title={row.description}
+            className="min-w-0 flex-1 truncate text-[13px] font-semibold leading-snug text-[var(--ink)]"
+          >
+            {row.description || "Untitled"}
+          </p>
         </div>
-        <p
-          title={row.description}
-          className="mt-2 line-clamp-2 break-words text-[13px] font-semibold leading-snug text-[var(--ink)]"
-        >
-          {row.description || "Untitled"}
-        </p>
-        {(row.categoryName || row.method) && (
-          <div className="mt-2 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-[var(--ink-muted)]">
+        {row.categoryName || row.flagged ? (
+          <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
             {row.categoryName && (
-              <span className="inline-flex items-center rounded-md bg-[var(--surface-2)] px-1.5 py-0.5 text-[11px] font-medium text-[var(--ink)]">
+              <span className="inline-flex items-center rounded-md bg-[var(--surface-2)] px-1.5 py-0.5 text-[11px] font-normal text-[var(--ink)]">
                 {row.categoryName}
               </span>
             )}
-            {row.method && (
-              <span className="inline-flex items-center gap-1 text-[11px] text-[var(--ink-muted)]">
-                <MethodIcon method={row.method} className="h-3 w-3" />
-                {methodLabel(row.method)}
-              </span>
-            )}
           </div>
-        )}
-        {row.notes && (
+        ) : null}
+        {showNotes && (
           <p
             title={row.notes}
             className="mt-1.5 line-clamp-2 break-words border-l-2 border-[var(--accent)]/30 pl-2 text-[11px] italic leading-relaxed text-[var(--ink-muted)]"
@@ -430,7 +445,25 @@ function LedgerRow({ row, pending, onAction }) {
         )}
       </td>
 
-      {/* 3. Account / Person */}
+      {/* 3. Type */}
+      <td className="min-w-0 max-w-0 px-4 py-3.5 align-middle">
+        <TransactionKindBadge kind={row.kind} />
+      </td>
+
+      {/* 4. Method */}
+      <td className="min-w-0 max-w-0 px-4 py-3.5 align-middle">
+        <Badge
+          tone="neutral"
+          title={row.method ? methodLabel(row.method) : "Cash"}
+          className="max-w-full"
+        >
+          <span className="min-w-0 truncate">
+            {row.method ? methodLabel(row.method) : "Cash"}
+          </span>
+        </Badge>
+      </td>
+
+      {/* 5. Account / Person */}
       <td className="px-4 py-3.5 align-middle">
         {row.employeeId || row.employeeName ? (
           <div>
@@ -441,7 +474,10 @@ function LedgerRow({ row, pending, onAction }) {
             />
             {row.counterpartyName && (
               <p className="mt-1 flex items-center gap-1 pl-10 text-xs text-[var(--ink-muted)]">
-                <ArrowLeftRight size={11} className="shrink-0 text-[var(--accent)]" />
+                <ArrowLeftRight
+                  size={11}
+                  className="shrink-0 text-[var(--accent)]"
+                />
                 <span className="truncate">
                   {row.kind === "transfer_sent" ? "To" : "From"}:{" "}
                   <strong className="font-medium text-[var(--ink)]">
@@ -472,12 +508,12 @@ function LedgerRow({ row, pending, onAction }) {
         )}
       </td>
 
-      {/* 4. Reference */}
+      {/* 6. Reference */}
       <td className="px-4 py-3.5 align-middle">
         <SourceFundsBadge source={row.referenceLabel} />
       </td>
 
-      {/* 5. Status */}
+      {/* 7. Status */}
       <td className="px-3 py-3.5 align-middle">
         <StatusBadge status={row.status} />
         {row.expenseDate && (
@@ -492,14 +528,15 @@ function LedgerRow({ row, pending, onAction }) {
         )}
       </td>
 
-      {/* 6. Amount & Flow */}
+      {/* 8. Amount & Flow */}
       <td className="px-4 py-3.5 text-right align-middle">
         <p
           className={cn(
             "text-sm font-semibold tabular-nums",
             isIn && "text-[var(--success)]",
             isOut && "text-[var(--danger)]",
-            isVoid && "text-[var(--ink-muted)] line-through decoration-[var(--border)]",
+            isVoid &&
+              "text-[var(--ink-muted)] line-through decoration-[var(--border)]",
           )}
         >
           {isIn ? "+" : isOut ? "−" : ""}
@@ -517,7 +554,7 @@ function LedgerRow({ row, pending, onAction }) {
         </span>
       </td>
 
-      {/* 7. Actions */}
+      {/* 9. Actions */}
       <td className="px-4 py-3.5 pr-5 text-right align-middle">
         <div className="flex justify-end">
           <RowActions row={row} pending={pending} onAction={onAction} />
@@ -531,6 +568,12 @@ function LedgerCard({ row, pending, onAction }) {
   const meta = TRANSACTION_KIND_META[row.kind];
   const isIn = row.direction === "in";
   const isOut = row.direction === "out";
+  // Same rule as the desktop row: transfer legs never render their
+  // system-generated memo inline.
+  const showNotes =
+    Boolean(row.notes) &&
+    row.kind !== "transfer_sent" &&
+    row.kind !== "transfer_received";
 
   return (
     <div className="relative overflow-hidden rounded-3xl border border-[var(--border)] bg-[var(--surface)] p-4 shadow-card transition-shadow hover:shadow-hover">
@@ -584,8 +627,11 @@ function LedgerCard({ row, pending, onAction }) {
       {/* Subtitle details: person, source, counterparty */}
       <p className="mt-0.5 truncate text-xs leading-snug text-[var(--ink-muted)]">
         {[
-          row.employeeName || (row.approvedBy ? `System (${row.approvedBy})` : "System"),
-          row.referenceLabel && row.referenceLabel !== "No source of funds" ? row.referenceLabel : null,
+          row.employeeName ||
+            (row.approvedBy ? `System (${row.approvedBy})` : "System"),
+          row.referenceLabel && row.referenceLabel !== "No source of funds"
+            ? row.referenceLabel
+            : null,
         ]
           .filter(Boolean)
           .join(" · ")}
@@ -595,14 +641,14 @@ function LedgerCard({ row, pending, onAction }) {
       </p>
 
       {/* Category / notes pills */}
-      {(row.categoryName || row.notes) && (
+      {(row.categoryName || showNotes) && (
         <div className="mt-2 flex flex-wrap items-center gap-1.5 text-xs text-[var(--ink-muted)]">
           {row.categoryName && (
-            <span className="rounded bg-[var(--surface-2)] px-1.5 py-0.5 text-[11px] font-medium text-[var(--ink)]">
+            <span className="rounded bg-[var(--surface-2)] px-1.5 py-0.5 text-[11px] font-normal text-[var(--ink)]">
               {row.categoryName}
             </span>
           )}
-          {row.notes && (
+          {showNotes && (
             <span className="truncate text-[11px] italic text-[var(--ink-muted)]">
               "{row.notes}"
             </span>
@@ -615,9 +661,11 @@ function LedgerCard({ row, pending, onAction }) {
         <StatusBadge status={row.status} />
 
         {row.method && (
-          <span className="flex min-w-0 items-center gap-1.5 text-xs text-[var(--ink-muted)]">
-            <MethodIcon method={row.method} className="h-3.5 w-3.5" />
-            <span className="truncate">{methodLabel(row.method)}</span>
+          <span
+            title={methodLabel(row.method)}
+            className="inline-flex max-w-full items-center rounded-md bg-[var(--surface-2)] px-1.5 py-0.5 text-[11px] font-normal text-[var(--ink)]"
+          >
+            <span className="min-w-0 truncate">{methodLabel(row.method)}</span>
           </span>
         )}
 
@@ -634,18 +682,22 @@ function LedgerCard({ row, pending, onAction }) {
 }
 
 const COLUMN_WIDTHS = [
-  "10%", // Date
-  "29%", // Transaction Details
-  "18%", // Account / Person
-  "12%", // Reference
-  "10%", // Status
-  "15%", // Amount & Flow
-  "6%",  // Actions
+  "9%", // Date
+  "22%", // Description — widest text column, takes from Type + Method
+  "10%", // Type — badges only, truncates to fit
+  "7%", // Method — short labels (Cash / E-Wallet / Bank Transfer), truncates
+  "15%", // Account / Person
+  "9%", // Reference
+  "8%", // Status
+  "14%", // Amount & Flow
+  "6%", // Actions
 ];
 
 const HEADERS = [
   { label: "Date" },
-  { label: "Transaction" },
+  { label: "Description" },
+  { label: "Type" },
+  { label: "Method" },
   { label: "Account / Person" },
   { label: "Reference" },
   { label: "Status" },
@@ -660,7 +712,7 @@ const TransactionsTable = ({ rows, pending = false, onAction }) => (
       tabIndex={0}
       aria-label="All transactions"
     >
-      <div className="relative min-w-[1180px] overflow-hidden rounded-3xl border border-[var(--border)] bg-[var(--surface)] shadow-card">
+      <div className="relative min-w-[1360px] overflow-hidden rounded-3xl border border-[var(--border)] bg-[var(--surface)] shadow-card">
         <div
           aria-hidden
           className="pointer-events-none absolute inset-x-6 top-0 z-10 h-px bg-[linear-gradient(90deg,transparent,var(--accent)/65,transparent)]"
@@ -668,8 +720,8 @@ const TransactionsTable = ({ rows, pending = false, onAction }) => (
 
         <table className="w-full table-fixed border-collapse text-left">
           <caption className="sr-only">
-            Unified transactions ledger with date, transaction details, person,
-            reference, status, amount flow and row actions
+            Unified transactions ledger with date, description, type, method,
+            person, reference, status, amount flow and row actions
           </caption>
 
           <colgroup>

@@ -507,7 +507,7 @@ export function StatCard({
                 </span>
                 <span
                   className={cn(
-                    "text-xs font-semibold tabular-nums rounded-full px-1.5 py-0.5",
+                    "text-xs font-normal tabular-nums rounded-full px-1.5 py-0.5",
                     accent
                       ? "bg-white/10 text-white/70"
                       : "bg-[var(--surface-2)] text-[var(--ink-muted)]",

@@ -198,7 +198,7 @@ export function TransactionActions({
   };
 
   const closedChip = (
-    <span className="inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-xs font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 text-[var(--ink-muted)] bg-[var(--ink)]/14 text-[var(--ink)]">
+    <span className="inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-xs font-normal transition-colors focus-visible:outline-none focus-visible:ring-2 text-[var(--ink-muted)] bg-[var(--ink)]/14 text-[var(--ink)]">
       <Flag size={13} strokeWidth={2.5} aria-hidden />
       Closed
     </span>

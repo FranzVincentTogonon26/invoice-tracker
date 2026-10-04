@@ -782,7 +782,7 @@ const AdminTransaction = () => {
             <CardDescription className="text-sm">
               <span className="inline-flex flex-wrap items-center gap-1.5">
                 {hasDateRange ? (
-                  <Badge tone="accent" className="font-semibold">
+                  <Badge tone="accent">
                     <CalendarRange size={12} aria-hidden />
                     {rangeLabel}
                   </Badge>
@@ -833,7 +833,7 @@ const AdminTransaction = () => {
             >
               <SlidersHorizontal size={16} aria-hidden />
               {mobileFilterChips.length > 0 && (
-                <span className="absolute -right-0.5 -top-0.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-[var(--accent)] px-1 text-[10px] font-semibold leading-none text-white ring-2 ring-[var(--surface)]">
+                <span className="absolute -right-0.5 -top-0.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-[var(--accent)] px-1 text-[10px] font-normal leading-none text-white ring-2 ring-[var(--surface)]">
                   {mobileFilterChips.length}
                 </span>
               )}

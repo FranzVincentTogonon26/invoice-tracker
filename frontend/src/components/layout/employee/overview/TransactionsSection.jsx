@@ -992,34 +992,44 @@ export const TransactionsSection = ({
                       </td>
 
                       <td className="px-4 py-3 align-middle">
-                        <p
-                          className=" text-[13px] font-medium leading-snug text-[var(--ink)]"
-                          title={
-                            transfer
-                              ? tx.reference_label || tx.description
-                              : tx.description
-                          }
-                        >
-                          {transfer
-                            ? tx.reference_label || tx.description || "—"
-                            : tx.description || "—"}
-                        </p>
-                        {flagged ? (
-                          <span className="mt-1.5 inline-flex">
-                            <Badge
-                              tone="warning"
-                              className="gap-1 px-1.5 py-0.5 text-[10px]"
-                              title="Flagged — dated before the first budget issued to you"
+                        <div className="flex min-w-0 items-center gap-1.5">
+                          {flagged ? (
+                            <span
+                              role="img"
+                              aria-label="Flagged transaction"
+                              title="Flagged"
+                              className="relative flex h-5 w-5 shrink-0"
                             >
-                              <Flag
-                                size={10}
+                              <span
                                 aria-hidden
-                                className="shrink-0"
+                                className="absolute inline-flex h-full w-full animate-ping rounded-full bg-[var(--danger)] opacity-40"
                               />
-                              Flagged
-                            </Badge>
-                          </span>
-                        ) : transfer && tx.notes && transferCounterparty(tx) ? (
+                              <Badge
+                                tone="danger"
+                                className="relative flex h-5 w-5 items-center justify-center rounded-full bg-[var(--danger)] p-0 text-white"
+                              >
+                                <Flag
+                                  size={10}
+                                  aria-hidden
+                                  fill="currentColor"
+                                />
+                              </Badge>
+                            </span>
+                          ) : null}
+                          <p
+                            className="truncate text-[13px] font-medium leading-snug text-[var(--ink)]"
+                            title={
+                              transfer
+                                ? tx.reference_label || tx.description
+                                : tx.description
+                            }
+                          >
+                            {transfer
+                              ? tx.reference_label || tx.description || "—"
+                              : tx.description || "—"}
+                          </p>
+                        </div>
+                        {transfer && tx.notes && transferCounterparty(tx) ? (
                           <p
                             className="mt-0.5 text-[11px] leading-snug text-[var(--ink-muted)]"
                             title={transferCounterparty(tx)}

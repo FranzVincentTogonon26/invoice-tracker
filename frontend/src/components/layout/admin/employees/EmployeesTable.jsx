@@ -155,7 +155,7 @@ export function SharePill({
   return (
     <span
       className={cn(
-        "inline-flex shrink-0 items-center gap-1 rounded-full px-2 py-0.5 text-xs font-semibold tabular-nums",
+        "inline-flex shrink-0 items-center gap-1 rounded-full px-2 py-0.5 text-xs font-normal tabular-nums",
         tone,
         className,
       )}
@@ -292,7 +292,7 @@ function EmployeeRow({ employee, pending, onAction }) {
       </td>
 
       <td className="px-3 py-3.5 text-center align-middle">
-        <span className="inline-flex h-7 min-w-7 items-center justify-center rounded-full bg-[var(--surface-2)] px-2 text-xs font-semibold tabular-nums text-[var(--ink)] ring-1 ring-inset ring-[var(--border)]">
+        <span className="inline-flex h-7 min-w-7 items-center justify-center rounded-full bg-[var(--surface-2)] px-2 text-xs font-normal tabular-nums text-[var(--ink)] ring-1 ring-inset ring-[var(--border)]">
           {Number(employee.issued_references) || 0}
         </span>
       </td>

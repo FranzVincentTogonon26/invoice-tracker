@@ -210,7 +210,7 @@ const EmployeeBudget = ({ employeeIssuedBudget = [], isLoading, onOpen }) => {
                         <span className="min-w-0 flex-1 truncate text-sm font-semibold tracking-tight text-[var(--ink)]">
                           {labelGroup.label}
                         </span>
-                        <span className="shrink-0 rounded-full bg-[var(--surface)] px-2 py-0.5 text-xs font-semibold tabular-nums text-[var(--ink-muted)]">
+                        <span className="shrink-0 rounded-full bg-[var(--surface)] px-2 py-0.5 text-xs font-normal tabular-nums text-[var(--ink-muted)]">
                           {labelGroup.count}{" "}
                           {labelGroup.count === 1 ? "issue" : "issues"}
                         </span>

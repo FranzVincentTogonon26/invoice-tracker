@@ -143,7 +143,7 @@ function Pill({ children, tone = "teal" }) {
       : { background: "#FDE7EA", color: "#BE123C" };
   return (
     <div
-      className="inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-semibold"
+      className="inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-normal"
       style={styles}
     >
       {children}

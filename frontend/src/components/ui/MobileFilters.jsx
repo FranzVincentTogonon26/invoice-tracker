@@ -64,7 +64,7 @@ export const FilterChips = ({ chips, onClearAll }) => {
             type="button"
             onClick={chip.onClear}
             aria-label={`Clear ${chip.label} filter`}
-            className="inline-flex shrink-0 items-center gap-1.5 rounded-full bg-[var(--accent-soft)] px-3 py-1.5 text-xs font-semibold text-[var(--accent-strong)] transition-colors hover:bg-[var(--accent-soft)]/70 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)]/30"
+            className="inline-flex shrink-0 items-center gap-1.5 rounded-full bg-[var(--accent-soft)] px-3 py-1.5 text-xs font-normal text-[var(--accent-strong)] transition-colors hover:bg-[var(--accent-soft)]/70 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)]/30"
           >
             {chip.label}
             <X size={12} aria-hidden />

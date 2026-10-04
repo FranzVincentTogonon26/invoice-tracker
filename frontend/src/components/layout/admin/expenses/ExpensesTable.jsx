@@ -4,6 +4,7 @@ import {
   CircleCheck,
   EllipsisVertical,
   Eye,
+  Flag,
   RotateCcw,
   Trash2,
   Wallet,
@@ -23,7 +24,10 @@ import {
   addDays,
 } from "../../../../lib/utils";
 
-const COLUMN_WIDTHS = ["10%", "22%", "15%", "11%", "10%", "12%", "16%", "5%"];
+// Column widths MUST sum to exactly 100% — `table-fixed` distributes any
+// leftover/overflow proportionally, so 101% forced a permanent ~11px overflow
+// and a always-on horizontal scrollbar inside the scroll container.
+const COLUMN_WIDTHS = ["10%", "22%", "15%", "11%", "10%", "12%", "15%", "5%"];
 
 const HEADERS = [
   { label: "Date" },
@@ -405,25 +409,45 @@ function LedgerRow({
         </p>
       </td>
 
-      <td className="px-4 py-4 align-middle">
-        <p
-          title={row.description}
-          className="truncate text-[13px] font-semibold leading-snug text-[var(--ink)]"
-        >
-          {row.description || "Untitled"}
-        </p>
-        <div className="mt-1 flex items-center gap-2">
+      <td className="min-w-0 max-w-0 px-4 py-4 align-middle">
+        <div className="flex min-w-0 items-center gap-1.5">
+          {row.flagged && (
+            <span
+              role="img"
+              aria-label="Flagged transaction"
+              title="Flagged"
+              className="relative flex h-5 w-5 shrink-0"
+            >
+              <span
+                aria-hidden
+                className="absolute inline-flex h-full w-full animate-ping rounded-full bg-[var(--danger)] opacity-40"
+              />
+              <Badge
+                tone="danger"
+                className="relative flex h-5 w-5 items-center justify-center rounded-full bg-[var(--danger)] p-0 text-white"
+              >
+                <Flag size={10} aria-hidden fill="currentColor" />
+              </Badge>
+            </span>
+          )}
+          <p
+            title={row.description}
+            className="truncate text-[13px] font-semibold leading-snug text-[var(--ink)]"
+          >
+            {row.description || "Untitled"}
+          </p>
+        </div>
+        <div className="mt-1 flex min-w-0 items-center gap-2">
           <p
             title={row.category || undefined}
-            className="min-w-0 truncate text-xs leading-snug text-[var(--ink-muted)]"
+            className="min-w-0 flex-1 truncate text-xs leading-snug text-[var(--ink-muted)]"
           >
             {row.category || "General"}
           </p>
-          {row.flagged && <FlaggedBadge className="shrink-0" />}
         </div>
       </td>
 
-      <td className="px-4 py-4 align-middle">
+      <td className="min-w-0 max-w-0 px-4 py-4 align-middle">
         <EmployeeCell
           name={row.employee}
           role={row.employeeRole}
@@ -432,7 +456,7 @@ function LedgerRow({
         />
       </td>
 
-      <td className="px-4 py-4 align-middle">
+      <td className="min-w-0 max-w-0 px-4 py-4 align-middle">
         <SourceFundsBadge
           source={
             row.employeeRole === "employee"
@@ -464,16 +488,16 @@ function LedgerRow({
         </div>
       </td>
 
-      <td className="px-4 py-4 text-right align-middle">
-        <p className="text-sm font-semibold tabular-nums text-[var(--ink)]">
+      <td className="min-w-0 max-w-0 px-4 py-4 text-right align-middle">
+        <p className="truncate text-sm font-semibold tabular-nums text-[var(--ink)]">
           {formatMoney(row.amount)}
         </p>
         <p
           title={methodLabel(row.method)}
-          className="mt-1.5 flex items-center justify-end gap-1.5 text-xs text-[var(--ink-muted)]"
+          className="mt-1.5 flex min-w-0 items-center justify-end gap-1.5 text-xs text-[var(--ink-muted)]"
         >
-          <MethodIcon method={row.method} className="h-3.5 w-3.5" />
-          <span className="truncate">{methodLabel(row.method)}</span>
+          <MethodIcon method={row.method} className="h-3.5 w-3.5 shrink-0" />
+          <span className="min-w-0 truncate">{methodLabel(row.method)}</span>
         </p>
       </td>
 
@@ -570,12 +594,22 @@ const ExpensesTable = ({
   onCancelExpense,
 }) => (
   <>
+    {/* Desktop — plain fluid wrapper, NOT a trapped scroll region.
+        `overflow-x-auto` + `overflow-y-clip` means: horizontal scroll only
+        appears if the 880px floor ever exceeds the card (mid widths); vertical
+        wheel / touch can never scroll this box — it always bubbles to the
+        page, so the mouse wheel never gets "stuck" on the table. The bar
+        itself is hidden (`[scrollbar-width:none]` + hidden webkit scrollbar)
+        but keyboard/touch horizontal panning still works when overflow exists.
+        No `scrollbar-slim` here on purpose: it sets
+        `overscroll-behavior: contain`, which is what trapped the vertical
+        wheel inside the table instead of handing it back to the page. */}
     <div
-      className="hidden overflow-x-auto rounded-3xl focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)]/30 md:block"
+      className="hidden overflow-x-auto overflow-y-clip overscroll-x-auto rounded-3xl [scrollbar-width:none] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)]/30 md:block [&::-webkit-scrollbar]:hidden"
       tabIndex={0}
       aria-label="Expenses"
     >
-      <div className="relative min-w-[1120px] overflow-hidden rounded-3xl border border-[var(--border)] bg-[var(--surface)] shadow-card">
+      <div className="relative min-w-0 overflow-hidden rounded-3xl border border-[var(--border)] bg-[var(--surface)] shadow-card lg:min-w-[880px]">
         <div
           aria-hidden
           className="pointer-events-none absolute inset-x-6 top-0 z-10 h-px bg-[linear-gradient(90deg,transparent,var(--accent)/65,transparent)]"
@@ -594,7 +628,7 @@ const ExpensesTable = ({
             ))}
           </colgroup>
 
-          <thead className="sticky top-0 z-[1]">
+          <thead>
             <tr className="bg-[var(--surface-2)]/90 backdrop-blur">
               {HEADERS.map((h) => (
                 <th

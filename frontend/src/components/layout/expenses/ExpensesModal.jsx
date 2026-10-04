@@ -424,7 +424,7 @@ const ExpensesModal = ({
                       {copy.title}
                     </h3>
                     {isScanMode && scanning && (
-                      <span className="inline-flex items-center gap-1.5 rounded-full bg-[var(--accent-soft)] px-2.5 py-1 text-xs font-semibold uppercase tracking-widest text-[var(--accent-strong)]">
+                      <span className="inline-flex items-center gap-1.5 rounded-full bg-[var(--accent-soft)] px-2.5 py-1 text-xs font-normal uppercase tracking-widest text-[var(--accent-strong)]">
                         <Loader2 size={11} className="animate-spin" />
                         Scanning..
                       </span>

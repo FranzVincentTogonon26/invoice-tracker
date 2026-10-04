@@ -291,7 +291,7 @@ const IssuedTransactionFilters = ({
           >
             <SlidersHorizontal size={16} aria-hidden />
             {chips.length > 0 && (
-              <span className="absolute -right-0.5 -top-0.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-[var(--accent)] px-1 text-[10px] font-semibold leading-none text-white ring-2 ring-[var(--surface)]">
+              <span className="absolute -right-0.5 -top-0.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-[var(--accent)] px-1 text-[10px] font-normal leading-none text-white ring-2 ring-[var(--surface)]">
                 {chips.length}
               </span>
             )}

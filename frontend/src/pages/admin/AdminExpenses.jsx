@@ -1,17 +1,8 @@
-import {
-  useCallback,
-  useEffect,
-  useLayoutEffect,
-  useMemo,
-  useRef,
-  useState,
-} from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { motion } from "framer-motion";
 import {
   CalendarOff,
   CalendarRange,
-  ChevronLeft,
-  ChevronRight,
   CircleAlert,
   CircleCheck,
   CircleX,
@@ -89,8 +80,9 @@ const STATUS_OPTIONS = [
   { value: "cancel", label: "Cancelled" },
 ];
 
-const FILTER_GAP = 8;
-const MIN_FILTER_WIDTH = 150;
+// Desktop filter order — rendered as a pure CSS grid (no JS measuring, no
+// sliding track) so resizing never creates a transient horizontal scrollbar
+// and the visible set of filters never shifts under the user's cursor.
 const FILTER_KEYS = ["employee", "category", "method", "status"];
 
 const dayOf = (value) => {
@@ -273,65 +265,6 @@ const AdminExpenses = () => {
     const timer = setTimeout(() => setDebouncedSearch(search), 300);
     return () => clearTimeout(timer);
   }, [search]);
-
-  const filtersRef = useRef(null);
-  const [filtersWidth, setFiltersWidth] = useState(0);
-  const [slideIndex, setSlideIndex] = useState(0);
-
-  useLayoutEffect(() => {
-    const el = filtersRef.current;
-    if (!el) return undefined;
-
-    const measure = () => {
-      const width = el.clientWidth;
-      if (width > 0) setFiltersWidth(width);
-    };
-
-    measure();
-    window.addEventListener("resize", measure);
-
-    let observer;
-
-    if (typeof ResizeObserver !== "undefined") {
-      observer = new ResizeObserver(measure);
-      observer.observe(el);
-    }
-
-    return () => {
-      window.removeEventListener("resize", measure);
-      observer?.disconnect();
-    };
-  }, []);
-
-  const filterCapacity = useMemo(() => {
-    if (filtersWidth <= 0) return FILTER_KEYS.length;
-
-    return Math.min(
-      FILTER_KEYS.length,
-      Math.max(
-        1,
-        Math.floor(
-          (filtersWidth + FILTER_GAP) / (MIN_FILTER_WIDTH + FILTER_GAP),
-        ),
-      ),
-    );
-  }, [filtersWidth]);
-
-  const filterItemWidth = useMemo(
-    () =>
-      filtersWidth <= 0
-        ? 0
-        : (filtersWidth - FILTER_GAP * (filterCapacity - 1)) / filterCapacity,
-    [filtersWidth, filterCapacity],
-  );
-
-  const slideMax = FILTER_KEYS.length - filterCapacity;
-  const slideAt = Math.min(Math.max(slideIndex, 0), Math.max(slideMax, 0));
-  const trackOffset = slideAt * (filterItemWidth + FILTER_GAP);
-  const showSlider = slideMax > 0;
-
-  const slidePrev = () => setSlideIndex(Math.max(slideAt - 1, 0));
-  const slideNext = () => setSlideIndex(Math.min(slideAt + 1, slideMax));
 
   const overview = data?.overview ?? {};
   const totalBudget = Number(overview.totalBudget ?? 0);
@@ -1067,7 +1000,7 @@ const AdminExpenses = () => {
             <CardDescription className="text-sm">
               <span className="inline-flex flex-wrap items-center gap-1.5">
                 {hasDateRange ? (
-                  <Badge tone="accent" className="font-semibold">
+                  <Badge tone="accent">
                     <CalendarRange size={12} aria-hidden />
                     {rangeLabel}
                   </Badge>
@@ -1088,8 +1021,8 @@ const AdminExpenses = () => {
           </div>
         </CardHeader>
 
-        <div className="mb-5 flex flex-col gap-3 lg:flex-row lg:items-center">
-          <div className="flex items-center gap-2 lg:hidden">
+        <div className="mb-5 flex flex-col gap-3 xl:flex-row xl:items-start">
+          <div className="flex items-center gap-2 xl:hidden">
             <div className="min-w-0 flex-1">{searchField}</div>
 
             <IconButton
@@ -1108,71 +1041,45 @@ const AdminExpenses = () => {
               <SlidersHorizontal size={16} aria-hidden />
 
               {mobileFilterChips.length > 0 && (
-                <span className="absolute -right-0.5 -top-0.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-[var(--accent)] px-1 text-[10px] font-semibold leading-none text-white ring-2 ring-[var(--surface)]">
+                <span className="absolute -right-0.5 -top-0.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-[var(--accent)] px-1 text-[10px] font-normal leading-none text-white ring-2 ring-[var(--surface)]">
                   {mobileFilterChips.length}
                 </span>
               )}
             </IconButton>
           </div>
 
+          {/* Desktop filters — pure CSS grid: every filter is always mounted
+              and always visible, columns just reflow (4 → 2) as the card
+              narrows. No measuring, no sliding track, no translateX, so
+              resizing can never flash a horizontal scrollbar or shuffle
+              which filters are on screen. Same records stay mounted. */}
           <div
             role="group"
             aria-label="Expense filters"
-            className="hidden lg:flex lg:min-w-0 lg:flex-1 lg:flex-wrap lg:items-center lg:gap-2"
+            className="hidden min-w-0 flex-1 grid-cols-4 gap-2 xl:grid 2xl:gap-2.5"
           >
-            {showSlider && (
-              <IconButton
-                type="button"
-                title="Show previous filters"
-                aria-label="Show previous filters"
-                aria-disabled={slideAt <= 0}
-                onClick={slidePrev}
-                disabled={slideAt <= 0}
-                className="h-10 w-10 shrink-0 disabled:pointer-events-none disabled:opacity-40"
-              >
-                <ChevronLeft size={18} aria-hidden="true" />
-              </IconButton>
-            )}
-
-            <div
-              ref={filtersRef}
-              className="relative min-w-0 flex-1 overflow-hidden"
-            >
-              <div
-                className="flex transition-transform duration-300 ease-out"
-                style={{
-                  gap: FILTER_GAP,
-                  width: `${
-                    FILTER_KEYS.length * filterItemWidth +
-                    (FILTER_KEYS.length - 1) * FILTER_GAP
-                  }px`,
-                  transform: `translateX(-${trackOffset}px)`,
-                }}
-              >
-                {FILTER_KEYS.map((key) => (
-                  <div key={key} className="min-w-0 flex-1">
-                    {renderFilter(key)}
-                  </div>
-                ))}
+            {FILTER_KEYS.map((key) => (
+              <div key={key} className="min-w-0">
+                {renderFilter(key)}
               </div>
-            </div>
-
-            {showSlider && (
-              <IconButton
-                type="button"
-                title="Show more filters"
-                aria-label="Show more filters"
-                aria-disabled={slideAt >= slideMax}
-                onClick={slideNext}
-                disabled={slideAt >= slideMax}
-                className="h-10 w-10 shrink-0 disabled:pointer-events-none disabled:opacity-40"
-              >
-                <ChevronRight size={18} aria-hidden="true" />
-              </IconButton>
-            )}
+            ))}
           </div>
 
-          <div className="hidden lg:ml-auto lg:block lg:w-[650px] lg:max-w-[45%] lg:min-w-[240px]">
+          {/* Mid widths (lg–xl): filters get their own full-width row above
+              search so nothing squeezes into a shrunken sliding window. */}
+          <div
+            role="group"
+            aria-label="Expense filters"
+            className="hidden min-w-0 grid-cols-2 gap-2 sm:grid-cols-4 lg:grid xl:hidden"
+          >
+            {FILTER_KEYS.map((key) => (
+              <div key={key} className="min-w-0">
+                {renderFilter(key)}
+              </div>
+            ))}
+          </div>
+
+          <div className="hidden min-w-0 xl:ml-auto xl:block xl:w-[420px] xl:shrink-0 2xl:w-[480px]">
             {searchField}
           </div>
         </div>

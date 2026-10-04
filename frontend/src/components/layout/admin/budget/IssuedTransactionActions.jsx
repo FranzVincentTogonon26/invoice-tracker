@@ -205,7 +205,7 @@ export function IssuedTransactionActions({
   // pills: 'open' rows cancel through the confirmation dialog, 'cancel' rows
   // restore directly. Closed rows never reach the menu — they keep the chip.
   const closedChip = (
-    <span className="inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-sm font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 text-[var(--ink-muted)] bg-[var(--ink)]/14 text-[var(--ink)]">
+    <span className="inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-sm font-normal transition-colors focus-visible:outline-none focus-visible:ring-2 text-[var(--ink-muted)] bg-[var(--ink)]/14 text-[var(--ink)]">
       <Flag size={13} strokeWidth={2.5} aria-hidden />
       Closed
     </span>
@@ -290,7 +290,7 @@ export function IssuedTransactionActions({
           aria-expanded={open}
           onClick={() => setOpen(true)}
           className={cn(
-            "inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-sm font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--danger)]/30",
+            "inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-sm font-normal transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--danger)]/30",
             "text-[var(--ink-muted)] hover:bg-[var(--danger)]/10 hover:text-[var(--danger)]",
             className,
           )}
@@ -304,7 +304,7 @@ export function IssuedTransactionActions({
           type="button"
           onClick={confirmRestore}
           className={cn(
-            "inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-sm font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--danger)]/30",
+            "inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-sm font-normal transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--danger)]/30",
             "text-[var(--ink-muted)] hover:bg-[var(--ink)]/14 hover:text-[var(--ink)]",
             className,
           )}

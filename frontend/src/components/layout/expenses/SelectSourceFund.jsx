@@ -227,7 +227,7 @@ const SelectSourceFund = ({
               </span>
               {!canChoose && !isBalance && (
                 <span
-                  className="shrink-0 rounded-full bg-[var(--surface)] px-1.5 py-0.5 text-xs font-semibold text-[var(--ink-muted)]"
+                  className="shrink-0 rounded-full bg-[var(--surface)] px-1.5 py-0.5 text-xs font-normal text-[var(--ink-muted)]"
                   title="Selected automatically — it is the only open budget source"
                 >
                   auto
