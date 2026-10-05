@@ -633,7 +633,7 @@ const EmployeeExpenseDetailsModal = ({ open, expense, onClose }) => {
                         </p>
                       </div>
                     </div>
-                    <span className="rounded-full border border-[var(--border)] bg-[var(--surface)] px-2.5 py-1 text-xs font-normal text-[var(--ink)] shadow-2xs">
+                    <span className=" rounded-full border border-[var(--border)] bg-[var(--surface)] px-2.5 py-1 text-xs font-normal text-[var(--ink)] shadow-2xs">
                       View receipt →
                     </span>
                   </button>

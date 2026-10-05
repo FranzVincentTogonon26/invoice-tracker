@@ -51,6 +51,12 @@ export function useBudgetMutations() {
       mutationFn: budgetsApi.create,
       onSuccess: invalidate,
     }),
+    // Deferred receipt upload for the Issue Budget scan flow (the held file
+    // goes up once the issuance is confirmed). No cache work here — the
+    // response is just the URL consumed by the create that calls this.
+    uploadIssuedReceiptImage: useMutation({
+      mutationFn: budgetsApi.uploadIssuedReceiptImage,
+    }),
     // Deletes a budget reference row (hard delete, cascades to dependent rows)
     removeReference: useMutation({
       mutationFn: budgetsApi.removeReference,

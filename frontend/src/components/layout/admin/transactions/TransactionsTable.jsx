@@ -62,6 +62,23 @@ export function TransactionKindBadge({ kind, className }) {
   );
 }
 
+// High-visibility marker for records carrying a scanned receipt attachment
+// (expenses via `receipt_id`/`image_url`, issuances via `image_url`).
+// Rendered next to the description so it reads at a glance.
+function ReceiptBadge() {
+  return (
+    <span
+      role="img"
+      aria-label="Receipt attached"
+      title="Receipt attached"
+      className="inline-flex shrink-0 items-center gap-1 rounded-full bg-[var(--accent-soft)] px-2 py-0.5 text-[11px]  text-[var(--accent-strong)]"
+    >
+      {/* <ReceiptText size={12} aria-hidden className="shrink-0" /> */}
+      Receipt
+    </span>
+  );
+}
+
 function SourceFundsBadge({ source }) {
   if (!source || source === "No source of funds") {
     return (
@@ -374,6 +391,9 @@ function LedgerRow({ row, pending, onAction }) {
   const isIn = row.direction === "in";
   const isOut = row.direction === "out";
   const isVoid = row.direction === "void";
+  // Receipt attachment marker — expenses (`receipt_id`/`image_url`) and
+  // issuances (`image_url`) badge their description line.
+  const hasReceipt = Boolean(row.receiptId || row.imageUrl);
   // Transfer legs carry system-generated memo text in `notes` — never show it
   // inline; the counterparty line already explains the movement.
   const showNotes =
@@ -425,6 +445,7 @@ function LedgerRow({ row, pending, onAction }) {
           >
             {row.description || "Untitled"}
           </p>
+          {hasReceipt && <ReceiptBadge />}
         </div>
         {row.categoryName || row.flagged ? (
           <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
@@ -489,21 +510,11 @@ function LedgerRow({ row, pending, onAction }) {
             )}
           </div>
         ) : (
-          <div className="flex min-w-0 items-center gap-2.5">
-            <span
-              aria-hidden
-              className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-[var(--surface-2)] text-xs font-semibold text-[var(--ink-muted)]"
-            >
-              B
-            </span>
-            <div className="min-w-0 flex-1">
-              <p className="truncate text-[13px] font-semibold leading-tight text-[var(--ink)]">
-                Boss
-              </p>
-              <p className="mt-0.5 truncate text-xs text-[var(--ink-muted)]">
-                {row.approvedBy ? `By ${row.approvedBy}` : "Allocation"}
-              </p>
-            </div>
+          <div className="min-w-0">
+            <PersonCell
+              name={row.approvedBy || "Boss"}
+              role={row.approvedBy ? "by Boss" : "Allocation"}
+            />
           </div>
         )}
       </td>
@@ -558,6 +569,7 @@ function LedgerCard({ row, pending, onAction }) {
   const meta = TRANSACTION_KIND_META[row.kind];
   const isIn = row.direction === "in";
   const isOut = row.direction === "out";
+  const hasReceipt = Boolean(row.receiptId || row.imageUrl);
   // Same rule as the desktop row: transfer legs never render their
   // system-generated memo inline.
   const showNotes =
@@ -607,12 +619,15 @@ function LedgerCard({ row, pending, onAction }) {
         </div>
       </div>
 
-      <p
-        title={row.description}
-        className="mt-2 line-clamp-2 break-words text-sm font-semibold leading-snug text-[var(--ink)]"
-      >
-        {row.description || "Untitled"}
-      </p>
+      <div className="mt-2 flex min-w-0 items-center gap-1.5">
+        <p
+          title={row.description}
+          className="min-w-0 flex-1 line-clamp-2 break-words text-sm font-semibold leading-snug text-[var(--ink)]"
+        >
+          {row.description || "Untitled"}
+        </p>
+        {hasReceipt && <ReceiptBadge />}
+      </div>
 
       {/* Subtitle details: person, source, counterparty */}
       <p className="mt-0.5 truncate text-xs leading-snug text-[var(--ink-muted)]">

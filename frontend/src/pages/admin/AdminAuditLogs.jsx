@@ -1,7 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { Inbox, RotateCcw, Search, X } from "lucide-react";
 import { PageHeader } from "../../components/ui/PageHeader";
-import { Button } from "../../components/ui/Button";
 import { SearchInput } from "../../components/ui/Input";
 import {
   EmptyState,
@@ -241,22 +240,6 @@ export default function AdminAuditLogs() {
       <PageHeader
         title="Audit Logs"
         description="backend/logs/transactions.md — newest first, times in your device's local time, streaming live."
-        actions={
-          <div className="flex w-full flex-wrap items-center gap-2 sm:w-auto justify-end">
-            <span className="inline-flex items-center gap-1.5 rounded-full border border-[var(--success)]/30 bg-[var(--success)]/10 px-2.5 py-1 text-[11px] font-semibold text-[var(--success)]">
-              <span className="relative flex h-1.5 w-1.5">
-                <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-[var(--success)] opacity-60" />
-                <span className="relative inline-flex h-1.5 w-1.5 rounded-full bg-[var(--success)]" />
-              </span>
-              Live
-            </span>
-            {hasActiveFilters && (
-              <Button variant="outline" size="md" onClick={clearFilters}>
-                <RotateCcw size={14} /> Clear
-              </Button>
-            )}
-          </div>
-        }
       />
 
       {/* Single-row filter bar — search + dates + dropdowns inline */}
@@ -289,7 +272,7 @@ export default function AdminAuditLogs() {
           />
         </div>
         <div className="grid grid-cols-2 gap-2 sm:flex sm:items-center sm:gap-2">
-          <div className="min-w-0 sm:w-[150px]">
+          <div className="min-w-0 sm:w-[150px] ">
             <DatePicker
               value={from}
               onChange={(next) => {
@@ -297,6 +280,7 @@ export default function AdminAuditLogs() {
                 resetPage();
               }}
               placeholder="From date"
+              className="text-xs"
             />
           </div>
           <div className="min-w-0 sm:w-[150px]">
@@ -307,6 +291,7 @@ export default function AdminAuditLogs() {
                 resetPage();
               }}
               placeholder="To date"
+              className="text-xs"
             />
           </div>
           <FilterListbox

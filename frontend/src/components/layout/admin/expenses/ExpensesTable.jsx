@@ -5,6 +5,7 @@ import {
   EllipsisVertical,
   Eye,
   Flag,
+  ReceiptText,
   RotateCcw,
   Trash2,
   Wallet,
@@ -375,6 +376,22 @@ function EmployeeCell({ name, role, avatarUrl, size = "md" }) {
   );
 }
 
+// High-visibility marker for rows carrying a scanned receipt attachment.
+// Rendered next to the description so it reads at a glance.
+function ReceiptBadge() {
+  return (
+    <span
+      role="img"
+      aria-label="Receipt attached"
+      title="Receipt attached"
+      className="inline-flex shrink-0 items-center gap-1 rounded-full bg-[var(--accent-soft)] px-2 py-0.5 text-[11px]  text-[var(--accent-strong)]"
+    >
+      {/* <ReceiptText size={12} aria-hidden className="shrink-0" /> */}
+      Receipt
+    </span>
+  );
+}
+
 function LedgerRow({
   row,
   pending,
@@ -384,6 +401,7 @@ function LedgerRow({
   onRemoveFromDraft,
   onCancelExpense,
 }) {
+  const hasReceipt = Boolean(row.receiptId || row.imageUrl);
   return (
     <tr
       className={cn(
@@ -432,10 +450,11 @@ function LedgerRow({
           )}
           <p
             title={row.description}
-            className="truncate text-[13px] font-semibold leading-snug text-[var(--ink)]"
+            className="min-w-0 flex-1 truncate text-[13px] font-semibold leading-snug text-[var(--ink)]"
           >
             {row.description || "Untitled"}
           </p>
+          {hasReceipt && <ReceiptBadge />}
         </div>
         <div className="mt-1 flex min-w-0 items-center gap-2">
           <p
@@ -527,6 +546,7 @@ function LedgerCard({
   onRemoveFromDraft,
   onCancelExpense,
 }) {
+  const hasReceipt = Boolean(row.receiptId || row.imageUrl);
   return (
     <div
       className={cn(
@@ -545,12 +565,15 @@ function LedgerCard({
         </span>
       </div>
 
-      <p
-        title={row.description}
-        className="mt-2 truncate text-sm font-semibold leading-snug text-[var(--ink)]"
-      >
-        {row.description || "Untitled"}
-      </p>
+      <div className="mt-2 flex min-w-0 items-center gap-1.5">
+        <p
+          title={row.description}
+          className="min-w-0 flex-1 truncate text-sm font-semibold leading-snug text-[var(--ink)]"
+        >
+          {row.description || "Untitled"}
+        </p>
+        {hasReceipt && <ReceiptBadge />}
+      </div>
 
       <p className="mt-0.5 truncate text-xs leading-snug text-[var(--ink-muted)]">
         {[row.category, row.employee].filter(Boolean).join(" | ") || "—"}{" "}

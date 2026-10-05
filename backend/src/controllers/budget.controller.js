@@ -5,6 +5,10 @@ import ApiError from "../utils/ApiError.js";
 import { validate } from "../utils/validate.js";
 import { createbudgetSchema } from "../validations/budget.validation.js";
 import { emitTransaction } from "../realtime/index.js";
+import {
+  saveIssuedBudgetImage,
+  deleteIssuedBudgetImage,
+} from "../utils/issuedBudgetImage.js";
 
 // Shared UUID shape check for path params (same regex the other handlers use).
 const UUID_RE =
@@ -84,6 +88,7 @@ export const create = async (req, res, next) => {
       note,
       label,
       approved,
+      image_url,
     } = validate(createbudgetSchema, req.body);
 
     // zod guarantees `amount` is a positive number; normalize just in case
@@ -121,6 +126,9 @@ export const create = async (req, res, next) => {
         description: String(description).trim(),
         method,
         note: note || null,
+        // Scanned receipt attachment (Issue Budget scan flow) — only present
+        // when the admin scanned a receipt for this issuance; otherwise NULL.
+        image_url: image_url || null,
       });
 
       emitTransaction({
@@ -174,6 +182,29 @@ export const create = async (req, res, next) => {
 
       return res.status(201).json({ budget: newReference });
     }
+  } catch (err) {
+    next(err);
+  }
+};
+
+// POST /budgets/issued-receipt-image — the deferred half of the Issue Budget
+// scan flow. The browser holds the picked receipt in memory while the admin
+// reviews the form; this endpoint is called ONCE on "Issue Budget" with that
+// single file (`file`), so nothing lands in `uploads/receipts_issued_budget`
+// before the confirmation and no scan leaves an orphan behind when the form
+// is discarded. The returned `image_url` is stored on the
+// `issued_budget` row by the create call that follows.
+export const uploadIssuedReceiptImage = async (req, res, next) => {
+  try {
+    if (!req.file) throw ApiError.badRequest("No receipt file uploaded");
+    const image_url = await saveIssuedBudgetImage({
+      buffer: req.file.buffer,
+      mimeType: req.file.mimetype,
+      originalName: req.file.originalname,
+    });
+    return res
+      .status(201)
+      .json({ image_url, file_name: req.file.originalname ?? "" });
   } catch (err) {
     next(err);
   }
@@ -483,6 +514,19 @@ export const removeIssuedTransaction = async (req, res, next) => {
     // employee ledger drop the row over the socket with no manual refresh —
     // the global `transactions` room is admin-only and never reaches them.
     const ownerId = result.userId ?? result.deleted?.user_id ?? null;
+
+    // Also drop the scanned receipt file from
+    // `uploads/receipts_issued_budget` when this row carried one — but only
+    // once nothing else points at it, so a shared image survives until its
+    // last referencing row is deleted too. Tied to THIS deleted row's
+    // `image_url`, so only its own file can ever be removed.
+    if (result.deleted?.image_url) {
+      const stillReferenced = await Budget.countIssuedByImageUrl(
+        result.deleted.image_url,
+      );
+      if (stillReferenced === 0)
+        await deleteIssuedBudgetImage(result.deleted.image_url);
+    }
 
     emitTransaction({
       action: "delete",

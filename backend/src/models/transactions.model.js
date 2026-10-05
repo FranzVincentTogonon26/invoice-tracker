@@ -45,11 +45,14 @@ class Transactions {
   // newest first. Each source table is read through its existing model method
   // (no duplicated SQL) and normalized to the same row shape the Admin
   // Transactions page renders:
-  //   { key, kind, id, date, description, notes, amount, moneyIn, moneyOut,
-  //     direction, status, method, referenceId, referenceLabel, categoryId,
-  //     categoryName, employeeId, employeeName, employeeRole, employeeAvatar,
-  //     counterpartyName, counterpartyRole, approvedBy, flagged, expenseDate,
-  //     dateSettled }
+//   { key, kind, id, date, description, notes, amount, moneyIn, moneyOut,
+//     direction, status, method, referenceId, referenceLabel, categoryId,
+//     categoryName, employeeId, employeeName, employeeRole, employeeAvatar,
+//     counterpartyName, counterpartyRole, approvedBy, flagged, expenseDate,
+//     dateSettled, receiptId, imageUrl }
+// `receiptId` / `imageUrl` mark rows carrying a scanned receipt attachment
+// (expenses via `expenses.receipt_id` / `expenses.image_url`, issuances via
+// `issued_budget.image_url`) so the ledger can badge them.
   // `kind` is one of 'budget' | 'issued' | 'expense' | 'abono' |
   // 'transfer_sent' | 'transfer_received'. `employeeId` is the account the
   // row is attributed to for the Employee filter (null for system-level
@@ -131,6 +134,8 @@ class Transactions {
         flagged: false,
         expenseDate: null,
         dateSettled: null,
+        receiptId: null,
+        imageUrl: row.image_url ?? null,
       });
     }
 
@@ -165,6 +170,8 @@ class Transactions {
         flagged: Number(row.flag) === 1,
         expenseDate: row.expense_date ?? null,
         dateSettled: null,
+        receiptId: row.receipt_id ?? null,
+        imageUrl: row.image_url ?? null,
       });
     }
 

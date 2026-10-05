@@ -2,6 +2,7 @@ import express from "express";
 import authMiddleware from "../middleware/auth.middleware.js";
 import requireAdminAccess from "../middleware/admin.middleware.js";
 import requireEmployeeAccess from "../middleware/employee.middleware.js";
+import { uploadReceipt } from "../middleware/upload.js";
 import * as budgetController from "../controllers/budget.controller.js";
 
 const router = express.Router();
@@ -87,6 +88,17 @@ router.patch(
   budgetController.restoreBudget,
 );
 router.post("/", authMiddleware, requireAdminAccess, budgetController.create);
+// Deferred receipt upload for the Issue Budget scan flow: the single held
+// file (`file`) is stored in `uploads/receipts_issued_budget` only when the
+// issuance is confirmed — the returned `image_url` lands on the
+// `issued_budget` row via the create call that follows.
+router.post(
+  "/issued-receipt-image",
+  authMiddleware,
+  requireAdminAccess,
+  uploadReceipt,
+  budgetController.uploadIssuedReceiptImage,
+);
 router.get(
   "/balance/:referenceId",
   authMiddleware,

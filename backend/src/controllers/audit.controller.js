@@ -36,27 +36,33 @@ const DEVICE_RE =
 
 const parseTimestamp = (raw) => {
   const s = String(raw ?? "").trim();
+  // Strict device format first — Date.parse is lenient and could half-parse
+  // `10-05-2025 ...` into the wrong instant (wrong day/month or dropped
+  // offset), so it must never see these rows. Legacy UTC ISO rows fall
+  // through to Date.parse below.
+  const m = DEVICE_RE.exec(s);
+  if (m) {
+    const [, MM, DD, YYYY, h12, mm, ss, ampm, sign, offH, offM] = m;
+    let h = Number(h12) % 12;
+    if (ampm === "PM") h += 12;
+    const wallUTC = Date.UTC(
+      Number(YYYY),
+      Number(MM) - 1,
+      Number(DD),
+      h,
+      Number(mm),
+      Number(ss),
+    );
+    if (Number.isNaN(wallUTC)) return null;
+    const offMin = sign
+      ? (sign === "-" ? -1 : 1) * (Number(offH) * 60 + Number(offM))
+      : 0;
+    if (Math.abs(offMin) > 840) return null;
+    return { ms: wallUTC - offMin * 60000, display: s };
+  }
   const iso = Date.parse(s);
   if (Number.isFinite(iso)) return { ms: iso, display: null };
-  const m = DEVICE_RE.exec(s);
-  if (!m) return null;
-  const [, MM, DD, YYYY, h12, mm, ss, ampm, sign, offH, offM] = m;
-  let h = Number(h12) % 12;
-  if (ampm === "PM") h += 12;
-  const wallUTC = Date.UTC(
-    Number(YYYY),
-    Number(MM) - 1,
-    Number(DD),
-    h,
-    Number(mm),
-    Number(ss),
-  );
-  if (Number.isNaN(wallUTC)) return null;
-  const offMin = sign
-    ? (sign === "-" ? -1 : 1) * (Number(offH) * 60 + Number(offM))
-    : 0;
-  if (Math.abs(offMin) > 840) return null;
-  return { ms: wallUTC - offMin * 60000, display: s };
+  return null;
 };
 const parseLine = (line, index) => {
   const cells = splitRow(line);

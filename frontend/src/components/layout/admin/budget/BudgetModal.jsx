@@ -7,6 +7,7 @@ import {
   WalletIcon,
   AlertCircle,
   Lock,
+  ScanLine,
   ShieldAlert,
   X,
   Plus,
@@ -18,8 +19,10 @@ import { SelectEmployee } from "../../../ui/SelectEmployee";
 import { SelectReference } from "../../../ui/SelectReference";
 import { Button } from "../../../ui/Button";
 import ReferencesModal from "./ReferencesModal";
+import BudgetScanModal from "./BudgetScanModal";
 import {
   useBudgetBalance,
+  useBudgetMutations,
   useEmployeeIssuedGuard,
 } from "../../../../hooks/useBudget";
 import useSmoothScroll from "../../../../hooks/useSmoothScroll";
@@ -28,7 +31,7 @@ import toast from "react-hot-toast";
 import { useAuth } from "../../../../context/AuthContext";
 import { USER_ROLES } from "../../../../constants";
 
-const APPROVER = "Franz Vincent";
+const APPROVER = "Maam Dhang";
 
 const initialForm = {
   reference_id: "",
@@ -223,7 +226,7 @@ function BalanceCard({ summary, isLoading, referenceId, projection, exceeds }) {
   );
 }
 
-function AmountInput({ value, onChange, disabled }) {
+function AmountInput({ value, onChange, disabled, onScan }) {
   const parsed = Number(value);
   const preview =
     String(value ?? "").trim() !== "" && !Number.isNaN(parsed)
@@ -232,17 +235,37 @@ function AmountInput({ value, onChange, disabled }) {
 
   return (
     <div>
-      <Input
-        value={value}
-        onChange={onChange}
-        min="0"
-        step="0.01"
-        type="number"
-        inputMode="decimal"
-        placeholder="0.00"
-        disabled={disabled}
-        Icon={PhilippinePesoIcon}
-      />
+      <div className="relative">
+        <Input
+          value={value}
+          onChange={onChange}
+          min="0"
+          step="0.01"
+          type="number"
+          inputMode="decimal"
+          placeholder="0.00"
+          disabled={disabled}
+          Icon={PhilippinePesoIcon}
+          className={onScan ? "pr-11" : undefined}
+        />
+        {onScan && (
+          <button
+            type="button"
+            disabled={disabled}
+            onClick={(e) => {
+              // The locked wrapper also listens for clicks (locked toast) —
+              // the scan action handles itself, so don't bubble.
+              e.stopPropagation();
+              onScan();
+            }}
+            title="Scan receipt to fill the amount"
+            aria-label="Scan receipt to fill the amount"
+            className="cursor-pointer absolute right-1.5 top-1/2 flex h-7 w-7 -translate-y-1/2 items-center justify-center rounded-full bg-[var(--surface-2)] text-[var(--ink-muted)] transition-colors hover:text-[var(--accent-strong)] disabled:opacity-50 disabled:pointer-events-none"
+          >
+            <ScanLine size={14} />
+          </button>
+        )}
+      </div>
       <div className="mt-1.5 flex items-center justify-between gap-2">
         <span
           className={`font-medium truncate text-sm tabular-nums leading-snug ${
@@ -269,7 +292,16 @@ function AmountInput({ value, onChange, disabled }) {
   );
 }
 
-function AmountField({ value, onChange, saving, locked, children }) {
+function AmountField({
+  value,
+  onChange,
+  saving,
+  locked,
+  onScan,
+  scanned,
+  onRemoveScan,
+  children,
+}) {
   const { user } = useAuth();
   const isAdmin = user?.role === USER_ROLES.ADMIN;
 
@@ -291,6 +323,7 @@ function AmountField({ value, onChange, saving, locked, children }) {
           value={value}
           onChange={onChange}
           disabled={saving || locked}
+          onScan={onScan}
         />
         <AnimatePresence initial={false}>
           {locked && (
@@ -307,6 +340,50 @@ function AmountField({ value, onChange, saving, locked, children }) {
                 Locked — select a budget source first to enable the amount
                 input.
               </span>
+            </motion.div>
+          )}
+        </AnimatePresence>
+        {/* Scanned-receipt identifier — marks the amount as scan-filled and
+            shows what will be uploaded with the issuance. */}
+        <AnimatePresence initial={false}>
+          {scanned && (
+            <motion.div
+              initial={{ opacity: 0, y: -4, height: 0 }}
+              animate={{ opacity: 1, y: 0, height: "auto" }}
+              exit={{ opacity: 0, y: -4, height: 0 }}
+              transition={{ duration: 0.25, ease: "easeOut" }}
+              role="status"
+              className="flex items-center gap-2.5 overflow-hidden rounded-xl border border-[var(--accent)]/25 bg-[var(--accent-soft)]/40 px-3 py-2 mt-1.5"
+            >
+              {scanned.previewUrl ? (
+                <img
+                  src={scanned.previewUrl}
+                  alt=""
+                  className="h-8 w-8 shrink-0 rounded-lg object-cover ring-1 ring-[var(--border)]"
+                />
+              ) : (
+                <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-[var(--accent-soft)] text-[var(--accent-strong)]">
+                  <ScanLine size={14} />
+                </span>
+              )}
+              <div className="min-w-0 flex-1">
+                <p className="truncate text-xs font-semibold text-[var(--ink)]">
+                  {scanned.vendor || scanned.fileName || "Receipt scanned"}
+                </p>
+                <p className="truncate text-[11px] text-[var(--accent-strong)]">
+                  Receipt scanned — image saves with this issuance
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={onRemoveScan}
+                disabled={saving}
+                aria-label="Remove scanned receipt"
+                title="Remove scanned receipt"
+                className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-[var(--ink-muted)] transition-colors hover:bg-[var(--surface)] hover:text-[var(--danger)] disabled:opacity-50"
+              >
+                <X size={14} />
+              </button>
             </motion.div>
           )}
         </AnimatePresence>
@@ -345,6 +422,29 @@ const BudgetModal = ({
 
   const [references, setReferences] = useState(budgetReferences);
   const [refsOpen, setRefsOpen] = useState(false);
+  const [scanOpen, setScanOpen] = useState(false);
+
+  // Scanned receipt held for the issuance (Issue Budget only): the picked
+  // File stays in the browser until submit, when it is uploaded once to
+  // `uploads/receipts_issued_budget` and its URL stored on the
+  // `issued_budget` row. Discarding the form drops it with nothing written.
+  const [scannedReceipt, setScannedReceipt] = useState(null);
+  const [scanPreviewUrl, setScanPreviewUrl] = useState("");
+  // Retry reuse: if the upload succeeded but the create that followed failed,
+  // a retry reuses the stored URL instead of writing the file twice.
+  const uploadedIssuedUrlRef = useRef(null);
+
+  useEffect(() => {
+    if (!scannedReceipt?.file) {
+      setScanPreviewUrl("");
+      return undefined;
+    }
+    const url = URL.createObjectURL(scannedReceipt.file);
+    setScanPreviewUrl(url);
+    return () => URL.revokeObjectURL(url);
+  }, [scannedReceipt]);
+
+  const { uploadIssuedReceiptImage } = useBudgetMutations();
 
   const [prevRefs, setPrevRefs] = useState(budgetReferences);
   if (budgetReferences !== prevRefs) {
@@ -366,8 +466,8 @@ const BudgetModal = ({
 
   const refsOpenRef = useRef(false);
   useEffect(() => {
-    refsOpenRef.current = refsOpen;
-  }, [refsOpen]);
+    refsOpenRef.current = refsOpen || scanOpen;
+  }, [refsOpen, scanOpen]);
 
   const set = (k) => (e) =>
     setForm((f) => ({ ...f, [k]: e?.target ? e.target.value : e }));
@@ -379,6 +479,9 @@ const BudgetModal = ({
     setErr("");
     setSaving(false);
     setRefsOpen(false);
+    setScanOpen(false);
+    setScannedReceipt(null);
+    uploadedIssuedUrlRef.current = null;
   }
 
   const handleClose = () => {
@@ -387,7 +490,29 @@ const BudgetModal = ({
     setForm({ ...initialForm });
     setErr("");
     setRefsOpen(false);
+    setScanOpen(false);
+    setScannedReceipt(null);
+    uploadedIssuedUrlRef.current = null;
     onClose();
+  };
+
+  // Receipt scan result → fills the Amount input and marks the form as
+  // scan-attached (identifier chip under the amount). Validation (balance,
+  // conflict, required fields) still runs on submit as usual.
+  const handleScanConfirm = ({ total, vendor, fileName, file } = {}) => {
+    if (!(Number(total) > 0)) return;
+    setForm((f) => ({ ...f, amount: String(total) }));
+    if (file) {
+      setScannedReceipt({ file, fileName: fileName || "", vendor: vendor || "" });
+      uploadedIssuedUrlRef.current = null;
+    }
+    notifySuccess(`Scanned amount ${formatMoney(Number(total))} applied.`);
+  };
+
+  const handleRemoveScan = () => {
+    if (saving) return;
+    setScannedReceipt(null);
+    uploadedIssuedUrlRef.current = null;
   };
 
   useEffect(() => {
@@ -399,6 +524,8 @@ const BudgetModal = ({
         setForm({ ...initialForm });
         setErr("");
         setRefsOpen(false);
+        setScannedReceipt(null);
+        uploadedIssuedUrlRef.current = null;
         onClose();
       }
     };
@@ -547,6 +674,25 @@ const BudgetModal = ({
 
     setSaving(true);
     try {
+      // Scanned attachment (Issue Budget only): upload the held receipt once
+      // so its URL can be stored on the `issued_budget` row. Skipped entirely
+      // when nothing was scanned.
+      let scannedImageUrl;
+      if (!isAddBudget && scannedReceipt?.file) {
+        const cached = uploadedIssuedUrlRef.current;
+        if (cached && cached.file === scannedReceipt.file && cached.url) {
+          scannedImageUrl = cached.url;
+        } else {
+          scannedImageUrl = await uploadIssuedReceiptImage.mutateAsync(
+            scannedReceipt.file,
+          );
+          uploadedIssuedUrlRef.current = {
+            file: scannedReceipt.file,
+            url: scannedImageUrl,
+          };
+        }
+      }
+
       const body = isAddBudget
         ? {
             type: "addBudget",
@@ -564,11 +710,14 @@ const BudgetModal = ({
             method: form.method,
             description: form.description,
             note: form.note,
+            ...(scannedImageUrl ? { image_url: scannedImageUrl } : {}),
           };
 
       await create.mutateAsync(body);
       setForm({ ...initialForm });
       setErr("");
+      setScannedReceipt(null);
+      uploadedIssuedUrlRef.current = null;
       onClose();
       // Admin-only: success toast is gated so only the admin who submitted
       // sees it. The inline banner (setErr) stays as the in-modal signal.
@@ -780,6 +929,17 @@ const BudgetModal = ({
                       onChange={set("amount")}
                       saving={saving}
                       locked={amountLocked}
+                      onScan={() => setScanOpen(true)}
+                      scanned={
+                        scannedReceipt
+                          ? {
+                              previewUrl: scanPreviewUrl,
+                              fileName: scannedReceipt.fileName,
+                              vendor: scannedReceipt.vendor,
+                            }
+                          : null
+                      }
+                      onRemoveScan={handleRemoveScan}
                     >
                       <AnimatePresence initial={false}>
                         {exceedsBalance && (
@@ -903,6 +1063,12 @@ const BudgetModal = ({
               onAdd={addReference}
               onDelete={removeReference}
               onClose={() => setRefsOpen(false)}
+            />
+
+            <BudgetScanModal
+              open={scanOpen}
+              onClose={() => setScanOpen(false)}
+              onConfirm={handleScanConfirm}
             />
           </div>
         </motion.div>

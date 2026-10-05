@@ -21,6 +21,20 @@ export const budgetsApi = {
     apiClient
       .post("/budgets", payload)
       .then((r) => r.data.budget ?? r.data.issuedBudget ?? r.data),
+  // Deferred receipt upload for the Issue Budget scan flow: sends the single
+  // held receipt (`file`) in ONE multipart request — called only when the
+  // issuance is confirmed, so nothing lands in
+  // `uploads/receipts_issued_budget` before that. Responds `{ image_url }`,
+  // stored on the `issued_budget` row by the create call that follows.
+  uploadIssuedReceiptImage: (file) => {
+    const form = new FormData();
+    form.append("file", file);
+    return apiClient
+      .post("/budgets/issued-receipt-image", form, {
+        headers: { "Content-Type": "multipart/form-data" },
+      })
+      .then((r) => r.data.image_url);
+  },
   // Deletes a budget reference row (hard delete, cascades to dependent rows)
   removeReference: (referenceId) =>
     apiClient.delete(`/budgets/${referenceId}`).then((r) => r.data),

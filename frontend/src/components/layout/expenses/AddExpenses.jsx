@@ -529,10 +529,9 @@ const AddExpenses = () => {
             items[index].totalAmount,
           )} value`,
       );
-      const message =
-        `Cannot proceed with your request — ${zeroLabels.join(
-          ", ",
-        )}. Every item must be greater than zero, please add a value or remove the line to proceed.`;
+      const message = `Cannot proceed with your request — ${zeroLabels.join(
+        ", ",
+      )}. Every item must be greater than zero, please add a value or remove the line to proceed.`;
       setFormError(message);
       notifyError(message);
       return;

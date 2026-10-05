@@ -159,6 +159,7 @@ class Budget {
     description,
     method,
     note,
+    image_url = null,
   }) {
     return withTransaction(async (client) => {
       const q = (text, params) => client.query(text, params);
@@ -224,11 +225,11 @@ class Budget {
       const issuedBudget = (
         await q(
           `INSERT INTO issued_budget
-             (issued_ref_id, amount, description, method, notes)
+             (issued_ref_id, amount, description, method, notes, image_url)
            VALUES
-             ($1, $2, $3, $4, $5)
+             ($1, $2, $3, $4, $5, $6)
            RETURNING *`,
-          [issuedReference.id, amount, description, method, note],
+          [issuedReference.id, amount, description, method, note, image_url],
         )
       ).rows[0];
 
@@ -626,6 +627,7 @@ class Budget {
           ib.notes,
           ib.amount::float8 AS amount,
           ib.method,
+          ib.image_url,
           ib.created_at AS date_issued,
           bib.status
        FROM budget_issued_reference bib
@@ -1070,8 +1072,7 @@ class Budget {
     });
   }
 
-  // Permanently deletes ONE cancelled `issued_budget` row (hard delete) plus
-  // its parent `budget_issued_reference` when the deleted row was its last
+  // Permanently deletes ONE cancelled `issued_budget` row (hard delete) plus  // its parent `budget_issued_reference` when the deleted row was its last
   // child. Business-rule refusals resolve (never throw — same style as the
   // transfer cancel guard):
   //   - row missing → `{ notFound: true }`
@@ -1159,6 +1160,21 @@ class Budget {
         reference_id: found.reference_id ?? null,
       };
     });
+  }
+
+  // How many surviving `issued_budget` rows still point at an
+  // `uploads/receipts_issued_budget` URL — the delete controller drops the
+  // file only once the count hits zero, so a shared image is never removed
+  // while another row still references it.
+  static async countIssuedByImageUrl(image_url) {
+    if (!image_url) return 0;
+    const result = await query(
+      `SELECT COUNT(*)::int AS count
+         FROM issued_budget
+        WHERE image_url = $1`,
+      [image_url],
+    );
+    return result.rows[0]?.count ?? 0;
   }
 }
 

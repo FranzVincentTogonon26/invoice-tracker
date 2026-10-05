@@ -51,6 +51,10 @@ export const createbudgetSchema = z
 
     // Optional field used only by issuedBudget (DB column: notes).
     note: z.string().optional(),
+    // Optional scanned-receipt image for issuedBudget (DB column:
+    // issued_budget.image_url) — the public /api/uploads URL minted by the
+    // issued receipt upload endpoint when the admin confirms the issuance.
+    image_url: z.string().optional(),
     approved: z.string().optional(),
   })
   .refine((data) => data.type !== "issuedBudget" || Boolean(data.employeeId), {
