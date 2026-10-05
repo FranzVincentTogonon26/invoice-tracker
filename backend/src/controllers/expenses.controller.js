@@ -165,13 +165,20 @@ export const create = async (req, res, next) => {
     });
     {
       const total = rows.reduce((s, r) => s + (Number(r.amount) || 0), 0);
+      // Fan-out: the global `transactions` room + `role:admin` keep every
+      // admin ledger (incl. AdminEmployees -> EmployeesTable issued / spent /
+      // remaining / progressbar / %) fresh with no refresh. The actor's own
+      // `user:<id>` room is always included too so their OTHER sessions/tabs
+      // drop the row silently as well (the saving tab already refreshes via
+      // its mutation onSuccess). All rows belong to `req.user.id`, so one id
+      // covers every affected personal room.
       emitTransaction({
         action: "create",
         entity: "expense",
         actor: req.user,
         message: `${req.user.role === "employee" ? "Employee spent" : "Recorded"} ${rows.length} expense line${rows.length === 1 ? "" : "s"} (${new Intl.NumberFormat("en-US", { style: "currency", currency: "PHP" }).format(total)}).`,
         metadata: { count: rows.length, amount: total, userId: req.user.id, reference_id: referenceId, ids: rows.map((r) => r.id ?? null).filter(Boolean) },
-        notifyUserIds: req.user.role === "employee" ? [] : rows.map((r) => r.user_id ?? null).filter(Boolean),
+        notifyUserIds: [req.user.id],
       });
     }
     return res.status(201).json({

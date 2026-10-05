@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import toast from "react-hot-toast";
 import { connectSocket, getSocket } from "../lib/socket";
@@ -16,6 +16,9 @@ const MONEY_KEYS = [
   ["employeeOverview"],
   ["employeeBudget"],
   ["employees"],
+  // Admin audit trail (sourced from backend/logs/transactions.md) — every
+  // money event appends a row there, so the visible page refetches live.
+  ["auditLogs"],
 ];
 
 const ALLOWED_ACTIONS = new Set([
@@ -57,21 +60,22 @@ const safeText = (v, max = 200) => {
   return v.replace(/[\u0000-\u001F\u007F]/g, " ").slice(0, max);
 };
 
-const describe = (p) => {
-  if (!p) return "Ledger updated";
-  const m = safeText(p.message, 200);
-  if (m) return m;
-  return `${p.action ?? "update"} · ${p.entity ?? "transaction"}`;
-};
-
 /**
  * Global realtime subscription. Mount ONCE near the root (App) while a user
- * is signed in:
+ * is signed in.
+ *
+ * TOAST POLICY (actor-only): success/error popups fire ONLY on the device
+ * that performed the action, from that action's own mutation handler
+ * (BudgetModal, AddExpenses, BudgetTransfer, row actions, ...). Socket
+ * events NEVER toast about someone else's activity — they only invalidate
+ * react-query caches so every ledger refreshes silently:
  * - `transactions:changed` -> invalidate every money query (admin ledger +
- *   all employee ledgers stay in sync without refetch spam).
+ *   all employee ledgers stay in sync without refetch spam). No toast.
  * - `balance:changed` -> same invalidation, no toast (too noisy).
- * - `employee:activity` (admins) / any employee-authored change -> toast so
- *   money moves are impossible to miss.
+ * - `employee:activity` -> same invalidation, no toast (admin radar is
+ *   silent; the employee already toasted on their own device).
+ * Personally-targeted security notices still toast because they ARE about
+ * you:
  * - `force:logout` -> session ended by admin (deactivated/removed).
  * - `force:reconnect` -> credential expired; transport already dropped
  *   server-side, reconnect with the fresh token.
@@ -81,7 +85,6 @@ const describe = (p) => {
 export function useRealtime({ enableToasts = true } = {}) {
   const qc = useQueryClient();
   const { user } = useAuth();
-  const lastToast = useRef(0);
 
   useEffect(() => {
     if (!user) return;
@@ -89,9 +92,18 @@ export function useRealtime({ enableToasts = true } = {}) {
     // No token (or unresolvable URL): stay on HTTP polling, never crash.
     if (!socket) return undefined;
 
+    // Prefix match (exact: false): ["employees"] covers both the roster list
+    // (["employees", params]) and the stat cards (["employees", "overview"]),
+    // so an employee's expense save refreshes issued / spent / remaining /
+    // progressbar / % on AdminEmployees -> EmployeesTable with no refresh.
+    // refetchType "active" refetches mounted views immediately.
     const invalidateMoney = () => {
       for (const key of MONEY_KEYS) {
-        qc.invalidateQueries({ queryKey: key });
+        qc.invalidateQueries({
+          queryKey: key,
+          exact: false,
+          refetchType: "active",
+        });
       }
     };
     // Coalesce bursts (e.g. settle N rows emits once, but double-fire safe).
@@ -101,23 +113,12 @@ export function useRealtime({ enableToasts = true } = {}) {
       t = setTimeout(invalidateMoney, 150);
     };
 
+    // Actor-only toasts: your own saves already toasted from their mutation
+    // handlers, so someone else's write must NEVER pop a toast here — just
+    // refresh silently via invalidateSoon() above.
     const onChanged = (payload) => {
       if (!isValidPayload(payload)) return;
       invalidateSoon();
-      if (!enableToasts) return;
-      // Toast only for writes by SOMEONE ELSE — your own saves already toast
-      // from their mutation handlers.
-      const mine = payload?.actor?.id && payload.actor.id === user?.user_id;
-      const movesMoney = ["create", "delete", "status", "settle", "transfer"].includes(
-        payload?.action,
-      );
-      if (movesMoney && !mine) {
-        const now = Date.now();
-        if (now - lastToast.current > 2500) {
-          lastToast.current = now;
-          toast.success(describe(payload), { id: "realtime-change" });
-        }
-      }
     };
 
     const onBalance = (payload) => {
@@ -125,16 +126,11 @@ export function useRealtime({ enableToasts = true } = {}) {
       invalidateSoon();
     };
 
+    // Actor-only toasts: the employee already toasted on their own device,
+    // so the admin radar stays silent too — just refresh via invalidateSoon().
     const onEmployeeActivity = (payload) => {
       if (!isValidPayload(payload)) return;
       invalidateSoon();
-      // Admin radar: every employee money move toasts, even beside the ledger.
-      if (!enableToasts || user?.role !== "admin") return;
-      const now = Date.now();
-      if (now - lastToast.current > 2500) {
-        lastToast.current = now;
-        toast(`Employee update: ${describe(payload)}`, { id: "employee-activity" });
-      }
     };
 
     const onForceLogout = (payload = {}) => {

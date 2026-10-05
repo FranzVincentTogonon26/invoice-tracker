@@ -477,13 +477,20 @@ export const removeIssuedTransaction = async (req, res, next) => {
         "ISSUED_HAS_EXPENSES",
       );
 
+    // Ownership lives on the parent `budget_issued_reference` (the child
+    // `issued_budget` row has no `user_id`), so the model surfaces it as
+    // `result.userId`. Targeting the owner's personal room is what makes the
+    // employee ledger drop the row over the socket with no manual refresh —
+    // the global `transactions` room is admin-only and never reaches them.
+    const ownerId = result.userId ?? result.deleted?.user_id ?? null;
+
     emitTransaction({
       action: "delete",
       entity: "issued-budget",
       actor: req.user,
       message: `Permanently deleted cancelled issuance (${result.deleted?.id ?? id}).`,
-      metadata: { id, userId: result.deleted?.user_id ?? null, amount: result.deleted?.amount ?? null },
-      notifyUserIds: result.deleted?.user_id ? [result.deleted.user_id] : [],
+      metadata: { id, userId: ownerId, amount: result.deleted?.amount ?? null, reference_id: result.reference_id ?? null, issuedId: result.deleted?.id ?? id },
+      notifyUserIds: ownerId ? [ownerId] : [],
     });
 
     return res.status(200).json({ issuedTransaction: result.deleted });

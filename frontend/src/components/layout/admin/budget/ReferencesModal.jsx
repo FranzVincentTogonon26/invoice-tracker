@@ -16,6 +16,8 @@ import toast from "react-hot-toast";
 import { formatDate } from "../../../../lib/utils";
 import { useBudgetMutations } from "../../../../hooks/useBudget";
 import useSmoothScroll from "../../../../hooks/useSmoothScroll";
+import { useAuth } from "../../../../context/AuthContext";
+import { USER_ROLES } from "../../../../constants";
 
 const ERROR_VISIBLE_MS = 5000;
 
@@ -32,6 +34,19 @@ const ReferencesModal = ({
   const [err, setErr] = useState("");
   const [adding, setAdding] = useState(false);
   const [deletingId, setDeletingId] = useState(null);
+
+  // Admin-only toast boundary — same rule as BudgetModal: success/error
+  // popups from this form are visible to admins only.
+  const { user } = useAuth();
+  const isAdmin = user?.role === USER_ROLES.ADMIN;
+  const notifySuccess = (message) => {
+    if (!isAdmin) return;
+    toast.success(message);
+  };
+  const notifyError = (message) => {
+    if (!isAdmin) return;
+    toast.error(message);
+  };
 
   useEffect(() => {
     if (!err) return undefined;
@@ -63,7 +78,9 @@ const ReferencesModal = ({
 
     const label = newRef.trim();
     if (!label) {
-      setErr("Reference name/label is required.");
+      const message = "Reference name/label is required.";
+      setErr(message);
+      notifyError(message);
       return;
     }
 
@@ -77,9 +94,11 @@ const ReferencesModal = ({
 
       setNewRef("");
       onClose();
-      toast.success(`Reference "${label}" added!`);
+      notifySuccess(`Reference "${label}" added!`);
     } catch (error) {
-      setErr(error?.message || "Couldn't add reference");
+      const message = error?.message || "Couldn't add reference";
+      setErr(message);
+      notifyError(message);
     } finally {
       setAdding(false);
     }
@@ -92,9 +111,11 @@ const ReferencesModal = ({
     try {
       await remove.mutateAsync(referenceId);
       onDelete?.(referenceId);
-      toast.success("Reference removed!");
+      notifySuccess("Reference removed!");
     } catch (error) {
-      setErr(error?.message || "Couldn't remove reference");
+      const message = error?.message || "Couldn't remove reference";
+      setErr(message);
+      notifyError(message);
     } finally {
       setDeletingId(null);
     }

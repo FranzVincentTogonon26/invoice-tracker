@@ -308,14 +308,6 @@ export const initSocket = (httpServer) => {
 
     const releaseSlot = () => {
       try {
-        const ip = socket.data.ip ?? clientIp(socket);
-        const left = (socketsPerIp.get(ip) ?? 1) - 1;
-        if (left <= 0) socketsPerIp.delete(ip);
-        else socketsPerIp.set(ip, left);
-      } catch {
-        // best-effort
-      }
-      try {
         if (socket.data.expTimer) clearTimeout(socket.data.expTimer);
       } catch {
         // best-effort

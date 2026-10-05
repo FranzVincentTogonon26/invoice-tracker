@@ -13,6 +13,16 @@ export const apiClient = axios.create({
 apiClient.interceptors.request.use((config) => {
   const token = getToken();
   if (token) config.headers.Authorization = `Bearer ${token}`;
+  // Device clock for the audit trail: every mutating request carries the
+  // device's own wall time so `backend/logs/transactions.md` records what
+  // the user actually saw on their clock (e.g. 10-05-2025 2:33:13 PM),
+  // not the server's UTC. Offset = minutes ahead of UTC.
+  try {
+    config.headers["X-Client-At"] = String(Date.now());
+    config.headers["X-Client-Tz"] = String(-new Date().getTimezoneOffset());
+  } catch {
+    // best-effort: logging headers must never break a request
+  }
   return config;
 });
 

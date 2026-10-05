@@ -1090,6 +1090,8 @@ class Budget {
           await q(
             `SELECT ib.id,
                     ib.issued_ref_id,
+                    bir.user_id,
+                    bir.reference_id,
                     bir.status
                FROM issued_budget ib
                JOIN budget_issued_reference bir ON bir.id = ib.issued_ref_id
@@ -1145,7 +1147,17 @@ class Budget {
         parentPruned = true;
       }
 
-      return { notFound: false, deleted: deleted ?? null, parentPruned };
+      // `issued_budget` carries no `user_id` (ownership lives on the parent
+      // `budget_issued_reference`), so surface it from the locked parent row.
+      // Without this the controller can't target the owner's personal socket
+      // room and the employee ledger never refreshes on delete.
+      return {
+        notFound: false,
+        deleted: deleted ?? null,
+        parentPruned,
+        userId: found.user_id ?? null,
+        reference_id: found.reference_id ?? null,
+      };
     });
   }
 }

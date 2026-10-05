@@ -28,6 +28,7 @@ import EmployeeSetting from "../pages/employee/EmployeeSetting";
 
 import AddExpenses from "../components/layout/expenses/AddExpenses";
 import BudgetTransfer from "../components/layout/budget_transfer/BudgetTransfer";
+import AdminAuditLogs from "../pages/admin/AdminAuditLogs";
 
 export const router = createBrowserRouter([
   {
@@ -61,6 +62,7 @@ export const router = createBrowserRouter([
               { path: "expenses/add", element: <AddExpenses /> },
               { path: "budget-transfer", element: <BudgetTransfer /> },
               { path: "profile", element: <AdminProfile /> },
+              { path: "audit-logs", element: <AdminAuditLogs /> },
             ],
           },
         ],

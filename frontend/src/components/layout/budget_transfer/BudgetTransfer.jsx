@@ -176,13 +176,6 @@ const BudgetTransfer = () => {
     }
   };
 
-  const handleCancel = () => {
-    if (saving) return;
-    setConfirmOpen(false);
-    setForm(initialForm);
-    setErrors({});
-  };
-
   const confirmSummary = recipient && amountNum != null && (
     <div className="mt-4 space-y-2 rounded-2xl border border-[var(--border)] bg-[var(--surface-2)]/60 px-4 py-3">
       <div className="flex items-center justify-between gap-3">
@@ -327,6 +320,7 @@ const BudgetTransfer = () => {
             onChange={set("employee")}
             placeholder={isLoading ? "Loading employees…" : "Select employee"}
             disabled={saving || isLoading}
+            searchable={false}
             buttonClassName="h-auto rounded-2xl px-3.5 py-3 bg-[var(--surface-2)] shadow-none"
             renderTrigger={(selectedOption) =>
               selectedOption ? (
@@ -485,11 +479,11 @@ const BudgetTransfer = () => {
             <Button
               type="button"
               variant="outline"
-              onClick={handleCancel}
+              onClick={() => nav(-1)}
               disabled={saving}
               className="w-full"
             >
-              Cancel
+              Discard
             </Button>
             <Button
               type="button"

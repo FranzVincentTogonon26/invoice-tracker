@@ -28,10 +28,15 @@ const NAV = [
     label: "Dashboard",
     primary: true,
   },
-  { to: "/admin/budget", icon: FileText, label: "Budget", primary: true,
+  {
+    to: "/admin/budget",
+    icon: FileText,
+    label: "Budget",
+    primary: true,
     // Budget Transfer is a sub-page of Budget — keep this row highlighted
     // while it is open.
-    match: ["/admin/budget-transfer"] },
+    match: ["/admin/budget-transfer"],
+  },
   {
     to: "/admin/transaction",
     icon: ArrowLeftRight,
@@ -40,12 +45,12 @@ const NAV = [
   { to: "/admin/employees", icon: Users, label: "Employees", primary: true },
   { to: "/admin/expenses", icon: Receipt, label: "Expenses", primary: true },
   {
-    to: "/reconciliation",
+    to: "/admin/reimbursement",
     icon: HandshakeIcon,
-    label: "Reconciliation",
+    label: "Reimbursement",
   },
   { to: "/admin/reports", icon: BarChart3, label: "Reports" },
-  { to: "/admin/reports", icon: Logs, label: "Audit Logs" },
+  { to: "/admin/audit-logs", icon: Logs, label: "Audit Logs" },
 ];
 
 // `md` is the hand-off point: from here up the hover-expanding rail is used,
@@ -79,9 +84,7 @@ const LABEL_BASE =
 const isActivePath = (pathname, { to, match }) =>
   pathname === to ||
   pathname.startsWith(`${to}/`) ||
-  (match ?? []).some(
-    (p) => pathname === p || pathname.startsWith(`${p}/`),
-  );
+  (match ?? []).some((p) => pathname === p || pathname.startsWith(`${p}/`));
 
 function NavItem({ to, icon: Icon, label, match }) {
   const { pathname } = useLocation();
@@ -187,36 +190,36 @@ function MobileDock({ onOpenMenu }) {
           const { to, icon: Icon, label } = item;
           const isActive = isActivePath(pathname, item);
           return (
-          <NavLink key={to} to={to} title={label} className={DOCK_CELL}>
-            <span
-              className={cn(
-                DOCK_INNER,
-                isActive
-                  ? "text-[var(--accent-strong)]"
-                  : "text-[var(--ink-muted)]",
-              )}
-            >
-              {isActive && (
-                <motion.span
-                  layoutId="mobile-dock-active"
-                  className="absolute inset-0 rounded-2xl bg-[var(--accent-soft)]"
-                  transition={{
-                    type: "spring",
-                    duration: 0.45,
-                    bounce: 0.18,
-                  }}
+            <NavLink key={to} to={to} title={label} className={DOCK_CELL}>
+              <span
+                className={cn(
+                  DOCK_INNER,
+                  isActive
+                    ? "text-[var(--accent-strong)]"
+                    : "text-[var(--ink-muted)]",
+                )}
+              >
+                {isActive && (
+                  <motion.span
+                    layoutId="mobile-dock-active"
+                    className="absolute inset-0 rounded-2xl bg-[var(--accent-soft)]"
+                    transition={{
+                      type: "spring",
+                      duration: 0.45,
+                      bounce: 0.18,
+                    }}
+                  />
+                )}
+                <Icon
+                  size={20}
+                  strokeWidth={isActive ? 2.4 : 2}
+                  className="relative z-10"
                 />
-              )}
-              <Icon
-                size={20}
-                strokeWidth={isActive ? 2.4 : 2}
-                className="relative z-10"
-              />
-              <span className="relative z-10 max-w-full truncate text-[12px] font-medium leading-none">
-                {label}
+                <span className="relative z-10 max-w-full truncate text-[12px] font-medium leading-none">
+                  {label}
+                </span>
               </span>
-            </span>
-          </NavLink>
+            </NavLink>
           );
         })}
 
@@ -352,35 +355,35 @@ function MobileMenuSheet({ open, onClose, onLogout, user }) {
                 const { to, icon: Icon, label } = item;
                 const isActive = isActivePath(location.pathname, item);
                 return (
-                <NavLink
-                  key={to}
-                  to={to}
-                  onClick={onClose}
-                  className="block min-w-0 focus-visible:outline-none"
-                >
-                  <span
-                    className={cn(
-                      SHEET_TILE,
-                      isActive
-                        ? "border-[var(--accent)]/35 bg-[var(--accent-soft)] text-[var(--accent-strong)] shadow-card"
-                        : "border-[var(--border)] bg-[var(--surface)] text-[var(--ink-muted)]",
-                    )}
+                  <NavLink
+                    key={to}
+                    to={to}
+                    onClick={onClose}
+                    className="block min-w-0 focus-visible:outline-none"
                   >
                     <span
                       className={cn(
-                        "flex h-9 w-9 shrink-0 items-center justify-center rounded-xl",
+                        SHEET_TILE,
                         isActive
-                          ? "bg-[var(--surface)] text-[var(--accent-strong)]"
-                          : "bg-[var(--surface-2)]",
+                          ? "border-[var(--accent)]/35 bg-[var(--accent-soft)] text-[var(--accent-strong)] shadow-card"
+                          : "border-[var(--border)] bg-[var(--surface)] text-[var(--ink-muted)]",
                       )}
                     >
-                      <Icon size={16} />
-                    </span>
+                      <span
+                        className={cn(
+                          "flex h-9 w-9 shrink-0 items-center justify-center rounded-xl",
+                          isActive
+                            ? "bg-[var(--surface)] text-[var(--accent-strong)]"
+                            : "bg-[var(--surface-2)]",
+                        )}
+                      >
+                        <Icon size={16} />
+                      </span>
                       <span className="truncate text-sm font-semibold tracking-tight">
                         {label}
                       </span>
                     </span>
-                </NavLink>
+                  </NavLink>
                 );
               })}
             </div>

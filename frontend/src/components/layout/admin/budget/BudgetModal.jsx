@@ -25,6 +25,8 @@ import {
 import useSmoothScroll from "../../../../hooks/useSmoothScroll";
 import { formatMoney } from "../../../../lib/utils";
 import toast from "react-hot-toast";
+import { useAuth } from "../../../../context/AuthContext";
+import { USER_ROLES } from "../../../../constants";
 
 const APPROVER = "Franz Vincent";
 
@@ -268,18 +270,21 @@ function AmountInput({ value, onChange, disabled }) {
 }
 
 function AmountField({ value, onChange, saving, locked, children }) {
+  const { user } = useAuth();
+  const isAdmin = user?.role === USER_ROLES.ADMIN;
+
+  const notifyLocked = () => {
+    // Admin-only toast — non-admins never see this popup.
+    if (!isAdmin) return;
+    toast.error("Select a budget reference first, then enter an amount.", {
+      id: "amount-locked",
+    });
+  };
+
   return (
     <Field label="Amount">
       <div
-        onClick={
-          locked
-            ? () =>
-                toast.error(
-                  "Select a budget reference first, then enter an amount.",
-                  { id: "amount-locked" },
-                )
-            : undefined
-        }
+        onClick={locked ? notifyLocked : undefined}
         className={locked ? "cursor-not-allowed" : undefined}
       >
         <AmountInput
@@ -322,6 +327,21 @@ const BudgetModal = ({
   const [form, setForm] = useState(initialForm);
   const [err, setErr] = useState("");
   const [saving, setSaving] = useState(false);
+
+  // Toast visibility boundary — this modal lives on admin routes, but the
+  // success/error popups must never leak to non-admin sessions (e.g. a stale
+  // closure or a shared socket toast). Every toast below goes through the
+  // admin gate.
+  const { user } = useAuth();
+  const isAdmin = user?.role === USER_ROLES.ADMIN;
+  const notifySuccess = (message) => {
+    if (!isAdmin) return;
+    toast.success(message);
+  };
+  const notifyError = (message) => {
+    if (!isAdmin) return;
+    toast.error(message);
+  };
 
   const [references, setReferences] = useState(budgetReferences);
   const [refsOpen, setRefsOpen] = useState(false);
@@ -519,6 +539,9 @@ const BudgetModal = ({
     const validationError = validate();
     if (validationError) {
       setErr(validationError);
+      // Admin-only: validation failures toast for the submitter (admin),
+      // never for other roles.
+      notifyError(validationError);
       return;
     }
 
@@ -547,13 +570,19 @@ const BudgetModal = ({
       setForm({ ...initialForm });
       setErr("");
       onClose();
-      toast.success(
+      // Admin-only: success toast is gated so only the admin who submitted
+      // sees it. The inline banner (setErr) stays as the in-modal signal.
+      notifySuccess(
         isAddBudget
           ? "Budget added successfully!"
           : "Budget issued successfully!",
       );
     } catch (error) {
-      setErr(error?.message || "Couldn't save budget");
+      const message = error?.message || "Couldn't save budget";
+      setErr(message);
+      // Admin-only: server failures toast for the submitter (admin), never
+      // for other roles.
+      notifyError(message);
     } finally {
       setSaving(false);
     }

@@ -35,6 +35,28 @@ const authMiddleware = async (req, res, next) => {
       // account is still active without a second users-table round trip.
       status: user.status,
     };
+
+    // Device clock for the audit trail (`X-Client-At` = device epoch ms,
+    // `X-Client-Tz` = minutes ahead of UTC). Validated and skew-guarded
+    // here so the transaction logger can record the wall time the user
+    // actually saw on their device. Missing/garbage/skewed values fall back
+    // to the server clock downstream.
+    try {
+      const at = Number(req.header("x-client-at"));
+      const tz = Number.parseInt(req.header("x-client-tz"), 10);
+      if (
+        Number.isFinite(at) &&
+        Math.abs(at - Date.now()) <= 24 * 60 * 60 * 1000 &&
+        Number.isFinite(tz) &&
+        tz >= -720 &&
+        tz <= 840
+      ) {
+        req.user.clientAt = at;
+        req.user.clientTz = tz;
+      }
+    } catch {
+      // best-effort: a bad clock header must never break auth
+    }
     next();
   } catch (err) {
     if (err.isApiError) return next(err);

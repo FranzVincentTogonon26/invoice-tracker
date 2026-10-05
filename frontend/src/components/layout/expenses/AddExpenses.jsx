@@ -233,7 +233,21 @@ const AddExpenses = () => {
 
   const isActiveSession = Boolean(user?.user_id && user?.status === "active");
   const isEmployee = user?.role === USER_ROLES.EMPLOYEE;
+  const isAdmin = user?.role === USER_ROLES.ADMIN;
   const sourceMode = isEmployee ? "balance" : "budget";
+
+  // Toast visibility boundary — AddExpenses is shared by both roles, so every
+  // popup below goes through these helpers: only the submitter's own session
+  // (employee submit → employee sees, admin submit → admin sees) ever shows
+  // one. No toast fires for inactive sessions or other roles.
+  const notifySuccess = (message) => {
+    if (!isActiveSession || (!isEmployee && !isAdmin)) return;
+    toast.success(message);
+  };
+  const notifyError = (message) => {
+    if (!isActiveSession || (!isEmployee && !isAdmin)) return;
+    toast.error(message);
+  };
 
   const categoryOptions = useMemo(
     () =>
@@ -261,7 +275,7 @@ const AddExpenses = () => {
   // the same files twice.
   const saving = create.isPending || uploadReceiptImages.isPending;
   const { loading: suggesting, suggest } = useExpenseSuggestion({
-    onError: (message) => toast.error(message),
+    onError: (message) => notifyError(message),
   });
 
   useEffect(() => {
@@ -471,23 +485,26 @@ const AddExpenses = () => {
     setShowZeroAmountErrors(true);
 
     if (!isActiveSession) {
-      setFormError(
-        "Your login must belong to an active user account to save expenses — contact an administrator.",
-      );
+      const message =
+        "Your login must belong to an active user account to save expenses — contact an administrator.";
+      setFormError(message);
+      notifyError(message);
       return;
     }
 
     if (funding.sources.length === 0) {
-      setFormError(
-        isEmployee
-          ? "No remaining balance found — ask your admin to issue budget or add abono before saving."
-          : "No source of funds detected — add a budget source before saving.",
-      );
+      const message = isEmployee
+        ? "No remaining balance found — ask your admin to issue budget or add abono before saving."
+        : "No source of funds detected — add a budget source before saving.";
+      setFormError(message);
+      notifyError(message);
       return;
     }
 
     if (!selectedReferenceId) {
-      setFormError("Please select source of funds to proceed.");
+      const message = "Please select source of funds to proceed.";
+      setFormError(message);
+      notifyError(message);
       return;
     }
 
@@ -499,7 +516,9 @@ const AddExpenses = () => {
 
     if (touched.length === 0) {
       setShowZeroAmountErrors(false);
-      setFormError("Add at least one expense line before saving.");
+      const message = "Add at least one expense line before saving.";
+      setFormError(message);
+      notifyError(message);
       return;
     }
 
@@ -510,11 +529,12 @@ const AddExpenses = () => {
             items[index].totalAmount,
           )} value`,
       );
-      setFormError(
+      const message =
         `Cannot proceed with your request — ${zeroLabels.join(
           ", ",
-        )}. Every item must be greater than zero, please add a value or remove the line to proceed.`,
-      );
+        )}. Every item must be greater than zero, please add a value or remove the line to proceed.`;
+      setFormError(message);
+      notifyError(message);
       return;
     }
 
@@ -523,24 +543,24 @@ const AddExpenses = () => {
         touchedIndexes.includes(index) && missingFieldsFor(item).length > 0,
     );
     if (invalidIndex >= 0) {
-      setFormError(
-        `Line ${invalidIndex + 1} needs a description and an amount greater than zero.`,
-      );
+      const message = `Line ${invalidIndex + 1} needs a description and an amount greater than zero.`;
+      setFormError(message);
+      notifyError(message);
       return;
     }
 
     if (insufficientFunds) {
-      setFormError(
-        isEmployee
-          ? `Cannot proceed with your request — insufficient funds. These expenses total ${formatMoney(total)}, but only ${formatMoney(funding.balance)} is left in your remaining balance (short by ${formatMoney(funding.shortfall)}). Lower an amount on any line to fit your balance.`
-          : `Cannot proceed with your request — insufficient funds in ${
-              funding.source?.label || "the selected budget source"
-            }. These expenses total ${formatMoney(total)}, but only ${formatMoney(
-              funding.balance,
-            )} is left (short by ${formatMoney(
-              funding.shortfall,
-            )}). Lower an amount or pick another budget source.`,
-      );
+      const message = isEmployee
+        ? `Cannot proceed with your request — insufficient funds. These expenses total ${formatMoney(total)}, but only ${formatMoney(funding.balance)} is left in your remaining balance (short by ${formatMoney(funding.shortfall)}). Lower an amount on any line to fit your balance.`
+        : `Cannot proceed with your request — insufficient funds in ${
+            funding.source?.label || "the selected budget source"
+          }. These expenses total ${formatMoney(total)}, but only ${formatMoney(
+            funding.balance,
+          )} is left (short by ${formatMoney(
+            funding.shortfall,
+          )}). Lower an amount or pick another budget source.`;
+      setFormError(message);
+      notifyError(message);
       return;
     }
 
@@ -621,7 +641,9 @@ const AddExpenses = () => {
       const flaggedCount = touchedIndexes.filter((index) =>
         backdatedLines.includes(index),
       ).length;
-      toast.success(
+      // Submitter-role-only: employee saves toast to the employee, admin saves
+      // toast to the admin (see notify helpers above + realtime gating).
+      notifySuccess(
         `Saved ${touched.length} expense line${touched.length === 1 ? "" : "s"}.${
           flaggedCount > 0
             ? ` ${flaggedCount} dated behind your first issued budget ${
@@ -632,7 +654,10 @@ const AddExpenses = () => {
       );
       nav(isEmployee ? "/employee/expenses" : "/admin/expenses");
     } catch (error) {
-      setFormError(error?.message || "Couldn't save expenses.");
+      const message = error?.message || "Couldn't save expenses.";
+      setFormError(message);
+      // Submitter-role-only: server failures toast to whoever submitted.
+      notifyError(message);
     }
   };
 
