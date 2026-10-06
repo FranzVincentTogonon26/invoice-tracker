@@ -1,19 +1,7 @@
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { abonoApi } from "../api/abono";
 
 export const abonoKey = (params) => ["abono", params || {}];
-
-// Admin Reimbursement page: every abono row across employees (the endpoint
-// scopes employees to their own rows). Nests under ["abono", …] so the
-// shared invalidate below plus the realtime bridge refresh it live.
-export function useAbonoList(params) {
-  const query = useQuery({
-    queryKey: abonoKey(params),
-    queryFn: () => abonoApi.list(params),
-  });
-
-  return { ...query, data: query.data?.abono ?? [] };
-}
 
 // Writes to employee_abono — every mutation refreshes both the admin list
 // key (see abonoKey) and the employee page key (useEmployeeAbono), so a row
@@ -51,19 +39,6 @@ export function useAbonoMutations() {
       mutationFn: abonoApi.settle,
       onSuccess: () => {
         invalidate();
-        qc.invalidateQueries({ queryKey: ["employeeOverview"] });
-        qc.invalidateQueries({ queryKey: ["employeeBudget"] });
-        qc.invalidateQueries({ queryKey: ["employeeExpenses"] });
-      },
-    }),
-    // Admin Reimburse — repays an employee by settling their checked OPEN
-    // rows on their behalf. The employee's own ledger drops the rows over
-    // the socket; the roster overview refreshes here too.
-    reimburse: useMutation({
-      mutationFn: ({ userId, ids }) => abonoApi.reimburse(userId, ids),
-      onSuccess: () => {
-        invalidate();
-        qc.invalidateQueries({ queryKey: ["employees"] });
         qc.invalidateQueries({ queryKey: ["employeeOverview"] });
         qc.invalidateQueries({ queryKey: ["employeeBudget"] });
         qc.invalidateQueries({ queryKey: ["employeeExpenses"] });

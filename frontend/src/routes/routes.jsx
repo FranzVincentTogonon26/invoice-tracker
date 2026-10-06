@@ -31,6 +31,7 @@ import BudgetTransfer from "../components/layout/budget_transfer/BudgetTransfer"
 import AdminAuditLogs from "../pages/admin/AdminAuditLogs";
 import AdminEmployeeReimbursement from "../pages/admin/AdminEmployeeReimbursement";
 import AdminReports from "../pages/admin/AdminReports";
+import AdminSourceFunds from "../pages/admin/AdminSourceFunds";
 
 export const router = createBrowserRouter([
   {
@@ -66,6 +67,7 @@ export const router = createBrowserRouter([
                 path: "reimbursement",
                 element: <AdminEmployeeReimbursement />,
               },
+              { path: "source-funds", element: <AdminSourceFunds /> },
               { path: "reports", element: <AdminReports /> },
               { path: "profile", element: <AdminProfile /> },
               { path: "audit-logs", element: <AdminAuditLogs /> },

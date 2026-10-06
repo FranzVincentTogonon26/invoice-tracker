@@ -1,6 +1,5 @@
 import express from "express";
 import authMiddleware from "../middleware/auth.middleware.js";
-import requireAdminAccess from "../middleware/admin.middleware.js";
 import requireEmployeeAccess from "../middleware/employee.middleware.js";
 import * as abonoController from "../controllers/abono.controller.js";
 
@@ -25,18 +24,6 @@ router.patch(
   authMiddleware,
   requireEmployeeAccess,
   abonoController.settleAbono,
-);
-
-// Reimburse (admin page): repays an employee who spent their own money by
-// settling the checked OPEN abono rows on their behalf. Admin-only — the
-// target account is validated (exists, employee role, active) in the
-// controller. Declared before the "/:id" routes so "reimburse" is never
-// parsed as an abono id.
-router.patch(
-  "/reimburse",
-  authMiddleware,
-  requireAdminAccess,
-  abonoController.reimburseAbono,
 );
 
 router.post("/", authMiddleware, abonoController.create);

@@ -453,7 +453,7 @@ export const cancelIssuedTransaction = async (req, res, next) => {
       );
     if (result.insufficientBalance)
       throw ApiError.badRequest(
-        `Cannot proceed your request — ${result.employeeName || "The employee"} has only ${formatPeso(result.remaining)} remaining balance.`,
+        `Cannot proceed your request — ${result.employeeName || "The employee"} has only ${formatPeso(result.remaining)} remaining balance after their open abono.`,
         "INSUFFICIENT_BALANCE",
       );
 

@@ -14,6 +14,7 @@ import {
   ArrowLeftRight,
   Logs,
   HandshakeIcon,
+  HandCoins,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/context/AuthContext";
@@ -49,6 +50,7 @@ const NAV = [
     icon: HandshakeIcon,
     label: "Reimbursement",
   },
+  { to: "/admin/source-funds", icon: HandCoins, label: "Source of Funds" },
   { to: "/admin/reports", icon: BarChart3, label: "Reports" },
   { to: "/admin/audit-logs", icon: Logs, label: "Audit Logs" },
 ];

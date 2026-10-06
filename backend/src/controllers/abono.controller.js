@@ -1,11 +1,9 @@
 import Abono from "../models/abono.model.js";
-import Employee from "../models/employee.model.js";
 import ApiError from "../utils/ApiError.js";
 import { validate } from "../utils/validate.js";
 import { emitTransaction } from "../realtime/index.js";
 import {
   createAbonoSchema,
-  reimburseAbonoSchema,
   settleAbonoSchema,
   updateAbonoDescriptionSchema,
 } from "../validations/abono.validation.js";
@@ -243,69 +241,6 @@ export const settleAbono = async (req, res, next) => {
         settled.length === 1
           ? "Abono settled."
           : `${settled.length} abono settled.`,
-    });
-  } catch (err) {
-    next(err);
-  }
-};
-
-// PATCH /abono/reimburse — the Admin Reimbursement flow: repays an employee
-// who spent their own money by settling the checked OPEN abono rows ON their
-// behalf. Same money rule as the employee self-settle (the shared
-// `Abono.settleOpen` transaction re-checks the remaining balance, so the
-// repayment can't overdraw the employee's pool). Admin-only at the route
-// layer; the target must be an active employee account. The employee's ledger
-// drops the rows over the socket via their personal room — no refresh needed.
-export const reimburseAbono = async (req, res, next) => {
-  try {
-    const payload = validate(reimburseAbonoSchema, req.body);
-
-    const target = await Employee.findEmployeeById(payload.user_id);
-    if (!target || target.role !== "employee")
-      throw ApiError.notFound("Employee not found", "EMPLOYEE_NOT_FOUND");
-    // NOTE: deliberately NOT the ACCOUNT_NOT_ACTIVE code — that code ends the
-    // caller's session client-side, and here it is the TARGET account that is
-    // inactive, not the admin calling.
-    if (target.status !== "active")
-      throw ApiError.forbidden(
-        `${target.name ?? "That employee"}'s account is not active, so it can't be reimbursed.`,
-        "TARGET_NOT_ACTIVE",
-      );
-
-    const { insufficient, requested, totalBalance, settled } =
-      await Abono.settleOpen(target.user_id, payload.ids);
-
-    if (insufficient) {
-      throw ApiError.badRequest(
-        "Cannot proceed your request due to insufficient balance — the checked abono is more than what remains.",
-        "INSUFFICIENT_BALANCE",
-      );
-    }
-
-    if (settled.length === 0) {
-      throw ApiError.badRequest(
-        "None of the selected abono are still open.",
-        "NOTHING_TO_SETTLE",
-      );
-    }
-
-    emitTransaction({
-      action: "settle",
-      entity: "abono",
-      actor: req.user,
-      message: `${req.user.name ?? "Admin"} reimbursed ${target.name ?? target.user_id} — settled ${settled.length} abono (${requested ?? ""}).`,
-      metadata: { count: settled.length, amount: requested ?? null, userId: target.user_id, ids: settled.map((r) => r.id ?? null).filter(Boolean) },
-      notifyUserIds: [target.user_id],
-    });
-
-    return res.status(200).json({
-      settled,
-      requested,
-      totalBalance,
-      message:
-        settled.length === 1
-          ? `${target.name ?? "Employee"} reimbursed.`
-          : `${settled.length} abono reimbursed for ${target.name ?? "employee"}.`,
     });
   } catch (err) {
     next(err);

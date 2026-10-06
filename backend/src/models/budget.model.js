@@ -893,8 +893,13 @@ class Budget {
       // as the transfer cancel guard. Remaining mirrors
       // EmployeeOverview.totalBalance: open issuances + OPEN abono −
       // PAID expenses − sent transfers + received transfers. It includes
-      // this row (still open), so `amount > remaining` means the take-back
-      // would drive the pool negative.
+      // this row (still open).
+      // Abono-first order: the employee's OPEN abono (the same figure the
+      // AdminEmployeesDetails "abono" value shows) is minused from the
+      // remaining balance BEFORE the issuance amount — the take-back may
+      // only draw from non-abono funds, so a cancel is allowed only when
+      // (remaining − abono) > amount. Settled/draft abono never fund the
+      // pool (the query above counts `status = 'open'` only).
       const pool = (
         await q(
           `SELECT
@@ -936,12 +941,16 @@ class Budget {
           Number(pool.total_received || 0),
       );
       const amount = toMoney(found.amount);
+      // Abono-first: minus the OPEN abono from the remaining balance first,
+      // then measure the issuance amount against what is left.
+      const openAbono = Math.max(0, Number(pool.total_abono || 0));
+      const coverable = toMoney(remaining - openAbono);
 
-      if (amount > remaining)
+      if (!(coverable > amount))
         return {
           insufficientBalance: true,
           amount,
-          remaining,
+          remaining: coverable,
           employeeName: found.employee_name,
         };
 
