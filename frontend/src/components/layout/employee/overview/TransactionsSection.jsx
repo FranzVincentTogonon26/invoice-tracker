@@ -11,7 +11,9 @@ import {
   Landmark,
   Layers,
   Search,
+  ShieldAlert,
   X,
+  XCircle,
   Inbox,
   Wallet,
   ReceiptText,
@@ -289,6 +291,48 @@ const OverviewDetailsBody = ({ row, meta }) => {
             <p className="mt-0.5 text-xs leading-relaxed text-[var(--warning)]/90">
               Dated before the first budget issued to you — an admin needs to
               approve it.
+            </p>
+          </div>
+        </div>
+      )}
+      {isCancelled(row) && (
+        <div
+          role="note"
+          className="flex items-start gap-2.5 rounded-2xl border border-[var(--danger)]/40 bg-[var(--danger)]/[0.1] px-4 py-3"
+        >
+          <XCircle
+            size={14}
+            aria-hidden
+            className="mt-0.5 shrink-0 text-[var(--danger)]"
+          />
+          <div className="min-w-0">
+            <p className="text-xs font-bold text-[var(--danger)]">
+              Expense cancelled
+            </p>
+            <p className="mt-0.5 text-xs leading-relaxed text-[var(--danger)]/90">
+              An admin cancelled your expense — it is not part of your
+              expenses and no longer counts toward your spending.
+            </p>
+          </div>
+        </div>
+      )}
+      {isDraftExpense(row) && (
+        <div
+          role="note"
+          className="flex items-start gap-2.5 rounded-2xl border border-[var(--danger)]/40 bg-[var(--danger)]/[0.1] px-4 py-3"
+        >
+          <ShieldAlert
+            size={14}
+            aria-hidden
+            className="mt-0.5 shrink-0 text-[var(--danger)]"
+          />
+          <div className="min-w-0">
+            <p className="text-xs font-bold text-[var(--danger)]">
+              Under review
+            </p>
+            <p className="mt-0.5 text-xs leading-relaxed text-[var(--danger)]/90">
+              Your expense is under review due to suspicious activity — an
+              admin will approve or cancel it.
             </p>
           </div>
         </div>

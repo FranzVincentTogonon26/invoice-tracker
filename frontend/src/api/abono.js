@@ -28,6 +28,14 @@ export const abonoApi = {
   settle: (ids) =>
     apiClient.patch("/abono/settle", { ids }).then((r) => r.data),
 
+  // Admin Reimburse — repays an employee who spent their own money by
+  // settling the checked OPEN abono rows on their behalf. Admin-only
+  // server-side; the target account is validated there.
+  reimburse: (userId, ids) =>
+    apiClient
+      .patch("/abono/reimburse", { user_id: userId, ids })
+      .then((r) => r.data),
+
   // Row action: permanently removes the abono record.
   remove: (id) => apiClient.delete(`/abono/${id}`).then((r) => r.data),
 };

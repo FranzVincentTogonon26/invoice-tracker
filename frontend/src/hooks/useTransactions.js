@@ -66,6 +66,12 @@ export function useTransactionsMutations() {
         budgetsApi.restoreTransaction(id, status),
       onSuccess: invalidate,
     }),
+    // Budget Given row: permanent delete of a cancelled row (refused
+    // server-side unless already cancelled).
+    removeBudget: useMutation({
+      mutationFn: budgetsApi.removeTransaction,
+      onSuccess: invalidate,
+    }),
     // Budget Issued row: flip the parent reference to 'cancel'.
     cancelIssued: useMutation({
       mutationFn: budgetsApi.cancelIssuedTransaction,
@@ -75,6 +81,13 @@ export function useTransactionsMutations() {
     restoreIssued: useMutation({
       mutationFn: ({ id, status }) =>
         budgetsApi.restoreIssuedTransaction(id, status),
+      onSuccess: invalidate,
+    }),
+    // Budget Issued row: permanent delete of a cancelled row (refused
+    // server-side unless cancelled or when linked expenses exist — and the
+    // scanned receipt file is removed with it).
+    removeIssued: useMutation({
+      mutationFn: budgetsApi.removeIssuedTransaction,
       onSuccess: invalidate,
     }),
     // Expense row: hard delete.

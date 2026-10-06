@@ -4,10 +4,13 @@ import { employeesApi } from "../api/employees";
 /* ── Employees ──────────────────────────────────────────────────── */
 export const employeesKey = (params) => ["employees", params || {}];
 
-export function useEmployees(params) {
+export function useEmployees(params, options = {}) {
   const query = useQuery({
     queryKey: employeesKey(params),
     queryFn: () => employeesApi.list(params),
+    // Extra options let a caller tune the query against the same endpoint
+    // (e.g. the command palette disables it for non-admin roles).
+    ...options,
   });
 
   // The API returns `{ employees: [...] }` — unwrap to the plain array so

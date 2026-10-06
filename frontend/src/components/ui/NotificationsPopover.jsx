@@ -3,33 +3,35 @@ import { useNavigate } from "react-router-dom";
 import { AnimatePresence, motion } from "framer-motion";
 import {
   Bell,
-  FileText,
-  CheckCircle2,
-  AlertTriangle,
-  Send,
+  ArrowLeftRight,
+  HandCoins,
+  Plus,
+  ReceiptText,
+  Wallet,
+  Layers,
 } from "lucide-react";
 import { IconButton } from "@/components/ui/IconButton";
-import { useDashboard } from "@/hooks/useDashboard";
+import { useTransactions } from "@/hooks/useTransactions";
 import { cn, relativeTime, formatMoney } from "@/lib/utils";
 
-const TONE = {
-  paid: "bg-[var(--success)]/12 text-[var(--success)]",
-  overdue: "bg-[var(--danger)]/12 text-[var(--danger)]",
-  sent: "bg-[var(--accent-soft)] text-[var(--accent-strong)]",
-  draft: "bg-[var(--surface-2)] text-[var(--ink-muted)]",
+// Mirrors the unified ledger kinds (see TransactionsTable) — every entry
+// links to a real row on /admin/transaction, never a dead route.
+const KIND_META = {
+  budget: { label: "Budget Given", Icon: Plus, tone: "bg-[var(--surface-2)] text-[var(--ink-muted)]" },
+  issued: { label: "Budget Issued", Icon: HandCoins, tone: "bg-[var(--accent-soft)] text-[var(--accent-strong)]" },
+  expense: { label: "Expense", Icon: ReceiptText, tone: "bg-[var(--warning)]/12 text-[var(--warning)]" },
+  abono: { label: "Abono", Icon: Wallet, tone: "bg-[var(--success)]/12 text-[var(--success)]" },
+  transfer_sent: { label: "Transfer Sent", Icon: ArrowLeftRight, tone: "bg-[var(--danger)]/12 text-[var(--danger)]" },
+  transfer_received: { label: "Transfer Received", Icon: ArrowLeftRight, tone: "bg-[var(--success)]/12 text-[var(--success)]" },
 };
-const ICON = {
-  paid: CheckCircle2,
-  overdue: AlertTriangle,
-  sent: Send,
-  draft: FileText,
-};
+
+const FALLBACK_META = { label: "Activity", Icon: Layers, tone: "bg-[var(--surface-2)] text-[var(--ink-muted)]" };
 
 export function NotificationsPopover() {
   const navigate = useNavigate();
-  const { data } = useDashboard();
-  const invoices = data?.recentInvoices || [];
-  const overdue = data?.stats?.overdueCount || 0;
+  const { transactions } = useTransactions();
+  const recent = (transactions || []).slice(0, 7);
+  const attention = (transactions || []).filter((t) => t.flagged).length;
 
   const [open, setOpen] = useState(false);
   const rootRef = useRef(null);
@@ -55,8 +57,8 @@ export function NotificationsPopover() {
       <IconButton
         onClick={() => setOpen((v) => !v)}
         title="Notifications"
-        dot={overdue > 0}
-        aria-label={`Notifications${overdue ? ` (${overdue} overdue)` : ""}`}
+        dot={attention > 0}
+        aria-label={`Notifications${attention > 0 ? ` (${attention} flagged)` : ""}`}
       >
         <Bell size={16} />
       </IconButton>
@@ -76,36 +78,36 @@ export function NotificationsPopover() {
               <div className="text-sm font-semibold text-[var(--ink)]">
                 Recent activity
               </div>
-              {overdue > 0 && (
+              {attention > 0 && (
                 <span className="text-xs font-semibold text-[var(--danger)] tabular-nums">
-                  {overdue} overdue
+                  {attention} flagged
                 </span>
               )}
             </div>
 
             <div className="max-h-[420px] overflow-y-auto">
-              {invoices.length === 0 ? (
+              {recent.length === 0 ? (
                 <div className="px-5 py-10 text-center">
                   <div className="h-10 w-10 mx-auto rounded-2xl bg-[var(--surface-2)] flex items-center justify-center text-[var(--ink-muted)] mb-3">
-                    <FileText size={16} />
+                    <Bell size={16} />
                   </div>
                   <div className="text-sm font-medium text-[var(--ink)]">
                     Nothing here yet
                   </div>
                   <div className="text-xs text-[var(--ink-muted)] mt-1">
-                    New invoices and payments will show up here.
+                    New budgets, issuances and expenses will show up here.
                   </div>
                 </div>
               ) : (
                 <ul>
-                  {invoices.map((inv, idx) => {
-                    const st = inv.effective_status;
-                    const Icon = ICON[st] || FileText;
+                  {recent.map((tx, idx) => {
+                    const meta = KIND_META[tx.kind] ?? FALLBACK_META;
+                    const Icon = meta.Icon;
                     return (
-                      <li key={inv.id}>
+                      <li key={tx.key ?? tx.id ?? idx}>
                         <button
                           onClick={() => {
-                            navigate(`/invoices/${inv.id}`);
+                            navigate("/admin/transaction");
                             setOpen(false);
                           }}
                           className={cn(
@@ -116,22 +118,21 @@ export function NotificationsPopover() {
                           <div
                             className={cn(
                               "h-9 w-9 rounded-xl flex items-center justify-center shrink-0",
-                              TONE[st] || TONE.draft,
+                              meta.tone,
                             )}
                           >
                             <Icon size={14} />
                           </div>
                           <div className="flex-1 min-w-0">
                             <div className="text-sm font-medium text-[var(--ink)] truncate">
-                              {inv.invoice_number} ·{" "}
-                              {inv.client_name || "No client"}
+                              {tx.description || meta.label}
                             </div>
                             <div className="text-xs text-[var(--ink-muted)] mt-0.5 truncate capitalize">
-                              {st} · {formatMoney(inv.total, inv.currency)}
+                              {meta.label} · {formatMoney(tx.amount)}
                             </div>
                           </div>
                           <div className="text-xs text-[var(--ink-muted)] shrink-0 tabular-nums mt-0.5">
-                            {relativeTime(inv.created_at)}
+                            {relativeTime(tx.date)}
                           </div>
                         </button>
                       </li>
@@ -143,12 +144,12 @@ export function NotificationsPopover() {
 
             <button
               onClick={() => {
-                navigate("/invoices");
+                navigate("/admin/transaction");
                 setOpen(false);
               }}
               className="w-full h-11 border-t border-[var(--border)] text-xs font-semibold text-[var(--accent-strong)] hover:bg-[var(--surface-2)] transition-colors"
             >
-              View all invoices
+              View all activity
             </button>
           </motion.div>
         )}
@@ -156,4 +157,3 @@ export function NotificationsPopover() {
     </div>
   );
 }
-

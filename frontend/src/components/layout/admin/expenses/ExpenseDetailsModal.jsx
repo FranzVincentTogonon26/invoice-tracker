@@ -588,7 +588,6 @@ const ExpenseDetailsModal = ({
               <div className="mt-4 flex rounded-xl bg-[var(--surface-2)] p-1">
                 <button
                   type="button"
-                  onClick={() => setActiveTab("details")}
                   className={cn(
                     "flex-1 rounded-lg py-1.5 text-xs font-semibold transition-all",
                     activeTab === "details"
@@ -600,7 +599,6 @@ const ExpenseDetailsModal = ({
                 </button>
                 <button
                   type="button"
-                  onClick={() => setActiveTab("receipt")}
                   className={cn(
                     "flex-1 flex items-center justify-center gap-1.5 rounded-lg py-1.5 text-xs font-semibold transition-all",
                     activeTab === "receipt"

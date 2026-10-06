@@ -168,6 +168,17 @@ function actionsForRow(row) {
             group: "danger",
           },
     );
+    // Cancelled rows offer a permanent hard delete (with its own confirm
+    // dialog) — live rows must be cancelled first.
+    if (row.status === "cancelled") {
+      items.push({
+        key: "delete-budget",
+        label: "Delete record",
+        Icon: Trash2,
+        danger: true,
+        group: "danger",
+      });
+    }
   }
 
   if (row.kind === "issued") {
@@ -188,6 +199,17 @@ function actionsForRow(row) {
             group: "danger",
           },
     );
+    // Cancelled issuances offer a permanent hard delete (with its own
+    // confirm dialog) — the scanned receipt file is removed with the row.
+    if (row.status === "cancel") {
+      items.push({
+        key: "delete-issued",
+        label: "Delete record",
+        Icon: Trash2,
+        danger: true,
+        group: "danger",
+      });
+    }
   }
 
   if (row.kind === "expense") {

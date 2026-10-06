@@ -6,54 +6,137 @@ import {
   LayoutGrid,
   FileText,
   Users,
-  Settings as SettingsIcon,
+  Receipt,
+  ArrowLeftRight,
+  Logs,
+  UserRound,
   Plus,
+  HandCoins,
+  Wallet,
+  House,
   CornerDownLeft,
 } from "lucide-react";
-import { cn, formatMoney } from "@/lib/utils";
-import { useInvoices } from "@/hooks/useInvoices";
-import { useClients } from "@/hooks/useClients";
+import { cn } from "@/lib/utils";
+import { useAuth } from "@/context/AuthContext";
+import { USER_ROLES } from "@/constants";
+import { useEmployees } from "@/hooks/useEmployees";
+import { EmployeeAvatar } from "@/components/ui/SelectEmployee";
 
-const NAV_ITEMS = [
+// Navigation targets must mirror routes.jsx exactly — every `to` below is a
+// real route, so palette jumps never land on the "*" fallthrough.
+const ADMIN_NAV = [
   {
     id: "nav:dashboard",
     kind: "nav",
     label: "Dashboard",
     hint: "Overview",
-    to: "/dashboard",
+    to: "/admin/dashboard",
     icon: LayoutGrid,
   },
   {
-    id: "nav:invoices",
+    id: "nav:budget",
     kind: "nav",
-    label: "Invoices",
-    hint: "Browse & manage",
-    to: "/invoices",
+    label: "Budget",
+    hint: "Allocate & issue",
+    to: "/admin/budget",
     icon: FileText,
   },
   {
-    id: "nav:new",
+    id: "nav:transactions",
     kind: "nav",
-    label: "Create Invoice",
-    hint: "New invoice",
-    to: "/invoices/new",
-    icon: Plus,
+    label: "Transactions",
+    hint: "Unified ledger",
+    to: "/admin/transaction",
+    icon: ArrowLeftRight,
   },
   {
-    id: "nav:clients",
+    id: "nav:employees",
     kind: "nav",
-    label: "Clients",
-    hint: "Manage clients",
-    to: "/clients",
+    label: "Employees",
+    hint: "Roster & balances",
+    to: "/admin/employees",
     icon: Users,
   },
   {
-    id: "nav:settings",
+    id: "nav:expenses",
     kind: "nav",
-    label: "Settings",
-    hint: "Company profile, appearance",
-    to: "/settings",
-    icon: SettingsIcon,
+    label: "Expenses",
+    hint: "Ledger",
+    to: "/admin/expenses",
+    icon: Receipt,
+  },
+  {
+    id: "nav:audit",
+    kind: "nav",
+    label: "Audit Logs",
+    hint: "Activity trail",
+    to: "/admin/audit-logs",
+    icon: Logs,
+  },
+];
+
+const ADMIN_ACTIONS = [
+  {
+    id: "action:add-expense",
+    kind: "action",
+    label: "Add Expense",
+    hint: "New expense lines",
+    to: "/admin/expenses/add",
+    icon: Plus,
+  },
+];
+
+const EMPLOYEE_NAV = [
+  {
+    id: "nav:overview",
+    kind: "nav",
+    label: "Overview",
+    hint: "My summary",
+    to: "/employee/overview",
+    icon: House,
+  },
+  {
+    id: "nav:budget",
+    kind: "nav",
+    label: "My Budget",
+    hint: "Issued & transfers",
+    to: "/employee/budget",
+    icon: Wallet,
+  },
+  {
+    id: "nav:expenses",
+    kind: "nav",
+    label: "Expenses",
+    hint: "My ledger",
+    to: "/employee/expenses",
+    icon: FileText,
+  },
+  {
+    id: "nav:abono",
+    kind: "nav",
+    label: "Abono",
+    hint: "Top-ups",
+    to: "/employee/abono",
+    icon: HandCoins,
+  },
+];
+
+const EMPLOYEE_ACTIONS = [
+  {
+    id: "action:add-expense",
+    kind: "action",
+    label: "Add Expense",
+    hint: "New expense lines",
+    to: "/employee/expenses/add",
+    icon: Plus,
+  },
+  {
+    id: "action:transfer",
+    kind: "action",
+    label: "Transfer Budget",
+    hint: "Move funds",
+    to: "/employee/budget-transfer",
+    icon: ArrowLeftRight,
   },
 ];
 
@@ -81,13 +164,18 @@ export function CommandPalette({ open, onClose }) {
 
 function PaletteBody({ onClose }) {
   const navigate = useNavigate();
+  const { user } = useAuth();
+  const isAdmin = user?.role === USER_ROLES.ADMIN;
   const [query, setQuery] = useState("");
   const [activeIdx, setActiveIdx] = useState(0);
   const inputRef = useRef(null);
   const listRef = useRef(null);
 
-  const { data: invoices } = useInvoices();
-  const { data: clients } = useClients();
+  // Admin-only directory search — employees never see the roster, so the
+  // request fires for admins only (the endpoint itself is admin-guarded).
+  const { data: employees } = useEmployees(undefined, {
+    enabled: Boolean(isAdmin),
+  });
 
   // Fresh mount on every open, so query/activeIdx start clean.
   useEffect(() => {
@@ -96,24 +184,20 @@ function PaletteBody({ onClose }) {
   }, []);
 
   const items = useMemo(() => {
-    const invoiceItems = (invoices || []).map((i) => ({
-      id: `invoice:${i.id}`,
-      kind: "invoice",
-      label: `${i.invoice_number} · ${i.client_name || "No client"}`,
-      hint: `${i.effective_status} · ${formatMoney(i.total, i.currency)}`,
-      to: `/invoices/${i.id}`,
-      icon: FileText,
-    }));
-    const clientItems = (clients || []).map((c) => ({
-      id: `client:${c.id}`,
-      kind: "client",
-      label: c.name,
-      hint: c.company || c.email || "Client",
-      to: `/clients/${c.id}`,
-      icon: Users,
+    const nav = isAdmin ? ADMIN_NAV : EMPLOYEE_NAV;
+    const actions = isAdmin ? ADMIN_ACTIONS : EMPLOYEE_ACTIONS;
+
+    const employeeItems = (isAdmin ? employees || [] : []).map((e) => ({
+      id: `employee:${e.user_id}`,
+      kind: "employee",
+      label: e.name || "Unnamed employee",
+      hint: e.email || e.status || "Employee",
+      to: `/admin/employees/${e.user_id}`,
+      icon: UserRound,
+      avatarUrl: e.avatar_url || "",
     }));
 
-    const pool = [...NAV_ITEMS, ...invoiceItems, ...clientItems];
+    const pool = [...nav, ...actions, ...employeeItems];
     if (!query.trim()) return pool;
 
     return pool
@@ -124,7 +208,13 @@ function PaletteBody({ onClose }) {
       .filter((x) => x.score > 0)
       .sort((a, b) => b.score - a.score)
       .map((x) => x.it);
-  }, [invoices, clients, query]);
+  }, [employees, isAdmin, query]);
+
+  // The pool shrinks as data loads / the query changes — clamp the cursor so
+  // Enter can never fire on a stale out-of-range index.
+  useEffect(() => {
+    setActiveIdx((i) => Math.min(i, Math.max(0, items.length - 1)));
+  }, [items.length]);
 
   useEffect(() => {
     const el = listRef.current?.querySelector(`[data-idx="${activeIdx}"]`);
@@ -158,15 +248,19 @@ function PaletteBody({ onClose }) {
       items: items.filter((i) => i.kind === "nav"),
     },
     {
-      key: "invoice",
-      title: "Invoices",
-      items: items.filter((i) => i.kind === "invoice"),
+      key: "action",
+      title: "Quick actions",
+      items: items.filter((i) => i.kind === "action"),
     },
-    {
-      key: "client",
-      title: "Clients",
-      items: items.filter((i) => i.kind === "client"),
-    },
+    ...(isAdmin
+      ? [
+          {
+            key: "employee",
+            title: "Employees",
+            items: items.filter((i) => i.kind === "employee"),
+          },
+        ]
+      : []),
   ];
 
   let renderIdx = -1;
@@ -193,13 +287,21 @@ function PaletteBody({ onClose }) {
       >
         <div
           className={cn(
-            "h-9 w-9 rounded-xl flex items-center justify-center shrink-0",
+            "h-9 w-9 rounded-xl flex items-center justify-center shrink-0 overflow-hidden",
             isActive
               ? "bg-[var(--surface)] text-[var(--accent-strong)]"
               : "bg-[var(--surface-2)] text-[var(--ink-muted)]",
           )}
         >
-          <Icon size={16} />
+          {it.kind === "employee" ? (
+            <EmployeeAvatar
+              name={it.label}
+              avatarUrl={it.avatarUrl}
+              className="h-9 w-9 rounded-xl text-sm"
+            />
+          ) : (
+            <Icon size={16} />
+          )}
         </div>
         <div className="flex-1 min-w-0">
           <div className="text-sm font-medium truncate">{it.label}</div>
@@ -249,7 +351,11 @@ function PaletteBody({ onClose }) {
               setActiveIdx(0);
             }}
             onKeyDown={handleKeyDown}
-            placeholder="Search invoices, clients, or jump to a page..."
+            placeholder={
+              isAdmin
+                ? "Search employees or jump to a page..."
+                : "Jump to a page..."
+            }
             className="flex-1 bg-transparent outline-none text-sm text-[var(--ink)] placeholder:text-[var(--ink-muted)]"
           />
           <kbd className="hidden sm:inline-flex items-center gap-1 text-xs px-2 h-6 rounded-md bg-[var(--surface-2)] text-[var(--ink-muted)] border border-[var(--border)] font-medium">
@@ -257,7 +363,10 @@ function PaletteBody({ onClose }) {
           </kbd>
         </div>
 
-        <div ref={listRef} className="max-h-[52vh] overflow-y-auto overscroll-contain p-2">
+        <div
+          ref={listRef}
+          className="max-h-[52vh] overflow-y-auto overscroll-contain p-2"
+        >
           {items.length === 0 && (
             <div className="text-center text-sm text-[var(--ink-muted)] py-10">
               No matches for &ldquo;{query}&rdquo;
@@ -304,4 +413,3 @@ function PaletteBody({ onClose }) {
     </motion.div>
   );
 }
-

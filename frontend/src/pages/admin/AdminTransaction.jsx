@@ -138,6 +138,24 @@ const CONFIRM_COPY = {
     confirmLabel: "Yes, delete it",
     pendingLabel: "Deleting…",
   },
+  "delete-budget": {
+    icon: <Trash2 size={20} aria-hidden />,
+    title: "Delete this budget record?",
+    description:
+      "Permanently removes the cancelled budget transaction. Only cancelled rows can be deleted — this can't be undone.",
+    cancelLabel: "Keep",
+    confirmLabel: "Yes, delete it",
+    pendingLabel: "Deleting…",
+  },
+  "delete-issued": {
+    icon: <Trash2 size={20} aria-hidden />,
+    title: "Delete this issued record?",
+    description:
+      "Permanently removes the cancelled issuance and its scanned receipt file. Refused when linked expenses exist — this can't be undone.",
+    cancelLabel: "Keep",
+    confirmLabel: "Yes, delete it",
+    pendingLabel: "Deleting…",
+  },
   "expense-draft": {
     icon: <RotateCcw size={20} aria-hidden />,
     title: "Move this expense to draft?",
@@ -191,6 +209,8 @@ const ACTION_ERROR = {
   "cancel-issued": "Couldn't cancel budget issuance",
   "restore-issued": "Couldn't restore budget issuance",
   "delete-expense": "Couldn't delete expense",
+  "delete-budget": "Couldn't delete budget record",
+  "delete-issued": "Couldn't delete issued record",
   "expense-draft": "Couldn't move expense to draft",
   "expense-restore": "Couldn't mark expense as paid",
   "expense-cancel": "Couldn't cancel expense",
@@ -530,8 +550,10 @@ const AdminTransaction = () => {
   const confirmPending =
     mutations.cancelBudget.isPending ||
     mutations.restoreBudget.isPending ||
+    mutations.removeBudget.isPending ||
     mutations.cancelIssued.isPending ||
     mutations.restoreIssued.isPending ||
+    mutations.removeIssued.isPending ||
     mutations.removeExpense.isPending ||
     mutations.markExpenseDraft.isPending ||
     mutations.markExpensePaid.isPending ||
@@ -587,6 +609,12 @@ const AdminTransaction = () => {
       } else if (action === "delete-expense") {
         await mutations.removeExpense.mutateAsync(row.id);
         toast.success("Expense deleted");
+      } else if (action === "delete-budget") {
+        await mutations.removeBudget.mutateAsync(row.id);
+        toast.success("Budget record deleted");
+      } else if (action === "delete-issued") {
+        await mutations.removeIssued.mutateAsync(row.id);
+        toast.success("Issued record deleted");
       } else if (action === "expense-draft") {
         await mutations.markExpenseDraft.mutateAsync(row.id);
         toast.success("Expense moved to draft");

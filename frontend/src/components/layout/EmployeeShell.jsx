@@ -2,9 +2,17 @@ import { AnimatePresence, motion } from "framer-motion";
 import { Topbar } from "./employee/Topbar";
 import { Sidebar } from "./employee/Sidebar";
 import { Outlet, useLocation } from "react-router-dom";
+import { useState } from "react";
 
 export default function EmployeeShell() {
   const location = useLocation();
+
+  // Close the palette when the route changes (adjust state during render —
+  // the documented alternative to a setState-in-effect).
+  const [lastPath, setLastPath] = useState(location.pathname);
+  if (lastPath !== location.pathname) {
+    setLastPath(location.pathname);
+  }
 
   return (
     <div className="min-h-screen flex bg-[var(--bg)]">

@@ -44,3 +44,15 @@ export const settleAbonoSchema = z.object({
     .min(1, { message: "Select at least one abono to settle" })
     .max(500, { message: "Too many abono records in one request" }),
 });
+
+// Admin Reimburse — the same settle, but driven by an admin for one employee:
+// the target account plus the ids of their OPEN abono rows being repaid.
+export const reimburseAbonoSchema = z.object({
+  user_id: z.uuid({ message: "Invalid employee id" }),
+  ids: z
+    .array(z.uuid({ message: "Invalid abono id" }), {
+      error: "Select at least one abono to reimburse",
+    })
+    .min(1, { message: "Select at least one abono to reimburse" })
+    .max(500, { message: "Too many abono records in one request" }),
+});

@@ -16,6 +16,7 @@ export function Topbar() {
 
       <div className="flex shrink-0 items-center gap-2 md:gap-3">
         <SocketStatus />
+
         <IconButton onClick={toggle} title="Toggle theme">
           {theme === "light" ? <Moon size={16} /> : <Sun size={16} />}
         </IconButton>
