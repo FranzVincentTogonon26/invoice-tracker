@@ -91,12 +91,14 @@ class Budget {
   // `reference_id` is intentionally omitted from the INSERT so the column's
   // `DEFAULT gen_random_uuid()` applies — inserting an explicit NULL would
   // violate the NOT NULL constraint (defaults don't fire for explicit NULLs).
-  static async createReferenceBudget({ label }) {
+  // `notes` is optional context shown on the Source of Funds page.
+  static async createReferenceBudget({ label, notes = null }) {
+    const trimmedNotes = String(notes ?? "").trim();
     const result = await query(
-      `INSERT INTO budget_reference (label)
-       VALUES ($1)
+      `INSERT INTO budget_reference (label, notes)
+       VALUES ($1, $2)
        RETURNING *`,
-      [label],
+      [label, trimmedNotes === "" ? null : trimmedNotes],
     );
     return result.rows[0];
   }
@@ -368,6 +370,11 @@ class Budget {
               FROM budget_issued_reference bir
              WHERE bir.reference_id = br.reference_id
           ) AS transactions,
+          (
+            SELECT COUNT(*)::int
+              FROM expenses e
+             WHERE e.reference_id = br.reference_id
+          ) AS expenses_count,
           (
             SELECT COUNT(*)::int
               FROM budget b

@@ -69,6 +69,12 @@ export function RowMenu({ source, onView, onEdit, onDelete }) {
     setMenuOpen(true);
   };
 
+  // Delete is offered only when nothing is connected to this source — no
+  // budget_issued_reference rows AND no expenses tagged to it — otherwise
+  // the menu stays to view/edit and the cascade stays out of accidental
+  // reach.
+  const hasConnections =
+    Number(source?.transactions) > 0 || Number(source?.expenses_count) > 0;
   const items = [
     {
       label: "View details",
@@ -82,12 +88,16 @@ export function RowMenu({ source, onView, onEdit, onDelete }) {
       danger: false,
       run: () => onEdit(source),
     },
-    {
-      label: "Delete source",
-      Icon: Trash2,
-      danger: true,
-      run: () => onDelete(source),
-    },
+    ...(!hasConnections
+      ? [
+          {
+            label: "Delete source",
+            Icon: Trash2,
+            danger: true,
+            run: () => onDelete(source),
+          },
+        ]
+      : []),
   ];
 
   return (
@@ -113,9 +123,9 @@ export function RowMenu({ source, onView, onEdit, onDelete }) {
             style={{ top: position.top, right: position.right }}
             className="fixed z-[70] min-w-[11rem] overflow-hidden rounded-2xl border border-[var(--border)] bg-[var(--surface)] py-1 shadow-hover"
           >
-            {items.map(({ label, Icon, danger, run }, i) => (
+            {items.map(({ label, Icon, danger, run }) => (
               <div key={label}>
-                {i === items.length - 1 && (
+                {danger && (
                   <div
                     role="separator"
                     aria-hidden

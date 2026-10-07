@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import { Inbox, Plus, Trash2 } from "lucide-react";
 import toast from "react-hot-toast";
 import { PageHeader } from "../../components/ui/PageHeader";
@@ -16,7 +17,7 @@ import {
   LoadingSkeleton,
 } from "../../components/ui/DataState";
 import ConfirmActionDialog from "../../components/layout/admin/expenses/ConfirmActionDialog";
-import ReferencesModal from "../../components/layout/admin/budget/ReferencesModal";
+import { SourceCreateModal } from "../../components/layout/admin/source-of-funds/SourceCreateModal";
 import {
   useSourceFunds,
   useSourceFundsMutations,
@@ -25,17 +26,16 @@ import { formatMoney, toMoney } from "../../lib/utils";
 import { SourceStats } from "../../components/layout/admin/source-of-funds/SourceStats";
 import { SourceFilters } from "../../components/layout/admin/source-of-funds/SourceFilters";
 import { SourceTable } from "../../components/layout/admin/source-of-funds/SourceTable";
-import { SourceViewModal } from "../../components/layout/admin/source-of-funds/SourceViewModal";
 import { SourceEditModal } from "../../components/layout/admin/source-of-funds/SourceEditModal";
 
 const PAGE_SIZE = 50;
 
 export default function AdminSourceFunds() {
+  const nav = useNavigate();
   const [search, setSearch] = useState("");
   const [debouncedSearch, setDebouncedSearch] = useState("");
   const [status, setStatus] = useState("all");
   const [page, setPage] = useState(0);
-  const [viewSource, setViewSource] = useState(null);
   const [editSource, setEditSource] = useState(null);
   const [deleteSource, setDeleteSource] = useState(null);
   const [refsOpen, setRefsOpen] = useState(false);
@@ -52,7 +52,8 @@ export default function AdminSourceFunds() {
     [debouncedSearch],
   );
   const { sources, isLoading, error, refetch } = useSourceFunds(params);
-  const { updateReference, removeReference } = useSourceFundsMutations();
+  const { createReference, updateReference, removeReference } =
+    useSourceFundsMutations();
 
   const rows = useMemo(() => {
     const list = sources ?? [];
@@ -108,6 +109,15 @@ export default function AdminSourceFunds() {
     setPage(0);
   };
 
+  // View details opens the dedicated overview route (deep-linkable via
+  // ?ref=) instead of a modal.
+  const handleView = (source) => {
+    if (!source?.reference_id) return;
+    nav(`/admin/source-funds/overview?ref=${source.reference_id}`, {
+      state: { referenceId: source.reference_id },
+    });
+  };
+
   const handleEditSave = async (source, payload) => {
     try {
       await updateReference.mutateAsync({
@@ -120,6 +130,18 @@ export default function AdminSourceFunds() {
       toast.success(`Source "${payload.label ?? source.label}" saved.`);
     } catch (err) {
       toast.error(err?.message || "Couldn't save the source.");
+    }
+  };
+
+  const handleCreate = async ({ label, notes }) => {
+    try {
+      await createReference.mutateAsync({ label, notes });
+      setRefsOpen(false);
+      // Actor-only toast: this admin's device confirms; other sessions
+      // refresh silently over the socket.
+      toast.success(`Source "${label}" created.`);
+    } catch (err) {
+      toast.error(err?.message || "Couldn't create the source.");
     }
   };
 
@@ -229,23 +251,13 @@ export default function AdminSourceFunds() {
             rangeStart={rangeStart}
             rangeEnd={rangeEnd}
             onPageChange={setPage}
-            onView={setViewSource}
+            onView={handleView}
             onEdit={setEditSource}
             onDelete={setDeleteSource}
           />
         )}
       </Card>
 
-      {viewSource && (
-        <SourceViewModal
-          source={viewSource}
-          onClose={() => setViewSource(null)}
-          onEdit={(source) => {
-            setViewSource(null);
-            setEditSource(source);
-          }}
-        />
-      )}
       {editSource && (
         <SourceEditModal
           source={editSource}
@@ -256,12 +268,13 @@ export default function AdminSourceFunds() {
           onSave={handleEditSave}
         />
       )}
-      <ReferencesModal
+      <SourceCreateModal
         open={refsOpen}
-        references={rows}
-        onAdd={() => refetch()}
-        onDelete={() => refetch()}
-        onClose={() => setRefsOpen(false)}
+        saving={createReference.isPending}
+        onClose={() => {
+          if (!createReference.isPending) setRefsOpen(false);
+        }}
+        onSave={handleCreate}
       />
       <ConfirmActionDialog
         open={Boolean(deleteSource)}

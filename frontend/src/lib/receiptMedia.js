@@ -47,3 +47,25 @@ export const openReceiptFile = (url) => {
     window.open(url, "_blank", "noopener");
   }
 };
+
+/** Coerces a scanned line-item field to a safe number (0 for garbage). */
+export const toReceiptNumber = (value) => {
+  const n = Number(value);
+  return Number.isFinite(n) ? n : 0;
+};
+
+/** Compact quantity reading — integers stay whole, fractions round to 2dp. */
+export const formatReceiptQty = (value) => {
+  const n = toReceiptNumber(value);
+  return Number.isInteger(n) ? String(n) : String(Math.round(n * 100) / 100);
+};
+
+/** Normalizes raw receipt line items into render-ready rows with stable keys. */
+export const normalizeReceiptLines = (receiptItems) =>
+  (receiptItems ?? []).map((item, index) => ({
+    key: `${item?.id ?? "line"}-${index}`,
+    description: String(item?.description ?? "").trim(),
+    quantity: toReceiptNumber(item?.qty),
+    rate: toReceiptNumber(item?.rate),
+    amount: toReceiptNumber(item?.amount),
+  }));

@@ -1,723 +1,38 @@
-import { useState, useMemo, useEffect, useRef, useCallback } from "react";
-import { createPortal } from "react-dom";
-import { AnimatePresence, motion } from "framer-motion";
+import { useState, useMemo, useEffect } from "react";
 import toast from "react-hot-toast";
 import {
-  Banknote,
   CircleCheck,
-  CreditCard,
-  Eye,
-  Flag,
-  Landmark,
+  Inbox,
   Layers,
+  RotateCcw,
   Search,
   Trash2,
   X,
-  Inbox,
-  Wallet,
-  ReceiptText,
-  RotateCcw,
-  HandCoins,
-  Wallet as MethodWalletIcon,
-  EllipsisVertical,
 } from "lucide-react";
-import { Card } from "../../../ui/Card";
-import { Badge } from "../../../ui/Badge";
-import { Button } from "../../../ui/Button";
-import { SearchInput } from "../../../ui/Input";
-import { Pager } from "../../../ui/Pager";
-import { EmptyState, LoadingSkeleton } from "../../../ui/DataState";
+import { useQueryClient } from "@tanstack/react-query";
+import { EXPENSES_PAGE_SIZE, USER_ROLES } from "@/constants";
 import {
-  cn,
+  filterExpenseSectionTransactions,
+  groupExpenseTransactionsByDate,
+} from "@/lib/expenseLedger";
+import {
   emptyDateRange,
   formatDate,
   formatDateRange,
   formatMoney,
-  formatTime,
-  isSameDay,
-  matchesDayRange,
-  methodLabel,
-  startOfDay,
-  toDate,
-  addDays,
-} from "../../../../lib/utils";
+} from "@/lib/utils";
+import { useAuth } from "@/context/AuthContext";
+import { useExpensesMutations } from "@/hooks/useExpenses";
+import { Card } from "../../../ui/Card";
+import { SearchInput } from "../../../ui/Input";
+import { Pager } from "../../../ui/Pager";
+import { EmptyState, LoadingSkeleton } from "../../../ui/DataState";
 import DateRangePicker from "../../../ui/DateRangePicker";
 import ConfirmActionDialog from "../../admin/expenses/ConfirmActionDialog";
-import { ExpenseStatusBadge } from "../../admin/expenses/ExpensesTable";
 import EmployeeExpenseDetailsModal from "./EmployeeExpenseDetailsModal";
-import { useExpensesMutations } from "../../../../hooks/useExpenses";
-import { expensesApi } from "../../../../api/expenses";
-import { useQueryClient } from "@tanstack/react-query";
-import { useAuth } from "../../../../context/AuthContext";
-import { USER_ROLES } from "../../../../constants";
-
-const formatShortDate = (value) => {
-  const parsed = toDate(value);
-  if (!parsed) return "—";
-  return parsed.toLocaleDateString("en-GB", { day: "numeric", month: "short" });
-};
-
-const METHOD_BADGE = {
-  cash: { tone: "success", icon: Banknote },
-  bank_transfer: { tone: "accent", icon: Landmark },
-  e_wallet: { tone: "warning", icon: MethodWalletIcon },
-};
-
-const MethodBadge = ({ method, className }) => {
-  const config = METHOD_BADGE[method] ?? { tone: "neutral", icon: CreditCard };
-  const BadgeIcon = config.icon;
-  return (
-    <Badge
-      tone={config.tone}
-      className={cn("shrink-0 px-2 py-1 text-[12px]", className)}
-    >
-      <BadgeIcon size={16} aria-hidden />
-      {methodLabel(method)}
-    </Badge>
-  );
-};
-
-const TYPE_CONFIG = {
-  issued: {
-    label: "Received",
-    badgeTone: "accent",
-    icon: Wallet,
-    iconWrapperClass: "bg-[var(--accent-soft)] text-[var(--accent-strong)]",
-  },
-  expense: {
-    label: "Paid",
-    badgeTone: "neutral",
-    icon: ReceiptText,
-    iconWrapperClass: "bg-[var(--accent-soft)] text-[var(--accent-strong)]",
-  },
-  abono: {
-    label: "Abono",
-    badgeTone: "warning",
-    icon: HandCoins,
-    iconWrapperClass: "bg-[var(--warning)]/15 text-[var(--warning)]",
-  },
-};
-
-const SHEET_EASE = [0.16, 1, 0.3, 1];
-const isSheetActionable = (row) => row?.kind === "expense";
-// Mirrors EmployeeExpenseDetailsModal: a receipt exists when the row links a
-// receipt record or carries a stored receipt file URL (image or PDF).
-const hasSheetReceipt = (row) => Boolean(row?.receiptId || row?.imageUrl);
-// `expenses.flag = 1` means the backend saved this employee line as backdated
-// (dated before the first budget issued to them). Accepts both the raw `flag`
-// column and the mapped `flagged` boolean so desktop + mobile render from any
-// shape the ledger passes in.
-const isFlagged = (row) => row?.flagged === true || Number(row?.flag) === 1;
-const PAGE_SIZE = 100;
-
-function getDateGroupLabel(date) {
-  const txDate = startOfDay(toDate(date));
-  const today = startOfDay(new Date());
-  const yesterday = addDays(today, -1);
-
-  if (isSameDay(txDate, today)) return "Today";
-  if (isSameDay(txDate, yesterday)) return "Yesterday";
-  return "Last days";
-}
-
-// Relative-day identifier for the desktop "Days" column — Today / Yesterday /
-// Last days by calendar day (local time), mirroring the admin ledger. An
-// unparseable date renders "—" instead of silently falling into Today
-// (`startOfDay` would fold a bad value into now).
-function getDaysLabel(date) {
-  if (!toDate(date)) return "—";
-  const txDate = startOfDay(toDate(date));
-  const today = startOfDay(new Date());
-  const yesterday = addDays(today, -1);
-
-  if (isSameDay(txDate, today)) return "Today";
-  if (isSameDay(txDate, yesterday)) return "Yesterday";
-  return "Last days";
-}
-
-function groupTransactionsByDate(rows) {
-  const groups = new Map();
-  const groupOrder = ["Today", "Yesterday", "Last days"];
-
-  for (const tx of rows) {
-    const label = getDateGroupLabel(tx.date);
-    if (!groups.has(label)) groups.set(label, []);
-    groups.get(label).push(tx);
-  }
-
-  return groupOrder
-    .filter((label) => groups.has(label) && groups.get(label).length > 0)
-    .map((label) => ({ label, transactions: groups.get(label) }));
-}
-
-const COLUMN_WIDTHS = ["13%", "23%", "13%", "12%", "17%", "16%", "6%"];
-
-function TransactionCard({ tx, meta, disabled, onOpen }) {
-  const actionable = isSheetActionable(tx);
-  const Icon = meta.icon;
-  const flagged = isFlagged(tx);
-
-  return (
-    <div
-      onClick={() => {
-        if (!actionable || disabled) return;
-        onOpen?.();
-      }}
-      onKeyDown={(e) => {
-        if (e.key !== "Enter" && e.key !== " ") return;
-        if (!actionable || disabled || e.target.closest("button")) return;
-        e.preventDefault();
-        onOpen?.();
-      }}
-      role="button"
-      tabIndex={actionable && !disabled ? 0 : undefined}
-      aria-label={`Open details for ${tx.description || meta.label}`}
-      className={cn(
-        "relative flex items-center justify-between gap-3 overflow-hidden rounded-2xl border border-[var(--border)] bg-[var(--surface-2)]/60 px-2.5 py-3 transition-shadow hover:shadow-card",
-        actionable && !disabled && "cursor-pointer active:scale-[0.99]",
-        flagged &&
-          "border-[var(--warning)]/50 bg-[var(--warning)]/[0.08] ring-1 ring-inset ring-[var(--warning)]/25",
-      )}
-    >
-      <div className="flex min-w-0 flex-1 items-center gap-3">
-        <span
-          aria-hidden
-          className={cn(
-            "flex h-10 w-10 shrink-0 items-center justify-center rounded-xl",
-            flagged
-              ? "bg-[var(--warning)]/15 text-[var(--warning)]"
-              : meta.iconWrapperClass,
-          )}
-        >
-          <Icon size={18} />
-        </span>
-        <div className="min-w-0">
-          <p className="flex min-w-0 items-center gap-1.5 truncate text-xs font-medium leading-none text-[var(--ink)]">
-            <span className="min-w-0 truncate capitalize">
-              {tx.description || meta.label}
-            </span>
-            {flagged && (
-              <Badge
-                tone="warning"
-                className="shrink-0 gap-1 px-1.5 py-0.5 text-[10px]"
-                title="Flagged — dated before the first budget issued to you"
-              >
-                <Flag size={10} aria-hidden className="shrink-0" />
-                Flagged
-              </Badge>
-            )}
-          </p>
-          <span className="mt-1.5 flex min-w-0 items-center gap-1.5 text-[11px] font-medium leading-none text-[var(--ink-muted)]">
-            <span className="shrink-0 tabular-nums">
-              {formatShortDate(tx.date)}
-            </span>
-            <span aria-hidden className="shrink-0 opacity-40">
-              |
-            </span>
-            <span className="truncate text-[10px] type-eyebrow">
-              {methodLabel(tx.method)}
-            </span>
-          </span>
-        </div>
-      </div>
-      <div className="flex shrink-0 items-center gap-1.5">
-        <p className="text-right font-display text-sm font-medium tabular-nums text-[var(--ink)]">
-          {formatMoney(tx.amount)}
-        </p>
-      </div>
-    </div>
-  );
-}
-
-function TransactionSheet({
-  row,
-  pending,
-  onClose,
-  onView,
-  onDelete,
-  onUpdate,
-  // Read-only rendering (Admin → Employee Details): drops the delete action
-  // and disables inline description editing.
-  canManage = true,
-  canEdit = true,
-}) {
-  const sheetRef = useRef(null);
-  const actionable = isSheetActionable(row) && canManage;
-  const meta = TYPE_CONFIG[row?.kind] ?? TYPE_CONFIG.expense;
-  const Icon = meta.icon;
-  const close = useCallback(() => {
-    if (pending) return;
-    onClose?.();
-  }, [onClose, pending]);
-
-  useEffect(() => {
-    if (!row) return undefined;
-    const onKeyDown = (event) => {
-      if (event.key !== "Escape") return;
-      event.stopPropagation();
-      close();
-    };
-    window.addEventListener("keydown", onKeyDown, true);
-    return () => window.removeEventListener("keydown", onKeyDown, true);
-  }, [row, close]);
-
-  const title = row?.description || meta.label || "Transaction";
-
-  return createPortal(
-    <AnimatePresence>
-      {row && (
-        <motion.div
-          key="expense-sheet"
-          className="fixed inset-0 z-[70] flex flex-col justify-end md:hidden"
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          exit={{ opacity: 0 }}
-          transition={{ duration: 0.2, ease: "easeOut" }}
-        >
-          <motion.div
-            className="absolute inset-0 bg-[var(--ink)]/40 backdrop-blur-sm"
-            onClick={close}
-            aria-hidden="true"
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            transition={{ duration: 0.22, ease: "easeOut" }}
-          />
-          <motion.div
-            ref={sheetRef}
-            tabIndex={-1}
-            role="dialog"
-            aria-modal="true"
-            aria-label={title}
-            initial={{ y: "100%" }}
-            animate={{ y: "0%" }}
-            exit={{ y: "100%" }}
-            transition={{ duration: 0.38, ease: SHEET_EASE }}
-            className={cn(
-              "relative max-h-[88dvh] w-full overflow-y-auto scrollbar-slim outline-none overscroll-contain",
-              "rounded-t-[15px] border border-b-0 border-[var(--border)]",
-              "bg-[var(--surface)] shadow-hover will-change-transform",
-              "px-4 pt-3 pb-[calc(env(safe-area-inset-bottom)+1.25rem)]",
-            )}
-          >
-            <TransactionSheetBody
-              row={row}
-              meta={meta}
-              Icon={Icon}
-              title={title}
-              actionable={actionable}
-              hasReceipt={hasSheetReceipt(row)}
-              pending={pending}
-              close={close}
-              onView={onView}
-              onDelete={onDelete}
-              onUpdate={onUpdate}
-              canEdit={canEdit}
-            />
-          </motion.div>
-        </motion.div>
-      )}
-    </AnimatePresence>,
-    document.body,
-  );
-}
-
-function TransactionSheetBody({
-  row,
-  meta,
-  Icon,
-  title,
-  actionable,
-  hasReceipt,
-  pending,
-  close,
-  onView,
-  onDelete,
-  onUpdate,
-  canEdit = true,
-}) {
-  const [isEditing, setIsEditing] = useState(false);
-  const [description, setDescription] = useState(title || "");
-  const textareaRef = useRef(null);
-
-  // Sync description state when title prop changes (e.g., parent updates sheetRow)
-  useEffect(() => {
-    if (!isEditing) {
-      setDescription(title || "");
-    }
-  }, [title, isEditing]);
-
-  const handleSave = useCallback(async () => {
-    const trimmed = description.trim();
-    if (!trimmed || trimmed === title) {
-      setIsEditing(false);
-      return;
-    }
-
-    try {
-      await expensesApi.updateDescription(row.id, trimmed);
-      toast.success("Description updated");
-      // Update the parent's sheetRow state
-      onUpdate?.({ ...row, description: trimmed });
-      setIsEditing(false);
-    } catch (err) {
-      toast.error(err?.message || "Failed to update description");
-      setDescription(title);
-      setIsEditing(false);
-    }
-  }, [row.id, description, title, onUpdate]);
-
-  const handleBlur = useCallback(() => {
-    handleSave();
-  }, [handleSave]);
-
-  const handleKeyDown = useCallback(
-    (e) => {
-      if (e.key === "Enter" && !e.shiftKey) {
-        e.preventDefault();
-        handleSave();
-      } else if (e.key === "Escape") {
-        setDescription(title);
-        setIsEditing(false);
-      }
-    },
-    [title, handleSave],
-  );
-
-  const handleDoubleClick = useCallback(() => {
-    if (actionable && !pending) {
-      setIsEditing(true);
-      // Focus textarea after render
-      setTimeout(() => textareaRef.current?.focus(), 0);
-    }
-  }, [actionable, pending]);
-
-  return (
-    <>
-      <div
-        aria-hidden
-        className="mx-auto h-1.5 w-10 rounded-full bg-[var(--ink-muted)]/25"
-      />
-      <div className="flex items-center gap-3 pt-4">
-        <span
-          aria-hidden
-          className={cn(
-            "flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl",
-            meta.iconWrapperClass,
-          )}
-        >
-          <Icon size={20} />
-        </span>
-        <div className="min-w-0 flex-1">
-          <p className="truncate font-display text-base font-medium tracking-tight text-[var(--ink)]">
-            Expense details
-          </p>
-          <p className="mt-0.5 truncate text-xs tabular-nums text-[var(--ink-muted)]">
-            {formatDate(row.date)}
-            {row.timeDate ? ` · ${formatTime(row.timeDate)}` : ""}
-          </p>
-        </div>
-        <button
-          type="button"
-          onClick={close}
-          aria-label="Close transaction preview"
-          className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-[var(--surface-2)] text-[var(--ink-muted)] transition-colors hover:text-[var(--ink)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)]/30"
-        >
-          <X size={16} aria-hidden />
-        </button>
-      </div>
-      <div className="mt-4 space-y-3">
-        {isFlagged(row) && (
-          <div
-            role="note"
-            className="flex items-start gap-2.5 rounded-2xl border border-[var(--warning)]/40 bg-[var(--warning)]/[0.1] px-4 py-3"
-          >
-            <Flag
-              size={14}
-              aria-hidden
-              className="mt-0.5 shrink-0 text-[var(--warning)]"
-            />
-            <div className="min-w-0">
-              <p className="text-xs font-bold text-[var(--warning)]">
-                Flagged for review
-              </p>
-              <p className="mt-0.5 text-xs leading-relaxed text-[var(--warning)]/90">
-                Dated before the first budget issued to you — an admin needs to
-                approve it.
-              </p>
-            </div>
-          </div>
-        )}
-        <div className="space-y-2 rounded-2xl border border-[var(--border)] bg-[var(--surface-2)]/60 px-4 py-3.5">
-          <div className="border-b border-[var(--border)] py-3">
-            <div className="flex items-center">
-              <p className="type-eyebrow text-[var(--ink-muted)]">
-                Description
-              </p>
-              {canEdit && (
-                <span className="ml-2 text-[10px] text-[var(--ink-muted)]">
-                  Double-click to edit
-                </span>
-              )}
-            </div>
-
-            {isEditing ? (
-              <textarea
-                ref={textareaRef}
-                value={description}
-                onChange={(e) => setDescription(e.target.value)}
-                onBlur={handleBlur}
-                onKeyDown={handleKeyDown}
-                rows={2}
-                className="mt-1.5 w-full min-h-[44px] rounded-lg border border-[var(--accent)] bg-[var(--surface)] px-3 py-2 text-sm text-[var(--ink)] placeholder-[var(--ink-muted)] focus:outline-none focus:ring-2 focus:ring-[var(--accent)]/30 resize-none"
-                placeholder="Enter description"
-              />
-            ) : (
-              <p
-                onDoubleClick={canEdit ? handleDoubleClick : undefined}
-                onTouchEnd={
-                  canEdit
-                    ? (e) => {
-                        // Handle double tap on mobile
-                        const now = Date.now();
-                        if (
-                          e.target.dataset.lastTap &&
-                          now - e.target.dataset.lastTap < 300
-                        ) {
-                          handleDoubleClick();
-                        }
-                        e.target.dataset.lastTap = now;
-                      }
-                    : undefined
-                }
-                className={cn(
-                  "mt-1.5 text-sm text-[var(--ink)] normal-case",
-                  actionable && !pending && "cursor-pointer hover:underline",
-                )}
-              >
-                {title || "—"}
-              </p>
-            )}
-          </div>
-          <div className="flex gap-3 items-center justify-between pt-3">
-            <div className="min-w-0">
-              <p className="type-eyebrow text-[var(--ink-muted)]">Amount</p>
-              <p className="mt-1 font-display text-2xl font-medium leading-none tracking-tight tabular-nums text-[var(--ink)]">
-                {formatMoney(row.amount)}
-              </p>
-              <p className="mt-1.5 truncate text-xs text-[var(--ink-muted)]">
-                {[row.category, methodLabel(row.method)]
-                  .filter(Boolean)
-                  .join(" · ")}
-              </p>
-            </div>
-            <ExpenseStatusBadge status={row.status} className="shrink-0" />
-          </div>
-        </div>
-      </div>
-      {actionable && (
-        <div className="mt-4 space-y-2">
-          {hasReceipt ? (
-            <Button
-              type="button"
-              variant="accent"
-              className="w-full"
-              onClick={() => {
-                close();
-                onView?.(row);
-              }}
-            >
-              <Eye size={15} aria-hidden />
-              View details & receipt
-            </Button>
-          ) : null}
-          <Button
-            type="button"
-            variant="outline"
-            className="w-full text-[var(--danger)]"
-            disabled={pending}
-            onClick={() => onDelete?.(row)}
-          >
-            <Trash2 size={15} aria-hidden />
-            Delete expense
-          </Button>
-        </div>
-      )}
-    </>
-  );
-}
-
-function RowActions({
-  row,
-  pending,
-  onView,
-  onDelete,
-  canDelete = true,
-  // Admin-only draft lifecycle (mirrors the admin expenses ledger): parked
-  // through onAddToDraft / restored through onRestoreFromDraft.
-  canManageDraft = false,
-  onAddToDraft,
-  onRestoreFromDraft,
-}) {
-  const [open, setOpen] = useState(false);
-  const [position, setPosition] = useState(null);
-  const btnRef = useRef(null);
-  const menuRef = useRef(null);
-
-  useEffect(() => {
-    if (!open) return undefined;
-
-    const close = () => {
-      setOpen(false);
-      btnRef.current?.focus();
-    };
-
-    const handlePointerDown = (e) => {
-      if (
-        !btnRef.current?.contains(e.target) &&
-        !menuRef.current?.contains(e.target)
-      )
-        close();
-    };
-
-    const handleKeyDown = (e) => {
-      if (e.key === "Escape") {
-        e.stopPropagation();
-        close();
-      }
-    };
-
-    window.addEventListener("pointerdown", handlePointerDown);
-    window.addEventListener("keydown", handleKeyDown);
-    window.addEventListener("scroll", close, {
-      capture: true,
-      passive: true,
-    });
-    window.addEventListener("resize", close);
-
-    return () => {
-      window.removeEventListener("pointerdown", handlePointerDown);
-      window.removeEventListener("keydown", handleKeyDown);
-      window.removeEventListener("scroll", close, { capture: true });
-      window.removeEventListener("resize", close);
-    };
-  }, [open]);
-
-  const items = [
-    {
-      key: "view",
-      label: "View expense",
-      Icon: Eye,
-      danger: false,
-      onSelect: () => onView?.(row),
-    },
-    // Admin-only, one at a time based on status: a paid expense can be parked
-    // in draft ("Add to draft"), a draft can be put back to paid ("Restore
-    // from draft"). Expense rows only — issuance/abono ledger entries carry
-    // no draft lifecycle.
-    ...(canManageDraft && row?.kind === "expense" && row?.status === "paid"
-      ? [
-          {
-            key: "draft",
-            label: "Add to draft",
-            Icon: RotateCcw,
-            danger: false,
-            onSelect: () => onAddToDraft?.(row),
-          },
-        ]
-      : []),
-    ...(canManageDraft && row?.kind === "expense" && row?.status === "draft"
-      ? [
-          {
-            key: "restore",
-            label: "Restore from draft",
-            Icon: CircleCheck,
-            danger: false,
-            onSelect: () => onRestoreFromDraft?.(row),
-          },
-        ]
-      : []),
-    // Read-only mode (Admin → Employee Details) keeps the menu for viewing
-    // but drops the destructive entry.
-    ...(canDelete
-      ? [
-          {
-            key: "delete",
-            label: "Delete expense",
-            Icon: Trash2,
-            danger: true,
-            onSelect: () => onDelete?.(row),
-          },
-        ]
-      : []),
-  ];
-
-  const openMenu = () => {
-    const rect = btnRef.current?.getBoundingClientRect();
-    if (rect) {
-      const MENU_H = 80;
-      const roomBelow = window.innerHeight - rect.bottom;
-      const flipUp = roomBelow < MENU_H + 8 && rect.top > MENU_H + 8;
-
-      setPosition({
-        ...(flipUp
-          ? { bottom: window.innerHeight - rect.top + 6 }
-          : { top: rect.bottom + 6 }),
-        right: window.innerWidth - rect.right,
-      });
-    }
-    setOpen(true);
-  };
-
-  return (
-    <>
-      <button
-        ref={btnRef}
-        type="button"
-        onClick={() => (open ? setOpen(false) : openMenu())}
-        aria-haspopup="menu"
-        aria-expanded={open}
-        aria-label={`Actions for ${row?.description || "expense"}`}
-        disabled={pending}
-        className="inline-flex h-8 w-8 items-center justify-center rounded-full text-[var(--ink-muted)] transition-colors hover:bg-[var(--surface-2)] hover:text-[var(--ink)] disabled:pointer-events-none disabled:opacity-40"
-      >
-        <EllipsisVertical size={16} aria-hidden />
-      </button>
-      {open &&
-        position &&
-        createPortal(
-          <div
-            ref={menuRef}
-            role="menu"
-            aria-label="Row actions"
-            style={{ ...position }}
-            className="fixed z-[70] min-w-[11rem] overflow-hidden rounded-2xl border border-[var(--border)] bg-[var(--surface)] py-1 shadow-hover"
-          >
-            {items.map(({ key, label, Icon, danger, onSelect }) => (
-              <button
-                key={key}
-                type="button"
-                role="menuitem"
-                disabled={pending}
-                onClick={() => {
-                  setOpen(false);
-                  onSelect();
-                }}
-                className={cn(
-                  "flex w-full items-center gap-2.5 px-3.5 py-2 text-sm font-medium transition-colors hover:bg-[var(--surface-2)] disabled:pointer-events-none disabled:opacity-40",
-                  danger ? "text-[var(--danger)]" : "text-[var(--ink)]",
-                )}
-              >
-                <Icon size={15} aria-hidden />
-                {label}
-              </button>
-            ))}
-          </div>,
-          document.body,
-        )}
-    </>
-  );
-}
+import { ExpenseSectionTable } from "./ExpenseSectionTable";
+import { ExpenseSectionMobileList } from "./ExpenseSectionMobileList";
+import { ExpenseTransactionSheet } from "./ExpenseTransactionSheet";
 
 export const TransactionsSectionExpenses = ({
   transactions = [],
@@ -859,54 +174,32 @@ export const TransactionsSectionExpenses = ({
     return () => clearTimeout(timer);
   }, [search]);
 
-  const filteredTransactions = useMemo(() => {
-    const q = debouncedSearch.trim().toLowerCase();
-    const { start, end } = dateRange ?? {};
-    const inRange = (tx) => matchesDayRange(tx.date, start, end);
-    if (!q) return transactions.filter(inRange);
-
-    return transactions.filter((tx) => {
-      if (!inRange(tx)) return false;
-      const typeLabel = TYPE_CONFIG[tx.kind]?.label?.toLowerCase() || "";
-      const desc = (tx.description || "").toLowerCase();
-      const refLabel = (tx.reference_label || "").toLowerCase();
-      const notes = (tx.notes || "").toLowerCase();
-      const method = methodLabel(tx.method || "").toLowerCase();
-      const status = (tx.status || "").toLowerCase();
-      const amountStr = String(tx.amount || "");
-      const dayLabel = getDaysLabel(tx.date).toLowerCase();
-
-      return (
-        desc.includes(q) ||
-        refLabel.includes(q) ||
-        notes.includes(q) ||
-        typeLabel.includes(q) ||
-        method.includes(q) ||
-        status.includes(q) ||
-        dayLabel.includes(q) ||
-        amountStr.includes(q)
-      );
-    });
-  }, [transactions, debouncedSearch, dateRange]);
+  const filteredTransactions = useMemo(
+    () =>
+      filterExpenseSectionTransactions(transactions, debouncedSearch, dateRange),
+    [transactions, debouncedSearch, dateRange],
+  );
 
   const pageCount = Math.max(
     1,
-    Math.ceil(filteredTransactions.length / PAGE_SIZE),
+    Math.ceil(filteredTransactions.length / EXPENSES_PAGE_SIZE),
   );
   const currentPage = Math.min(page, pageCount - 1);
   const pageRows = useMemo(
     () =>
       filteredTransactions.slice(
-        currentPage * PAGE_SIZE,
-        (currentPage + 1) * PAGE_SIZE,
+        currentPage * EXPENSES_PAGE_SIZE,
+        (currentPage + 1) * EXPENSES_PAGE_SIZE,
       ),
     [filteredTransactions, currentPage],
   );
 
   const rangeStart =
-    filteredTransactions.length === 0 ? 0 : currentPage * PAGE_SIZE + 1;
+    filteredTransactions.length === 0
+      ? 0
+      : currentPage * EXPENSES_PAGE_SIZE + 1;
   const rangeEnd = Math.min(
-    (currentPage + 1) * PAGE_SIZE,
+    (currentPage + 1) * EXPENSES_PAGE_SIZE,
     filteredTransactions.length,
   );
 
@@ -986,188 +279,16 @@ export const TransactionsSectionExpenses = ({
             }
           />
         ) : (
-          <div className="overflow-x-auto rounded-2xl border border-[var(--border)] bg-[var(--surface)] shadow-card">
-            <table className="w-full min-w-[980px] table-fixed border-collapse text-left">
-              <caption className="sr-only">
-                Employee all transactions list with relative day and time
-              </caption>
-              <colgroup>
-                {COLUMN_WIDTHS.map((width, i) => (
-                  <col key={i} style={{ width }} />
-                ))}
-              </colgroup>
-              <thead className="sticky top-0 z-[1] bg-[var(--surface-2)]">
-                <tr>
-                  <th className="whitespace-nowrap border-b border-[var(--border)] px-4 py-3 type-eyebrow text-[var(--ink-muted)] first:pl-5">
-                    Date
-                  </th>
-                  <th className="whitespace-nowrap border-b border-[var(--border)] px-4 py-3 type-eyebrow text-[var(--ink-muted)]">
-                    Description
-                  </th>
-                  <th className="whitespace-nowrap border-b border-[var(--border)] px-4 py-3 type-eyebrow text-[var(--ink-muted)]">
-                    Payment Method
-                  </th>
-                  <th className="whitespace-nowrap border-b border-[var(--border)] px-4 py-3 type-eyebrow text-[var(--ink-muted)]">
-                    Status
-                  </th>
-                  <th className="whitespace-nowrap border-b border-[var(--border)] px-4 py-3 type-eyebrow text-[var(--ink-muted)]">
-                    Days
-                  </th>
-                  <th className="whitespace-nowrap border-b border-[var(--border)] px-4 py-3 text-right type-eyebrow text-[var(--ink-muted)] last:pr-5">
-                    Amount
-                  </th>
-                  <th className="whitespace-nowrap border-b border-[var(--border)] px-4 py-3 text-right type-eyebrow text-[var(--ink-muted)] last:pr-5">
-                    <span className="sr-only">Actions</span>
-                  </th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-[var(--border)]">
-                {pageRows.map((tx) => {
-                  const meta = TYPE_CONFIG[tx.kind] ?? TYPE_CONFIG.expense;
-                  const Icon = meta.icon;
-                  const flagged = isFlagged(tx);
-                  const daysLabel = getDaysLabel(tx.date);
-
-                  return (
-                    <tr
-                      key={`${tx.kind}-${tx.id}`}
-                      className={cn(
-                        "relative transition-colors duration-150 hover:bg-[var(--accent)]/[0.05]",
-                        tx.status === "cancel" &&
-                          "bg-[var(--danger)]/[0.08] hover:bg-[var(--danger)]/[0.12]",
-                      )}
-                      title={
-                        flagged
-                          ? "Flagged — dated before the first budget issued to you"
-                          : undefined
-                      }
-                    >
-                      <td className="relative px-4 py-3 first:pl-5 align-middle">
-                        <p className="whitespace-nowrap text-[13px] font-medium leading-none tabular-nums text-[var(--ink)]">
-                          {formatDate(tx.date)}
-                        </p>
-                        <p className="mt-1 whitespace-nowrap text-[11px] leading-none tabular-nums text-[var(--ink-muted)]">
-                          {formatTime(tx.date)}
-                        </p>
-                      </td>
-                      <td className="px-4 py-3 align-middle">
-                        <div className="flex min-w-0 items-center gap-1.5">
-                          {flagged && (
-                            <span
-                              role="img"
-                              aria-label="Flagged transaction"
-                              title="Flagged"
-                              className="relative flex h-5 w-5 shrink-0"
-                            >
-                              <span
-                                aria-hidden
-                                className="absolute inline-flex h-full w-full animate-ping rounded-full bg-[var(--danger)] opacity-40"
-                              />
-                              <Badge
-                                tone="danger"
-                                className="relative flex h-5 w-5 items-center justify-center rounded-full bg-[var(--danger)] p-0 text-white"
-                              >
-                                <Flag
-                                  size={10}
-                                  aria-hidden
-                                  fill="currentColor"
-                                />
-                              </Badge>
-                            </span>
-                          )}
-                          <p
-                            className="normal-case text-[13px] font-medium leading-snug text-[var(--ink)]"
-                            title={tx.reference_label || tx.description}
-                          >
-                            {tx.description}
-                          </p>
-                        </div>
-                      </td>
-                      <td className="px-4 py-3 align-middle">
-                        <MethodBadge
-                          method={tx.method}
-                          className="max-w-full"
-                        />
-                      </td>
-                      <td className="px-4 py-3 align-middle">
-                        {tx.status ? (
-                          <ExpenseStatusBadge
-                            status={tx.status}
-                            className="max-w-full px-2 py-1 text-[11px]"
-                          />
-                        ) : (
-                          <Badge
-                            tone={meta.badgeTone}
-                            className="max-w-full gap-1.5 px-2 py-1 text-[11px]"
-                          >
-                            <Icon
-                              size={12}
-                              strokeWidth={2.2}
-                              className="shrink-0"
-                            />
-                            <span className="truncate">{meta.label}</span>
-                          </Badge>
-                        )}
-                      </td>
-                      <td className="px-4 py-3 align-middle">
-                        <p
-                          className="flex flex-row items-center gap-1.5 whitespace-nowrap leading-none"
-                          title={`${formatDate(tx.date)} at ${formatTime(tx.date)}`}
-                        >
-                          <span
-                            className={cn(
-                              "text-[13px] font-medium",
-                              daysLabel === "Today"
-                                ? "text-[var(--accent-strong)]"
-                                : "text-[var(--ink)]",
-                            )}
-                          >
-                            {daysLabel}
-                          </span>
-                          <span
-                            aria-hidden
-                            className="shrink-0 text-[var(--ink-muted)] opacity-40"
-                          >
-                            ·
-                          </span>
-                          <span className="shrink-0 text-[11px] tabular-nums text-[var(--ink-muted)]">
-                            {formatTime(tx.date)}
-                          </span>
-                        </p>
-                      </td>
-                      <td className="px-4 py-3 text-right last:pr-5 align-middle">
-                        <span
-                          className={cn(
-                            "whitespace-nowrap font-display text-[15px] font-medium tabular-nums",
-                          )}
-                        >
-                          {formatMoney(tx.amount)}
-                        </span>
-                      </td>
-                      <td className="px-4 py-4 pr-5 text-right align-middle">
-                        <div className="flex justify-end">
-                          <RowActions
-                            row={tx}
-                            pending={confirmPending}
-                            onView={setViewRow}
-                            onDelete={setDeleteRow}
-                            canDelete={!readOnly}
-                            canManageDraft={isAdmin}
-                            onAddToDraft={(row) =>
-                              setDraftRow({ row, to: "draft" })
-                            }
-                            onRestoreFromDraft={(row) =>
-                              setDraftRow({ row, to: "paid" })
-                            }
-                          />
-                        </div>
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-          </div>
+          <ExpenseSectionTable
+            rows={pageRows}
+            pending={confirmPending}
+            onView={setViewRow}
+            onDelete={setDeleteRow}
+            canDelete={!readOnly}
+            canManageDraft={isAdmin}
+            onAddToDraft={(row) => setDraftRow({ row, to: "draft" })}
+            onRestoreFromDraft={(row) => setDraftRow({ row, to: "paid" })}
+          />
         )}
       </div>
 
@@ -1211,38 +332,15 @@ export const TransactionsSectionExpenses = ({
             }
           />
         ) : (
-          (() => {
-            const dateGroups = groupTransactionsByDate(pageRows);
-            return (
-              <>
-                {dateGroups.map(({ label, transactions }) => (
-                  <div key={label} className="space-y-2.5">
-                    <h4 className="px-1 text-[11px] font-medium uppercase tracking-wider text-[var(--ink-muted)]">
-                      {label}
-                    </h4>
-                    {transactions.map((tx) => {
-                      const meta = TYPE_CONFIG[tx.kind] ?? TYPE_CONFIG.expense;
-
-                      return (
-                        <TransactionCard
-                          key={`${tx.kind}-${tx.id}`}
-                          tx={tx}
-                          meta={meta}
-                          disabled={confirmPending}
-                          onOpen={() => setSheetRow(tx)}
-                          onDelete={() => setDeleteRow(tx)}
-                        />
-                      );
-                    })}
-                  </div>
-                ))}
-              </>
-            );
-          })()
+          <ExpenseSectionMobileList
+            groups={groupExpenseTransactionsByDate(pageRows)}
+            disabled={confirmPending}
+            onOpen={setSheetRow}
+          />
         )}
       </div>
 
-      {!isLoading && filteredTransactions.length > PAGE_SIZE && (
+      {!isLoading && filteredTransactions.length > EXPENSES_PAGE_SIZE && (
         <div className="mt-4 flex flex-col items-center gap-3 border-t border-[var(--border)] pt-4 sm:flex-row sm:items-center sm:justify-between">
           <p className="text-xs tabular-nums text-[var(--ink-muted)]">
             Showing {rangeStart}–{rangeEnd} of {filteredTransactions.length}{" "}
@@ -1258,7 +356,7 @@ export const TransactionsSectionExpenses = ({
         onClose={() => setViewRow(null)}
       />
 
-      <TransactionSheet
+      <ExpenseTransactionSheet
         row={sheetRow}
         pending={confirmPending}
         onClose={() => setSheetRow(null)}

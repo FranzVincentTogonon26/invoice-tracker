@@ -49,6 +49,12 @@ export const createbudgetSchema = z
       .trim()
       .optional(),
 
+    // Optional context for addBudgetReference (Source of Funds create form).
+    reference_notes: z
+      .string({ error: "Invalid notes" })
+      .max(500, { message: "Notes are too long" })
+      .optional(),
+
     // Optional field used only by issuedBudget (DB column: notes).
     note: z.string().optional(),
     // Optional scanned-receipt image for issuedBudget (DB column:

@@ -1,6 +1,10 @@
 import {
   ArrowLeftRight,
+  Banknote,
+  CreditCard,
+  FileText,
   HandCoins,
+  Landmark,
   Plus,
   ReceiptText,
   Wallet,
@@ -170,3 +174,143 @@ export function budgetBreakdown(employee) {
     spentShare,
   };
 }
+
+// ── Employee overview ledger (All Transactions) ──────────────────────
+// Single-consumer presentation config for the overview feed. Plain
+// references (no JSX), so the table, mobile cards, sheet and dialog share
+// one source of truth — same pattern as TRANSACTION_KIND_META above.
+export const OVERVIEW_TYPE_LABEL_SHORT = {
+  issued: "Received",
+  expense: "Spent",
+  abono: "Abono",
+  transfer: "Transfer",
+};
+
+// Mobile sheet / desktop dialog header per kind — titled by the item's TYPE
+// (Received -> Budget, Spent -> Expenses …) instead of echoing the row's
+// description, which already renders in the details body's Description row.
+export const OVERVIEW_TYPE_ITEM_TITLE = {
+  issued: "Budget",
+  expense: "Expenses",
+  abono: "Abono",
+  transfer: "Transfer",
+};
+
+// Instant-scan method tint per payment method so the type is readable
+// without parsing text. Unknown methods fall back to neutral.
+export const OVERVIEW_METHOD_TONES = {
+  cash: "success",
+  bank_transfer: "accent",
+  e_wallet: "warning",
+};
+
+export const OVERVIEW_TYPE_CONFIG = {
+  issued: {
+    label: "Received",
+    badgeTone: "accent",
+    Icon: Wallet,
+    iconWrapperClass: "bg-[var(--accent-soft)] text-[var(--accent-strong)]",
+  },
+  expense: {
+    label: "Paid",
+    badgeTone: "neutral",
+    Icon: ReceiptText,
+    iconWrapperClass: "bg-[var(--accent-soft)] text-[var(--accent-strong)]",
+  },
+  abono: {
+    label: "Abono",
+    badgeTone: "warning",
+    Icon: HandCoins,
+    iconWrapperClass: "bg-[var(--warning)]/15 text-[var(--warning)]",
+  },
+  // Budget transfers are identified by the ArrowLeftRight glyph everywhere in
+  // this ledger (table badge, mobile meta, sheet). Direction splits the
+  // reading: sent money leaves the pool (−, danger), received money widens it
+  // (+, accent) — the same sign convention the budget ledger uses.
+  transfer: {
+    label: "Transfer",
+    badgeTone: "accent",
+    Icon: ArrowLeftRight,
+    iconWrapperClass: "bg-[var(--accent-soft)] text-[var(--accent-strong)]",
+  },
+};
+
+// Nine columns: Date, Description, Receipt, Type, Method, Status, Day,
+// Amount, Actions.
+export const OVERVIEW_COLUMN_WIDTHS = [
+  "10%",
+  "19%",
+  "8%",
+  "12%",
+  "8%",
+  "10%",
+  "10%",
+  "17%",
+  "6%",
+];
+
+export const OVERVIEW_PAGE_SIZE = 100;
+
+// ── Employee expenses ledger (All Expenses) ──────────────────────────
+// Single-consumer presentation config for the expenses feed. Plain
+// references (no JSX), so the table, mobile cards and sheet share one
+// source of truth — same pattern as TRANSACTION_KIND_META above.
+export const EXPENSES_TYPE_CONFIG = {
+  issued: {
+    label: "Received",
+    badgeTone: "accent",
+    Icon: Wallet,
+    iconWrapperClass: "bg-[var(--accent-soft)] text-[var(--accent-strong)]",
+  },
+  expense: {
+    label: "Paid",
+    badgeTone: "neutral",
+    Icon: ReceiptText,
+    iconWrapperClass: "bg-[var(--accent-soft)] text-[var(--accent-strong)]",
+  },
+  abono: {
+    label: "Abono",
+    badgeTone: "warning",
+    Icon: HandCoins,
+    iconWrapperClass: "bg-[var(--warning)]/15 text-[var(--warning)]",
+  },
+};
+
+// Instant-scan method badge: tint + glyph per payment method so the type is
+// readable without parsing text. Unknown methods fall back to neutral.
+export const EXPENSES_METHOD_BADGE = {
+  cash: { tone: "success", Icon: Banknote },
+  bank_transfer: { tone: "accent", Icon: Landmark },
+  e_wallet: { tone: "warning", Icon: Wallet },
+};
+
+export const EXPENSES_METHOD_FALLBACK = { tone: "neutral", Icon: CreditCard };
+
+// Eight columns: Date, Description, Receipt, Payment Method, Status, Days,
+// Amount, Actions.
+export const EXPENSES_COLUMN_WIDTHS = [
+  "12%",
+  "21%",
+  "9%",
+  "12%",
+  "11%",
+  "15%",
+  "14%",
+  "6%",
+];
+
+export const EXPENSES_PAGE_SIZE = 100;
+
+// Zoom bounds for the receipt image preview in the expense details modal.
+export const EXPENSES_RECEIPT_ZOOM = { min: 0.75, max: 2.2, step: 0.25 };
+
+// Payment-method glyph per method for the expense details modal. Unknown
+// methods fall back to a card glyph.
+export const EXPENSES_DETAIL_METHOD_ICONS = {
+  cash: Banknote,
+  bank_transfer: Landmark,
+  e_wallet: Wallet,
+  cheque: FileText,
+};
+
+export const EXPENSES_DETAIL_METHOD_FALLBACK_ICON = CreditCard;

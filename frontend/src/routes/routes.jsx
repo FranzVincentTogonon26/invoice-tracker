@@ -19,6 +19,11 @@ import AdminBudget from "../pages/admin/AdminBudget";
 import AdminProfile from "../pages/admin/AdminProfile";
 import AdminTransaction from "../pages/admin/AdminTransaction";
 import AdminExpenses from "../pages/admin/AdminExpenses";
+import AdminAuditLogs from "../pages/admin/AdminAuditLogs";
+import AdminEmployeeReimbursement from "../pages/admin/AdminEmployeeReimbursement";
+import AdminReports from "../pages/admin/AdminReports";
+import AdminSourceFunds from "../pages/admin/AdminSourceFunds";
+import AdminSourceFundsOverview from "../components/layout/admin/source-of-funds/SourceFundsOverview";
 
 import EmployeeOverview from "../pages/employee/EmployeeOverview";
 import EmployeeBudget from "../pages/employee/EmployeeBudget";
@@ -28,10 +33,6 @@ import EmployeeSetting from "../pages/employee/EmployeeSetting";
 
 import AddExpenses from "../components/layout/expenses/AddExpenses";
 import BudgetTransfer from "../components/layout/budget_transfer/BudgetTransfer";
-import AdminAuditLogs from "../pages/admin/AdminAuditLogs";
-import AdminEmployeeReimbursement from "../pages/admin/AdminEmployeeReimbursement";
-import AdminReports from "../pages/admin/AdminReports";
-import AdminSourceFunds from "../pages/admin/AdminSourceFunds";
 
 export const router = createBrowserRouter([
   {
@@ -68,6 +69,10 @@ export const router = createBrowserRouter([
                 element: <AdminEmployeeReimbursement />,
               },
               { path: "source-funds", element: <AdminSourceFunds /> },
+              {
+                path: "source-funds/overview",
+                element: <AdminSourceFundsOverview />,
+              },
               { path: "reports", element: <AdminReports /> },
               { path: "profile", element: <AdminProfile /> },
               { path: "audit-logs", element: <AdminAuditLogs /> },

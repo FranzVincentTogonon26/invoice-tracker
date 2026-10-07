@@ -135,6 +135,8 @@ class EmployeeOverview {
           0 AS flag,
           ib.created_at AS date,
           ib.created_at AS created_at,
+          NULL AS receipt_id,
+          NULL AS image_url,
           NULL AS direction,
           NULL AS counterparty
         FROM issued_budget ib
@@ -163,6 +165,8 @@ class EmployeeOverview {
           e.flag AS flag,
           e.created_at AS date,
           e.created_at AS created_at,
+          e.receipt_id,
+          e.image_url,
           NULL AS direction,
           NULL AS counterparty
         FROM expenses e
@@ -188,6 +192,8 @@ class EmployeeOverview {
           0 AS flag,
           ea.created_at AS date,
           ea.created_at AS created_at,
+          NULL AS receipt_id,
+          NULL AS image_url,
           NULL AS direction,
           NULL AS counterparty
         FROM employee_abono ea
@@ -216,11 +222,11 @@ class EmployeeOverview {
           0 AS flag,
           bt.created_at AS date,
           bt.created_at AS created_at,
+          NULL AS receipt_id,
+          NULL AS image_url,
           'sent' AS direction,
           ru.name AS counterparty
         FROM budget_transfer bt
-        JOIN budget_reference br ON br.reference_id = bt.reference_id
-          AND br.status = 'open'
         LEFT JOIN users ru ON ru.user_id = bt.transfer_to
         WHERE bt.user_id = $1 AND bt.status = 'success'
 
@@ -245,11 +251,11 @@ class EmployeeOverview {
           0 AS flag,
           bt.created_at AS date,
           bt.created_at AS created_at,
+          NULL AS receipt_id,
+          NULL AS image_url,
           'received' AS direction,
           su.name AS counterparty
         FROM budget_transfer bt
-        JOIN budget_reference br ON br.reference_id = bt.reference_id
-          AND br.status = 'open'
         LEFT JOIN users su ON su.user_id = bt.user_id
         WHERE bt.transfer_to = $1 AND bt.status = 'success'
       )

@@ -20,8 +20,7 @@ const DIALOG_EASE = [0.16, 1, 0.3, 1];
  * Destructive-confirmation dialog for the "remove employee" action — mirrors
  * the alertdialog shell used by the Budget transaction actions.
  */
-function DeleteDialog({ titleId, descriptionId, pending, onClose, onConfirm }) {
-  return (
+function DeleteDialog({ titleId, descriptionId, pending, onClose, onConfirm }) {  return (
     <motion.div
       className="fixed inset-0 z-[60] flex items-center justify-center p-4"
       animate={{ opacity: 1 }}
@@ -78,6 +77,76 @@ function DeleteDialog({ titleId, descriptionId, pending, onClose, onConfirm }) {
   );
 }
 
+/**
+ * Confirmation dialog for deactivating an account — same alertdialog shell
+ * as the delete dialog, in a warning tone since access is cut immediately
+ * (the employee is signed out everywhere) but the account itself survives.
+ */
+function DeactivateDialog({
+  titleId,
+  descriptionId,
+  employeeName,
+  pending,
+  onClose,
+  onConfirm,
+}) {
+  return (
+    <motion.div
+      className="fixed inset-0 z-[60] flex items-center justify-center p-4"
+      animate={{ opacity: 1 }}
+      exit={{ opacity: 0 }}
+      transition={{ duration: 0.2, ease: DIALOG_EASE }}
+    >
+      {/* Backdrop click = dismiss (a no-op while the request is in flight). */}
+      <div
+        className="absolute inset-0 bg-[var(--ink)]/30 backdrop-blur-sm"
+        onClick={onClose}
+      />
+      <motion.div
+        role="alertdialog"
+        aria-modal="true"
+        aria-labelledby={titleId}
+        aria-describedby={descriptionId}
+        aria-busy={pending || undefined}
+        onClick={(e) => e.stopPropagation()}
+        initial={{ opacity: 0, y: 14, scale: 0.97 }}
+        animate={{ opacity: 1, y: 0, scale: 1 }}
+        exit={{ opacity: 0, y: 8, scale: 0.97 }}
+        transition={{ duration: 0.22, ease: DIALOG_EASE }}
+        className="relative w-full max-w-sm rounded-3xl border border-[var(--border)] bg-[var(--surface)] p-6 shadow-hover"
+      >
+        <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-[var(--warning)]/12 text-[var(--warning)]">
+          <UserX size={20} aria-hidden />
+        </div>
+        <h2
+          id={titleId}
+          className="mt-4 font-display text-lg font-medium tracking-tight text-[var(--ink)]"
+        >
+          Deactivate {employeeName || "this employee"}?
+        </h2>
+        <p
+          id={descriptionId}
+          className="mt-1.5 text-sm leading-relaxed text-[var(--ink-muted)]"
+        >
+          They will be signed out everywhere and can&apos;t sign back in
+          until reactivated. Their records and balances are kept.
+        </p>
+        <div className="mt-5 flex items-center justify-end gap-2">
+          <Button variant="outline" onClick={onClose} disabled={pending}>
+            Keep active
+          </Button>
+          <Button variant="danger" onClick={onConfirm} disabled={pending}>
+            {pending && (
+              <Loader2 size={13} className="animate-spin" aria-hidden />
+            )}
+            {pending ? "Deactivating…" : "Yes, deactivate"}
+          </Button>
+        </div>
+      </motion.div>
+    </motion.div>
+  );
+}
+
 // Menu clusters, rendered top to bottom with a separator between non-empty
 // clusters: viewing, account-status moves, then the destructive action.
 const MENU_GROUPS = ["view", "status", "danger"];
@@ -101,7 +170,9 @@ export function EmployeeActions({ employee, pending = false, onAction }) {
   const [menuOpen, setMenuOpen] = useState(false);
   const [position, setPosition] = useState(null);
   const [confirmDelete, setConfirmDelete] = useState(false);
+  const [confirmDeactivate, setConfirmDeactivate] = useState(false);
   const [removing, setRemoving] = useState(false);
+  const [updating, setUpdating] = useState(false);
   const triggerRef = useRef(null);
   const menuRef = useRef(null);
   const titleId = useId();
@@ -161,6 +232,20 @@ export function EmployeeActions({ employee, pending = false, onAction }) {
     setConfirmDelete(false);
   };
 
+  const closeDeactivate = () => {
+    // Same no-dismiss-while-pending rule as the delete dialog.
+    if (updating) return;
+    setConfirmDeactivate(false);
+    triggerRef.current?.focus();
+  };
+
+  const runDeactivate = async () => {
+    setUpdating(true);
+    await onAction("deactivate", employee);
+    setUpdating(false);
+    setConfirmDeactivate(false);
+  };
+
   const statusItem =
     employee.status === "pending"
       ? {
@@ -199,8 +284,14 @@ export function EmployeeActions({ employee, pending = false, onAction }) {
           {
             ...statusItem,
             danger: false,
+            warning: statusItem.action === "deactivate",
             group: "status",
-            run: () => onAction(statusItem.action, employee),
+            // Deactivate cuts access immediately, so it asks first like the
+            // delete action does — approve/activate stay one-click.
+            run: () =>
+              statusItem.action === "deactivate"
+                ? setConfirmDeactivate(true)
+                : onAction(statusItem.action, employee),
           },
         ]
       : []),
@@ -290,7 +381,7 @@ export function EmployeeActions({ employee, pending = false, onAction }) {
                     className="mx-3 border-t border-[var(--border)]"
                   />
                 )}
-                {section.map(({ key, label, Icon, danger, run }) => (
+                {section.map(({ key, label, Icon, danger, warning, run }) => (
                   <button
                     key={key}
                     type="button"
@@ -299,7 +390,11 @@ export function EmployeeActions({ employee, pending = false, onAction }) {
                     onClick={() => runItem(run)}
                     className={cn(
                       "flex w-full items-center gap-2.5 px-3.5 py-2 text-sm font-medium transition-colors hover:bg-[var(--surface-2)] disabled:pointer-events-none disabled:opacity-40",
-                      danger ? "text-[var(--danger)]" : "text-[var(--ink)]",
+                      danger
+                        ? "text-[var(--danger)]"
+                        : warning
+                          ? "text-[var(--warning)]"
+                          : "text-[var(--ink)]",
                     )}
                   >
                     <Icon size={15} aria-hidden />
@@ -322,6 +417,17 @@ export function EmployeeActions({ employee, pending = false, onAction }) {
               pending={removing}
               onClose={closeDelete}
               onConfirm={confirmRemove}
+            />
+          )}
+          {confirmDeactivate && (
+            <DeactivateDialog
+              key="deactivate-confirm"
+              titleId={titleId}
+              descriptionId={descriptionId}
+              employeeName={employee.name}
+              pending={updating}
+              onClose={closeDeactivate}
+              onConfirm={runDeactivate}
             />
           )}
         </AnimatePresence>,

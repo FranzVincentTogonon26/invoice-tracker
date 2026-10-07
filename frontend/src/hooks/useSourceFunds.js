@@ -24,6 +24,17 @@ export function useSourceFundsMutations() {
     qc.invalidateQueries({ queryKey: ["budgets"] });
   };
   return {
+    // Creates one source (label + optional notes). New sources always open
+    // as 'open'.
+    createReference: useMutation({
+      mutationFn: ({ label, notes }) =>
+        budgetsApi.create({
+          type: "addBudgetReference",
+          label,
+          reference_notes: notes || undefined,
+        }),
+      onSuccess: invalidate,
+    }),
     // Edits one source (label / notes / status).
     updateReference: useMutation({
       mutationFn: ({ referenceId, payload }) =>

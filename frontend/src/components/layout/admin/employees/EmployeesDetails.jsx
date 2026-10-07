@@ -1,19 +1,7 @@
-import { Children, Fragment, useMemo, useRef, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
-import { AnimatePresence, motion } from "framer-motion";
 import toast from "react-hot-toast";
-import {
-  ArrowLeft,
-  CalendarDays,
-  ClipboardList,
-  Files,
-  HandCoins,
-  Loader2,
-  Pencil,
-  ReceiptText,
-  UserX,
-  Wallet,
-} from "lucide-react";
+import { CalendarDays, Files, Loader2, Pencil, UserX } from "lucide-react";
 import { Badge } from "@/components/ui/Badge";
 import { Card } from "@/components/ui/Card";
 import { EmployeeAvatar } from "@/components/ui/SelectEmployee";
@@ -28,67 +16,19 @@ import {
   SharePill,
 } from "./EmployeesTable";
 import { AVATAR_ACCEPT, AVATAR_EXTENSIONS, budgetBreakdown } from "@/constants";
-import { cn, fileExtension, formatDate, formatMoney } from "@/lib/utils";
+import {
+  cn,
+  fileExtension,
+  formatDate,
+  formatMoney,
+  formatTime,
+} from "@/lib/utils";
 import { useEmployees, useEmployeesMutations } from "@/hooks/useEmployees";
-import { Tabs, TabsList, TabsTrigger } from "@/components/ui/Tabs";
-import EmployeeTransaction from "./EmployeeTransaction";
-import EmployeeBudget from "./EmployeeBudget";
-import EmployeeExpenses from "./EmployeeExpenses";
-import EmployeeAbono from "./EmployeeAbono";
-
-// Tab order drives the panel slide direction. Icons mirror the transaction-kind
-// vocabulary used across the app (issued → HandCoins, expense →
-// ReceiptText, abono → Wallet).
-const TAB_META = [
-  { value: "employee_transaction", label: "Overview", Icon: ClipboardList },
-  { value: "employee_budget",      label: "Budget",   Icon: HandCoins },
-  { value: "employee_expenses",    label: "Expenses", Icon: ReceiptText },
-  { value: "employee_abono",       label: "Abono",    Icon: Wallet },
-];
-
-// The curve the rest of the app animates with (shells, tab panels, dialogs).
-const PANEL_EASE = [0.16, 1, 0.3, 1];
-
-// Compact centered budget tile — label over a single centered value row;
-// optional breakdown figures ride in the same row, split by vertical rules.
-function BudgetMetric({ icon: Icon, label, value, tone, children }) {
-  // toArray drops the `false` from `{cond && <row />}` pairs, so the rule
-  // only renders when at least one breakdown row actually exists.
-  const breakdown = Children.toArray(children).filter(Boolean);
-  return (
-    <div className="rounded-xl border border-[var(--border)] bg-[var(--surface-2)]/50 p-3">
-      <div className="flex items-center justify-center gap-2">
-        <Icon size={14} aria-hidden className="text-[var(--ink-muted)]" />
-        <p className="type-eyebrow text-[var(--ink-muted)]">{label}</p>
-      </div>
-      <div className="mt-1.5 flex flex-wrap items-center justify-center gap-x-2 gap-y-1">
-        <p
-          className={cn(
-            "font-display text-[15px] font-medium tabular-nums",
-            tone === "danger"
-              ? "text-[var(--danger)]"
-              : tone === "accent"
-                ? "text-[var(--accent-strong)]"
-                : tone === "warning"
-                  ? "text-[var(--warning)]"
-                  : "text-[var(--ink)]",
-          )}
-        >
-          {value}
-        </p>
-        {breakdown.map((row, i) => (
-          <Fragment key={i}>
-            <span
-              aria-hidden
-              className="h-4 w-px shrink-0 bg-[var(--border)]"
-            />
-            {row}
-          </Fragment>
-        ))}
-      </div>
-    </div>
-  );
-}
+import { useEmployeeDetailsOverview } from "@/hooks/useEmployeeDetails";
+import { BackButton, DetailsHeader } from "./EmployeeDetailsHeader";
+import { EmployeeFundsPanel } from "./EmployeeFundsPanel";
+import { EmployeeDetailsTabs } from "./EmployeeDetailsTabs";
+import { TAB_META } from "@/lib/employeeDetailsTabs";
 
 /**
  * Admin → Employees → profile detail (route `employees/:id`).
@@ -119,6 +59,12 @@ export default function AdminEmployeesDetails() {
   const uploadingAvatar = updateAvatar.isPending;
   const avatarFileRef = useRef(null);
 
+  // Trace feed for the chart below — every transaction on this account.
+  // Loaded alongside the roster (not gated on `employee`) so hooks stay
+  // unconditional; the query is id-scoped server-side.
+  const { data: detailOverview, isLoading: traceLoading } =
+    useEmployeeDetailsOverview(id);
+
   const employee = useMemo(
     () => employees.find((e) => String(e.user_id) === String(id)),
     [employees, id],
@@ -147,7 +93,9 @@ export default function AdminEmployeesDetails() {
       await updateAvatar.mutateAsync({ id: employee.user_id, file: picked });
       toast.success(`Updated photo for ${employee.name}.`);
     } catch (err) {
-      toast.error(err?.message || "Couldn't update the photo. Please try again.");
+      toast.error(
+        err?.message || "Couldn't update the photo. Please try again.",
+      );
     }
   };
 
@@ -159,6 +107,82 @@ export default function AdminEmployeesDetails() {
     setDirection(nextIndex > currentIndex ? 1 : -1);
     setTab(value);
   };
+
+  // Trace feed — three independent running lines (cumulative issued,
+  // cumulative spent, cumulative abono), oldest first. Each line only ever
+  // climbs when its own kind lands; hovering any point compares that date's
+  // record against all three running totals. Written without reassignment
+  // (prefix sums over the head slice) so no render-phase mutation lint fires.
+  // NOTE: must stay above the early returns below — hooks can't move
+  // between renders, and these returns skip the rest of the component.
+  const traceData = useMemo(() => {
+    const feed = detailOverview?.transactions ?? [];
+    const short = (iso) => {
+      const d = new Date(iso);
+      if (Number.isNaN(d.getTime())) return "—";
+      return d.toLocaleDateString("en-GB", {
+        day: "numeric",
+        month: "short",
+      });
+    };
+    const full = (iso) => {
+      const d = new Date(iso);
+      if (Number.isNaN(d.getTime())) return "—";
+      return `${formatDate(iso)} · ${formatTime(iso)}`;
+    };
+    const round = (n) => Math.round(n * 100) / 100;
+    const amountOf = (t) => Number(t.amount) || 0;
+    const isIssued = (t) => t.kind === "issued" || t.direction === "received";
+    const isAbono = (t) => !isIssued(t) && t.kind === "abono";
+    const sorted = [...feed].sort(
+      (a, b) => new Date(a.date ?? 0) - new Date(b.date ?? 0),
+    );
+    const cumSum = (head, pred) =>
+      round(head.filter(pred).reduce((s, t) => s + amountOf(t), 0));
+    return sorted.map((t, i) => {
+      const head = sorted.slice(0, i + 1);
+      const amount = amountOf(t);
+      const base = {
+        label: short(t.date),
+        fullDate: full(t.date),
+        title: t.description || "",
+        status: t.status || "",
+        amount,
+        signed: "",
+        cumIssued: cumSum(head, isIssued),
+        cumSpent: cumSum(head, (x) => !isIssued(x) && !isAbono(x)),
+        cumAbono: cumSum(head, isAbono),
+        kindLabel: t.kind || "record",
+        dot: "bg-[var(--ink-muted)]",
+      };
+      if (isIssued(t))
+        return {
+          ...base,
+          signed: "+",
+          kindLabel:
+            t.kind === "issued" ? "Budget issued" : "Transfer received",
+          dot: "bg-[var(--accent)]",
+        };
+      if (isAbono(t))
+        return {
+          ...base,
+          signed: "+",
+          kindLabel: "Abono",
+          dot: "bg-[var(--warning)]",
+        };
+      return {
+        ...base,
+        signed: "−",
+        kindLabel:
+          t.kind === "expense"
+            ? "Expense"
+            : t.direction === "sent"
+              ? "Transfer sent"
+              : (t.kind ?? "record"),
+        dot: "bg-[var(--danger)]",
+      };
+    });
+  }, [detailOverview]);
 
   if (isLoading) {
     return (
@@ -290,7 +314,6 @@ export default function AdminEmployeesDetails() {
           </div>
 
           <div className="w-full lg:max-w-sm lg:shrink-0">
-
             <div className="flex items-end justify-between gap-3">
               <div className="min-w-0">
                 <div className="flex items-baseline justify-between gap-2">
@@ -331,155 +354,22 @@ export default function AdminEmployeesDetails() {
         </div>
       </Card>
 
-      <Card padding="md">
-        <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
-          <BudgetMetric
-            icon={Wallet}
-            label="Issued Budget"
-            value={formatMoney(issued)}
-          >
-            {received > 0 && (
-              <p
-                className="text-xs font-medium tabular-nums text-[var(--accent-strong)]"
-                title={`${formatMoney(received)} received from budget transfers`}
-              >
-                + {formatMoney(received)} received
-              </p>
-            )}
-          </BudgetMetric>
-          <BudgetMetric
-            icon={ReceiptText}
-            label="Total Spent"
-            value={formatMoney(spent)}
-          >
-            {sent > 0 && (
-              <p
-                className="text-xs font-medium tabular-nums text-[var(--danger)]"
-                title={`${formatMoney(sent)} sent via budget transfers`}
-              >
-                - {formatMoney(sent)} sent
-              </p>
-            )}
-          </BudgetMetric>
-          <BudgetMetric
-            icon={HandCoins}
-            label="Abono Held"
-            value={formatMoney(abono)}
-            tone={abono > 0 ? "warning" : undefined}
-          />
-        </div>
-      </Card>
+      <EmployeeFundsPanel
+        issued={issued}
+        received={received}
+        spent={spent}
+        sent={sent}
+        abono={abono}
+        traceData={traceData}
+        traceLoading={traceLoading}
+      />
 
-      <Tabs value={tab} onValueChange={changeTab} className="space-y-3">
-        <div className="sticky top-0 z-10 bg-[var(--bg)]/90 py-2 backdrop-blur-sm md:-mx-1 md:px-1">
-          <TabsList className="scrollbar-slim w-full max-w-full gap-1 overflow-x-auto rounded-full p-1 sm:w-auto sm:self-start">
-            {TAB_META.map(({ value, label, Icon }) => (
-              <TabsTrigger
-                key={value}
-                value={value}
-                className="grow px-3 sm:grow-0 sm:px-4"
-              >
-                <Icon
-                  size={14}
-                  aria-hidden
-                  className="hidden shrink-0 sm:block"
-                />
-                <span className="whitespace-nowrap text-xs font-medium">
-                  {label}
-                </span>
-              </TabsTrigger>
-            ))}
-          </TabsList>
-          {/* Soft edge so content fades out beneath the frosted bar on scroll. */}
-          <span
-            aria-hidden
-            className="pointer-events-none absolute inset-x-0 top-full h-2 bg-[linear-gradient(to_bottom,var(--bg),transparent)]"
-          />
-        </div>
-
-        {/* Direct AnimatePresence control (not TabsContent) so the exit animation can play. */}
-        <div className="relative">
-          <AnimatePresence mode="wait" initial={false} custom={direction}>
-            <motion.div
-              key={tab}
-              custom={direction}
-              initial={{ opacity: 0, x: direction * 24 }}
-              animate={{ opacity: 1, x: 0 }}
-              exit={{ opacity: 0, x: direction * -24 }}
-              transition={{ duration: 0.28, ease: PANEL_EASE }}
-            >
-              {tab === "employee_transaction" && (
-                <EmployeeTransaction userId={employee.user_id} />
-              )}
-              {tab === "employee_budget" && (
-                <EmployeeBudget userId={employee.user_id} />
-              )}
-              {tab === "employee_expenses" && (
-                <EmployeeExpenses userId={employee.user_id} />
-              )}
-              {tab === "employee_abono" && (
-                <EmployeeAbono userId={employee.user_id} />
-              )}
-            </motion.div>
-          </AnimatePresence>
-        </div>
-      </Tabs>
+      <EmployeeDetailsTabs
+        tab={tab}
+        onTabChange={changeTab}
+        direction={direction}
+        employeeId={employee.user_id}
+      />
     </div>
-  );
-}
-
-function DetailsHeader({ onBack, actions, description }) {
-  return (
-    <div className="flex items-center gap-3">
-      <BackButton onClick={onBack} />
-      <div className="min-w-0 flex-1">
-        <nav
-          aria-label="Breadcrumb"
-          className="flex min-w-0 items-center gap-1.5 text-sm"
-        >
-          <button
-            type="button"
-            onClick={onBack}
-            className="shrink-0 text-[var(--ink-muted)] transition-colors hover:text-[var(--ink)]"
-          >
-            Employees
-          </button>
-          <span
-            aria-hidden
-            className="shrink-0 text-[var(--ink-muted)] opacity-50"
-          >
-            /
-          </span>
-          <span className="truncate font-medium text-[var(--ink)]">
-            Profile
-          </span>
-        </nav>
-        {description && (
-          <p className="mt-0.5 truncate text-xs text-[var(--ink-muted)]">
-            {description}
-          </p>
-        )}
-      </div>
-      {actions && (
-        <div className="flex shrink-0 items-center gap-2">{actions}</div>
-      )}
-    </div>
-  );
-}
-
-// Icon-only circular back button shared by every state — matches the
-// BudgetTransfer / AddExpenses header pattern (border + surface + shadow),
-// so it reads as a button instead of a text link.
-function BackButton({ onClick, label = "Back to employees" }) {
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      aria-label={label}
-      title={label}
-      className="mt-1 flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-[var(--border)] bg-[var(--surface)] text-[var(--ink-muted)] shadow-card transition-colors hover:bg-[var(--surface-2)] hover:text-[var(--ink)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)]/30"
-    >
-      <ArrowLeft size={16} aria-hidden />
-    </button>
   );
 }
