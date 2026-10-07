@@ -126,7 +126,7 @@ const AddAbonoModal = ({ open, onClose }) => {
                   <div className="min-w-0">
                     <h3
                       id={titleId}
-                      className="font-display text-base font-semibold tracking-tight text-[var(--ink)]"
+                      className="font-display text-base font-medium tracking-tight text-[var(--ink)]"
                     >
                       Add Abono
                     </h3>

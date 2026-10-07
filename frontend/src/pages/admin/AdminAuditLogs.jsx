@@ -57,7 +57,7 @@ function FilterListbox({ label, value, options, onChange, width }) {
         renderTrigger={(selectedOption) => (
           <span className="truncate text-xs text-[var(--ink-muted)]">
             {selectedOption ? (
-              <span className="font-semibold">{selectedOption.label}</span>
+              <span className="font-medium">{selectedOption.label}</span>
             ) : (
               label
             )}
@@ -122,7 +122,7 @@ function LogLine({ entry }) {
         <span className="text-[var(--ink-muted)]"> ({entry.role})</span>
       </span>
       {entry.amount && (
-        <span className="shrink-0 tabular-nums font-semibold text-[var(--success)]">
+        <span className="shrink-0 tabular-nums font-medium text-[var(--success)]">
           {entry.amount}
         </span>
       )}
@@ -328,7 +328,7 @@ export default function AdminAuditLogs() {
             <button
               type="button"
               onClick={clearFilters}
-              className="col-span-2 inline-flex h-9 items-center justify-center gap-1.5 rounded-full px-3 text-xs font-semibold text-[var(--ink-muted)] transition-colors hover:bg-[var(--surface-2)] hover:text-[var(--ink)] sm:col-auto sm:w-auto"
+              className="col-span-2 inline-flex h-9 items-center justify-center gap-1.5 rounded-full px-3 text-xs font-medium text-[var(--ink-muted)] transition-colors hover:bg-[var(--surface-2)] hover:text-[var(--ink)] sm:col-auto sm:w-auto"
             >
               <RotateCcw size={13} aria-hidden />
               Clear all

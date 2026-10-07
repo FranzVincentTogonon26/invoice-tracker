@@ -88,6 +88,21 @@ router.patch(
   budgetController.restoreBudget,
 );
 router.post("/", authMiddleware, requireAdminAccess, budgetController.create);
+// Source of Funds management (AdminSourceFunds page) — full list with live
+// aggregates (open AND disconnected sources), plus edit. Declared before
+// "/:referenceId" so the literal segment is never parsed as an id.
+router.get(
+  "/references",
+  authMiddleware,
+  requireAdminAccess,
+  budgetController.sourceFunds,
+);
+router.patch(
+  "/references/:referenceId",
+  authMiddleware,
+  requireAdminAccess,
+  budgetController.updateReference,
+);
 // Deferred receipt upload for the Issue Budget scan flow: the single held
 // file (`file`) is stored in `uploads/receipts_issued_budget` only when the
 // issuance is confirmed — the returned `image_url` lands on the

@@ -342,7 +342,7 @@ const OverviewDetailsBody = ({ row, meta }) => {
           <p className="type-eyebrow text-[var(--ink-muted)]">Amount</p>
           <p
             className={cn(
-              "mt-1 font-display text-2xl font-semibold leading-none tracking-tight tabular-nums text-[var(--ink)]",
+              "mt-1 font-display text-2xl font-medium leading-none tracking-tight tabular-nums text-[var(--ink)]",
               isCancelledIssued(row) && "line-through",
             )}
           >
@@ -539,7 +539,7 @@ function OverviewSheet({ row, onClose }) {
                 <Icon size={20} />
               </span>
               <div className="min-w-0 flex-1">
-                <p className="truncate font-display text-base font-semibold tracking-tight text-[var(--ink)]">
+                <p className="truncate font-display text-base font-medium tracking-tight text-[var(--ink)]">
                   {title}
                 </p>
                 <p className="mt-0.5 truncate text-xs tabular-nums text-[var(--ink-muted)]">
@@ -752,7 +752,7 @@ function OverviewDialog({ row, onClose }) {
                 <Icon size={20} />
               </span>
               <div className="min-w-0 flex-1">
-                <p className="truncate font-display text-base font-semibold tracking-tight text-[var(--ink)]">
+                <p className="truncate font-display text-base font-medium tracking-tight text-[var(--ink)]">
                   {title}
                 </p>
                 <p className="mt-0.5 truncate text-xs tabular-nums text-[var(--ink-muted)]">
@@ -878,7 +878,7 @@ export const TransactionsSection = ({
           </span>
           <div>
             <div className="flex items-center gap-2">
-              <h3 className="font-display text-base font-semibold tracking-tight text-[var(--ink)]">
+              <h3 className="font-display text-base font-medium tracking-tight text-[var(--ink)]">
                 All Transactions
               </h3>
             </div>
@@ -1027,7 +1027,7 @@ export const TransactionsSection = ({
                           aria-hidden
                           className="absolute inset-y-2 left-0 w-[3px] rounded-full bg-transparent"
                         />
-                        <p className="whitespace-nowrap text-[13px] font-semibold leading-none tabular-nums text-[var(--ink)]">
+                        <p className="whitespace-nowrap text-[13px] font-medium leading-none tabular-nums text-[var(--ink)]">
                           {formatDate(tx.date)}
                         </p>
                         <p className="mt-1 whitespace-nowrap text-[11px] leading-none tabular-nums text-[var(--ink-muted)]">
@@ -1191,7 +1191,7 @@ export const TransactionsSection = ({
                       <td className="px-4 py-3 text-right align-middle">
                         <span
                           className={cn(
-                            "whitespace-nowrap font-display text-[15px] font-semibold tabular-nums",
+                            "whitespace-nowrap font-display text-[15px] font-medium tabular-nums",
                             amountColor,
                             (isCancelled(tx) || isCancelledIssued(tx)) &&
                               "line-through",
@@ -1262,7 +1262,7 @@ export const TransactionsSection = ({
               <>
                 {dateGroups.map(({ label, transactions }) => (
                   <div key={label} className="space-y-2.5">
-                    <h4 className="px-1 text-[11px] font-semibold uppercase tracking-wider text-[var(--ink-muted)]">
+                    <h4 className="px-1 text-[11px] font-medium uppercase tracking-wider text-[var(--ink-muted)]">
                       {label}
                     </h4>
                     {transactions.map((tx) => {
@@ -1313,7 +1313,7 @@ export const TransactionsSection = ({
                           {/* Left: Icon & Details matching requested mobile structure */}
                           <div className="flex items-center gap-3 min-w-0">
                             <div className="min-w-0">
-                              <p className="flex min-w-0 items-center gap-1.5 truncate text-xs font-semibold leading-none text-[var(--ink)]">
+                              <p className="flex min-w-0 items-center gap-1.5 truncate text-xs font-medium leading-none text-[var(--ink)]">
                                 <span className="min-w-0 truncate capitalize">
                                   {tx.description || meta.label}
                                 </span>
@@ -1381,7 +1381,7 @@ export const TransactionsSection = ({
                           <div className="text-right shrink-0">
                             <p
                               className={cn(
-                                "font-display text-sm font-semibold tabular-nums",
+                                "font-display text-sm font-medium tabular-nums",
                                 amountColor,
                                 (isCancelled(tx) || isCancelledIssued(tx)) &&
                                   "line-through",

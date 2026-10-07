@@ -10,7 +10,6 @@ import {
   HandCoins,
   Loader2,
   Pencil,
-  Receipt,
   ReceiptText,
   UserX,
   Wallet,
@@ -65,7 +64,7 @@ function BudgetMetric({ icon: Icon, label, value, tone, children }) {
       <div className="mt-1.5 flex flex-wrap items-center justify-center gap-x-2 gap-y-1">
         <p
           className={cn(
-            "font-display text-[15px] font-semibold tabular-nums",
+            "font-display text-[15px] font-medium tabular-nums",
             tone === "danger"
               ? "text-[var(--danger)]"
               : tone === "accent"
@@ -267,7 +266,7 @@ export default function AdminEmployeesDetails() {
               />
             </div>
             <div className="min-w-0">
-              <p className="truncate font-display text-lg font-semibold tracking-tight text-[var(--ink)]">
+              <p className="truncate font-display text-lg font-medium tracking-tight text-[var(--ink)]">
                 {employee.name}
               </p>
               <p className="mt-0.5 truncate text-sm text-[var(--ink-muted)]">
@@ -291,6 +290,7 @@ export default function AdminEmployeesDetails() {
           </div>
 
           <div className="w-full lg:max-w-sm lg:shrink-0">
+
             <div className="flex items-end justify-between gap-3">
               <div className="min-w-0">
                 <div className="flex items-baseline justify-between gap-2">
@@ -303,7 +303,7 @@ export default function AdminEmployeesDetails() {
                 </div>
                 <p
                   className={cn(
-                    "mt-1 font-display text-2xl font-semibold leading-none tracking-tight tabular-nums",
+                    "mt-1 font-display text-2xl font-medium leading-none tracking-tight tabular-nums",
                     overSpent ? "text-[var(--danger)]" : "text-[var(--ink)]",
                   )}
                 >
@@ -340,7 +340,7 @@ export default function AdminEmployeesDetails() {
           >
             {received > 0 && (
               <p
-                className="text-xs font-semibold tabular-nums text-[var(--accent-strong)]"
+                className="text-xs font-medium tabular-nums text-[var(--accent-strong)]"
                 title={`${formatMoney(received)} received from budget transfers`}
               >
                 + {formatMoney(received)} received
@@ -348,13 +348,13 @@ export default function AdminEmployeesDetails() {
             )}
           </BudgetMetric>
           <BudgetMetric
-            icon={Receipt}
+            icon={ReceiptText}
             label="Total Spent"
             value={formatMoney(spent)}
           >
             {sent > 0 && (
               <p
-                className="text-xs font-semibold tabular-nums text-[var(--danger)]"
+                className="text-xs font-medium tabular-nums text-[var(--danger)]"
                 title={`${formatMoney(sent)} sent via budget transfers`}
               >
                 - {formatMoney(sent)} sent
@@ -384,7 +384,7 @@ export default function AdminEmployeesDetails() {
                   aria-hidden
                   className="hidden shrink-0 sm:block"
                 />
-                <span className="whitespace-nowrap text-xs font-semibold">
+                <span className="whitespace-nowrap text-xs font-medium">
                   {label}
                 </span>
               </TabsTrigger>

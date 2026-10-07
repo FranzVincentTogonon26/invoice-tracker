@@ -85,7 +85,7 @@ const LineCells = ({ item, index }) => (
         </div>
       </div>
     </td>
-    <td className="whitespace-nowrap px-4 py-3 text-right align-top font-semibold tabular-nums text-[var(--ink)]">
+    <td className="whitespace-nowrap px-4 py-3 text-right align-top font-medium tabular-nums text-[var(--ink)]">
       {formatMoney(item.amount)}
     </td>
   </>
@@ -126,7 +126,7 @@ const LineItemsSection = ({
         className="overflow-hidden rounded-2xl border border-[var(--border)] bg-[var(--surface)] shadow-xs"
       >
         <div className="flex items-center justify-between gap-2 border-b border-[var(--border)] bg-[var(--surface-2)]/30 px-4 py-3">
-          <p className="text-[11px] font-semibold uppercase tracking-[0.08em] text-[var(--ink-muted)]">
+          <p className="text-[11px] font-medium uppercase tracking-[0.08em] text-[var(--ink-muted)]">
             Receipt items
           </p>
         </div>
@@ -165,7 +165,7 @@ const LineItemsSection = ({
         <span className="mx-auto flex h-9 w-9 items-center justify-center rounded-xl bg-[var(--surface-2)] text-[var(--ink-muted)]">
           <FileText size={16} aria-hidden />
         </span>
-        <p className="mt-2 text-xs font-semibold text-[var(--ink)]">
+        <p className="mt-2 text-xs font-medium text-[var(--ink)]">
           No itemized lines found
         </p>
         <p className="mt-0.5 text-[11px] leading-relaxed text-[var(--ink-muted)]">
@@ -191,7 +191,7 @@ const LineItemsSection = ({
       >
         <div className="min-w-0 flex-1">
           <div className="flex flex-wrap items-center gap-2">
-            <span className="text-xs font-semibold uppercase tracking-wide text-[var(--ink)]">
+            <span className="text-xs font-medium uppercase tracking-wide text-[var(--ink)]">
               Scanned line items
             </span>
             <span className="inline-flex items-center rounded-full bg-[var(--surface-2)] px-2 py-0.5 text-[11px] font-normal text-[var(--ink-muted)]">
@@ -200,7 +200,7 @@ const LineItemsSection = ({
           </div>
           <p className="mt-0.5 text-xs text-[var(--ink-muted)]">
             Total itemized:{" "}
-            <span className="font-semibold text-[var(--ink)]">
+            <span className="font-medium text-[var(--ink)]">
               {formatMoney(itemsTotal)}
             </span>
           </p>
@@ -258,7 +258,7 @@ const LineItemsSection = ({
               <span className="text-[var(--ink-muted)]">
                 Scanned line items total
               </span>
-              <span className="font-semibold tabular-nums text-[var(--ink)]">
+              <span className="font-medium tabular-nums text-[var(--ink)]">
                 {formatMoney(itemsTotal)}
               </span>
             </div>
@@ -407,7 +407,7 @@ const EmployeeExpenseDetailsModal = ({ open, expense, onClose }) => {
                 <ReceiptText size={20} />
               </span>
               <div className="min-w-0 flex-1">
-                <p className="truncate font-display text-base font-semibold tracking-tight text-[var(--ink)]">
+                <p className="truncate font-display text-base font-medium tracking-tight text-[var(--ink)]">
                   Expense details
                 </p>
                 <p className="mt-0.5 truncate text-xs tabular-nums text-[var(--ink-muted)]">
@@ -432,7 +432,7 @@ const EmployeeExpenseDetailsModal = ({ open, expense, onClose }) => {
                   type="button"
                   onClick={() => setActiveTab("details")}
                   className={cn(
-                    "flex-1 rounded-lg py-1.5 text-xs font-semibold transition-all",
+                    "flex-1 rounded-lg py-1.5 text-xs font-medium transition-all",
                     activeTab === "details"
                       ? "bg-[var(--surface)] text-[var(--ink)] shadow-xs"
                       : "text-[var(--ink-muted)] hover:text-[var(--ink)]",
@@ -444,7 +444,7 @@ const EmployeeExpenseDetailsModal = ({ open, expense, onClose }) => {
                   type="button"
                   onClick={() => setActiveTab("receipt")}
                   className={cn(
-                    "flex-1 flex items-center justify-center gap-1.5 rounded-lg py-1.5 text-xs font-semibold transition-all",
+                    "flex-1 flex items-center justify-center gap-1.5 rounded-lg py-1.5 text-xs font-medium transition-all",
                     activeTab === "receipt"
                       ? "bg-[var(--surface)] text-[var(--ink)] shadow-xs"
                       : "text-[var(--ink-muted)] hover:text-[var(--ink)]",
@@ -497,7 +497,7 @@ const EmployeeExpenseDetailsModal = ({ open, expense, onClose }) => {
                     <p className="type-eyebrow text-[var(--ink-muted)]">
                       Amount
                     </p>
-                    <p className="mt-1 font-display text-2xl font-semibold leading-none tracking-tight tabular-nums text-[var(--ink)]">
+                    <p className="mt-1 font-display text-2xl font-medium leading-none tracking-tight tabular-nums text-[var(--ink)]">
                       {formatMoney(row?.amount)}
                     </p>
                     <p className="mt-1.5 truncate text-xs text-[var(--ink-muted)]">
@@ -621,7 +621,7 @@ const EmployeeExpenseDetailsModal = ({ open, expense, onClose }) => {
                         )}
                       </span>
                       <div>
-                        <p className="text-xs font-semibold text-[var(--ink)]">
+                        <p className="text-xs font-medium text-[var(--ink)]">
                           {receiptIsPdf
                             ? "PDF receipt document attached"
                             : "Receipt image attached"}
@@ -694,7 +694,7 @@ const EmployeeExpenseDetailsModal = ({ open, expense, onClose }) => {
                       <button
                         type="button"
                         onClick={() => openReceiptFile(receiptUrl)}
-                        className="inline-flex items-center gap-1 rounded-lg bg-[var(--accent-soft)] px-2.5 py-1 text-xs font-semibold text-[var(--accent-strong)] transition-opacity hover:opacity-90"
+                        className="inline-flex items-center gap-1 rounded-lg bg-[var(--accent-soft)] px-2.5 py-1 text-xs font-medium text-[var(--accent-strong)] transition-opacity hover:opacity-90"
                       >
                         <Maximize2 size={12} aria-hidden />
                         Full size
@@ -722,7 +722,7 @@ const EmployeeExpenseDetailsModal = ({ open, expense, onClose }) => {
                         )}
                       </span>
                       <div className="max-w-[280px] space-y-1">
-                        <p className="text-sm font-semibold text-[var(--ink)]">
+                        <p className="text-sm font-medium text-[var(--ink)]">
                           {receiptIsPdf
                             ? "PDF document receipt"
                             : "Receipt attachment"}
@@ -776,7 +776,7 @@ const EmployeeExpenseDetailsModal = ({ open, expense, onClose }) => {
                 <button
                   type="button"
                   onClick={() => setActiveTab("details")}
-                  className="text-xs font-semibold text-[var(--accent-strong)] hover:underline"
+                  className="text-xs font-medium text-[var(--accent-strong)] hover:underline"
                 >
                   ← Back to overview
                 </button>
@@ -787,7 +787,7 @@ const EmployeeExpenseDetailsModal = ({ open, expense, onClose }) => {
                 type="button"
                 variant="outline"
                 onClick={handleClose}
-                className="rounded-full px-5 text-xs font-semibold"
+                className="rounded-full px-5 text-xs font-medium"
               >
                 Close
               </Button>

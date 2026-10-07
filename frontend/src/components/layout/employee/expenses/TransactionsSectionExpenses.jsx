@@ -192,7 +192,7 @@ function TransactionCard({ tx, meta, disabled, onOpen }) {
           <Icon size={18} />
         </span>
         <div className="min-w-0">
-          <p className="flex min-w-0 items-center gap-1.5 truncate text-xs font-semibold leading-none text-[var(--ink)]">
+          <p className="flex min-w-0 items-center gap-1.5 truncate text-xs font-medium leading-none text-[var(--ink)]">
             <span className="min-w-0 truncate capitalize">
               {tx.description || meta.label}
             </span>
@@ -221,7 +221,7 @@ function TransactionCard({ tx, meta, disabled, onOpen }) {
         </div>
       </div>
       <div className="flex shrink-0 items-center gap-1.5">
-        <p className="text-right font-display text-sm font-semibold tabular-nums text-[var(--ink)]">
+        <p className="text-right font-display text-sm font-medium tabular-nums text-[var(--ink)]">
           {formatMoney(tx.amount)}
         </p>
       </div>
@@ -409,7 +409,7 @@ function TransactionSheetBody({
           <Icon size={20} />
         </span>
         <div className="min-w-0 flex-1">
-          <p className="truncate font-display text-base font-semibold tracking-tight text-[var(--ink)]">
+          <p className="truncate font-display text-base font-medium tracking-tight text-[var(--ink)]">
             Expense details
           </p>
           <p className="mt-0.5 truncate text-xs tabular-nums text-[var(--ink-muted)]">
@@ -502,7 +502,7 @@ function TransactionSheetBody({
           <div className="flex gap-3 items-center justify-between pt-3">
             <div className="min-w-0">
               <p className="type-eyebrow text-[var(--ink-muted)]">Amount</p>
-              <p className="mt-1 font-display text-2xl font-semibold leading-none tracking-tight tabular-nums text-[var(--ink)]">
+              <p className="mt-1 font-display text-2xl font-medium leading-none tracking-tight tabular-nums text-[var(--ink)]">
                 {formatMoney(row.amount)}
               </p>
               <p className="mt-1.5 truncate text-xs text-[var(--ink-muted)]">
@@ -798,14 +798,14 @@ export const TransactionsSectionExpenses = ({
   const draftSummary = draftRow ? (
     <div className="mt-4 flex items-center gap-3 rounded-2xl border border-[var(--border)] bg-[var(--surface-2)]/60 px-4 py-3">
       <div className="min-w-0 flex-1">
-        <p className="truncate text-base font-semibold text-[var(--ink)]">
+        <p className="truncate text-base font-medium text-[var(--ink)]">
           {draftRow.row.description || "Untitled expense"}
         </p>
         <p className="mt-0.5 truncate text-xs text-[var(--ink-muted)]">
           {`${draftRow.row.category || "Uncategorized"} · ${formatDate(draftRow.row.date)}`}
         </p>
       </div>
-      <span className="shrink-0 text-sm font-semibold tabular-nums text-[var(--ink)]">
+      <span className="shrink-0 text-sm font-medium tabular-nums text-[var(--ink)]">
         {formatMoney(draftRow.row.amount)}
       </span>
     </div>
@@ -838,14 +838,14 @@ export const TransactionsSectionExpenses = ({
   const confirmSummary = deleteRow ? (
     <div className="mt-4 flex items-center gap-3 rounded-2xl border border-[var(--border)] bg-[var(--surface-2)]/60 px-4 py-3">
       <div className="min-w-0 flex-1">
-        <p className="truncate text-base font-semibold text-[var(--ink)]">
+        <p className="truncate text-base font-medium text-[var(--ink)]">
           {deleteRow.description || "Untitled expense"}
         </p>
         <p className="mt-0.5 truncate text-xs text-[var(--ink-muted)]">
           {`${deleteRow.category || "Uncategorized"} · ${formatDate(deleteRow.date)}`}
         </p>
       </div>
-      <span className="shrink-0 text-sm font-semibold tabular-nums text-[var(--ink)]">
+      <span className="shrink-0 text-sm font-medium tabular-nums text-[var(--ink)]">
         {formatMoney(deleteRow.amount)}
       </span>
     </div>
@@ -919,7 +919,7 @@ export const TransactionsSectionExpenses = ({
           </span>
           <div>
             <div className="flex items-center gap-2">
-              <h3 className="font-display text-base font-semibold tracking-tight text-[var(--ink)]">
+              <h3 className="font-display text-base font-medium tracking-tight text-[var(--ink)]">
                 All Expenses
               </h3>
             </div>
@@ -1138,7 +1138,7 @@ export const TransactionsSectionExpenses = ({
                       <td className="px-4 py-3 text-right last:pr-5 align-middle">
                         <span
                           className={cn(
-                            "whitespace-nowrap font-display text-[15px] font-semibold tabular-nums",
+                            "whitespace-nowrap font-display text-[15px] font-medium tabular-nums",
                           )}
                         >
                           {formatMoney(tx.amount)}
@@ -1217,7 +1217,7 @@ export const TransactionsSectionExpenses = ({
               <>
                 {dateGroups.map(({ label, transactions }) => (
                   <div key={label} className="space-y-2.5">
-                    <h4 className="px-1 text-[11px] font-semibold uppercase tracking-wider text-[var(--ink-muted)]">
+                    <h4 className="px-1 text-[11px] font-medium uppercase tracking-wider text-[var(--ink-muted)]">
                       {label}
                     </h4>
                     {transactions.map((tx) => {

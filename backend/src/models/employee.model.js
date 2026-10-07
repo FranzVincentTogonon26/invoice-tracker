@@ -136,6 +136,11 @@ class Employee {
     }
 
     // `::float8` casts DECIMAL (returned by pg as strings) to a JS number.
+    // Closed sources leave no footsteps: every sum below only counts rows
+    // under an open source — holdings, spend and abono tied to a cut-off
+    // source vanish from display AND from the remaining-balance math.
+    // Untagged expenses (reference_id IS NULL) still count: they connect to
+    // no source at all.
     const result = await query(
       `SELECT
           u.user_id,
@@ -149,17 +154,23 @@ class Employee {
             SELECT SUM(ib.amount)
             FROM issued_budget ib
             JOIN budget_issued_reference bir ON ib.issued_ref_id = bir.id
+            JOIN budget_reference br ON br.reference_id = bir.reference_id
             WHERE bir.user_id = u.user_id AND bir.status = 'open'
+              AND br.status = 'open'
           ), 0)::float8 AS issued_budget,
           COALESCE((
             SELECT SUM(e.total_amount)
             FROM expenses e
+            LEFT JOIN budget_reference br ON br.reference_id = e.reference_id
             WHERE e.user_id = u.user_id AND e.status = 'paid'
+              AND (e.reference_id IS NULL OR br.status = 'open')
           ), 0)::float8 AS total_spent,
           COALESCE((
             SELECT SUM(ea.amount)
             FROM employee_abono ea
+            JOIN budget_reference br ON br.reference_id = ea.reference_id
             WHERE ea.user_id = u.user_id AND ea.status = 'open'
+              AND br.status = 'open'
           ), 0)::float8 AS total_abono,
           COALESCE((
             SELECT SUM(bt.amount)
@@ -179,17 +190,23 @@ class Employee {
               SELECT SUM(ib.amount)
               FROM issued_budget ib
               JOIN budget_issued_reference bir ON ib.issued_ref_id = bir.id
+              JOIN budget_reference br ON br.reference_id = bir.reference_id
               WHERE bir.user_id = u.user_id AND bir.status = 'open'
+                AND br.status = 'open'
             ), 0)
             + COALESCE((
               SELECT SUM(ea.amount)
               FROM employee_abono ea
+              JOIN budget_reference br ON br.reference_id = ea.reference_id
               WHERE ea.user_id = u.user_id AND ea.status = 'open'
+                AND br.status = 'open'
             ), 0)
             - COALESCE((
               SELECT SUM(e.total_amount)
               FROM expenses e
+              LEFT JOIN budget_reference br ON br.reference_id = e.reference_id
               WHERE e.user_id = u.user_id AND e.status = 'paid'
+                AND (e.reference_id IS NULL OR br.status = 'open')
             ), 0)
             - COALESCE((
               SELECT SUM(bt.amount)
@@ -206,7 +223,9 @@ class Employee {
             SELECT COUNT(*)
             FROM issued_budget ib2
             JOIN budget_issued_reference bir2 ON ib2.issued_ref_id = bir2.id
+            JOIN budget_reference br2 ON br2.reference_id = bir2.reference_id
             WHERE bir2.user_id = u.user_id
+              AND br2.status = 'open'
           )::int AS issued_references,
           -- Parent issuance rows for this user, any status — the delete guard:
           -- an employee who was ever issued budget keeps their history, so the
@@ -242,13 +261,19 @@ class Employee {
     const budget = await query(
       `SELECT
           COALESCE((
-            SELECT SUM(b.amount) FROM budget b WHERE b.status != 'cancelled'
+            SELECT SUM(b.amount)
+              FROM budget b
+              JOIN budget_reference br ON br.reference_id = b.reference_id
+             WHERE b.status != 'cancelled'
+               AND br.status = 'open'
           ), 0) AS total_allocated,
           COALESCE((
             SELECT SUM(i.amount)
             FROM issued_budget i
             JOIN budget_issued_reference bir ON i.issued_ref_id = bir.id
+            JOIN budget_reference br ON br.reference_id = bir.reference_id
             WHERE bir.status = 'open'
+              AND br.status = 'open'
           ), 0) AS total_issued`,
       [],
     );

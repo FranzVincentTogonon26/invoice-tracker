@@ -17,7 +17,7 @@ const SHEET_EASE = [0.16, 1, 0.3, 1];
 
 // Caption styling shared by the sheet's field labels.
 const FIELD_LABEL =
-  "mb-1.5 block text-[11px] font-semibold uppercase tracking-[0.12em] text-[var(--ink-muted)]";
+  "mb-1.5 block text-[11px] font-medium uppercase tracking-[0.12em] text-[var(--ink-muted)]";
 
 // Insight tile tones — mirrors the View-expense modal's recommendations so the
 // advice inside a sheet reads in the same visual language.
@@ -75,7 +75,7 @@ export const FilterChips = ({ chips, onClearAll }) => {
         <button
           type="button"
           onClick={onClearAll}
-          className="shrink-0 text-xs font-semibold text-[var(--ink-muted)] transition-colors hover:text-[var(--ink)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)]/30"
+          className="shrink-0 text-xs font-medium text-[var(--ink-muted)] transition-colors hover:text-[var(--ink)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)]/30"
         >
           Clear
         </button>
@@ -137,7 +137,7 @@ const SheetTip = ({ tip }) => {
         <Icon size={14} aria-hidden />
       </span>
       <div className="min-w-0 flex-1">
-        <p className="text-[13px] font-semibold leading-snug text-[var(--ink)]">
+        <p className="text-[13px] font-medium leading-snug text-[var(--ink)]">
           {tip.title}
         </p>
         <p className="mt-1 text-xs leading-relaxed text-[var(--ink-muted)]">
@@ -243,7 +243,7 @@ export const FilterSheet = ({
               <div className="min-w-0 flex-1">
                 <h2
                   id={titleId}
-                  className="font-display text-base font-semibold tracking-tight text-[var(--ink)]"
+                  className="font-display text-base font-medium tracking-tight text-[var(--ink)]"
                 >
                   {title}
                 </h2>

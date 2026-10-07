@@ -24,7 +24,7 @@ import { cn, fileExtension } from "@/lib/utils";
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 const FieldLabel = ({ children }) => (
-  <p className="mb-1.5 text-[11px] font-semibold uppercase tracking-[0.08em] text-[var(--ink-muted)]">
+  <p className="mb-1.5 text-[11px] font-medium uppercase tracking-[0.08em] text-[var(--ink-muted)]">
     {children}
   </p>
 );
@@ -37,7 +37,7 @@ const SummaryRow = ({ label, value, changed }) => (
     <p
       className={cn(
         "min-w-0 truncate text-sm",
-        changed ? "font-semibold text-[var(--ink)]" : "text-[var(--ink-muted)]",
+        changed ? "font-medium text-[var(--ink)]" : "text-[var(--ink-muted)]",
       )}
     >
       {value}
@@ -306,7 +306,7 @@ const EmployeeAccount = ({ user, loading = false }) => {
                   type="button"
                   onClick={removePhoto}
                   disabled={saving || waiting}
-                  className="inline-flex items-center gap-1.5 text-xs font-semibold text-[var(--danger)] transition-colors hover:opacity-80 disabled:opacity-50"
+                  className="inline-flex items-center gap-1.5 text-xs font-medium text-[var(--danger)] transition-colors hover:opacity-80 disabled:opacity-50"
                 >
                   <Trash2 size={13} aria-hidden />
                   {file ? "Discard photo" : "Remove"}
@@ -321,7 +321,7 @@ const EmployeeAccount = ({ user, loading = false }) => {
                     setAvatarBroken(false);
                   }}
                   disabled={saving || waiting}
-                  className="text-xs font-semibold text-[var(--ink-muted)] transition-colors hover:text-[var(--ink)] disabled:opacity-50"
+                  className="text-xs font-medium text-[var(--ink-muted)] transition-colors hover:text-[var(--ink)] disabled:opacity-50"
                 >
                   Undo
                 </button>

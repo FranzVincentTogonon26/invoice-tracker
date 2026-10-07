@@ -7,6 +7,15 @@ export function cn(...inputs) {
 }
 
 /**
+ * Centavo-safe money rounding shared by ledgers that aggregate DECIMAL
+ * columns client-side (pg returns them as strings) — keeps 0.1 + 0.2 style
+ * residues out of displayed totals.
+ */
+export function toMoney(value) {
+  return Math.round((Number(value) || 0) * 100) / 100;
+}
+
+/**
  * Human-readable label for a payment method value (`expenses.payment_method`),
  * falling back to a Title Cased copy of unknown values so legacy rows still
  * read sensibly.

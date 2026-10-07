@@ -13,7 +13,7 @@ export function EmployeeAvatar({ name, avatarUrl, className }) {
   const fallback = (
     <span
       className={cn(
-        "h-8 w-8 rounded-full bg-[var(--accent-soft)] text-[var(--accent-strong)] font-semibold flex items-center justify-center text-sm ring-1 ring-[var(--surface)] shrink-0",
+        "h-8 w-8 rounded-full bg-[var(--accent-soft)] text-[var(--accent-strong)] font-medium flex items-center justify-center text-sm ring-1 ring-[var(--surface)] shrink-0",
         className,
       )}
       aria-hidden

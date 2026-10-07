@@ -180,13 +180,13 @@ const BudgetTransfer = () => {
     <div className="mt-4 space-y-2 rounded-2xl border border-[var(--border)] bg-[var(--surface-2)]/60 px-4 py-3">
       <div className="flex items-center justify-between gap-3">
         <p className="min-w-0 truncate text-sm text-[var(--ink-muted)]">To</p>
-        <p className="truncate text-sm font-semibold text-[var(--ink)]">
+        <p className="truncate text-sm font-medium text-[var(--ink)]">
           {recipient.name || "Unnamed employee"}
         </p>
       </div>
       <div className="flex items-center justify-between gap-3">
         <p className="text-sm text-[var(--ink-muted)]">Amount</p>
-        <p className="font-display text-sm font-semibold tabular-nums text-[var(--ink)]">
+        <p className="font-display text-sm font-medium tabular-nums text-[var(--ink)]">
           {formatMoney(amountNum)}
         </p>
       </div>
@@ -200,7 +200,7 @@ const BudgetTransfer = () => {
         <p className="text-sm text-[var(--ink-muted)]">Remaining after</p>
         <p
           className={cn(
-            "font-display text-sm font-semibold tabular-nums",
+            "font-display text-sm font-medium tabular-nums",
             projected != null && projected < -0.004
               ? "text-[var(--danger)]"
               : "text-[var(--ink)]",
@@ -226,7 +226,7 @@ const BudgetTransfer = () => {
           </button>
           <div className="min-w-0">
             <div className="flex flex-wrap items-center gap-2">
-              <h2 className="font-display sm:text-2xl text-lg font-semibold tracking-tight text-[var(--ink)]">
+              <h2 className="font-display sm:text-2xl text-lg font-medium tracking-tight text-[var(--ink)]">
                 Budget Transfer
               </h2>
             </div>
@@ -265,7 +265,7 @@ const BudgetTransfer = () => {
               {" = "}
               <span
                 className={cn(
-                  "font-semibold",
+                  "font-medium",
                   insufficient || isOverdrawn
                     ? "text-[var(--danger)]"
                     : "text-[var(--ink)]",
@@ -293,7 +293,7 @@ const BudgetTransfer = () => {
               className="h-10 w-10 text-sm ring-2"
             />
             <div className="min-w-0 flex-1">
-              <div className="truncate text-sm font-semibold text-[var(--ink)]">
+              <div className="truncate text-sm font-medium text-[var(--ink)]">
                 {isLoading ? "Loading…" : me?.name || "Your account"}
               </div>
               <div className="truncate text-xs text-[var(--ink-muted)]">
@@ -331,7 +331,7 @@ const BudgetTransfer = () => {
                     className="h-10 w-10 text-sm ring-2"
                   />
                   <span className="min-w-0 flex-1 text-left">
-                    <span className="block truncate text-sm font-semibold text-[var(--ink)]">
+                    <span className="block truncate text-sm font-medium text-[var(--ink)]">
                       {selectedOption.label}
                     </span>
                     <span className="block truncate text-xs capitalize text-[var(--ink-muted)]">
@@ -343,12 +343,12 @@ const BudgetTransfer = () => {
                 <span className="flex min-w-0 flex-1 items-center gap-3">
                   <span
                     aria-hidden
-                    className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-[var(--surface)] text-sm font-semibold text-[var(--ink-muted)] ring-2 ring-[var(--surface)]"
+                    className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-[var(--surface)] text-sm font-medium text-[var(--ink-muted)] ring-2 ring-[var(--surface)]"
                   >
                     <CircleUser size={28} strokeWidth={1} />
                   </span>
                   <span className="min-w-0 flex-1 text-left">
-                    <span className="block truncate text-sm font-semibold text-[var(--ink-muted)]">
+                    <span className="block truncate text-sm font-medium text-[var(--ink-muted)]">
                       {isLoading ? "Loading employees…" : "Select employee"}
                     </span>
                     <span className="block truncate text-xs text-[var(--ink-muted)]">
@@ -411,15 +411,15 @@ const BudgetTransfer = () => {
                   />
                   <span>
                     Insufficient balance —{" "}
-                    <span className="font-semibold tabular-nums">
+                    <span className="font-medium tabular-nums">
                       {formatMoney(amountNum)}
                     </span>{" "}
                     is more than the remaining{" "}
-                    <span className="font-semibold tabular-nums">
+                    <span className="font-medium tabular-nums">
                       {formatMoney(totalBalance)}
                     </span>
                     . Enter an amount up to{" "}
-                    <span className="font-semibold tabular-nums">
+                    <span className="font-medium tabular-nums">
                       {formatMoney(totalBalance)}
                     </span>
                     .

@@ -36,7 +36,7 @@ export function EmployeeCell({ name, role, avatarUrl, size = "md" }) {
         <span
           aria-hidden
           className={cn(
-            "flex shrink-0 items-center justify-center rounded-full bg-[var(--accent-soft)] font-semibold text-[var(--accent-strong)]",
+            "flex shrink-0 items-center justify-center rounded-full bg-[var(--accent-soft)] font-medium text-[var(--accent-strong)]",
             compact ? "h-8 w-8 text-xs" : "h-9 w-9 text-sm",
           )}
         >
@@ -46,7 +46,7 @@ export function EmployeeCell({ name, role, avatarUrl, size = "md" }) {
       <div className="min-w-0">
         <p
           className={cn(
-            "truncate font-semibold leading-tight text-[var(--ink)]",
+            "truncate font-medium leading-tight text-[var(--ink)]",
             compact ? "text-sm" : "text-sm",
           )}
         >
@@ -119,7 +119,7 @@ export function IssuedTransactionRow({ transaction: t, onAction }) {
         </p>
       </td>
       <td className="px-4 py-3.5 text-right align-middle">
-        <span className="text-sm font-semibold tabular-nums text-[var(--ink)]">
+        <span className="text-sm font-medium tabular-nums text-[var(--ink)]">
           {formatMoney(t.amount)}
         </span>
       </td>
@@ -182,7 +182,7 @@ export function IssuedTransactionCard({ transaction: t, onAction }) {
 
       <div className="mt-3 flex items-start justify-between gap-3">
         <div className="min-w-0">
-          <p className="text-sm font-semibold leading-snug text-[var(--ink)]">
+          <p className="text-sm font-medium leading-snug text-[var(--ink)]">
             {t.description}
           </p>
           {t.notes && (
@@ -191,7 +191,7 @@ export function IssuedTransactionCard({ transaction: t, onAction }) {
             </p>
           )}
         </div>
-        <span className="shrink-0 text-base font-semibold tabular-nums text-[var(--ink)]">
+        <span className="shrink-0 text-base font-medium tabular-nums text-[var(--ink)]">
           {formatMoney(t.amount)}
         </span>
       </div>

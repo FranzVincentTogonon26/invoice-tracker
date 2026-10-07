@@ -288,7 +288,7 @@ export default function AdminEmployees() {
                 type="button"
                 onClick={() => updateStatus(t.key)}
                 className={cn(
-                  "h-8 rounded-full px-4 text-xs font-semibold transition-colors",
+                  "h-8 rounded-full px-4 text-xs font-medium transition-colors",
                   status === t.key
                     ? "bg-[var(--ink)] text-[var(--bg)]"
                     : "text-[var(--ink-muted)] hover:text-[var(--ink)]",

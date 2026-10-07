@@ -7,8 +7,6 @@ import {
   EllipsisVertical,
   Eye,
   Flag,
-  HandCoins,
-  Plus,
   ReceiptText,
   RefreshCcw,
   RotateCcw,
@@ -24,24 +22,9 @@ import {
   formatTime,
   methodLabel,
 } from "../../../../lib/utils";
+import { TRANSACTION_KIND_META } from "@/constants";
 
-// Every kind the unified ledger carries: its badge tone, label and icon.
-export const TRANSACTION_KIND_META = {
-  budget: { tone: "neutral", label: "Budget Given", Icon: Plus },
-  issued: { tone: "accent", label: "Budget Issued", Icon: HandCoins },
-  expense: { tone: "warning", label: "Expense", Icon: ReceiptText },
-  abono: { tone: "success", label: "Abono", Icon: Wallet },
-  transfer_sent: {
-    tone: "danger",
-    label: "Transfer Sent",
-    Icon: ArrowLeftRight,
-  },
-  transfer_received: {
-    tone: "success",
-    label: "Transfer Received",
-    Icon: ArrowLeftRight,
-  },
-};
+export { TRANSACTION_KIND_META };
 
 export function TransactionKindBadge({ kind, className }) {
   const meta = TRANSACTION_KIND_META[kind] ?? {
@@ -555,7 +538,7 @@ function LedgerRow({ row, pending, onAction }) {
       <td className="min-w-0 max-w-0 px-4 py-3.5 text-right align-middle">
         <p
           className={cn(
-            "truncate text-sm font-semibold tabular-nums",
+            "truncate text-sm font-medium tabular-nums",
             isIn && "text-[var(--success)]",
             isOut && "text-[var(--danger)]",
             isVoid &&
@@ -619,7 +602,7 @@ function LedgerCard({ row, pending, onAction }) {
         <div className="text-right">
           <span
             className={cn(
-              "block text-base font-semibold tabular-nums",
+              "block text-base font-medium tabular-nums",
               isIn && "text-[var(--success)]",
               isOut && "text-[var(--danger)]",
               !isIn && !isOut && "text-[var(--ink-muted)]",
@@ -644,7 +627,7 @@ function LedgerCard({ row, pending, onAction }) {
       <div className="mt-2 flex min-w-0 items-center gap-1.5">
         <p
           title={row.description}
-          className="min-w-0 flex-1 line-clamp-2 break-words text-sm font-semibold leading-snug text-[var(--ink)]"
+          className="min-w-0 flex-1 line-clamp-2 break-words text-sm font-medium leading-snug text-[var(--ink)]"
         >
           {row.description || "Untitled"}
         </p>

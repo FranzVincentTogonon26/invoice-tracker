@@ -79,7 +79,7 @@ const IssuedTransactionMobileFilters = ({
           <button
             type="button"
             onClick={() => onClearAll?.()}
-            className="mt-3 inline-flex w-full items-center justify-center gap-1.5 rounded-full px-3 py-2.5 text-xs font-semibold text-[var(--ink-muted)] transition-colors hover:bg-[var(--surface-2)] hover:text-[var(--ink)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)]/30"
+            className="mt-3 inline-flex w-full items-center justify-center gap-1.5 rounded-full px-3 py-2.5 text-xs font-medium text-[var(--ink-muted)] transition-colors hover:bg-[var(--surface-2)] hover:text-[var(--ink)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)]/30"
           >
             <RotateCcw size={13} aria-hidden />
             Clear filters and search

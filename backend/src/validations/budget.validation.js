@@ -86,3 +86,28 @@ export const createbudgetSchema = z
     message: "Reference label is required",
     path: ["label"],
   });
+
+// Source of Funds edit (AdminSourceFunds page) — at least one field must be
+// present. `status` flips the blackout switch: 'cut_off' disconnects the
+// source from every flow, 'open' restores it.
+export const updateBudgetReferenceSchema = z
+  .object({
+    label: z
+      .string({ error: "Invalid label" })
+      .trim()
+      .min(1, { message: "Label must not be empty" })
+      .max(120, { message: "Label is too long" })
+      .optional(),
+    notes: z
+      .string({ error: "Invalid notes" })
+      .max(500, { message: "Notes are too long" })
+      .optional(),
+    status: z.enum(["open", "cut_off"], { error: "Invalid status" }).optional(),
+  })
+  .refine(
+    (data) =>
+      data.label !== undefined ||
+      data.notes !== undefined ||
+      data.status !== undefined,
+    { message: "Nothing to update" },
+  );

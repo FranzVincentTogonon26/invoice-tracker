@@ -29,7 +29,7 @@ const ConfirmClearDialog = ({ open, onKeep, onConfirm }) => (
               <Trash2 size={17} />
             </span>
             <div className="min-w-0">
-              <h4 className="font-display text-lg font-semibold tracking-tight text-[var(--ink)]">
+              <h4 className="font-display text-lg font-medium tracking-tight text-[var(--ink)]">
                 Remove scanned receipt?
               </h4>
               <p className="mt-1 text-sm leading-relaxed text-[var(--ink-muted)]">

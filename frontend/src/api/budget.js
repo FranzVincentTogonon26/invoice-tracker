@@ -21,6 +21,18 @@ export const budgetsApi = {
     apiClient
       .post("/budgets", payload)
       .then((r) => r.data.budget ?? r.data.issuedBudget ?? r.data),
+  // Source of Funds management (AdminSourceFunds page): EVERY reference
+  // with live aggregates (allocated / issued / expenses / remaining /
+  // transaction counts), newest first — disconnected sources stay visible
+  // here so they can be edited, reopened or deleted.
+  sourceFunds: (params = {}) =>
+    apiClient.get("/budgets/references", { params }).then((r) => r.data),
+  // Edits one source (label / notes / status). Closing ('cut_off')
+  // disconnects it from every flow; reopening restores it.
+  updateReference: (referenceId, payload) =>
+    apiClient
+      .patch(`/budgets/references/${referenceId}`, payload)
+      .then((r) => r.data.reference ?? r.data),
   // Deferred receipt upload for the Issue Budget scan flow: sends the single
   // held receipt (`file`) in ONE multipart request — called only when the
   // issuance is confirmed, so nothing lands in

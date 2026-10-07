@@ -199,7 +199,7 @@ const BudgetTransaction = ({ breakdown = [] }) => {
                   key={t.key}
                   onClick={() => updateStatus(t.key)}
                   className={cn(
-                    "h-8 flex-1 rounded-full px-2 text-xs font-semibold transition-colors sm:flex-none sm:px-4",
+                    "h-8 flex-1 rounded-full px-2 text-xs font-medium transition-colors sm:flex-none sm:px-4",
                     status === t.key
                       ? "bg-[var(--ink)] text-[var(--bg)]"
                       : "text-[var(--ink-muted)] hover:text-[var(--ink)]",
@@ -282,7 +282,7 @@ const BudgetTransaction = ({ breakdown = [] }) => {
               </p>
               <p className="text-sm text-[var(--ink-muted)] sm:ml-auto sm:mr-6">
                 Total
-                <span className="ml-2 text-sm font-semibold text-[var(--accent-strong)] tabular-nums">
+                <span className="ml-2 text-sm font-medium text-[var(--accent-strong)] tabular-nums">
                   {formatMoney(total)}
                 </span>
               </p>
@@ -318,7 +318,7 @@ const CancelUndoToast = ({ transaction, visible, onUndo }) => (
       <Ban size={16} aria-hidden />
     </div>
     <div className="min-w-0 flex-1 py-2.5">
-      <p className="text-sm font-semibold text-[var(--ink)]">
+      <p className="text-sm font-medium text-[var(--ink)]">
         Transaction cancelled
       </p>
       <p className="truncate text-xs text-[var(--ink-muted)]">
@@ -329,7 +329,7 @@ const CancelUndoToast = ({ transaction, visible, onUndo }) => (
     <button
       type="button"
       onClick={onUndo}
-      className="h-8 shrink-0 rounded-full bg-[var(--accent-soft)] px-3.5 text-xs font-semibold text-[var(--accent-strong)] transition-colors hover:bg-[var(--accent-soft)]/80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)]/40"
+      className="h-8 shrink-0 rounded-full bg-[var(--accent-soft)] px-3.5 text-xs font-medium text-[var(--accent-strong)] transition-colors hover:bg-[var(--accent-soft)]/80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)]/40"
     >
       Undo
     </button>

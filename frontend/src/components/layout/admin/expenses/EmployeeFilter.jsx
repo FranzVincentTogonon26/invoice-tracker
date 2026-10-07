@@ -25,7 +25,7 @@ const EmployeeAvatar = ({ option }) => {
   return (
     <span
       aria-hidden
-      className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-[var(--accent-soft)] text-[10px] font-semibold leading-none text-[var(--accent-strong)]"
+      className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-[var(--accent-soft)] text-[10px] font-medium leading-none text-[var(--accent-strong)]"
     >
       {initials || "?"}
     </span>
@@ -44,12 +44,12 @@ export const employeeListboxProps = (placeholder = "All Employee") => ({
     option ? (
       <span className="flex min-w-0 flex-1 items-center gap-2 text-left">
         <EmployeeAvatar option={option} />
-        <span className="min-w-0 truncate text-xs font-semibold text-[var(--ink-muted)]">
+        <span className="min-w-0 truncate text-xs font-medium text-[var(--ink-muted)]">
           {option.label}
         </span>
       </span>
     ) : (
-      <span className="min-w-0 flex-1 truncate text-left text-xs font-semibold text-[var(--ink-muted)]">
+      <span className="min-w-0 flex-1 truncate text-left text-xs font-medium text-[var(--ink-muted)]">
         {placeholder}
       </span>
     ),

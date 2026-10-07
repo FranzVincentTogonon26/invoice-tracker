@@ -245,7 +245,7 @@ export default function AdminBudget() {
                 </p>
                 <p className="mt-1.5 flex flex-wrap items-baseline gap-x-2">
                   <span
-                    className={`font-display text-2xl font-semibold tracking-tight tabular-nums ${
+                    className={`font-display text-2xl font-medium tracking-tight tabular-nums ${
                       Number(cashOnHand) < 0
                         ? "text-[var(--danger)]"
                         : "text-[var(--ink)]"
@@ -253,7 +253,7 @@ export default function AdminBudget() {
                   >
                     {utilization.toFixed(1)}%
                   </span>
-                  <span className="text-sm font-semibold text-[var(--ink)]">
+                  <span className="text-sm font-medium text-[var(--ink)]">
                     used
                   </span>
                   <span className="w-full text-sm text-[var(--ink-muted)] sm:w-auto">
@@ -336,7 +336,7 @@ export default function AdminBudget() {
                   className="h-2 w-2 rounded-full bg-[var(--accent)]"
                 />
                 Issued ·{" "}
-                <span className="font-semibold tabular-nums text-[var(--ink)]">
+                <span className="font-medium tabular-nums text-[var(--ink)]">
                   {formatMoney(totalIssued)}
                 </span>
               </span>
@@ -346,7 +346,7 @@ export default function AdminBudget() {
                   className="h-2 w-2 rounded-full bg-[var(--warning)]/70"
                 />
                 My Expenses ·{" "}
-                <span className="font-semibold tabular-nums text-[var(--ink)]">
+                <span className="font-medium tabular-nums text-[var(--ink)]">
                   {formatMoney(totalExpenses)}
                 </span>
               </span>
@@ -376,7 +376,7 @@ export default function AdminBudget() {
                     aria-hidden
                     className="hidden shrink-0 sm:block"
                   />
-                  <span className="whitespace-nowrap text-xs font-semibold">
+                  <span className="whitespace-nowrap text-xs font-medium">
                     {label}
                   </span>
                 </TabsTrigger>

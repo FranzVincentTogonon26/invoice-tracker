@@ -1,6 +1,6 @@
 import { useCallback, useMemo, useState } from "react";
 import { motion } from "framer-motion";
-import { BadgeCheck, Banknote, Plus, Wallet } from "lucide-react";
+import { BadgeCheck, Banknote, Plus, ReceiptText, Wallet } from "lucide-react";
 import { PageHeader } from "../../components/ui/PageHeader";
 import { Button } from "../../components/ui/Button";
 import { cn, formatMoney } from "../../lib/utils";
@@ -41,7 +41,7 @@ const MiniStat = ({ icon: Icon, label, value, loading, iconClass, title }) => (
     {loading ? (
       <div className="mt-2.5 h-5 w-16 animate-pulse rounded-md bg-[var(--surface-2)] sm:w-20" />
     ) : (
-      <p className="mt-2 truncate font-display text-[13px] font-semibold leading-none tracking-tight tabular-nums text-[var(--ink)] sm:text-[19px]">
+      <p className="mt-2 truncate font-display text-[13px] font-medium leading-none tracking-tight tabular-nums text-[var(--ink)] sm:text-[19px]">
         {value}
       </p>
     )}
@@ -61,6 +61,7 @@ const EmployeeAbono = () => {
   const totalAbono = Number(data?.overview?.totalAbono) || 0;
   const totalBudget = Number(data?.overview?.totalBudget) || 0;
   const totalBalance = Number(data?.overview?.totalBalance) || 0;
+  const totalExpenses = Number(data?.overview?.totalExpenses) || 0;
 
   const serverTransactions = useMemo(
     () => (data?.abono ?? []).map(toTransaction),
@@ -165,7 +166,7 @@ const EmployeeAbono = () => {
             {isLoading ? (
               <div className="relative mt-3 h-10 w-44 animate-pulse rounded-xl bg-white/20 sm:h-12 sm:w-64" />
             ) : (
-              <p className="relative mt-3 font-display text-[34px] font-semibold leading-none tracking-tight tabular-nums sm:text-[44px]">
+              <p className="relative mt-3 font-display text-[34px] font-medium leading-none tracking-tight tabular-nums sm:text-[44px]">
                 {formatMoney(totalAbono)}
               </p>
             )}
@@ -173,8 +174,16 @@ const EmployeeAbono = () => {
 
           <motion.div
             variants={card}
-            className="grid grid-cols-2 divide-x divide-[var(--border)] rounded-[20px] border border-[var(--border)] bg-[var(--surface)] shadow-card sm:rounded-[24px]"
+            className="grid grid-cols-3 divide-x divide-[var(--border)] rounded-[20px] border border-[var(--border)] bg-[var(--surface)] shadow-card sm:rounded-[24px]"
           >
+            <MiniStat
+              icon={ReceiptText}
+              label="Spent"
+              value={formatMoney(totalExpenses)}
+              loading={isLoading}
+              title={formatMoney(totalExpenses)}
+              iconClass="bg-[var(--danger)]/10 text-[var(--danger)]"
+            />
             <MiniStat
               icon={Banknote}
               label="Remaining"

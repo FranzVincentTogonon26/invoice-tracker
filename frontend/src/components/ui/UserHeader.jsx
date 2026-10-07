@@ -10,7 +10,7 @@ export function UserHeader({ user }) {
     <>
       {/* Desktop — greeting + subtitle */}
       <div className="hidden min-w-0 md:block">
-        <h1 className="font-display text-2xl font-semibold leading-tight tracking-tight text-[var(--ink)] md:text-3xl">
+        <h1 className="font-display text-2xl font-medium leading-tight tracking-tight text-[var(--ink)] md:text-3xl">
           {greeting}, {firstName}.
         </h1>
         <p className="mt-1 text-sm leading-relaxed text-[var(--ink-muted)]">

@@ -47,11 +47,11 @@ const CategoryPanel = ({
       <table className="w-full text-sm">
         <thead>
           <tr className="sticky top-0 z-10 bg-[var(--surface-2)] type-eyebrow text-[var(--ink-muted)]">
-            <th className="px-4 py-2.5 text-left font-semibold">Category</th>
-            <th className="px-4 py-2.5 truncate text-right font-semibold">
+            <th className="px-4 py-2.5 text-left font-medium">Category</th>
+            <th className="px-4 py-2.5 truncate text-right font-medium">
               Date Created
             </th>
-            <th className="px-4 py-2.5 text-right font-semibold" />
+            <th className="px-4 py-2.5 text-right font-medium" />
           </tr>
         </thead>
         <tbody>
@@ -62,7 +62,7 @@ const CategoryPanel = ({
             >
               <td
                 title={category.category_name}
-                className="max-w-[240px] truncate px-4 py-2 lg:text-sm text-xs font-semibold text-[var(--ink)]"
+                className="max-w-[240px] truncate px-4 py-2 lg:text-sm text-xs font-medium text-[var(--ink)]"
               >
                 {category.category_name ?? "—"}
               </td>

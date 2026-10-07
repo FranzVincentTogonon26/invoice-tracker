@@ -148,7 +148,7 @@ const TransferDetailsBody = ({ row, pending, onCancel, actionable = true }) => {
           <p className="type-eyebrow text-[var(--ink-muted)]">Amount</p>
           <p
             className={cn(
-              "mt-1 font-display text-2xl font-semibold leading-none tracking-tight tabular-nums",
+              "mt-1 font-display text-2xl font-medium leading-none tracking-tight tabular-nums",
               rowAmountClass(row),
             )}
           >
@@ -234,7 +234,7 @@ const IssuedDetailsBody = ({ row }) => {
             <p className="type-eyebrow text-[var(--ink-muted)]">Amount</p>
             <p
               className={cn(
-                "mt-1 font-display text-2xl font-semibold leading-none tracking-tight tabular-nums",
+                "mt-1 font-display text-2xl font-medium leading-none tracking-tight tabular-nums",
                 rowAmountClass(row),
                 cancelled && "line-through",
               )}
@@ -319,7 +319,7 @@ function TransactionCard({ tx, onOpen }) {
           <Icon size={18} />
         </span>
         <div className="min-w-0">
-          <p className="flex min-w-0 items-center gap-1.5 truncate text-xs font-semibold leading-none text-[var(--ink)]">
+          <p className="flex min-w-0 items-center gap-1.5 truncate text-xs font-medium leading-none text-[var(--ink)]">
             <span className="min-w-0 truncate">{title}</span>
             {isCancelledIssued(tx) && (
               <Badge
@@ -347,7 +347,7 @@ function TransactionCard({ tx, onOpen }) {
       <div className="flex shrink-0 flex-col items-end gap-1.5">
         <p
           className={cn(
-            "text-right font-display text-sm font-semibold tabular-nums",
+            "text-right font-display text-sm font-medium tabular-nums",
             rowAmountClass(tx),
             isCancelledIssued(tx) && "line-through",
           )}
@@ -446,7 +446,7 @@ function TransactionSheet({
                 <meta.icon size={20} />
               </span>
               <div className="min-w-0 flex-1">
-                <p className="truncate font-display text-base font-semibold tracking-tight text-[var(--ink)]">
+                <p className="truncate font-display text-base font-medium tracking-tight text-[var(--ink)]">
                   {title}
                 </p>
                 <p className="mt-0.5 truncate text-xs tabular-nums text-[var(--ink-muted)]">
@@ -525,7 +525,7 @@ export const TransactionsSectionBudget = ({
   const cancelSummary = cancelRow ? (
     <div className="mt-4 flex items-center gap-3 rounded-2xl border border-[var(--border)] bg-[var(--surface-2)]/60 px-4 py-3">
       <div className="min-w-0 flex-1">
-        <p className="truncate text-base font-semibold text-[var(--ink)]">
+        <p className="truncate text-base font-medium text-[var(--ink)]">
           {rowCounterparty(cancelRow) || "Budget transfer"}
         </p>
         <p className="mt-0.5 truncate text-xs text-[var(--ink-muted)]">
@@ -533,7 +533,7 @@ export const TransactionsSectionBudget = ({
           {cancelRow.date ? ` · ${formatTime(cancelRow.date)}` : ""}
         </p>
       </div>
-      <span className="shrink-0 text-sm font-semibold tabular-nums text-[var(--danger)]">
+      <span className="shrink-0 text-sm font-medium tabular-nums text-[var(--danger)]">
         -{formatMoney(cancelRow.amount)}
       </span>
     </div>
@@ -609,7 +609,7 @@ export const TransactionsSectionBudget = ({
           </span>
           <div>
             <div className="flex items-center gap-2">
-              <h3 className="font-display text-base font-semibold tracking-tight text-[var(--ink)]">
+              <h3 className="font-display text-base font-medium tracking-tight text-[var(--ink)]">
                 Budget Issued
               </h3>
             </div>
@@ -721,7 +721,7 @@ export const TransactionsSectionBudget = ({
                       className="transition-colors duration-150 hover:bg-[var(--accent)]/[0.05]"
                     >
                       <td className="px-4 py-3 align-middle first:pl-5">
-                        <p className="whitespace-nowrap text-[13px] font-semibold leading-none tabular-nums text-[var(--ink)]">
+                        <p className="whitespace-nowrap text-[13px] font-medium leading-none tabular-nums text-[var(--ink)]">
                           {formatDate(tx.date)}
                         </p>
                         <p className="mt-1 whitespace-nowrap text-[11px] leading-none tabular-nums text-[var(--ink-muted)]">
@@ -730,7 +730,7 @@ export const TransactionsSectionBudget = ({
                       </td>
                       <td className="px-4 py-3 align-middle">
                         <p
-                          className=" text-[13px] font-semibold leading-snug text-[var(--ink)]"
+                          className=" text-[13px] font-medium leading-snug text-[var(--ink)]"
                           title={rowTitle(tx)}
                         >
                           {rowTitle(tx)}
@@ -786,7 +786,7 @@ export const TransactionsSectionBudget = ({
                       <td className="px-4 py-3 text-right align-middle">
                         <span
                           className={cn(
-                            "text-[13px] font-semibold tabular-nums",
+                            "text-[13px] font-medium tabular-nums",
                             rowAmountClass(tx),
                             isCancelledIssued(tx) && "line-through",
                           )}

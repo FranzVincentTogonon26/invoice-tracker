@@ -73,7 +73,7 @@ const ROW_BASE =
   "transition-[width,background-color,color,box-shadow] duration-300 ease-[cubic-bezier(0.16,1,0.3,1)]";
 
 const LABEL_BASE =
-  "text-sm font-semibold tracking-tight whitespace-nowrap pr-4 " +
+  "text-sm font-medium tracking-tight whitespace-nowrap pr-4 " +
   "opacity-0 -translate-x-1 " +
   "transition-[opacity,transform] duration-200 ease-out " +
   "group-hover/sidebar:opacity-100 group-hover/sidebar:translate-x-0 group-hover/sidebar:delay-100";
@@ -165,7 +165,7 @@ const SHEET_TILE =
   "flex items-center gap-2.5 rounded-2xl border px-3 py-3 transition-colors";
 
 const ACCOUNT_ROW =
-  "flex h-12 w-full items-center gap-3 rounded-2xl px-3 text-sm font-semibold tracking-tight " +
+  "flex h-12 w-full items-center gap-3 rounded-2xl px-3 text-sm font-medium tracking-tight " +
   "transition-colors focus-visible:outline-none " +
   "focus-visible:ring-2 focus-visible:ring-[var(--accent)]/30";
 
@@ -315,7 +315,7 @@ function MobileMenuSheet({ open, onClose, onLogout, user }) {
             <div className="flex items-center gap-3 pt-4">
               <AILogo />
               <div className="min-w-0 flex-1">
-                <div className="font-display text-base font-semibold text-[var(--ink)]">
+                <div className="font-display text-base font-medium text-[var(--ink)]">
                   Budget Tracker
                 </div>
                 <div className="text-xs text-[var(--ink-muted)]">
@@ -340,7 +340,7 @@ function MobileMenuSheet({ open, onClose, onLogout, user }) {
                 className="h-10 w-10 text-sm ring-2"
               />
               <div className="min-w-0 flex-1">
-                <div className="truncate text-sm font-semibold text-[var(--ink)]">
+                <div className="truncate text-sm font-medium text-[var(--ink)]">
                   {displayName}
                 </div>
                 {displayEmail && (
@@ -381,7 +381,7 @@ function MobileMenuSheet({ open, onClose, onLogout, user }) {
                       >
                         <Icon size={16} />
                       </span>
-                      <span className="truncate text-sm font-semibold tracking-tight">
+                      <span className="truncate text-sm font-medium tracking-tight">
                         {label}
                       </span>
                     </span>
@@ -513,7 +513,7 @@ export function Sidebar() {
             </div>
             <span
               className={cn(
-                "ml-0 font-display text-base font-semibold text-[var(--ink)] whitespace-nowrap",
+                "ml-0 font-display text-base font-medium text-[var(--ink)] whitespace-nowrap",
                 "opacity-0 -translate-x-1",
                 "transition-[opacity,transform] duration-200 ease-out",
                 "group-hover/sidebar:opacity-100 group-hover/sidebar:translate-x-0 group-hover/sidebar:delay-100",
@@ -555,7 +555,7 @@ export function Sidebar() {
                 "group-hover/sidebar:opacity-100 group-hover/sidebar:translate-x-0 group-hover/sidebar:delay-100",
               )}
             >
-              <div className="text-sm font-semibold text-[var(--ink)] truncate">
+              <div className="text-sm font-medium text-[var(--ink)] truncate">
                 {displayName}
               </div>
               {displayEmail && (
@@ -585,7 +585,7 @@ export function Sidebar() {
         summary={
           <div className="mt-4 flex items-center gap-3 rounded-2xl border border-[var(--border)] bg-[var(--surface-2)]/60 px-4 py-3">
             <div className="min-w-0 flex-1">
-              <p className="truncate text-base font-semibold text-[var(--ink)]">
+              <p className="truncate text-base font-medium text-[var(--ink)]">
                 {displayName}
               </p>
               {displayEmail && (

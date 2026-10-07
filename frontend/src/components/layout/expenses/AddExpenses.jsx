@@ -674,7 +674,7 @@ const AddExpenses = () => {
           </button>
           <div className="min-w-0">
             <div className="flex flex-wrap items-center gap-2">
-              <h2 className="font-display sm:text-2xl text-lg font-semibold tracking-tight text-[var(--ink)]">
+              <h2 className="font-display sm:text-2xl text-lg font-medium tracking-tight text-[var(--ink)]">
                 Add Expenses
               </h2>
               <Badge tone="accent">New draft</Badge>
@@ -757,13 +757,13 @@ const AddExpenses = () => {
                   <div className="flex min-w-0 items-center gap-2.5">
                     <span
                       className={cn(
-                        "flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-[var(--ink)] font-display text-xs font-semibold tabular-nums text-[var(--bg)]",
+                        "flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-[var(--ink)] font-display text-xs font-medium tabular-nums text-[var(--bg)]",
                         flaggedLines.includes(i) && "bg-[var(--danger)]",
                       )}
                     >
                       {String(i + 1).padStart(2, "0")}
                     </span>
-                    <p className="truncate text-sm font-semibold text-[var(--ink)]">
+                    <p className="truncate text-sm font-medium text-[var(--ink)]">
                       {it.description.trim() || `Expense item ${i + 1}`}
                     </p>
                     {it.receiptLocal && (
@@ -887,7 +887,7 @@ const AddExpenses = () => {
                     <div className="relative">
                       <span
                         className={cn(
-                          "pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 text-sm font-semibold",
+                          "pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 text-sm font-medium",
                           flaggedLines.includes(i)
                             ? "text-[var(--danger)]"
                             : "text-[var(--ink-muted)]",
@@ -908,7 +908,7 @@ const AddExpenses = () => {
                           flaggedLines.includes(i) ? true : undefined
                         }
                         className={cn(
-                          "pl-8 text-right font-semibold tabular-nums",
+                          "pl-8 text-right font-medium tabular-nums",
                           flaggedLines.includes(i) &&
                             "border-[var(--danger)]/50 focus:border-[var(--danger)]/60 focus:ring-[var(--danger)]/20",
                         )}
@@ -933,7 +933,7 @@ const AddExpenses = () => {
                       )}
                     </span>
                     <div className="min-w-0">
-                      <p className="truncate text-sm font-semibold text-[var(--ink)]">
+                      <p className="truncate text-sm font-medium text-[var(--ink)]">
                         {it.receiptId
                           ? it.receiptLocal
                             ? "Receipt attached"
@@ -973,7 +973,7 @@ const AddExpenses = () => {
             ref={addLineRef}
             type="button"
             onClick={addItem}
-            className="mt-3 flex w-full items-center justify-center gap-2 rounded-2xl border border-dashed border-[var(--border)] px-4 py-3.5 text-sm font-semibold text-[var(--accent-strong)] hover:border-[var(--accent)]/50 hover:bg-[var(--accent-soft)]/40 transition-colors"
+            className="mt-3 flex w-full items-center justify-center gap-2 rounded-2xl border border-dashed border-[var(--border)] px-4 py-3.5 text-sm font-medium text-[var(--accent-strong)] hover:border-[var(--accent)]/50 hover:bg-[var(--accent-soft)]/40 transition-colors"
           >
             <span className="flex h-6 w-6 items-center justify-center rounded-full bg-[var(--accent-soft)]">
               <Plus size={14} />
@@ -1021,7 +1021,7 @@ const AddExpenses = () => {
               <p className="type-eyebrow text-[var(--accent-strong)]">
                 Total expenses
               </p>
-              <p className="mt-1 font-display text-3xl font-semibold tabular-nums tracking-tight text-[var(--ink)]">
+              <p className="mt-1 font-display text-3xl font-medium tabular-nums tracking-tight text-[var(--ink)]">
                 {formatMoney(total)}
               </p>
               <p className="mt-1 text-xs text-[var(--ink-muted)]">
@@ -1064,7 +1064,7 @@ const AddExpenses = () => {
                     <span className="flex min-w-0 items-center gap-2 text-[var(--ink-muted)]">
                       <span
                         className={cn(
-                          "flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-[var(--surface-2)] text-xs font-semibold tabular-nums",
+                          "flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-[var(--surface-2)] text-xs font-medium tabular-nums",
                           missingAmount
                             ? "bg-[var(--danger)]/12 text-[var(--danger)]"
                             : backdated &&
@@ -1098,12 +1098,12 @@ const AddExpenses = () => {
                           it.totalAmount,
                         )} value — add an amount greater than zero to proceed`}
                       >
-                        <span className="flex items-center justify-end gap-1 font-semibold tabular-nums text-[var(--danger)]">
+                        <span className="flex items-center justify-end gap-1 font-medium tabular-nums text-[var(--danger)]">
                           {formatMoney(it.totalAmount)}
                         </span>
                       </span>
                     ) : (
-                      <span className="shrink-0 font-semibold tabular-nums text-[var(--ink)]">
+                      <span className="shrink-0 font-medium tabular-nums text-[var(--ink)]">
                         {formatMoney(it.totalAmount)}
                       </span>
                     )}

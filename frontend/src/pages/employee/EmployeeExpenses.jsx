@@ -1,5 +1,5 @@
 import { motion } from "framer-motion";
-import { Banknote, Plus, TrendingUp } from "lucide-react";
+import { Banknote, Plus, ReceiptText, TrendingUp } from "lucide-react";
 import { PageHeader } from "../../components/ui/PageHeader";
 import { cn, formatMoney } from "../../lib/utils";
 import TransactionsSectionExpenses from "../../components/layout/employee/expenses/TransactionsSectionExpenses";
@@ -40,7 +40,7 @@ const MiniStat = ({ icon: Icon, label, value, loading, iconClass, title }) => (
     {loading ? (
       <div className="mt-2.5 h-5 w-16 animate-pulse rounded-md bg-[var(--surface-2)] sm:w-20" />
     ) : (
-      <p className="mt-2 truncate font-display text-[13px] font-semibold leading-none tracking-tight tabular-nums text-[var(--ink)] sm:text-[19px]">
+      <p className="mt-2 truncate font-display text-[13px] font-medium leading-none tracking-tight tabular-nums text-[var(--ink)] sm:text-[19px]">
         {value}
       </p>
     )}
@@ -156,7 +156,7 @@ const EmployeeExpenses = () => {
             {isLoading ? (
               <div className="relative mt-3 h-10 w-44 animate-pulse rounded-xl bg-white/20 sm:h-12 sm:w-64" />
             ) : (
-              <p className="relative mt-3 font-display text-[34px] font-semibold leading-none tracking-tight tabular-nums sm:text-[44px]">
+              <p className="relative mt-3 font-display text-[34px] font-medium leading-none tracking-tight tabular-nums sm:text-[44px]">
                 {formatMoney(totalExpenses)}
               </p>
             )}
@@ -164,8 +164,16 @@ const EmployeeExpenses = () => {
 
           <motion.div
             variants={card}
-            className="grid grid-cols-2 divide-x divide-[var(--border)] rounded-[20px] border border-[var(--border)] bg-[var(--surface)] shadow-card sm:rounded-[24px]"
+            className="grid grid-cols-3 divide-x divide-[var(--border)] rounded-[20px] border border-[var(--border)] bg-[var(--surface)] shadow-card sm:rounded-[24px]"
           >
+            <MiniStat
+              icon={ReceiptText}
+              label="Spent"
+              value={formatMoney(totalExpenses)}
+              loading={isLoading}
+              title={formatMoney(totalExpenses)}
+              iconClass="bg-[var(--danger)]/10 text-[var(--danger)]"
+            />
             <MiniStat
               icon={Banknote}
               label="Remaining"

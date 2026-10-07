@@ -57,7 +57,13 @@ export const FUNDING_STATUS = {
  * the draft consumes (`used`, 0-100) and the `status` above.
  */
 export const fundingState = (references = [], referenceId = "", expenses = 0) => {
-  const sources = references.map(withBalance);
+  // Open-only funding: rows whose `status` is present and not 'open' (a
+  // cut-off source) can neither be picked nor validate a draft — a
+  // disconnected source connects to no activity. Rows without a status
+  // field (already filtered server-side) still count.
+  const sources = references
+    .filter((reference) => !reference.status || reference.status === "open")
+    .map(withBalance);
   const source =
     sources.find((item) => item.reference_id === referenceId) ??
     (sources.length === 1 ? sources[0] : null);

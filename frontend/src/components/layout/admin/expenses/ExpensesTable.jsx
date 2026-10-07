@@ -347,7 +347,7 @@ function EmployeeCell({ name, role, avatarUrl, size = "md" }) {
         <span
           aria-hidden
           className={cn(
-            "flex shrink-0 items-center justify-center rounded-full bg-[var(--accent-soft)] font-semibold text-[var(--accent-strong)]",
+            "flex shrink-0 items-center justify-center rounded-full bg-[var(--accent-soft)] font-medium text-[var(--accent-strong)]",
             compact ? "h-8 w-8 text-xs" : "h-10 w-10 text-sm",
           )}
         >
@@ -357,7 +357,7 @@ function EmployeeCell({ name, role, avatarUrl, size = "md" }) {
       <div className="min-w-0">
         <p
           className={cn(
-            "truncate font-semibold leading-tight text-[var(--ink)]",
+            "truncate font-medium leading-tight text-[var(--ink)]",
             compact ? "text-[13px]" : "text-base",
           )}
         >
@@ -450,7 +450,7 @@ function LedgerRow({
           )}
           <p
             title={row.description}
-            className="min-w-0 flex-1 truncate text-[13px] font-semibold leading-snug text-[var(--ink)]"
+            className="min-w-0 flex-1 truncate text-[13px] font-medium leading-snug text-[var(--ink)]"
           >
             {row.description || "Untitled"}
           </p>
@@ -508,7 +508,7 @@ function LedgerRow({
       </td>
 
       <td className="min-w-0 max-w-0 px-4 py-4 text-right align-middle">
-        <p className="truncate text-sm font-semibold tabular-nums text-[var(--ink)]">
+        <p className="truncate text-sm font-medium tabular-nums text-[var(--ink)]">
           {formatMoney(row.amount)}
         </p>
         <p
@@ -560,7 +560,7 @@ function LedgerCard({
       />
 
       <div className="flex items-start justify-end">
-        <span className="shrink-0 text-base font-semibold tabular-nums text-[var(--ink)]">
+        <span className="shrink-0 text-base font-medium tabular-nums text-[var(--ink)]">
           {formatMoney(row.amount)}
         </span>
       </div>
@@ -568,7 +568,7 @@ function LedgerCard({
       <div className="mt-2 flex min-w-0 items-center gap-1.5">
         <p
           title={row.description}
-          className="min-w-0 flex-1 truncate text-sm font-semibold leading-snug text-[var(--ink)]"
+          className="min-w-0 flex-1 truncate text-sm font-medium leading-snug text-[var(--ink)]"
         >
           {row.description || "Untitled"}
         </p>

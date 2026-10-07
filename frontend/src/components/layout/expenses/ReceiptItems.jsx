@@ -54,7 +54,7 @@ const ItemRow = ({ item, index, onItemChange, onRemove }) => {
           />
         </div>
         <div className="min-w-0 text-right">
-          <span className="text-sm font-semibold tabular-nums text-[var(--ink)]">
+          <span className="text-sm font-medium tabular-nums text-[var(--ink)]">
             {formatMoney(amount)}
           </span>
         </div>
@@ -110,7 +110,7 @@ const ItemRow = ({ item, index, onItemChange, onRemove }) => {
           </div>
         </div>
         <div className="shrink-0 text-right">
-          <span className="text-sm font-semibold tabular-nums text-[var(--ink)]">
+          <span className="text-sm font-medium tabular-nums text-[var(--ink)]">
             {formatMoney(amount)}
           </span>
         </div>
@@ -150,7 +150,7 @@ const ReceiptItems = ({
 
     <div className="mt-2 overflow-hidden rounded-xl border border-[var(--border)] bg-[var(--surface)] sm:mt-2.5">
       <div
-        className={`hidden ${GRID_COLS} items-center gap-x-3 border-b border-[var(--border)] bg-[var(--surface-2)]/50 px-2 py-1.5 text-xs font-semibold uppercase tracking-widest text-[var(--ink-muted)] sm:grid lg:gap-x-4 lg:px-3 lg:py-2`}
+        className={`hidden ${GRID_COLS} items-center gap-x-3 border-b border-[var(--border)] bg-[var(--surface-2)]/50 px-2 py-1.5 text-xs font-medium uppercase tracking-widest text-[var(--ink-muted)] sm:grid lg:gap-x-4 lg:px-3 lg:py-2`}
       >
         <span>Description</span>
         <span className="text-center">Qty</span>
@@ -230,10 +230,10 @@ const ReceiptItems = ({
     </div>
 
     <div className="mt-2 flex items-center justify-between gap-4 border-t border-[var(--border)] pt-2 sm:mt-2.5 sm:pt-2.5">
-      <span className="text-xs font-semibold uppercase tracking-widest text-[var(--ink-muted)]">
+      <span className="text-xs font-medium uppercase tracking-widest text-[var(--ink-muted)]">
         Total amount
       </span>
-      <span className="font-display text-lg font-semibold tabular-nums tracking-tight text-[var(--ink)]">
+      <span className="font-display text-lg font-medium tabular-nums tracking-tight text-[var(--ink)]">
         {formatMoney(itemsTotal)}
       </span>
     </div>

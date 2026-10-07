@@ -26,38 +26,54 @@ const toMoney = (value) => Math.round((Number(value) || 0) * 100) / 100;
 // captions without a second round-trip. One query, all scalar subqueries.
 class EmployeeOverview {
   static async employeeOverview(userId, { search } = {}) {
+    // Closed sources leave no footsteps: every sum below only counts rows
+    // under an open source, and the feed legs filter the same way.
+    // Untagged expenses (reference_id IS NULL) connect to no source and
+    // stay visible.
     const statsResult = await query(
       `SELECT
           COALESCE((
             SELECT SUM(ib.amount)
             FROM budget_issued_reference bir
             JOIN issued_budget ib ON ib.issued_ref_id = bir.id
+            JOIN budget_reference br ON br.reference_id = bir.reference_id
             WHERE bir.user_id = $1 AND bir.status = 'open'
+              AND br.status = 'open'
           ), 0)::float8 AS total_budget,
           COALESCE((
             SELECT COUNT(*)
             FROM budget_issued_reference bir
+            JOIN budget_reference br ON br.reference_id = bir.reference_id
             WHERE bir.user_id = $1 AND bir.status = 'open'
+              AND br.status = 'open'
           ), 0)::int AS active_references,
           COALESCE((
             SELECT SUM(e.total_amount)
             FROM expenses e
+            LEFT JOIN budget_reference br ON br.reference_id = e.reference_id
             WHERE e.user_id = $1 AND e.status = 'paid'
+              AND (e.reference_id IS NULL OR br.status = 'open')
           ), 0)::float8 AS total_expenses,
           COALESCE((
             SELECT COUNT(*)
             FROM expenses e
+            LEFT JOIN budget_reference br ON br.reference_id = e.reference_id
             WHERE e.user_id = $1 AND e.status = 'paid'
+              AND (e.reference_id IS NULL OR br.status = 'open')
           ), 0)::int AS expense_count,
           COALESCE((
             SELECT SUM(ea.amount)
             FROM employee_abono ea
+            JOIN budget_reference br ON br.reference_id = ea.reference_id
             WHERE ea.user_id = $1 AND ea.status = 'open'
+              AND br.status = 'open'
           ), 0)::float8 AS total_abono,
           COALESCE((
             SELECT COUNT(*)
             FROM employee_abono ea
+            JOIN budget_reference br ON br.reference_id = ea.reference_id
             WHERE ea.user_id = $1
+              AND br.status = 'open'
           ), 0)::int AS abono_count,
           COALESCE((
             SELECT SUM(bt.amount)
@@ -103,7 +119,8 @@ class EmployeeOverview {
 
     const txQuery = `
       WITH all_tx AS (
-        -- 1. Budget Issued transactions
+        -- 1. Budget Issued transactions (open sources only — holdings under
+        --    a cut-off source leave no footsteps here).
         SELECT
           ib.id,
           'issued' AS kind,
@@ -122,14 +139,16 @@ class EmployeeOverview {
           NULL AS counterparty
         FROM issued_budget ib
         JOIN budget_issued_reference bir ON ib.issued_ref_id = bir.id
-        LEFT JOIN budget_reference br ON br.reference_id = bir.reference_id
+        JOIN budget_reference br ON br.reference_id = bir.reference_id
+          AND br.status = 'open'
         WHERE bir.user_id = $1
 
         UNION ALL
 
         -- 2. Expense transactions — EVERY status is listed (paid / draft /
         --    cancel) so the ledger shows the full record; only the aggregate
-        --    subqueries above stay paid-only, so no total moves.
+        --    subqueries above stay paid-only, so no total moves. Rows tagged
+        --    to a cut-off source are hidden; untagged rows stay.
         SELECT
           e.id,
           'expense' AS kind,
@@ -150,10 +169,11 @@ class EmployeeOverview {
         LEFT JOIN category c ON c.category_id = e.category_id
         LEFT JOIN budget_reference br ON br.reference_id = e.reference_id
         WHERE e.user_id = $1
+          AND (e.reference_id IS NULL OR br.status = 'open')
 
         UNION ALL
 
-        -- 3. Abono transactions
+        -- 3. Abono transactions (open sources only).
         SELECT
           ea.id,
           'abono' AS kind,
@@ -171,12 +191,14 @@ class EmployeeOverview {
           NULL AS direction,
           NULL AS counterparty
         FROM employee_abono ea
-        LEFT JOIN budget_reference br ON br.reference_id = ea.reference_id
+        JOIN budget_reference br ON br.reference_id = ea.reference_id
+          AND br.status = 'open'
         WHERE ea.user_id = $1
 
         UNION ALL
 
-        -- 4. Budget transfers sent — money leaving this employee's pool.
+        -- 4. Budget transfers sent — money leaving this employee's pool
+        --    (open sources only).
         SELECT
           bt.id,
           'transfer' AS kind,
@@ -197,12 +219,15 @@ class EmployeeOverview {
           'sent' AS direction,
           ru.name AS counterparty
         FROM budget_transfer bt
+        JOIN budget_reference br ON br.reference_id = bt.reference_id
+          AND br.status = 'open'
         LEFT JOIN users ru ON ru.user_id = bt.transfer_to
         WHERE bt.user_id = $1 AND bt.status = 'success'
 
         UNION ALL
 
-        -- 5. Budget transfers received — money entering this employee's pool.
+        -- 5. Budget transfers received — money entering this employee's pool
+        --    (open sources only).
         SELECT
           bt.id,
           'transfer' AS kind,
@@ -223,6 +248,8 @@ class EmployeeOverview {
           'received' AS direction,
           su.name AS counterparty
         FROM budget_transfer bt
+        JOIN budget_reference br ON br.reference_id = bt.reference_id
+          AND br.status = 'open'
         LEFT JOIN users su ON su.user_id = bt.user_id
         WHERE bt.transfer_to = $1 AND bt.status = 'success'
       )

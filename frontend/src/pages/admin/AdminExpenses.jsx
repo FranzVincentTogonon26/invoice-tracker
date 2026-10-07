@@ -1,236 +1,44 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { motion } from "framer-motion";
-import {
-  CalendarOff,
-  CalendarRange,
-  CircleAlert,
-  CircleCheck,
-  CircleX,
-  ClipboardList,
-  HandCoins,
-  Plus,
-  ReceiptText,
-  RotateCcw,
-  Search,
-  SlidersHorizontal,
-  Trash2,
-  Wallet,
-  X,
-  XCircle,
-} from "lucide-react";
+import { CalendarOff, CalendarRange, Plus } from "lucide-react";
 import toast from "react-hot-toast";
 import { Button } from "../../components/ui/Button";
 import { Badge } from "../../components/ui/Badge";
-import { IconButton } from "../../components/ui/IconButton";
 import { PageHeader } from "../../components/ui/PageHeader";
-import { StatCard } from "../../components/ui/StatCard";
-import { DateRangePicker } from "../../components/ui/DateRangePicker";
 import {
   Card,
   CardDescription,
   CardHeader,
   CardTitle,
 } from "../../components/ui/Card";
-import { SearchInput } from "../../components/ui/Input";
-import Listbox from "../../components/ui/Listbox";
-import { FilterChips } from "../../components/ui/MobileFilters";
-import {
-  EmptyState,
-  ErrorState,
-  LoadingSkeleton,
-} from "../../components/ui/DataState";
-import { Pager } from "../../components/ui/Pager";
-import {
-  cn,
-  formatDate,
-  formatMoney,
-  startOfDay,
-  toDate,
-} from "../../lib/utils";
+import { formatDate, formatMoney, startOfDay } from "../../lib/utils";
 import { useNavigate } from "react-router-dom";
-import { PAYMENT_METHODS } from "../../constants";
+import {
+  EXPENSE_LEDGER_STATUS_META,
+  EXPENSE_LEDGER_STATUS_ORDER,
+  EXPENSE_STATUS_OPTIONS,
+  PAYMENT_METHODS,
+} from "../../constants";
 import { useExpenses, useExpensesMutations } from "../../hooks/useExpenses";
-import ExpensesTable from "../../components/layout/admin/expenses/ExpensesTable";
 import ConfirmActionDialog from "../../components/layout/admin/expenses/ConfirmActionDialog";
 import ExpenseDetailsModal from "../../components/layout/admin/expenses/ExpenseDetailsModal";
-import ExpensesMobileFilters from "../../components/layout/admin/expenses/ExpensesMobileFilters";
-import { employeeListboxProps } from "../../components/layout/admin/expenses/EmployeeFilter";
-
-const container = {
-  hidden: {},
-  show: { transition: { staggerChildren: 0.07, delayChildren: 0.02 } },
-};
-
-const item = {
-  hidden: { opacity: 0, y: 14 },
-  show: {
-    opacity: 1,
-    y: 0,
-    transition: { duration: 0.45, ease: [0.16, 1, 0.3, 1] },
-  },
-};
+import { ExpenseOverview } from "../../components/layout/admin/expenses/ExpenseOverview";
+import { ExpenseFilterBar } from "../../components/layout/admin/expenses/ExpenseFilterBar";
+import { ExpenseLedger } from "../../components/layout/admin/expenses/ExpenseLedger";
+import {
+  buildRangeSeries,
+  countDays,
+  emptyRange,
+  matchesDayRange,
+  matchesLedgerFilters,
+  rowsWindow,
+  shortRangeLabel,
+} from "../../lib/expenseLedger";
+import {
+  ACTION_ERROR,
+  CONFIRM_COPY,
+} from "../../components/layout/admin/expenses/ExpenseDialogCopy";
 
 const PAGE_SIZE = 100;
-const emptyRange = () => ({ start: null, end: null });
-
-const STATUS_OPTIONS = [
-  { value: "all", label: "All status" },
-  { value: "paid", label: "Paid" },
-  { value: "draft", label: "Draft" },
-  { value: "cancel", label: "Cancelled" },
-];
-
-// Desktop filter order — rendered as a pure CSS grid (no JS measuring, no
-// sliding track) so resizing never creates a transient horizontal scrollbar
-// and the visible set of filters never shifts under the user's cursor.
-const FILTER_KEYS = ["employee", "category", "method", "status"];
-
-const dayOf = (value) => {
-  const parsed = toDate(value);
-  return parsed ? startOfDay(parsed) : null;
-};
-
-const rowDay = (row) => dayOf(row?.expense_date ?? row?.date);
-
-const matchesDayRange = (value, start, end) => {
-  const day = dayOf(value);
-  if (!day) return true;
-  if (start && day < startOfDay(start)) return false;
-  if (end && day > startOfDay(end)) return false;
-  return true;
-};
-
-const matchesLedgerFilters = (
-  row,
-  { category, employee, method, status, query },
-) => {
-  if (employee && employee !== "all" && row.employeeId !== employee)
-    return false;
-  if (category !== "all" && row.categoryId !== category) return false;
-  if (method !== "all" && row.method !== method) return false;
-  if (status !== "all" && row.status !== status) return false;
-  if (!query) return true;
-
-  return [row.description, row.category, row.employee, row.method]
-    .filter(Boolean)
-    .some((v) => String(v).toLowerCase().includes(query));
-};
-
-const LEDGER_STATUS_META = {
-  paid: { tone: "success", label: "Paid" },
-  draft: { tone: "warning", label: "Draft" },
-  cancel: { tone: "danger", label: "Cancelled" },
-};
-
-const LEDGER_STATUS_ORDER = ["paid", "draft", "cancel"];
-
-// Copy for the shared row-action confirmation dialog — one entry per action
-// that opens it from the ledger (Delete / Add to draft / Remove from draft /
-// Cancel). The dialog shell is shared; only these strings and the icon change.
-const CONFIRM_COPY = {
-  delete: {
-    icon: <Trash2 size={20} aria-hidden />,
-    title: "Delete this expense?",
-    description:
-      "This permanently removes the expense record — and the receipt image stored with it, unless another expense still uses it. This can't be undone.",
-    cancelLabel: "Keep expense",
-    confirmLabel: "Yes, delete it",
-    pendingLabel: "Deleting…",
-  },
-  draft: {
-    icon: <RotateCcw size={20} aria-hidden />,
-    title: "Add this expense to draft?",
-    description:
-      "The record stays in the employee's ledger, but its status moves back to Draft — only paid expenses count against the employee's balance, so this amount returns to their available balance until it is paid again.",
-    cancelLabel: "Keep as paid",
-    confirmLabel: "Yes, add to draft",
-    pendingLabel: "Moving…",
-  },
-  restore: {
-    icon: <CircleCheck size={20} aria-hidden />,
-    title: "Remove this expense from draft?",
-    description:
-      "The record leaves Draft and counts against the employee's balance again — exactly as it did before it was parked there.",
-    cancelLabel: "Keep as draft",
-    confirmLabel: "Yes, mark as paid",
-    pendingLabel: "Restoring…",
-  },
-  cancel: {
-    icon: <XCircle size={20} aria-hidden />,
-    title: "Cancel this expense?",
-    description:
-      "The record stays in the ledger, but its status moves to Cancelled — it is void and never counts against anyone's balance. Only paid or draft expenses can be spent again afterwards.",
-    cancelLabel: "Keep as draft",
-    confirmLabel: "Yes, cancel it",
-    pendingLabel: "Cancelling…",
-  },
-};
-
-// Fallback toasts for the same actions when the API answers without a message
-// (network failure, timeout, …) — the server's own message always wins.
-const ACTION_ERROR = {
-  delete: "Couldn’t delete expense",
-  draft: "Couldn’t add expense to draft",
-  restore: "Couldn’t mark expense as paid",
-  cancel: "Couldn’t cancel expense",
-};
-const DAY_MS = 24 * 60 * 60 * 1000;
-
-const countDays = (start, end) =>
-  Math.round((startOfDay(end) - startOfDay(start)) / DAY_MS) + 1;
-
-const shortRangeLabel = (range) => {
-  if (!range?.start || !range?.end) return "";
-
-  const withYear = range.start.getFullYear() !== range.end.getFullYear();
-
-  const format = (day) =>
-    day.toLocaleDateString("en-US", {
-      month: "short",
-      day: "numeric",
-      ...(withYear ? { year: "numeric" } : {}),
-    });
-
-  return `${format(range.start)} - ${format(range.end)}`;
-};
-
-const buildRangeSeries = (range, rows, measure) => {
-  const start = range?.start ? startOfDay(range.start) : null;
-  const end = range?.end ? startOfDay(range.end) : null;
-
-  if (!start || !end || end < start) return [];
-
-  const days = countDays(start, end);
-  const bucketDays = days <= 14 ? 1 : Math.ceil(days / 14);
-  const totals = new Array(Math.ceil(days / bucketDays)).fill(0);
-
-  for (const row of rows) {
-    const day = rowDay(row);
-
-    if (!day || day < start || day > end) continue;
-
-    const bucket = Math.floor((countDays(start, day) - 1) / bucketDays);
-
-    totals[bucket] += measure(row);
-  }
-
-  return totals.map((v) => ({ v }));
-};
-
-const rowsWindow = (rows) => {
-  let start = null;
-  let end = null;
-
-  for (const row of rows) {
-    const day = rowDay(row);
-
-    if (!day) continue;
-    if (!start || day < start) start = day;
-    if (!end || day > end) end = day;
-  }
-
-  return start && end ? { start, end } : null;
-};
 
 const AdminExpenses = () => {
   const nav = useNavigate();
@@ -462,27 +270,29 @@ const AdminExpenses = () => {
     const counts = new Map();
 
     for (const row of allLedgerRows) {
-      const status = row.status || "draft";
-      counts.set(status, (counts.get(status) ?? 0) + 1);
+      const rowStatus = row.status || "draft";
+      counts.set(rowStatus, (counts.get(rowStatus) ?? 0) + 1);
     }
 
     const order = [
-      ...LEDGER_STATUS_ORDER.filter((status) => counts.has(status)),
+      ...EXPENSE_LEDGER_STATUS_ORDER.filter((rowStatus) =>
+        counts.has(rowStatus),
+      ),
       ...[...counts.keys()].filter(
-        (status) => !LEDGER_STATUS_ORDER.includes(status),
+        (rowStatus) => !EXPENSE_LEDGER_STATUS_ORDER.includes(rowStatus),
       ),
     ];
 
-    return order.map((status) => {
-      const meta = LEDGER_STATUS_META[status] ?? {
+    return order.map((rowStatus) => {
+      const meta = EXPENSE_LEDGER_STATUS_META[rowStatus] ?? {
         tone: "neutral",
-        label: status,
+        label: rowStatus,
       };
 
       return {
-        key: status,
+        key: rowStatus,
         label: meta.label,
-        value: counts.get(status),
+        value: counts.get(rowStatus),
         tone: meta.tone,
       };
     });
@@ -597,7 +407,8 @@ const AdminExpenses = () => {
       chips.push({
         key: "status",
         label:
-          STATUS_OPTIONS.find((o) => o.value === status)?.label ?? "Status",
+          EXPENSE_STATUS_OPTIONS.find((o) => o.value === status)?.label ??
+          "Status",
         onClear: () => {
           setStatus("all");
           setPage(0);
@@ -626,6 +437,14 @@ const AdminExpenses = () => {
     setEmployee(nextEmployee);
     setMethod(nextMethod);
     setStatus(nextStatus);
+    setPage(0);
+  };
+
+  const handleFilterChange = (key, value) => {
+    if (key === "employee") setEmployee(value);
+    else if (key === "category") setCategory(value);
+    else if (key === "method") setMethod(value);
+    else if (key === "status") setStatus(value);
     setPage(0);
   };
 
@@ -742,7 +561,7 @@ const AdminExpenses = () => {
   const confirmSummary = confirmAction ? (
     <div className="mt-4 flex items-center gap-3 rounded-2xl border border-[var(--border)] bg-[var(--surface-2)]/60 px-4 py-3">
       <div className="min-w-0 flex-1">
-        <p className="truncate text-base font-semibold text-[var(--ink)]">
+        <p className="truncate text-base font-medium text-[var(--ink)]">
           {confirmAction.row.description || "Untitled expense"}
         </p>
         <p className="mt-0.5 truncate text-xs text-[var(--ink-muted)]">
@@ -750,7 +569,7 @@ const AdminExpenses = () => {
         </p>
       </div>
 
-      <span className="shrink-0 text-sm font-semibold tabular-nums text-[var(--ink)]">
+      <span className="shrink-0 text-sm font-medium tabular-nums text-[var(--ink)]">
         {formatMoney(confirmAction.row.amount)}
       </span>
     </div>
@@ -765,118 +584,12 @@ const AdminExpenses = () => {
       ? { ...confirmCopyBase, cancelLabel: "Keep cancelled" }
       : confirmCopyBase;
 
-  const searchField = (
-    <div className="flex w-full items-center gap-2">
-      <SearchInput
-        leftIcon={<Search size={16} />}
-        placeholder="Search..."
-        aria-label="Search expenses"
-        value={search}
-        onChange={(e) => {
-          setSearch(e.target.value);
-          setPage(0);
-        }}
-        className="h-11 min-w-0 flex-1 sm:h-10"
-        rightSlot={
-          search ? (
-            <button
-              type="button"
-              onClick={() => {
-                setSearch("");
-                setPage(0);
-              }}
-              aria-label="Clear search"
-              className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-[var(--ink-muted)] transition-colors hover:bg-[var(--surface-2)] hover:text-[var(--ink)]"
-            >
-              <X size={14} />
-            </button>
-          ) : null
-        }
-      />
-
-      <DateRangePicker
-        value={dateRange}
-        onChange={(r) => {
-          setDateRange(r);
-          setPage(0);
-        }}
-        placeholder="All dates"
-        align="end"
-        compactOnMobile
-      />
-    </div>
-  );
-
   const mobileFiltersLabel =
     mobileFilterChips.length > 0
       ? `Filter ledger — ${mobileFilterChips.length} ${
           mobileFilterChips.length === 1 ? "filter" : "filters"
         } active`
       : "Filter ledger";
-
-  const renderFilter = (key) => {
-    switch (key) {
-      case "employee":
-        return (
-          <Listbox
-            portal
-            options={employeeOptions}
-            value={employee}
-            onChange={(v) => {
-              setEmployee(v);
-              setPage(0);
-            }}
-            placeholder="All Employee"
-            {...employeeListboxProps("All Employee")}
-          />
-        );
-
-      case "category":
-        return (
-          <Listbox
-            portal
-            options={categoryOptions}
-            value={category}
-            onChange={(v) => {
-              setCategory(v);
-              setPage(0);
-            }}
-            placeholder="All categories"
-          />
-        );
-
-      case "method":
-        return (
-          <Listbox
-            portal
-            options={methodOptions}
-            value={method}
-            onChange={(v) => {
-              setMethod(v);
-              setPage(0);
-            }}
-            placeholder="All methods"
-          />
-        );
-
-      case "status":
-        return (
-          <Listbox
-            portal
-            options={STATUS_OPTIONS}
-            value={status}
-            onChange={(v) => {
-              setStatus(v);
-              setPage(0);
-            }}
-            placeholder="All status"
-          />
-        );
-
-      default:
-        return null;
-    }
-  };
 
   return (
     <div className="space-y-5 pb-2">
@@ -896,101 +609,22 @@ const AdminExpenses = () => {
         }
       />
 
-      <section aria-label="Expenses overview" className="space-y-4">
-        <motion.div
-          variants={container}
-          initial="hidden"
-          animate="show"
-          className="grid grid-cols-1 items-stretch gap-3 sm:grid-cols-2 sm:gap-4 xl:grid-cols-4"
-        >
-          <motion.div variants={item} className="h-full min-w-0 [&>div]:h-full">
-            <StatCard
-              label="Total Expenses"
-              value={formatMoney(totalSpend)}
-              icon={ReceiptText}
-              loading={isLoading}
-              accent
-              chart="bars"
-              data={spendSeries}
-              stats={heroStats}
-            />
-          </motion.div>
-
-          <motion.div variants={item} className="h-full min-w-0 [&>div]:h-full">
-            <StatCard
-              label="My Balance"
-              value={formatMoney(cashOnHand)}
-              icon={Wallet}
-              loading={isLoading}
-              tone={
-                isBalanceOverdrawn
-                  ? "danger"
-                  : isBalanceDepleted
-                    ? "warning"
-                    : undefined
-              }
-              status={
-                isBalanceOverdrawn
-                  ? {
-                      tone: "danger",
-                      label: "Overdrawn — over budget",
-                      icon: CircleX,
-                    }
-                  : isBalanceDepleted
-                    ? {
-                        tone: "warning",
-                        label: "Depleted — no funds left",
-                        icon: CircleAlert,
-                      }
-                    : undefined
-              }
-              stats={balanceStats}
-            />
-          </motion.div>
-
-          <motion.div variants={item} className="h-full min-w-0 [&>div]:h-full">
-            <StatCard
-              label="Total Issued Budget"
-              value={formatMoney(totalIssued)}
-              icon={HandCoins}
-              loading={isLoading}
-              stats={issuedStats}
-            />
-          </motion.div>
-
-          <motion.div variants={item} className="h-full min-w-0 [&>div]:h-full">
-            <StatCard
-              label="Total Expenses Transactions"
-              value={allLedgerRows.length}
-              icon={ClipboardList}
-              loading={isLoading}
-              chart="bars"
-              data={recordSeries}
-              stats={statusStats}
-              status={
-                flaggedCount > 0
-                  ? {
-                      tone: "danger",
-                      label:
-                        flaggedCount === 1 ? "1 flag" : `${flaggedCount} flag`,
-                    }
-                  : undefined
-              }
-            />
-          </motion.div>
-        </motion.div>
-
-        <p className="px-1 text-xs text-[var(--ink-muted)]">
-          Money figures — My Balance, Spent, Total Expenses, Avg / day and the
-          ledger footer total — count admin spend only: cancelled lines and
-          employee rows are excluded (employee spend is drawn from the budget
-          already issued to them) · Total Expenses adds open budget issuances to
-          expenses · Transactions counts every expense row, cancelled and
-          employee included · The overview cards above are always all-time —
-          charts and Avg / day span the records from first to last, and the date
-          range only filters the table below
-        </p>
-      </section>
+      <ExpenseOverview
+        isLoading={isLoading}
+        totalSpend={totalSpend}
+        spendSeries={spendSeries}
+        heroStats={heroStats}
+        cashOnHand={cashOnHand}
+        isBalanceOverdrawn={isBalanceOverdrawn}
+        isBalanceDepleted={isBalanceDepleted}
+        balanceStats={balanceStats}
+        totalIssued={totalIssued}
+        issuedStats={issuedStats}
+        recordCount={allLedgerRows.length}
+        recordSeries={recordSeries}
+        statusStats={statusStats}
+        flaggedCount={flaggedCount}
+      />
 
       <Card padding="lg" className="relative rounded-3xl px-2 sm:px-6">
         <CardHeader>
@@ -1021,150 +655,70 @@ const AdminExpenses = () => {
           </div>
         </CardHeader>
 
-        <div className="mb-5 flex flex-col gap-3 xl:flex-row xl:items-start">
-          <div className="flex items-center gap-2 xl:hidden">
-            <div className="min-w-0 flex-1">{searchField}</div>
-
-            <IconButton
-              type="button"
-              title="Filter"
-              aria-label={mobileFiltersLabel}
-              aria-haspopup="dialog"
-              aria-expanded={filtersOpen}
-              onClick={() => setFiltersOpen(true)}
-              className={cn(
-                "shrink-0 sm:h-10 sm:w-10",
-                mobileFilterChips.length > 0 &&
-                  "border-[var(--accent)]/40 bg-[var(--accent-soft)] text-[var(--accent-strong)]",
-              )}
-            >
-              <SlidersHorizontal size={16} aria-hidden />
-
-              {mobileFilterChips.length > 0 && (
-                <span className="absolute -right-0.5 -top-0.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-[var(--accent)] px-1 text-[10px] font-normal leading-none text-white ring-2 ring-[var(--surface)]">
-                  {mobileFilterChips.length}
-                </span>
-              )}
-            </IconButton>
-          </div>
-
-          {/* Desktop filters — pure CSS grid: every filter is always mounted
-              and always visible, columns just reflow (4 → 2) as the card
-              narrows. No measuring, no sliding track, no translateX, so
-              resizing can never flash a horizontal scrollbar or shuffle
-              which filters are on screen. Same records stay mounted. */}
-          <div
-            role="group"
-            aria-label="Expense filters"
-            className="hidden min-w-0 flex-1 grid-cols-4 gap-2 xl:grid 2xl:gap-2.5"
-          >
-            {FILTER_KEYS.map((key) => (
-              <div key={key} className="min-w-0">
-                {renderFilter(key)}
-              </div>
-            ))}
-          </div>
-
-          {/* Mid widths (lg–xl): filters get their own full-width row above
-              search so nothing squeezes into a shrunken sliding window. */}
-          <div
-            role="group"
-            aria-label="Expense filters"
-            className="hidden min-w-0 grid-cols-2 gap-2 sm:grid-cols-4 lg:grid xl:hidden"
-          >
-            {FILTER_KEYS.map((key) => (
-              <div key={key} className="min-w-0">
-                {renderFilter(key)}
-              </div>
-            ))}
-          </div>
-
-          <div className="hidden min-w-0 xl:ml-auto xl:block xl:w-[420px] xl:shrink-0 2xl:w-[480px]">
-            {searchField}
-          </div>
-        </div>
-
-        <FilterChips
+        <ExpenseFilterBar
+          search={search}
+          onSearch={(value) => {
+            setSearch(value);
+            setPage(0);
+          }}
+          dateRange={dateRange}
+          onDateRange={(r) => {
+            setDateRange(r);
+            setPage(0);
+          }}
+          filters={{ employee, category, method, status }}
+          onFilterChange={handleFilterChange}
+          options={{
+            employee: employeeOptions,
+            category: categoryOptions,
+            method: methodOptions,
+            status: EXPENSE_STATUS_OPTIONS,
+          }}
           chips={mobileFilterChips}
-          onClearAll={() => {
+          onClearAllFilters={() => {
             setEmployee("all");
             setCategory("all");
             setMethod("all");
             setStatus("all");
             setPage(0);
           }}
+          filtersOpen={filtersOpen}
+          onOpenFilters={setFiltersOpen}
+          mobileFiltersLabel={mobileFiltersLabel}
+          countMatches={countLedgerMatches}
+          totalRows={ledgerRows.length}
+          hasActiveFilters={hasActiveFilters}
+          onApplyMobile={applyMobileFilters}
+          onClearMobile={clearFilters}
         />
 
-        {isLoading ? (
-          <LoadingSkeleton rows={6} />
-        ) : error ? (
-          <ErrorState
-            title="Couldn't load expenses"
-            message="Something went wrong while fetching expenses."
-            onRetry={refetch}
-            onClearFilters={hasActiveFilters ? clearFilters : undefined}
-          />
-        ) : pageRows.length === 0 ? (
-          <EmptyState
-            icon={ReceiptText}
-            title={
-              hasActiveFilters
-                ? "No records match your filters"
-                : "No expenses yet"
-            }
-            message={
-              hasActiveFilters
-                ? emptyFilterMessage
-                : 'Use the "Add Expense" button to record the first one.'
-            }
-            onClear={hasActiveFilters ? clearFilters : undefined}
-          />
-        ) : (
-          <>
-            <ExpensesTable
-              rows={pageRows}
-              pending={
-                remove.isPending ||
-                markEmployeeDraft.isPending ||
-                markEmployeePaid.isPending ||
-                setExpenseStatus.isPending
-              }
-              onView={handleViewRow}
-              onDelete={requestDelete}
-              onAddToDraft={requestAddToDraft}
-              onRemoveFromDraft={requestRemoveFromDraft}
-              onCancelExpense={requestCancelExpense}
-            />
-
-            <div
-              className={cn(
-                "mt-4 flex flex-col gap-3 border-t border-[var(--border)] pt-4 sm:flex-row sm:items-center",
-              )}
-            >
-              <p className="text-sm text-[var(--ink-muted)]">
-                Showing {rangeStart}–{rangeEnd} of {filteredRows.length}{" "}
-                {filteredRows.length === 1 ? "record" : "records"}
-              </p>
-
-              {pageCount > 1 && (
-                <div className="sm:ml-auto">
-                  <Pager
-                    page={currentPage}
-                    pageCount={pageCount}
-                    onChange={setPage}
-                  />
-                </div>
-              )}
-
-              <p className="text-sm text-[var(--ink-muted)] sm:ml-auto sm:mr-6">
-                Total
-                <span className="ml-2 text-sm font-semibold text-[var(--accent-strong)] tabular-nums">
-                  {formatMoney(total)}
-                </span>
-              </p>
-            </div>
-          </>
-        )}
+        <ExpenseLedger
+          isLoading={isLoading}
+          error={error}
+          onRetry={refetch}
+          hasActiveFilters={hasActiveFilters}
+          onClearFilters={clearFilters}
+          emptyFilterMessage={emptyFilterMessage}
+          pageRows={pageRows}
+          pending={
+            remove.isPending ||
+            markEmployeeDraft.isPending ||
+            markEmployeePaid.isPending ||
+            setExpenseStatus.isPending
+          }
+          onView={handleViewRow}
+          onDelete={requestDelete}
+          onAddToDraft={requestAddToDraft}
+          onRemoveFromDraft={requestRemoveFromDraft}
+          onCancelExpense={requestCancelExpense}
+          filteredRows={filteredRows}
+          currentPage={currentPage}
+          pageCount={pageCount}
+          onPageChange={setPage}
+          rangeStart={rangeStart}
+          rangeEnd={rangeEnd}
+          total={total}
+        />
       </Card>
 
       <ExpenseDetailsModal
@@ -1191,24 +745,6 @@ const AdminExpenses = () => {
         pending={confirmPending}
         onCancel={closeConfirm}
         onConfirm={runConfirmedAction}
-      />
-
-      <ExpensesMobileFilters
-        open={filtersOpen}
-        onClose={() => setFiltersOpen(false)}
-        employee={employee}
-        category={category}
-        method={method}
-        status={status}
-        employeeOptions={employeeOptions}
-        categoryOptions={categoryOptions}
-        methodOptions={methodOptions}
-        statusOptions={STATUS_OPTIONS}
-        onApply={applyMobileFilters}
-        onClearAll={clearFilters}
-        countMatches={countLedgerMatches}
-        totalRows={ledgerRows.length}
-        hasActiveFilters={hasActiveFilters}
       />
     </div>
   );

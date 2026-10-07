@@ -162,7 +162,7 @@ const ReferencesModal = ({
                 <div className="min-w-0">
                   <h3
                     id="references-modal-title"
-                    className="font-display text-lg font-semibold tracking-tight"
+                    className="font-display text-lg font-medium tracking-tight"
                   >
                     Budget Source Reference
                   </h3>
@@ -215,13 +215,13 @@ const ReferencesModal = ({
                 <table className="w-full text-sm">
                   <thead>
                     <tr className="sticky top-0 z-10 bg-[var(--surface-2)] type-eyebrow text-[var(--ink-muted)]">
-                      <th className="px-4 py-2.5 text-left font-semibold">
+                      <th className="px-4 py-2.5 text-left font-medium">
                         Source Name
                       </th>
-                      <th className="px-4 py-2.5 text-right font-semibold">
+                      <th className="px-4 py-2.5 text-right font-medium">
                         Date Created
                       </th>
-                      <th className="px-4 py-2.5 text-right font-semibold"></th>
+                      <th className="px-4 py-2.5 text-right font-medium"></th>
                     </tr>
                   </thead>
                   <tbody>

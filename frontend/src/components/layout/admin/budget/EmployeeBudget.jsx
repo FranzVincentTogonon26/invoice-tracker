@@ -93,12 +93,12 @@ const EmployeeBudget = ({ employeeIssuedBudget = [], isLoading, onOpen }) => {
           <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-[var(--accent-soft)] text-[var(--accent-strong)]">
             <Wallet size={20} />
           </div>
-          <p className="mt-4 font-display text-lg font-semibold tracking-tight text-[var(--ink)]">
+          <p className="mt-4 font-display text-lg font-medium tracking-tight text-[var(--ink)]">
             No budgets issued yet
           </p>
           <p className="mt-1.5 max-w-sm text-xs leading-relaxed text-[var(--ink-muted)]">
             Use the{" "}
-            <span className="font-semibold text-[var(--accent-strong)]">
+            <span className="font-medium text-[var(--accent-strong)]">
               Budget Issued
             </span>{" "}
             button to create the first one.
@@ -161,7 +161,7 @@ const EmployeeBudget = ({ employeeIssuedBudget = [], isLoading, onOpen }) => {
                     className="h-9 w-9 text-sm"
                   />
                   <div className="min-w-0 flex-1">
-                    <p className="truncate text-sm font-semibold text-[var(--ink)]">
+                    <p className="truncate text-sm font-medium text-[var(--ink)]">
                       {group.name}
                     </p>
                     <p className="mt-0.5 truncate text-xs text-[var(--ink-muted)]">
@@ -175,7 +175,7 @@ const EmployeeBudget = ({ employeeIssuedBudget = [], isLoading, onOpen }) => {
                         <>
                           {" "}
                           ·{" "}
-                          <span className="font-semibold text-[var(--ink)]">
+                          <span className="font-medium text-[var(--ink)]">
                             {singleRef.label}
                           </span>
                         </>
@@ -185,7 +185,7 @@ const EmployeeBudget = ({ employeeIssuedBudget = [], isLoading, onOpen }) => {
                   <span className="hidden shrink-0 items-center gap-1 rounded-full bg-[var(--surface-2)] px-2.5 py-1 text-xs  text-[var(--ink-muted)] sm:inline-flex">
                     Latest {formatDate(singleRef?.recent_date)}
                   </span>
-                  <span className="shrink-0 font-display text-base font-semibold text-[var(--ink)] tabular-nums transition-colors duration-200 group-hover/row:text-[var(--accent-strong)]">
+                  <span className="shrink-0 font-display text-base font-medium text-[var(--ink)] tabular-nums transition-colors duration-200 group-hover/row:text-[var(--accent-strong)]">
                     {formatMoney(total)}
                   </span>
                   <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full border border-[var(--border)] text-[var(--ink-muted)] transition-all duration-200 group-hover/row:border-[var(--accent)]/40 group-hover/row:bg-[var(--accent-soft)] group-hover/row:text-[var(--accent-strong)]">
@@ -207,7 +207,7 @@ const EmployeeBudget = ({ employeeIssuedBudget = [], isLoading, onOpen }) => {
                         )}
                       >
                         <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-[var(--accent)]/60" />
-                        <span className="min-w-0 flex-1 truncate text-sm font-semibold tracking-tight text-[var(--ink)]">
+                        <span className="min-w-0 flex-1 truncate text-sm font-medium tracking-tight text-[var(--ink)]">
                           {labelGroup.label}
                         </span>
                         <span className="shrink-0 rounded-full bg-[var(--surface)] px-2 py-0.5 text-xs font-normal tabular-nums text-[var(--ink-muted)]">
@@ -217,7 +217,7 @@ const EmployeeBudget = ({ employeeIssuedBudget = [], isLoading, onOpen }) => {
                         <span className="hidden shrink-0 text-xs tabular-nums text-[var(--ink-muted)] sm:block">
                           {formatDate(labelGroup.recent_date)}
                         </span>
-                        <span className="min-w-[5.5rem] shrink-0 text-right text-sm font-semibold text-[var(--accent-strong)] tabular-nums">
+                        <span className="min-w-[5.5rem] shrink-0 text-right text-sm font-medium text-[var(--accent-strong)] tabular-nums">
                           {formatMoney(labelGroup.total)}
                         </span>
                       </div>

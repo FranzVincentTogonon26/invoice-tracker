@@ -41,7 +41,7 @@ export function ErrorState({
       <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-[var(--danger)]/12 text-[var(--danger)]">
         <RotateCcw size={20} />
       </div>
-      <p className="mt-4 text-sm font-semibold text-[var(--ink)]">{title}</p>
+      <p className="mt-4 text-sm font-medium text-[var(--ink)]">{title}</p>
       {message && (
         <p className="mt-1.5 max-w-xs text-sm leading-relaxed text-[var(--ink-muted)]">
           {message}
@@ -51,7 +51,7 @@ export function ErrorState({
         <button
           type="button"
           onClick={onRetry}
-          className="mt-4 inline-flex h-8 items-center gap-1.5 rounded-full border border-[var(--border)] px-3.5 text-sm font-semibold text-[var(--accent-strong)] transition-colors hover:bg-[var(--accent-soft)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)]/30"
+          className="mt-4 inline-flex h-8 items-center gap-1.5 rounded-full border border-[var(--border)] px-3.5 text-sm font-medium text-[var(--accent-strong)] transition-colors hover:bg-[var(--accent-soft)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)]/30"
         >
           <RotateCcw size={12} />
           Try again
@@ -61,7 +61,7 @@ export function ErrorState({
         <button
           type="button"
           onClick={onClearFilters}
-          className="mt-4 inline-flex h-8 items-center gap-1.5 rounded-full border border-[var(--border)] px-3.5 text-sm font-semibold text-[var(--accent-strong)] transition-colors hover:bg-[var(--accent-soft)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)]/30"
+          className="mt-4 inline-flex h-8 items-center gap-1.5 rounded-full border border-[var(--border)] px-3.5 text-sm font-medium text-[var(--accent-strong)] transition-colors hover:bg-[var(--accent-soft)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)]/30"
         >
           <RotateCcw size={12} />
           {clearLabel}
@@ -88,7 +88,7 @@ export function EmptyState({
       <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-[var(--accent-soft)] text-[var(--accent-strong)]">
         <Icon size={20} />
       </div>
-      <p className="mt-4 font-display sm:text-lg text-base font-semibold tracking-tight text-[var(--ink)]">
+      <p className="mt-4 font-display sm:text-lg text-base font-medium tracking-tight text-[var(--ink)]">
         {title}
       </p>
       {message && (
@@ -100,7 +100,7 @@ export function EmptyState({
         <button
           type="button"
           onClick={onClear}
-          className="mt-4 inline-flex h-8 items-center gap-1.5 rounded-full border border-[var(--border)] px-3.5 text-sm font-semibold text-[var(--accent-strong)] transition-colors hover:bg-[var(--accent-soft)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)]/30"
+          className="mt-4 inline-flex h-8 items-center gap-1.5 rounded-full border border-[var(--border)] px-3.5 text-sm font-medium text-[var(--accent-strong)] transition-colors hover:bg-[var(--accent-soft)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)]/30"
         >
           <RotateCcw size={16} />
           {clearLabel}

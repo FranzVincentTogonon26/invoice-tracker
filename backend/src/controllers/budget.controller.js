@@ -3,7 +3,10 @@ import Employee from "../models/employee.model.js";
 import User from "../models/user.model.js";
 import ApiError from "../utils/ApiError.js";
 import { validate } from "../utils/validate.js";
-import { createbudgetSchema } from "../validations/budget.validation.js";
+import {
+  createbudgetSchema,
+  updateBudgetReferenceSchema,
+} from "../validations/budget.validation.js";
 import { emitTransaction } from "../realtime/index.js";
 import {
   saveIssuedBudgetImage,
@@ -93,6 +96,19 @@ export const create = async (req, res, next) => {
 
     // zod guarantees `amount` is a positive number; normalize just in case
     const parsedAmount = Number(amount);
+
+    // Source-of-funds gate: a budget reference connects writes only while
+    // its status is 'open'. Closed sources accept no top-ups, no issuances
+    // and no restores — pickers already hide them; this is the enforcement.
+    if (
+      (type === "addBudget" || type === "issuedBudget") &&
+      !(await Budget.isReferenceOpen(reference_id))
+    ) {
+      throw ApiError.conflict(
+        "This budget source is closed — only open sources accept activity.",
+        "REFERENCE_NOT_OPEN",
+      );
+    }
 
     if (type === "issuedBudget") {
       const validateEmployee = await Employee.findEmployeeById(employeeId);
@@ -205,6 +221,52 @@ export const uploadIssuedReceiptImage = async (req, res, next) => {
     return res
       .status(201)
       .json({ image_url, file_name: req.file.originalname ?? "" });
+  } catch (err) {
+    next(err);
+  }
+};
+
+// GET /budgets/references — Source of Funds management list (AdminSourceFunds
+// page): EVERY reference with live aggregates, newest first. Unlike the
+// picker lists, disconnected (cut_off) sources stay visible here so they can
+// be edited, reopened or deleted.
+export const sourceFunds = async (req, res, next) => {
+  try {
+    const sources = await Budget.sourceFunds(req.query);
+    return res.status(200).json({ sources });
+  } catch (err) {
+    next(err);
+  }
+};
+
+// PATCH /budgets/references/:referenceId — edit a source of funds (label /
+// notes / status). Closing ('open' → 'cut_off') disconnects the source from
+// every flow; reopening restores it.
+export const updateReference = async (req, res, next) => {
+  try {
+    const { referenceId } = req.params;
+    if (!UUID_RE.test(referenceId || ""))
+      throw ApiError.badRequest("Invalid reference id", "VALIDATION_ERROR");
+
+    const payload = validate(updateBudgetReferenceSchema, req.body ?? {});
+    const updated = await Budget.updateReference(referenceId, payload);
+    if (!updated)
+      throw ApiError.notFound("Reference not found", "REFERENCE_NOT_FOUND");
+
+    emitTransaction({
+      action: "update",
+      entity: "budget-reference",
+      actor: req.user,
+      message:
+        payload.status === "cut_off"
+          ? `Closed budget source "${updated?.label ?? referenceId}" — it no longer connects to any flow.`
+          : payload.status === "open"
+            ? `Reopened budget source "${updated?.label ?? referenceId}".`
+            : `Updated budget source "${updated?.label ?? referenceId}".`,
+      metadata: { reference_id: referenceId, label: updated?.label ?? null, status: updated?.status ?? null },
+    });
+
+    return res.status(200).json({ reference: updated });
   } catch (err) {
     next(err);
   }
@@ -417,6 +479,11 @@ export const restoreBudget = async (req, res, next) => {
     const restored = await Budget.restoreBudget(id, status);
     if (!restored)
       throw ApiError.notFound("Budget not found", "BUDGET_NOT_FOUND");
+    if (restored.notOpen)
+      throw ApiError.conflict(
+        "This budget source is closed — only open sources accept activity.",
+        "REFERENCE_NOT_OPEN",
+      );
 
     emitTransaction({
       action: "update",
@@ -563,6 +630,11 @@ export const restoreIssuedTransaction = async (req, res, next) => {
       throw ApiError.notFound(
         "Issued transaction not found",
         "ISSUED_TRANSACTION_NOT_FOUND",
+      );
+    if (restored.notOpen)
+      throw ApiError.conflict(
+        "This budget source is closed — only open sources accept activity.",
+        "REFERENCE_NOT_OPEN",
       );
 
     emitTransaction({

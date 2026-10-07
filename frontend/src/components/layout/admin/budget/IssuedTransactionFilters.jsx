@@ -77,7 +77,7 @@ function FilterAvatar({ name, avatarUrl, size = "h-7 w-7 text-xs" }) {
     <span
       aria-hidden
       className={cn(
-        "flex shrink-0 items-center justify-center rounded-full bg-[var(--accent-soft)] font-semibold text-[var(--accent-strong)]",
+        "flex shrink-0 items-center justify-center rounded-full bg-[var(--accent-soft)] font-medium text-[var(--accent-strong)]",
         size,
       )}
     >
@@ -118,7 +118,7 @@ function FilterTrigger({ filterKey, label, selectedOption }) {
             name={selectedOption.label}
             avatarUrl={selectedOption.avatar_url}
           />
-          <span className="truncate text-xs text-[var(--ink-muted)] font-semibold">
+          <span className="truncate text-xs text-[var(--ink-muted)] font-medium">
             {selectedOption.label}
           </span>
         </span>
@@ -128,7 +128,7 @@ function FilterTrigger({ filterKey, label, selectedOption }) {
       return (
         <span className="flex min-w-0 items-center gap-2">
           <MethodIcon method={selectedOption.value} />
-          <span className="truncate text-xs text-[var(--ink-muted)] font-semibold">
+          <span className="truncate text-xs text-[var(--ink-muted)] font-medium">
             {selectedOption.label}
           </span>
         </span>
@@ -140,7 +140,7 @@ function FilterTrigger({ filterKey, label, selectedOption }) {
           <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-[var(--accent-soft)] text-[var(--accent-strong)]">
             <HandCoins size={13} aria-hidden />
           </span>
-          <span className="truncate text-xs text-[var(--ink-muted)] font-semibold">
+          <span className="truncate text-xs text-[var(--ink-muted)] font-medium">
             {selectedOption.label}
           </span>
         </span>
@@ -149,7 +149,7 @@ function FilterTrigger({ filterKey, label, selectedOption }) {
     return (
       <span className="flex min-w-0 items-center gap-2">
         <StatusDot statusValue={selectedOption.value} />
-        <span className="truncate text-xs text-[var(--ink-muted)] font-semibold">
+        <span className="truncate text-xs text-[var(--ink-muted)] font-medium">
           {selectedOption.label}
         </span>
       </span>

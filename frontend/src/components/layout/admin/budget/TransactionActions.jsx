@@ -338,7 +338,7 @@ export function TransactionActions({
             type="button"
             onClick={confirmRestore}
             className={cn(
-              "inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-sm font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--danger)]/30",
+              "inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--danger)]/30",
               "text-[var(--ink-muted)] hover:bg-[var(--ink)]/14 hover:text-[var(--ink)]",
               className,
             )}
@@ -351,7 +351,7 @@ export function TransactionActions({
             onClick={() => setDeleteOpen(true)}
             aria-haspopup="dialog"
             aria-expanded={deleteOpen}
-            className="inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-sm font-semibold text-[var(--ink-muted)] transition-colors hover:bg-[var(--danger)]/10 hover:text-[var(--danger)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--danger)]/30"
+            className="inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-sm font-medium text-[var(--ink-muted)] transition-colors hover:bg-[var(--danger)]/10 hover:text-[var(--danger)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--danger)]/30"
           >
             <Trash2 size={13} strokeWidth={2.5} aria-hidden />
             Delete
@@ -366,7 +366,7 @@ export function TransactionActions({
           disabled={!canCancel}
           onClick={() => setOpen(true)}
           className={cn(
-            "inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-sm font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--danger)]/30",
+            "inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--danger)]/30",
             "text-[var(--ink-muted)] hover:bg-[var(--danger)]/10 hover:text-[var(--danger)]",
             className,
           )}
@@ -394,7 +394,7 @@ export function TransactionActions({
                 </DialogIcon>
                 <h2
                   id={titleId}
-                  className="mt-4 font-display text-lg font-semibold tracking-tight text-[var(--ink)]"
+                  className="mt-4 font-display text-lg font-medium tracking-tight text-[var(--ink)]"
                 >
                   Invalid request
                 </h2>
@@ -403,11 +403,11 @@ export function TransactionActions({
                   className="mt-1.5 text-sm leading-relaxed text-[var(--ink-muted)]"
                 >
                   Unable to proceed — the transaction amount{" "}
-                  <span className="font-semibold text-[var(--ink)] tabular-nums">
+                  <span className="font-medium text-[var(--ink)] tabular-nums">
                     {formatMoney(amount)}
                   </span>{" "}
                   is greater than the {remainingLabel}{" "}
-                  <span className="font-semibold text-[var(--ink)] tabular-nums">
+                  <span className="font-medium text-[var(--ink)] tabular-nums">
                     {formatMoney(remaining)}
                   </span>
                   .
@@ -437,7 +437,7 @@ export function TransactionActions({
                 </DialogIcon>
                 <h2
                   id={titleId}
-                  className="mt-4 font-display text-lg font-semibold tracking-tight text-[var(--ink)]"
+                  className="mt-4 font-display text-lg font-medium tracking-tight text-[var(--ink)]"
                 >
                   Cancel budget transaction?
                 </h2>
@@ -447,7 +447,7 @@ export function TransactionActions({
                 >
                   Are you sure you want to cancel this budget transaction? Its
                   status will be updated to{" "}
-                  <span className="font-semibold text-[var(--danger)]">
+                  <span className="font-medium text-[var(--danger)]">
                     cancelled
                   </span>{" "}
                   — you&apos;ll have a few seconds to undo afterwards.
@@ -457,14 +457,14 @@ export function TransactionActions({
                     card) so admins confirm exactly what they're reversing. */}
                 <div className="mt-4 flex items-center gap-3 rounded-2xl border border-[var(--border)] bg-[var(--surface-2)]/60 px-4 py-3">
                   <div className="min-w-0 flex-1">
-                    <p className="truncate text-base font-semibold text-[var(--ink)]">
+                    <p className="truncate text-base font-medium text-[var(--ink)]">
                       {transaction.description || "Budget transaction"}
                     </p>
                     <p className="mt-0.5 text-sm text-[var(--ink-muted)]">
                       Amount to reverse
                     </p>
                   </div>
-                  <span className="shrink-0 text-sm font-semibold text-[var(--ink)] tabular-nums">
+                  <span className="shrink-0 text-sm font-medium text-[var(--ink)] tabular-nums">
                     {formatMoney(amount)}
                   </span>
                 </div>
@@ -505,7 +505,7 @@ export function TransactionActions({
               </DialogIcon>
               <h2
                 id={deleteTitleId}
-                className="mt-4 font-display text-lg font-semibold tracking-tight text-[var(--ink)]"
+                className="mt-4 font-display text-lg font-medium tracking-tight text-[var(--ink)]"
               >
                 Delete this transaction record?
               </h2>
@@ -514,7 +514,7 @@ export function TransactionActions({
                 className="mt-1.5 text-sm leading-relaxed text-[var(--ink-muted)]"
               >
                 This permanently removes the transaction record and{" "}
-                <span className="font-semibold text-[var(--danger)]">
+                <span className="font-medium text-[var(--danger)]">
                   can&apos;t be undone
                 </span>
                 . Only cancelled transactions can be deleted.
@@ -524,7 +524,7 @@ export function TransactionActions({
                   they're destroying. */}
               <div className="mt-4 flex items-center gap-3 rounded-2xl border border-[var(--border)] bg-[var(--surface-2)]/60 px-4 py-3">
                 <div className="min-w-0 flex-1">
-                  <p className="truncate text-base font-semibold text-[var(--ink)]">
+                  <p className="truncate text-base font-medium text-[var(--ink)]">
                     {transaction.description || "Budget transaction"}
                   </p>
                   <p className="mt-0.5 truncate text-sm text-[var(--ink-muted)]">
@@ -533,7 +533,7 @@ export function TransactionActions({
                       .join(" · ")}
                   </p>
                 </div>
-                <span className="shrink-0 text-sm font-semibold text-[var(--ink)] tabular-nums">
+                <span className="shrink-0 text-sm font-medium text-[var(--ink)] tabular-nums">
                   {formatMoney(amount)}
                 </span>
               </div>

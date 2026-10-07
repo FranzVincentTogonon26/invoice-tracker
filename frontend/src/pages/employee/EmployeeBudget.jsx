@@ -39,7 +39,7 @@ const MiniStat = ({ icon: Icon, label, value, loading, iconClass, title }) => (
     {loading ? (
       <div className="mt-2.5 h-5 w-16 animate-pulse rounded-md bg-[var(--surface-2)] sm:w-20" />
     ) : (
-      <p className="mt-2 truncate font-display text-[13px] font-semibold leading-none tracking-tight tabular-nums text-[var(--ink)] sm:text-[19px]">
+      <p className="mt-2 truncate font-display text-[13px] font-medium leading-none tracking-tight tabular-nums text-[var(--ink)] sm:text-[19px]">
         {value}
       </p>
     )}
@@ -118,7 +118,7 @@ const EmployeeBudget = () => {
             {isLoading ? (
               <div className="relative mt-3 h-10 w-44 animate-pulse rounded-xl bg-white/20 sm:h-12 sm:w-64" />
             ) : (
-              <p className="relative mt-3 font-display text-[34px] font-semibold leading-none tracking-tight tabular-nums sm:text-[44px]">
+              <p className="relative mt-3 font-display text-[34px] font-medium leading-none tracking-tight tabular-nums sm:text-[44px]">
                 {formatMoney(totalBudget)}
               </p>
             )}
@@ -129,19 +129,19 @@ const EmployeeBudget = () => {
             className="grid grid-cols-2 divide-x divide-[var(--border)] rounded-[20px] border border-[var(--border)] bg-[var(--surface)] shadow-card sm:rounded-[24px]"
           >
             <MiniStat
-              icon={Banknote}
-              label="Remaining"
-              value={formatMoney(totalBalance)}
-              loading={isLoading}
-              title={formatMoney(totalBalance)}
-              iconClass="bg-[var(--accent-soft)] text-[var(--accent-strong)]"
-            />
-            <MiniStat
               icon={ReceiptText}
               label="Spent"
               value={formatMoney(totalExpenses)}
               loading={isLoading}
               title={formatMoney(totalExpenses)}
+              iconClass="bg-[var(--accent-soft)] text-[var(--accent-strong)]"
+            />
+            <MiniStat
+              icon={Banknote}
+              label="Remaining"
+              value={formatMoney(totalBalance)}
+              loading={isLoading}
+              title={formatMoney(totalBalance)}
               iconClass="bg-[var(--accent-soft)] text-[var(--accent-strong)]"
             />
           </motion.div>

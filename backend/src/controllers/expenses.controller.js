@@ -128,7 +128,15 @@ export const create = async (req, res, next) => {
     // budget reference they spent from, employees tag the reference their
     // remaining balance was issued from. An employee may only tag a reference
     // they hold an open issuance for — anything else is dropped to NULL.
+    // Either way the source must still be open: a closed source connects to
+    // no activity, so tagging it is refused instead of silently nulled.
     let referenceId = payload.reference_id ?? null;
+    if (referenceId && !(await Budget.isReferenceOpen(referenceId))) {
+      throw ApiError.conflict(
+        "This budget source is closed — only open sources accept activity.",
+        "REFERENCE_NOT_OPEN",
+      );
+    }
     if (req.user.role === "employee" && referenceId) {
       const held = await Budget.employeeOpenIssuedReferences({
         user_id: req.user.id,

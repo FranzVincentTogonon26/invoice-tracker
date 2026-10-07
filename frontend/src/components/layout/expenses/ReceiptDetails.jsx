@@ -17,7 +17,7 @@ const ReceiptDetails = ({ receipt, scanning }) => {
       <div className="flex items-baseline justify-between gap-3">
         <CardTitle className="tracking-tight lg:text-base">Details</CardTitle>
         {rows.length > 0 && (
-          <span className="hidden shrink-0 text-xs font-semibold uppercase tracking-widest text-[var(--ink-muted)] lg:inline">
+          <span className="hidden shrink-0 text-xs font-medium uppercase tracking-widest text-[var(--ink-muted)] lg:inline">
             {rows.length} of 3 read
           </span>
         )}
@@ -31,7 +31,7 @@ const ReceiptDetails = ({ receipt, scanning }) => {
               </span>
               <span className="type-eyebrow">{label}</span>
             </span>
-            <span className="min-w-0 max-w-[60%] flex-1 break-words text-right text-sm font-semibold leading-snug text-[var(--ink)]">
+            <span className="min-w-0 max-w-[60%] flex-1 break-words text-right text-sm font-medium leading-snug text-[var(--ink)]">
               {value}
             </span>
           </div>

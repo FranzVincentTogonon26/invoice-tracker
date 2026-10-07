@@ -7,6 +7,9 @@ class Budget {
   // Budget Overview
 
   static async budgetOverview() {
+    // Closed sources leave no footsteps: every leg joins its
+    // budget_reference with `br.status = 'open'`, so a cut-off source and
+    // everything under it vanish from display AND from the totals.
     const overviewBudget = await query(
       `SELECT
           br.reference_id,
@@ -16,6 +19,7 @@ class Budget {
        FROM budget_reference br
        LEFT JOIN budget b ON b.reference_id = br.reference_id
        WHERE b.status != 'cancelled'
+         AND br.status = 'open'
        GROUP BY br.reference_id, br.label, br.created_at
        ORDER BY br.created_at DESC`,
       [],
@@ -31,6 +35,7 @@ class Budget {
        JOIN issued_budget i ON i.issued_ref_id = bir.id
        JOIN budget_reference br ON br.reference_id = bir.reference_id
        WHERE bir.status = 'open'
+         AND br.status = 'open'
        GROUP BY br.reference_id, br.label, br.created_at
        ORDER BY br.created_at DESC`,
       [],
@@ -46,10 +51,11 @@ class Budget {
           COALESCE(SUM(e.total_amount), 0) AS amount
        FROM expenses e
        JOIN budget_reference br ON br.reference_id = e.reference_id
-       WHERE NOT EXISTS (
-         SELECT 1 FROM users u
-          WHERE u.user_id = e.user_id AND u.role = 'employee'
-       )
+       WHERE br.status = 'open'
+         AND NOT EXISTS (
+          SELECT 1 FROM users u
+           WHERE u.user_id = e.user_id AND u.role = 'employee'
+        )
        GROUP BY br.reference_id, br.label, br.created_at
        ORDER BY br.created_at DESC`,
       [],
@@ -269,6 +275,9 @@ class Budget {
   // `recent_date` is the transaction's own date — the card keeps the MAX of
   // the rows it received, which equals the old MAX(i.created_at).
   static async employeesWithBudget() {
+    // Closed sources leave no footsteps: holdings under a cut-off source
+    // never surface here, so employees connected only through one disappear
+    // from display entirely.
     const result = await query(
       `SELECT
           ib.id AS issued_budget_id,
@@ -283,8 +292,9 @@ class Budget {
        FROM budget_issued_reference bir
           LEFT JOIN users u
           ON bir.user_id = u.user_id
-          LEFT JOIN budget_reference br
+          JOIN budget_reference br
           ON br.reference_id = bir.reference_id
+          AND br.status = 'open'
           JOIN issued_budget ib
           ON ib.issued_ref_id = bir.id
        WHERE bir.status = 'open'
@@ -295,12 +305,201 @@ class Budget {
     return result.rows;
   }
 
+  // Source-of-funds gate: a budget reference only connects transactions
+  // while its status is 'open'. Anything else ('cut_off', …) disconnects it
+  // from every flow — writes must refuse it and pickers must not list it.
+  static async isReferenceOpen(reference_id) {
+    if (!reference_id) return false;
+    const result = await query(
+      `SELECT status FROM budget_reference WHERE reference_id = $1`,
+      [reference_id],
+    );
+    return (result.rows[0]?.status ?? null) === "open";
+  }
+
+  // Source of Funds management list — EVERY reference (open AND cut-off),
+  // each with its live aggregates, newest first. Unlike the picker lists,
+  // management must also see disconnected sources to edit, reopen or
+  // delete them — the `status` column drives those decisions.
+  // Per source: allocated (non-cancelled budget rows), issued (open
+  // issuances), expenses (paid, non-employee — employee spend already left
+  // as `issued`), remaining = allocated − issued − expenses, transactions
+  // (budget_issued_reference rows), budgets (budget rows).
+  static async sourceFunds({ search } = {}) {
+    const params = [];
+    let searchClause = "";
+    if (search && search.trim()) {
+      params.push(`%${search.trim()}%`);
+      searchClause = `AND (br.label ILIKE $1 OR br.notes ILIKE $1)`;
+    }
+    const result = await query(
+      `SELECT
+          br.reference_id,
+          br.label,
+          br.notes,
+          br.status,
+          br.date_cut_off,
+          br.created_at,
+          COALESCE((
+            SELECT SUM(b.amount)
+              FROM budget b
+             WHERE b.reference_id = br.reference_id
+               AND b.status != 'cancelled'
+          ), 0)::float8 AS allocated,
+          COALESCE((
+            SELECT SUM(ib.amount)
+              FROM budget_issued_reference bir
+              JOIN issued_budget ib ON ib.issued_ref_id = bir.id
+             WHERE bir.reference_id = br.reference_id
+               AND bir.status = 'open'
+          ), 0)::float8 AS issued,
+          COALESCE((
+            SELECT SUM(e.total_amount)
+              FROM expenses e
+             WHERE e.reference_id = br.reference_id
+               AND e.status = 'paid'
+               AND NOT EXISTS (
+                 SELECT 1 FROM users u
+                  WHERE u.user_id = e.user_id AND u.role = 'employee'
+               )
+          ), 0)::float8 AS expenses,
+          (
+            SELECT COUNT(*)::int
+              FROM budget_issued_reference bir
+             WHERE bir.reference_id = br.reference_id
+          ) AS transactions,
+          (
+            SELECT COUNT(*)::int
+              FROM budget b
+             WHERE b.reference_id = br.reference_id
+          ) AS budgets,
+          -- People involved with this source: every distinct account behind
+          -- its issuances, expenses, abono and transfers (employees AND
+          -- admins), with avatar + role for identity display. Capped list
+          -- plus a total count for the "+N more" overflow.
+          (
+            SELECT COALESCE(
+              json_agg(
+                json_build_object(
+                  'user_id', p.user_id,
+                  'name', p.name,
+                  'avatar_url', p.avatar_url,
+                  'role', p.role
+                )
+                ORDER BY p.name
+              )
+              FILTER (WHERE p.rn <= 6),
+              '[]'
+            )
+            FROM (
+              SELECT u.user_id, u.name, u.avatar_url, u.role,
+                     ROW_NUMBER() OVER (ORDER BY u.name) AS rn
+                FROM users u
+               WHERE u.user_id IN (
+                      SELECT bir.user_id
+                        FROM budget_issued_reference bir
+                       WHERE bir.reference_id = br.reference_id
+                       UNION
+                      SELECT e.user_id
+                        FROM expenses e
+                       WHERE e.reference_id = br.reference_id
+                       UNION
+                      SELECT ea.user_id
+                        FROM employee_abono ea
+                       WHERE ea.reference_id = br.reference_id
+                       UNION
+                      SELECT bt.user_id
+                        FROM budget_transfer bt
+                       WHERE bt.reference_id = br.reference_id
+                       UNION
+                      SELECT btr.transfer_to
+                        FROM budget_transfer btr
+                       WHERE btr.reference_id = br.reference_id
+                     )
+            ) p
+          ) AS involved,
+          (
+            SELECT COUNT(*)::int
+              FROM (
+                SELECT bir.user_id
+                  FROM budget_issued_reference bir
+                 WHERE bir.reference_id = br.reference_id
+                 UNION
+                SELECT e.user_id
+                  FROM expenses e
+                 WHERE e.reference_id = br.reference_id
+                 UNION
+                SELECT ea.user_id
+                  FROM employee_abono ea
+                 WHERE ea.reference_id = br.reference_id
+                 UNION
+                SELECT bt.user_id
+                  FROM budget_transfer bt
+                 WHERE bt.reference_id = br.reference_id
+                 UNION
+                SELECT btr.transfer_to
+                  FROM budget_transfer btr
+                 WHERE btr.reference_id = br.reference_id
+              ) people
+          ) AS involved_count
+         FROM budget_reference br
+        WHERE 1 = 1
+          ${searchClause}
+        ORDER BY br.created_at DESC`,
+      params,
+    );
+    return result.rows.map((row) => {
+      const allocated = Number(row.allocated) || 0;
+      const issued = Number(row.issued) || 0;
+      const expenses = Number(row.expenses) || 0;
+      return {
+        ...row,
+        allocated,
+        issued,
+        expenses,
+        remaining: allocated - issued - expenses,
+      };
+    });
+  }
+
+  // Update a source of funds (label / notes / status). Closing
+  // ('open' → 'cut_off') disconnects the source from every flow; reopening
+  // restores it. Resolves null when the reference does not exist.
+  static async updateReference(reference_id, { label, notes, status }) {
+    const sets = [];
+    const params = [];
+    if (label !== undefined) {
+      params.push(String(label).trim());
+      sets.push(`label = $${params.length}`);
+    }
+    if (notes !== undefined) {
+      const trimmed = String(notes ?? "").trim();
+      params.push(trimmed === "" ? null : trimmed);
+      sets.push(`notes = $${params.length}`);
+    }
+    if (status !== undefined) {
+      params.push(status);
+      sets.push(
+        `status = $${params.length}, date_cut_off = CASE WHEN $${params.length} = 'cut_off' THEN COALESCE(date_cut_off, NOW()) ELSE NULL END`,
+      );
+    }
+    if (sets.length === 0) return null;
+    params.push(reference_id);
+    const result = await query(
+      `UPDATE budget_reference
+          SET ${sets.join(", ")}
+        WHERE reference_id = $${params.length}
+        RETURNING reference_id, label, notes, status, date_cut_off, created_at`,
+      params,
+    );
+    return result.rows[0] ?? null;
+  }
   // Budget Reference
   static async budgetReference() {
     const result = await query(
       `SELECT 
         reference_id, 
-        label, created_at, 
+        label, created_at, status,
         ( SELECT COUNT(id) FROM budget bi WHERE bi.reference_id = b.reference_id ) AS active 
        FROM budget_reference b
        WHERE b.status = 'open'
@@ -327,6 +526,10 @@ class Budget {
   // well would subtract them twice, so every admin-side expense sum below
   // (here and in expenses.model.js) skips rows owned by an employee.
   static async referenceBalance(referenceId) {
+    // A closed source has no balance to show — nobody, no footsteps.
+    if (!(await Budget.isReferenceOpen(referenceId))) {
+      return { allocated: 0, issued: 0, expenses: 0, balance: 0 };
+    }
     const result = await query(
       `SELECT
           COALESCE((
@@ -391,6 +594,9 @@ class Budget {
        LEFT JOIN budget_reference br ON br.reference_id = bir.reference_id
        WHERE bir.user_id = $1
          AND bir.status = 'open'
+         -- A cut-off source connects to nothing: holdings under it neither
+         -- block new issuances nor surface as usable funds.
+         AND br.status = 'open'
          ${excludeClause}
        ORDER BY bir.created_at DESC`,
       params,
@@ -422,17 +628,23 @@ class Budget {
             SELECT SUM(ib.amount)
             FROM budget_issued_reference bir
             JOIN issued_budget ib ON ib.issued_ref_id = bir.id
+            JOIN budget_reference br ON br.reference_id = bir.reference_id
             WHERE bir.user_id = $1 AND bir.status = 'open'
+              AND br.status = 'open'
           ), 0)::float8 AS total_budget,
           COALESCE((
             SELECT SUM(e.total_amount)
             FROM expenses e
+            LEFT JOIN budget_reference br ON br.reference_id = e.reference_id
             WHERE e.user_id = $1 AND e.status = 'paid'
+              AND (e.reference_id IS NULL OR br.status = 'open')
           ), 0)::float8 AS total_expenses,
           COALESCE((
             SELECT SUM(ea.amount)
             FROM employee_abono ea
+            JOIN budget_reference br ON br.reference_id = ea.reference_id
             WHERE ea.user_id = $1 AND ea.status = 'open'
+              AND br.status = 'open'
           ), 0)::float8 AS total_abono,
           COALESCE((
             SELECT SUM(bt.amount)
@@ -447,7 +659,9 @@ class Budget {
           COALESCE((
             SELECT COUNT(*)
             FROM budget_issued_reference bir
+            JOIN budget_reference br ON br.reference_id = bir.reference_id
             WHERE bir.user_id = $1 AND bir.status = 'open'
+              AND br.status = 'open'
           ), 0)::int AS active_references`,
       [userId],
     );
@@ -492,7 +706,8 @@ class Budget {
             ib.created_at AS created_at
            FROM budget_issued_reference bir
            JOIN issued_budget ib ON ib.issued_ref_id = bir.id
-           LEFT JOIN budget_reference br ON br.reference_id = bir.reference_id
+           JOIN budget_reference br ON br.reference_id = bir.reference_id
+              AND br.status = 'open'
           WHERE bir.user_id = $1
         UNION ALL
          SELECT
@@ -518,6 +733,7 @@ class Budget {
            LEFT JOIN budget_reference br ON br.reference_id = bt.reference_id
            LEFT JOIN users ru ON ru.user_id = bt.transfer_to
           WHERE bt.user_id = $1 AND bt.status = 'success'
+            AND br.status = 'open'
         UNION ALL
          SELECT
             bt.id,
@@ -542,6 +758,7 @@ class Budget {
            LEFT JOIN budget_reference br ON br.reference_id = bt.reference_id
            LEFT JOIN users su ON su.user_id = bt.user_id
           WHERE bt.transfer_to = $1 AND bt.status = 'success'
+            AND br.status = 'open'
        ) t
        ${searchClause}
        ORDER BY t.created_at DESC`,
@@ -609,10 +826,13 @@ class Budget {
       ? `WHERE (u.name ILIKE $1
               OR ib.description ILIKE $1
               OR ib.notes ILIKE $1
-              OR br.label ILIKE $1)`
-      : "";
+              OR br.label ILIKE $1)
+            AND br.status = 'open'`
+      : `WHERE br.status = 'open'`;
 
     // `::float8` casts DECIMAL (returned by pg as strings) to a JS number.
+    // Closed sources leave no footsteps: rows under a cut-off source never
+    // list here (`bib.reference_id` is NOT NULL, so the condition is safe).
     const result = await query(
       `SELECT
           ib.id,
@@ -664,6 +884,9 @@ class Budget {
     }
 
     // `::float8` casts DECIMAL (returned by pg as strings) to a JS number.
+    // Closed sources leave no footsteps: rows under a cut-off source never
+    // list here (`budget.reference_id` is NOT NULL, so the inner condition
+    // is safe).
     const result = await query(
       `SELECT
           b.id,
@@ -678,7 +901,7 @@ class Budget {
           br.label
        FROM budget b
        LEFT JOIN budget_reference br ON br.reference_id = b.reference_id
-       ${where.length ? `WHERE ${where.join(" AND ")}` : ""}
+       ${where.length ? `WHERE ${where.join(" AND ")} AND br.status = 'open'` : `WHERE br.status = 'open'`}
        ORDER BY b.created_at DESC`,
       params,
     );
@@ -779,15 +1002,27 @@ class Budget {
   }
 
   // Undo a cancellation — restore the transaction to its previous status
-  // ('added' | 'closed') and clear the cancellation stamp.
+  // ('added' | 'closed') and clear the cancellation stamp. Refuses with
+  // `{ notOpen: true }` when the row's source of funds is no longer open —
+  // restoring would reconnect a disconnected source.
   static async restoreBudget(id, status) {
+    const owner = await query(
+      `SELECT b.reference_id, br.status AS ref_status
+         FROM budget b
+         LEFT JOIN budget_reference br ON br.reference_id = b.reference_id
+        WHERE b.id = $1`,
+      [id],
+    );
+    const row = owner.rows[0];
+    if (!row) return null;
+    if ((row.ref_status ?? null) !== "open") return { notOpen: true };
     const result = await query(
       `UPDATE budget
           SET status = $2,
               cancelled_at = NULL,
               updated_at = NOW()
         WHERE id = $1
-        RETURNING *`,
+       RETURNING *`,
       [id, status],
     );
     return result.rows[0] ?? null;
@@ -1031,6 +1266,15 @@ class Budget {
         ).rows[0] ?? null;
 
       if (!found) return null;
+
+      // A cut-off source connects to nothing — restoring would reconnect
+      // it, so the undo is refused while the source stays disconnected.
+      const source = (
+        await q(`SELECT status FROM budget_reference WHERE reference_id = $1`, [
+          found.reference_id,
+        ])
+      ).rows[0];
+      if ((source?.status ?? null) !== "open") return { notOpen: true };
 
       // Already in the requested state — nothing to move.
       if (found.status === status) {

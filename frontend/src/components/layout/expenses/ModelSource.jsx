@@ -35,7 +35,7 @@ const ModelSource = ({
 
   return (
     <div className="relative z-10 flex items-center justify-end gap-2 text-sm">
-      <span className="shrink-0 text-[var(--ink-muted)] font-semibold truncate">
+      <span className="shrink-0 text-[var(--ink-muted)] font-medium truncate">
         {label}
       </span>
       <div className="w-48 shrink-0">

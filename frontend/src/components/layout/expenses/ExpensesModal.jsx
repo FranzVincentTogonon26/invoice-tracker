@@ -419,7 +419,7 @@ const ExpensesModal = ({
                   <div className="flex flex-wrap items-center gap-x-2.5 gap-y-1.5">
                     <h3
                       id="expenses-modal-title"
-                      className="font-display text-lg font-semibold tracking-tight"
+                      className="font-display text-lg font-medium tracking-tight"
                     >
                       {copy.title}
                     </h3>
@@ -497,7 +497,7 @@ const ExpensesModal = ({
                     className="order-first w-full text-center text-xs leading-snug text-[var(--ink-muted)] sm:hidden"
                   >
                     Upload a receipt above to enable{" "}
-                    <span className="font-semibold text-[var(--ink)]">
+                    <span className="font-medium text-[var(--ink)]">
                       Confirm Receipt
                     </span>
                     .

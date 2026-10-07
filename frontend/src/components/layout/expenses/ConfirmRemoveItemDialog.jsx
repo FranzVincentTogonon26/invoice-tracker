@@ -87,7 +87,7 @@ const ConfirmRemoveItemDialog = ({
 
             <h2
               id={titleId}
-              className="mt-4 font-display text-lg font-semibold tracking-tight text-[var(--ink)]"
+              className="mt-4 font-display text-lg font-medium tracking-tight text-[var(--ink)]"
             >
               Remove expense line {lineNumber}?
             </h2>
@@ -102,7 +102,7 @@ const ConfirmRemoveItemDialog = ({
 
             <div className="mt-4 flex items-center gap-3 rounded-2xl border border-[var(--border)] bg-[var(--surface-2)]/60 px-4 py-3">
               <div className="min-w-0 flex-1">
-                <p className="truncate text-base font-semibold text-[var(--ink)]">
+                <p className="truncate text-base font-medium text-[var(--ink)]">
                   {line?.description?.trim() || `Expense item ${lineNumber}`}
                 </p>
                 <p className="mt-0.5 truncate text-xs text-[var(--ink-muted)]">
@@ -110,7 +110,7 @@ const ConfirmRemoveItemDialog = ({
                   {formatDate(line?.date)}
                 </p>
               </div>
-              <span className="shrink-0 text-sm font-semibold tabular-nums text-[var(--ink)]">
+              <span className="shrink-0 text-sm font-medium tabular-nums text-[var(--ink)]">
                 {formatMoney(line?.totalAmount)}
               </span>
             </div>

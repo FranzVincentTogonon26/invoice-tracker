@@ -246,14 +246,14 @@ function OtpModalContent({ email, onClose, onVerify, onResend }) {
         </motion.div>
 
         {/* Title */}
-        <h2 className="font-display text-xl font-semibold tracking-tight text-[var(--ink)] mt-5">
+        <h2 className="font-display text-xl font-medium tracking-tight text-[var(--ink)] mt-5">
           Verify your email
         </h2>
 
         {/* Description */}
         <p className="text-[var(--ink-muted)] mt-1.5 text-sm leading-relaxed">
           We sent a 6-digit code to{" "}
-          <span className="font-semibold text-[var(--ink)]">{email}</span>.
+          <span className="font-medium text-[var(--ink)]">{email}</span>.
           Enter it below to continue.
         </p>
 
@@ -287,7 +287,7 @@ function OtpModalContent({ email, onClose, onVerify, onResend }) {
               onChange={(e) => handleChange(i, e.target.value)}
               onKeyDown={(e) => handleKeyDown(i, e)}
               onFocus={(e) => e.target.select()}
-              className={`h-14 w-full flex-1 rounded-2xl border text-center font-display text-2xl font-semibold tabular-nums tracking-tight text-[var(--ink)] outline-none transition-all duration-200 focus:bg-[var(--surface)] focus:border-[var(--accent)]/40 focus:ring-4 focus:ring-[var(--accent)]/10 ${
+              className={`h-14 w-full flex-1 rounded-2xl border text-center font-display text-2xl font-medium tabular-nums tracking-tight text-[var(--ink)] outline-none transition-all duration-200 focus:bg-[var(--surface)] focus:border-[var(--accent)]/40 focus:ring-4 focus:ring-[var(--accent)]/10 ${
                 digit
                   ? "border-[var(--accent)]/40 bg-[var(--surface)]"
                   : "border-[var(--border)] bg-[var(--surface-2)]"
@@ -338,7 +338,7 @@ function OtpModalContent({ email, onClose, onVerify, onResend }) {
             type="button"
             onClick={handleResend}
             disabled={resendIn > 0 || resending}
-            className="inline-flex items-center gap-1.5 text-[var(--accent-strong)] font-semibold hover:underline disabled:text-[var(--ink-muted)] disabled:no-underline disabled:cursor-not-allowed"
+            className="inline-flex items-center gap-1.5 text-[var(--accent-strong)] font-medium hover:underline disabled:text-[var(--ink-muted)] disabled:no-underline disabled:cursor-not-allowed"
           >
             {resending && <Loader2 size={12} className="animate-spin" />}
             {resendIn > 0

@@ -240,7 +240,7 @@ export function DateRangePicker({
           // Solid hairline + card shadow in both states, matching SearchInput
           // and the rest of the filter row (no more dashed trigger).
           hasValue
-            ? "border border-[var(--accent)]/35 font-semibold shadow-card hover:shadow-hover"
+            ? "border border-[var(--accent)]/35 font-medium shadow-card hover:shadow-hover"
             : "border border-[var(--border)] bg-[var(--surface)] font-medium text-[var(--ink-muted)] shadow-card hover:border-[var(--accent)]/40 hover:bg-[var(--surface-2)] hover:text-[var(--ink)] hover:shadow-hover",
           // Mobile filter row: a 44px icon-only trigger that matches the
           // search field's height; `sm:` restores the full-width label.
@@ -326,10 +326,10 @@ export function DateRangePicker({
                 )}
               >
                 <div className="flex items-baseline justify-between gap-3 border-b border-[var(--border)] px-5 py-3">
-                  <span className="font-display text-lg font-semibold tracking-tight text-[var(--ink)]">
+                  <span className="font-display text-lg font-medium tracking-tight text-[var(--ink)]">
                     Date range
                   </span>
-                  <span className="truncate text-sm font-semibold text-[var(--ink-muted)]">
+                  <span className="truncate text-sm font-medium text-[var(--ink-muted)]">
                     {formatDateRange(
                       draft,
                       hasValue
@@ -374,7 +374,7 @@ export function DateRangePicker({
                       >
                         <ChevronLeft size={16} aria-hidden />
                       </NavButton>
-                      <span className="text-sm font-semibold text-[var(--ink)]">
+                      <span className="text-sm font-medium text-[var(--ink)]">
                         {viewMonth.toLocaleDateString("en-US", {
                           month: "long",
                           year: "numeric",

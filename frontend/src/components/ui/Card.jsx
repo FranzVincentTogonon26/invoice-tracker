@@ -45,7 +45,7 @@ export const CardHeader = ({ className, ...props }) => (
 export const CardTitle = ({ className, ...props }) => (
   <h3
     className={cn(
-      "font-display text-base font-semibold text-[var(--ink)] tracking-tight leading-snug",
+      "font-display text-base font-medium text-[var(--ink)] tracking-tight leading-snug",
       className
     )}
     {...props}

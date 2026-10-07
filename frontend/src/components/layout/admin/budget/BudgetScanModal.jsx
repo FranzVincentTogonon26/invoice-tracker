@@ -206,7 +206,7 @@ const BudgetScanModal = ({ open, onClose, onConfirm }) => {
                 <div className="min-w-0">
                   <h3
                     id="budget-scan-title"
-                    className="font-display text-lg font-semibold tracking-tight flex items-center gap-2"
+                    className="font-display text-lg font-medium tracking-tight flex items-center gap-2"
                   >
                     <span className="flex h-9 w-9 items-center justify-center rounded-2xl bg-[var(--accent-soft)] text-[var(--accent-strong)]">
                       <ScanLine size={16} />
@@ -246,7 +246,7 @@ const BudgetScanModal = ({ open, onClose, onConfirm }) => {
                         </span>
                       )}
                       <div className="min-w-0 flex-1">
-                        <p className="truncate text-sm font-semibold text-[var(--ink)]">
+                        <p className="truncate text-sm font-medium text-[var(--ink)]">
                           {scanned.vendor || fileName || "Scanned receipt"}
                         </p>
                         <p className="mt-0.5 truncate text-xs text-[var(--ink-muted)]">
@@ -262,7 +262,7 @@ const BudgetScanModal = ({ open, onClose, onConfirm }) => {
                       <p className="type-eyebrow text-[var(--accent-strong)]">
                         Scanned total
                       </p>
-                      <p className="mt-1 font-display text-3xl font-semibold tabular-nums tracking-tight text-[var(--ink)]">
+                      <p className="mt-1 font-display text-3xl font-medium tabular-nums tracking-tight text-[var(--ink)]">
                         {formatMoney(total)}
                       </p>
                     </div>

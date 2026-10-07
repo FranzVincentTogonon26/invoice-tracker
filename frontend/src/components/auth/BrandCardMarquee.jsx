@@ -120,7 +120,7 @@ function PreviewCard({ children, width = 300 }) {
 
 function Label({ children }) {
   return (
-    <div className="text-xs uppercase tracking-widest text-gray-400 font-semibold">
+    <div className="text-xs uppercase tracking-widest text-gray-400 font-medium">
       {children}
     </div>
   );
@@ -160,7 +160,7 @@ function RevenueCard() {
           <Label>Total Revenue</Label>
           <div className="flex items-baseline gap-1 mt-1.5">
             <span
-              className="font-display text-4xl font-semibold leading-none tracking-tight tabular-nums text-gray-900">
+              className="font-display text-4xl font-medium leading-none tracking-tight tabular-nums text-gray-900">
               $22,375
             </span>
           </div>
@@ -190,7 +190,7 @@ function InvoiceCard() {
       <div className="flex items-start justify-between mb-3">
         <div>
           <Label>Invoice</Label>
-          <div className="text-base font-semibold text-gray-900 mt-1 tabular-nums">INV-0012</div>
+          <div className="text-base font-medium text-gray-900 mt-1 tabular-nums">INV-0012</div>
         </div>
         <Pill>Sent</Pill>
       </div>
@@ -198,13 +198,13 @@ function InvoiceCard() {
         {[["Design sprint", "$3,200"], ["Development · 40h", "$3,800"]].map(([d, a]) => (
           <div key={d} className="flex items-center justify-between text-xs">
             <span className="text-gray-500">{d}</span>
-            <span className="text-gray-900 font-semibold tracking-tight tabular-nums">{a}</span>
+            <span className="text-gray-900 font-medium tracking-tight tabular-nums">{a}</span>
           </div>
         ))}
       </div>
       <div className="flex items-center justify-between mt-3 pt-2 border-t border-gray-100">
-        <span className="text-xs uppercase tracking-widest text-gray-400 font-semibold">Total</span>
-        <span className="text-base font-semibold tabular-nums" style={{ color: TEAL_DARK }}>$7,595</span>
+        <span className="text-xs uppercase tracking-widest text-gray-400 font-medium">Total</span>
+        <span className="text-base font-medium tabular-nums" style={{ color: TEAL_DARK }}>$7,595</span>
       </div>
       <Footer subtitle="Nova Retail Group" />
     </PreviewCard>
@@ -233,7 +233,7 @@ function OverdueCard() {
               <div className="text-sm font-medium text-gray-900 truncate">{r.c}</div>
               <div className="text-xs text-gray-400">{r.d} overdue</div>
             </div>
-            <span className="text-sm font-semibold text-gray-900 tabular-nums">{r.a}</span>
+            <span className="text-sm font-medium text-gray-900 tabular-nums">{r.a}</span>
           </div>
         ))}
       </div>
@@ -253,13 +253,13 @@ function ReceiptCard() {
         </Pill>
       </div>
       <div className="rounded-2xl p-3" style={{ background: TEAL_SOFT }}>
-        <div className="text-xs uppercase tracking-widest font-semibold mb-1" style={{ color: TEAL_DARK }}>
+        <div className="text-xs uppercase tracking-widest font-medium mb-1" style={{ color: TEAL_DARK }}>
           Extracted
         </div>
         <div className="text-sm font-medium text-gray-900">Adobe Inc.</div>
         <div className="flex items-center justify-between text-xs text-gray-600 mt-1">
           <span>Creative Cloud · ×1</span>
-          <span className="tabular-nums font-semibold text-gray-900">$54.99</span>
+          <span className="tabular-nums font-medium text-gray-900">$54.99</span>
         </div>
       </div>
       <Footer subtitle="Image → invoice" />
@@ -280,7 +280,7 @@ function ReminderCard() {
       <div className="rounded-2xl bg-gray-50 border border-gray-100 p-3">
         <div className="flex items-center gap-2 mb-1.5">
           <BellRing size={12} style={{ color: TEAL_DARK }} />
-          <span className="text-xs font-semibold text-gray-900">Friendly nudge</span>
+          <span className="text-xs font-medium text-gray-900">Friendly nudge</span>
         </div>
         <p className="text-xs text-gray-500 leading-snug">
           "Hi Nova — just a gentle reminder that invoice INV-0006 for $2,400 was due last week…"
@@ -302,7 +302,7 @@ function PaidCard() {
         </Pill>
       </div>
       <div
-        className="font-display text-4xl font-semibold leading-none tracking-tight tabular-nums text-gray-900">
+        className="font-display text-4xl font-medium leading-none tracking-tight tabular-nums text-gray-900">
         $3,472
       </div>
       <div className="flex items-center gap-1 mt-3">

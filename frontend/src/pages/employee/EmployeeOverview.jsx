@@ -43,7 +43,7 @@ const MiniStat = ({ icon: Icon, label, value, loading, iconClass, title }) => (
     {loading ? (
       <div className="mt-2.5 h-5 w-16 animate-pulse rounded-md bg-[var(--surface-2)] sm:w-20" />
     ) : (
-      <p className="mt-2 truncate font-display text-[13px] font-semibold leading-none tracking-tight tabular-nums text-[var(--ink)] sm:text-[19px]">
+      <p className="mt-2 truncate font-display text-[13px] font-medium leading-none tracking-tight tabular-nums text-[var(--ink)] sm:text-[19px]">
         {value}
       </p>
     )}
@@ -163,7 +163,7 @@ const EmployeeOverview = () => {
               </>
             ) : (
               <>
-                <p className="relative mt-3 font-display text-[34px] font-semibold leading-none tracking-tight tabular-nums sm:text-[44px]">
+                <p className="relative mt-3 font-display text-[34px] font-medium leading-none tracking-tight tabular-nums sm:text-[44px]">
                   {formatMoney(totalBalance)}
                 </p>
                 {/* utilization — spent share of everything funded */}

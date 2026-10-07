@@ -11,7 +11,7 @@ export function ApproverCell({ name, approvedAt, className }) {
 
   return (
     <div className={cn("flex min-w-0 items-center gap-3", className)}>
-      <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-[var(--accent-soft)] text-sm font-semibold text-[var(--accent-strong)] ring-2 ring-[var(--accent)]/10">
+      <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-[var(--accent-soft)] text-sm font-medium text-[var(--accent-strong)] ring-2 ring-[var(--accent)]/10">
         {hasApprover ? (
           name.trim()[0].toUpperCase()
         ) : (

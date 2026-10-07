@@ -115,7 +115,7 @@ const EmployeesModal = ({ open, onClose, create }) => {
                 <div className="min-w-0">
                   <h3
                     id="employees-modal-title"
-                    className="font-display text-lg font-semibold tracking-tight"
+                    className="font-display text-lg font-medium tracking-tight"
                   >
                     Add Employee
                   </h3>

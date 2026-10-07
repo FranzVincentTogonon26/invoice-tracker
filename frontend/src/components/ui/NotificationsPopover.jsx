@@ -75,11 +75,11 @@ export function NotificationsPopover() {
             aria-label="Notifications"
           >
             <div className="flex items-center justify-between px-5 h-12 border-b border-[var(--border)]">
-              <div className="text-sm font-semibold text-[var(--ink)]">
+              <div className="text-sm font-medium text-[var(--ink)]">
                 Recent activity
               </div>
               {attention > 0 && (
-                <span className="text-xs font-semibold text-[var(--danger)] tabular-nums">
+                <span className="text-xs font-medium text-[var(--danger)] tabular-nums">
                   {attention} flagged
                 </span>
               )}
@@ -147,7 +147,7 @@ export function NotificationsPopover() {
                 navigate("/admin/transaction");
                 setOpen(false);
               }}
-              className="w-full h-11 border-t border-[var(--border)] text-xs font-semibold text-[var(--accent-strong)] hover:bg-[var(--surface-2)] transition-colors"
+              className="w-full h-11 border-t border-[var(--border)] text-xs font-medium text-[var(--accent-strong)] hover:bg-[var(--surface-2)] transition-colors"
             >
               View all activity
             </button>

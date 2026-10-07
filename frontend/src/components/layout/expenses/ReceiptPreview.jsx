@@ -18,7 +18,7 @@ const ReceiptPreview = ({
       className="h-14 w-11 shrink-0 rounded-xl border border-[var(--border)] bg-white object-cover shadow-card sm:h-16 sm:w-14 lg:h-20 lg:w-16 lg:rounded-2xl"
     />
     <div className="min-w-0 flex-1">
-      <p className="truncate text-base font-semibold tracking-tight text-[var(--ink)]">
+      <p className="truncate text-base font-medium tracking-tight text-[var(--ink)]">
         {receipt.fileName || "Receipt attached"}
       </p>
       <p className="mt-0.5 text-xs leading-relaxed text-[var(--ink-muted)]">

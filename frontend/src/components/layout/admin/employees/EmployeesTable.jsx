@@ -185,7 +185,7 @@ function EmployeeCell({ employee }) {
         className="h-9 w-9 rounded-full text-sm ring-1 ring-inset ring-[var(--accent)]/15"
       />
       <div className="min-w-0">
-        <p className="truncate font-display text-sm font-semibold leading-snug tracking-tight text-[var(--ink)] transition-colors duration-150 group-hover:text-[var(--accent-strong)]">
+        <p className="truncate font-display text-sm font-medium leading-snug tracking-tight text-[var(--ink)] transition-colors duration-150 group-hover:text-[var(--accent-strong)]">
           {employee.name}
         </p>
         <p className="mt-0.5 truncate text-xs leading-tight text-[var(--ink-muted)]">
@@ -225,21 +225,34 @@ function EmployeeRow({ employee, pending, onAction }) {
         <div className="space-y-1">
           {received > 0 && (
             <p
-              className="text-xs font-semibold tabular-nums text-[var(--accent-strong)]"
+              className="flex items-center justify-end gap-1.5 text-xs tabular-nums"
               title={`${formatMoney(received)} received from budget transfers`}
             >
-              + {formatMoney(received)}
+              <span className="font-medium uppercase tracking-wide text-[var(--success)]/80">
+                Received
+              </span>
+              <span className="font-medium text-[var(--success)]">
+                + {formatMoney(received)}
+              </span>
             </p>
           )}
           {abono > 0 && (
             <p
-              className="text-xs font-semibold tabular-nums text-[var(--warning)]"
-              title={`${formatMoney(abono)} abono held`}
+              className="flex items-center justify-end gap-1.5 text-xs tabular-nums"
+              title={`${formatMoney(abono)} open abono held`}
             >
-              + {formatMoney(abono)}
+              <span className="font-medium uppercase tracking-wide text-[var(--warning)]/80">
+                Abono
+              </span>
+              <span className="font-medium text-[var(--warning)]">
+                + {formatMoney(abono)}
+              </span>
             </p>
           )}
-          <p className="font-display text-sm font-semibold tabular-nums text-[var(--ink)]">
+          <p
+            className="font-display text-sm font-medium tabular-nums text-[var(--ink)]"
+            title={`${formatMoney(issued)} issued budget`}
+          >
             {formatMoney(issued)}
           </p>
         </div>
@@ -249,13 +262,21 @@ function EmployeeRow({ employee, pending, onAction }) {
         <div className="space-y-1">
           {sent > 0 && (
             <p
-              className="text-xs font-semibold tabular-nums text-[var(--danger)]"
+              className="flex items-center justify-end gap-1.5 text-xs tabular-nums"
               title={`${formatMoney(sent)} sent via budget transfers`}
             >
-              - {formatMoney(sent)}
+              <span className="font-medium uppercase tracking-wide text-[var(--danger)]/80">
+                Sent
+              </span>
+              <span className="font-medium text-[var(--danger)]">
+                - {formatMoney(sent)}
+              </span>
             </p>
           )}
-          <p className="font-display text-sm font-semibold tabular-nums text-[var(--ink)]">
+          <p
+            className="font-display text-sm font-medium tabular-nums text-[var(--ink)]"
+            title={`${formatMoney(spent)} total spent`}
+          >
             {formatMoney(spent)}
           </p>
         </div>
@@ -266,7 +287,7 @@ function EmployeeRow({ employee, pending, onAction }) {
           <div className="flex items-center justify-between gap-2">
             <p
               className={cn(
-                "font-display text-[15px] font-semibold tabular-nums",
+                "font-display text-[15px] font-medium tabular-nums",
                 overSpent ? "text-[var(--danger)]" : "text-[var(--ink)]",
               )}
             >
@@ -334,7 +355,7 @@ function CardMetric({ label, value, tone, className }) {
       <p className="type-eyebrow text-[var(--ink-muted)]">{label}</p>
       <p
         className={cn(
-          "mt-1 truncate font-display text-[15px] font-semibold tabular-nums",
+          "mt-1 truncate font-display text-[15px] font-medium tabular-nums",
           tone === "danger" ? "text-[var(--danger)]" : "text-[var(--ink)]",
         )}
       >
@@ -346,7 +367,7 @@ function CardMetric({ label, value, tone, className }) {
 
 /** Mobile employee card — every column stays readable in a stacked layout. */
 function EmployeeCard({ employee, pending, onAction }) {
-  const { issued, spent, remaining, received, abono, funded, spentShare } =
+  const { issued, spent, remaining, received, abono, sent, funded, spentShare } =
     budgetBreakdown(employee);
   const overSpent = remaining < 0;
   const references = Number(employee.issued_references) || 0;
@@ -392,15 +413,44 @@ function EmployeeCard({ employee, pending, onAction }) {
         {/* Same "+ received" figure as the table row's Issued Budget cell —
             only rendered when the employee actually received a transfer. */}
         {received > 0 && (
-          <p className="col-span-3 text-xs font-semibold tabular-nums text-[var(--accent-strong)]">
-            + {formatMoney(received)} received budget
+          <p className="col-span-3 flex items-center gap-1.5 text-xs tabular-nums">
+            <span className="font-medium uppercase tracking-wide text-[var(--success)]/80">
+              Received
+            </span>
+            <span className="font-medium text-[var(--success)]">
+              + {formatMoney(received)}
+            </span>
+            <span className="truncate font-normal text-[var(--ink-muted)]">
+              budget
+            </span>
           </p>
         )}
         {/* Same "+ abono" figure as the table row — open abono the employee
             still holds, warning tone like the Overview's Abono stat. */}
         {abono > 0 && (
-          <p className="col-span-3 text-xs font-semibold tabular-nums text-[var(--warning)]">
-            + {formatMoney(abono)} abono held
+          <p className="col-span-3 flex items-center gap-1.5 text-xs tabular-nums">
+            <span className="font-medium uppercase tracking-wide text-[var(--warning)]/80">
+              Abono
+            </span>
+            <span className="font-medium text-[var(--warning)]">
+              + {formatMoney(abono)}
+            </span>
+            <span className="truncate font-normal text-[var(--ink-muted)]">
+              held
+            </span>
+          </p>
+        )}
+        {sent > 0 && (
+          <p className="col-span-3 flex items-center gap-1.5 text-xs tabular-nums">
+            <span className="font-medium uppercase tracking-wide text-[var(--danger)]/80">
+              Sent
+            </span>
+            <span className="font-medium text-[var(--danger)]">
+              - {formatMoney(sent)}
+            </span>
+            <span className="truncate font-normal text-[var(--ink-muted)]">
+              transfers
+            </span>
           </p>
         )}
       </div>

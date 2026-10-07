@@ -15,7 +15,7 @@ const ScanOverlay = () => (
       </span>
     </div>
     <div className="text-center">
-      <p className="text-base font-semibold text-[var(--ink)]">
+      <p className="text-base font-medium text-[var(--ink)]">
         Scanning receipt, please wait
       </p>
       <p className="mt-1 text-sm text-[var(--ink-muted)]">

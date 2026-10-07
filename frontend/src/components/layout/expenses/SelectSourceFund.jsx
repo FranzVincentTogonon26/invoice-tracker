@@ -68,7 +68,7 @@ function BalancePrompt({ title, description }) {
         <WalletIcon size={15} />
       </div>
       <div className="min-w-0 flex-1">
-        <p className="text-sm font-semibold text-[var(--ink-muted)]">{title}</p>
+        <p className="text-sm font-medium text-[var(--ink-muted)]">{title}</p>
         <p className="text-xs leading-snug text-[var(--ink-muted)]">
           {description}
         </p>
@@ -202,7 +202,7 @@ const SelectSourceFund = ({
               <p className="type-eyebrow text-[var(--ink-muted)]">Balance</p>
               <p
                 className={cn(
-                  "font-display flex items-center gap-1 text-lg font-semibold tracking-tight tabular-nums",
+                  "font-display flex items-center gap-1 text-lg font-medium tracking-tight tabular-nums",
                   funding.amount,
                 )}
               >
@@ -247,7 +247,7 @@ const SelectSourceFund = ({
               <p className="type-eyebrow text-xs text-[var(--ink-muted)]">
                 expenses
               </p>
-              <p className="truncate text-sm font-semibold tabular-nums text-[var(--ink)]">
+              <p className="truncate text-sm font-medium tabular-nums text-[var(--ink)]">
                 {formatMoney(expenses)}
               </p>
             </div>
@@ -258,7 +258,7 @@ const SelectSourceFund = ({
               </p>
               <p
                 className={cn(
-                  "truncate text-sm font-semibold tabular-nums",
+                  "truncate text-sm font-medium tabular-nums",
                   funding.remaining,
                 )}
               >
@@ -300,7 +300,7 @@ const SelectSourceFund = ({
 
           {insufficient && (
             <div className="mt-3 rounded-2xl border border-[var(--danger)]/30 bg-[var(--danger)]/10 px-3 py-3">
-              <p className="flex items-start gap-1.5 text-xs font-semibold leading-snug text-[var(--danger)]">
+              <p className="flex items-start gap-1.5 text-xs font-medium leading-snug text-[var(--danger)]">
                 <AlertCircle size={13} aria-hidden className="mt-px shrink-0" />
                 <span>
                   Cannot proceed with your request — insufficient funds. These
@@ -330,7 +330,7 @@ const SelectSourceFund = ({
                         title={`Fund these expenses from ${
                           source.label || "this source"
                         }`}
-                        className="flex max-w-full items-center gap-1.5 rounded-full border border-[var(--border)] bg-[var(--surface)] px-2.5 py-1 text-xs font-semibold text-[var(--ink)] transition-colors hover:border-[var(--accent)]/50 hover:bg-[var(--accent-soft)]/40 disabled:cursor-not-allowed disabled:opacity-50"
+                        className="flex max-w-full items-center gap-1.5 rounded-full border border-[var(--border)] bg-[var(--surface)] px-2.5 py-1 text-xs font-medium text-[var(--ink)] transition-colors hover:border-[var(--accent)]/50 hover:bg-[var(--accent-soft)]/40 disabled:cursor-not-allowed disabled:opacity-50"
                       >
                         <WalletIcon
                           size={12}

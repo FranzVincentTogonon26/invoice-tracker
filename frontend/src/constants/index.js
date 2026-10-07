@@ -1,4 +1,80 @@
+import {
+  ArrowLeftRight,
+  HandCoins,
+  Plus,
+  ReceiptText,
+  Wallet,
+} from "lucide-react";
+
 export const USER_ROLES = { ADMIN: "admin", EMPLOYEE: "employee" };
+export const EXPENSE_STATUS_OPTIONS = [
+  { value: "all", label: "All status" },
+  { value: "paid", label: "Paid" },
+  { value: "draft", label: "Draft" },
+  { value: "cancel", label: "Cancelled" },
+];
+export const EXPENSE_FILTER_KEYS = ["employee", "category", "method", "status"];
+export const EXPENSE_LEDGER_STATUS_META = {
+  paid: { tone: "success", label: "Paid" },
+  draft: { tone: "warning", label: "Draft" },
+  cancel: { tone: "danger", label: "Cancelled" },
+};
+export const EXPENSE_LEDGER_STATUS_ORDER = ["paid", "draft", "cancel"];
+
+// Unified ledger kinds (Admin Transactions) — badge tone, label and icon per
+// kind. Plain references (no JSX), so ledger tables, details modals and the
+// command-palette-style filters can share one source of truth.
+export const TRANSACTION_KIND_META = {
+  budget: { tone: "neutral", label: "Budget Given", Icon: Plus },
+  issued: { tone: "accent", label: "Budget Issued", Icon: HandCoins },
+  expense: { tone: "warning", label: "Expense", Icon: ReceiptText },
+  abono: { tone: "success", label: "Abono", Icon: Wallet },
+  transfer_sent: {
+    tone: "danger",
+    label: "Transfer Sent",
+    Icon: ArrowLeftRight,
+  },
+  transfer_received: {
+    tone: "success",
+    label: "Transfer Received",
+    Icon: ArrowLeftRight,
+  },
+};
+export const TRANSACTION_TYPE_OPTIONS = [
+  { value: "all", label: "All types" },
+  { value: "budget", label: "Budget Given" },
+  { value: "issued", label: "Budget Issued" },
+  { value: "expense", label: "Expenses" },
+  { value: "abono", label: "Abono" },
+  { value: "transfer", label: "Transfers" },
+];
+export const TRANSACTION_DIRECTION_OPTIONS = [
+  { value: "all", label: "All flows" },
+  { value: "in", label: "Money In" },
+  { value: "out", label: "Money Out" },
+  { value: "void", label: "No movement" },
+];
+export const TRANSACTION_FILTER_KEYS = [
+  "direction",
+  "employee",
+  "reference",
+  "category",
+  "status",
+];
+export const SYSTEM_EMPLOYEE_VALUE = "__system";
+export const SOURCE_STATUS = {
+  open: { tone: "success", label: "Open" },
+  cut_off: { tone: "danger", label: "Closed" },
+};
+export const SOURCE_STATUS_OPTIONS = [
+  { value: "all", label: "All statuses" },
+  { value: "open", label: "Open" },
+  { value: "cut_off", label: "Closed" },
+];
+export const SOURCE_EDIT_STATUS_OPTIONS = [
+  { value: "open", label: "Open — accepts activity" },
+  { value: "cut_off", label: "Closed — disconnected" },
+];
 export const PAYMENT_METHODS = [
   { value: "cash", label: "Cash" },
   { value: "bank_transfer", label: "Bank Transfer" },

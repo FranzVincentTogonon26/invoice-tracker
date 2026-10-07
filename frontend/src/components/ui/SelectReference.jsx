@@ -10,6 +10,11 @@ import { formatDate } from "../../lib/utils";
  * still supported. The selected `value` is a `reference_id` — keys/selection
  * must never use `created_at`.
  *
+ * Open-only display: rows whose `status` is present and not 'open' (e.g. a
+ * cut-off source) are never listed — a disconnected source connects to no
+ * activity. Rows without a status field (older payloads, already filtered
+ * server-side) still show.
+ *
  * Row layout: leading accent-soft calendar chip, the human `label` as the
  * primary line, and the date + mono `reference_id` as muted metadata.
  */
@@ -21,7 +26,9 @@ export const SelectReference = ({
   disabled,
   searchable = true,
 }) => {
-  const options = references.map((reference) => ({
+  const options = references
+    .filter((reference) => !reference.status || reference.status === "open")
+    .map((reference) => ({
     value: reference.reference_id,
     // Searchable text: the human label, falling back to the reference id
     label: reference.label || reference.reference_id,

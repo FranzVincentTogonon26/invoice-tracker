@@ -26,7 +26,7 @@ export function TransactionRow({
           aria-hidden
           className="absolute inset-y-3 left-0 w-0.5 rounded-full bg-[var(--accent-strong)] opacity-0 transition-opacity duration-150 group-hover:opacity-100"
         />
-        <p className="text-sm font-semibold leading-snug text-[var(--ink)]">
+        <p className="text-sm font-medium leading-snug text-[var(--ink)]">
           {t.description}
         </p>
 
@@ -39,7 +39,7 @@ export function TransactionRow({
 
       {/* Amount */}
       <td className="px-4 py-3.5 text-right align-middle">
-        <span className="text-sm font-semibold tabular-nums text-[var(--ink)]">
+        <span className="text-sm font-medium tabular-nums text-[var(--ink)]">
           {formatMoney(t.amount)}
         </span>
       </td>
@@ -116,7 +116,7 @@ export function TransactionCard({
       />
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
-          <p className="text-sm font-semibold leading-snug text-[var(--ink)]">
+          <p className="text-sm font-medium leading-snug text-[var(--ink)]">
             {t.description}
           </p>
           {t.label && (
@@ -135,7 +135,7 @@ export function TransactionCard({
       </div>
 
       <div className="mt-3 flex items-center justify-between gap-3">
-        <span className="text-base font-semibold text-[var(--ink)] tabular-nums">
+        <span className="text-base font-medium text-[var(--ink)] tabular-nums">
           {formatMoney(t.amount)}
         </span>
         <StatusBadge status={t.status} />

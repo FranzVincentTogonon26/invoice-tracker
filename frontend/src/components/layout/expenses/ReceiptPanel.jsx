@@ -12,7 +12,7 @@ const EmptyScanPlaceholder = () => (
       <ScanLine size={20} />
     </span>
     <div className="min-w-0 lg:pt-0">
-      <p className="text-base font-semibold tracking-tight text-[var(--ink)]">
+      <p className="text-base font-medium tracking-tight text-[var(--ink)]">
         No scan yet
       </p>
       <p className="mt-0.5 max-w-[46ch] lg:text-sm text-xs leading-relaxed text-[var(--ink-muted)] lg:mt-1">

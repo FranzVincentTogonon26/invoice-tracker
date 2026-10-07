@@ -104,7 +104,7 @@ const ConfirmActionDialog = ({
 
             <h2
               id={titleId}
-              className="mt-4 font-display text-lg font-semibold tracking-tight text-[var(--ink)]"
+              className="mt-4 font-display text-lg font-medium tracking-tight text-[var(--ink)]"
             >
               {title}
             </h2>

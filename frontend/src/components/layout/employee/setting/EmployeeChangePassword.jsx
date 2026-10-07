@@ -18,7 +18,7 @@ const MIN_CURRENT_LENGTH = 6;
 const MIN_NEW_LENGTH = 8;
 
 const FieldLabel = ({ children }) => (
-  <p className="mb-1.5 text-[11px] font-semibold uppercase tracking-[0.08em] text-[var(--ink-muted)]">
+  <p className="mb-1.5 text-[11px] font-medium uppercase tracking-[0.08em] text-[var(--ink-muted)]">
     {children}
   </p>
 );
@@ -48,7 +48,7 @@ const PasswordToggle = ({ shown, onToggle, label }) => (
 const SummaryRow = ({ label, value }) => (
   <div className="flex items-center justify-between gap-3">
     <p className="shrink-0 text-sm text-[var(--ink-muted)]">{label}</p>
-    <p className="min-w-0 truncate text-sm font-semibold text-[var(--ink)]">
+    <p className="min-w-0 truncate text-sm font-medium text-[var(--ink)]">
       {value}
     </p>
   </div>

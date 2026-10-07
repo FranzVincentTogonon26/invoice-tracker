@@ -136,7 +136,7 @@ export function DatePicker({
         aria-label={`Date: ${label}`}
         title={title}
         className={cn(
-          "flex font-semibold h-10 w-full items-center gap-2 rounded-full border border-[var(--border)] bg-[var(--surface)] pl-5 pr-4 text-sm tabular-nums outline-none transition-colors",
+          "flex font-medium h-10 w-full items-center gap-2 rounded-full border border-[var(--border)] bg-[var(--surface)] pl-5 pr-4 text-sm tabular-nums outline-none transition-colors",
           "hover:border-[var(--accent)]/40 focus:border-[var(--accent)]/50 focus:ring-2 focus:ring-[var(--accent)]/15",
           "disabled:opacity-50",
           open && "border-[var(--accent)]/50 ring-2 ring-[var(--accent)]/15",
@@ -166,10 +166,10 @@ export function DatePicker({
             )}
           >
             <div className="flex items-baseline justify-between gap-3 border-b border-[var(--border)] px-5 py-3">
-              <span className="font-display text-lg font-semibold tracking-tight text-[var(--ink)]">
+              <span className="font-display text-lg font-medium tracking-tight text-[var(--ink)]">
                 Date
               </span>
-              <span className="truncate text-sm font-semibold text-[var(--ink-muted)]">
+              <span className="truncate text-sm font-medium text-[var(--ink-muted)]">
                 {selected ? formatDate(selected) : "Pick a date"}
               </span>
             </div>
@@ -181,7 +181,7 @@ export function DatePicker({
                 >
                   <ChevronLeft size={16} aria-hidden />
                 </NavButton>
-                <span className="text-sm font-semibold text-[var(--ink)]">
+                <span className="text-sm font-medium text-[var(--ink)]">
                   {viewMonth.toLocaleDateString("en-US", {
                     month: "long",
                     year: "numeric",
@@ -228,7 +228,7 @@ export function DatePicker({
                           className={cn(
                             "flex h-9 items-center justify-center rounded-full text-sm font-medium tabular-nums transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)]/40",
                             isSelected
-                              ? "bg-[var(--accent)] font-semibold text-white hover:bg-[var(--accent-strong)]"
+                              ? "bg-[var(--accent)] font-medium text-white hover:bg-[var(--accent-strong)]"
                               : "text-[var(--ink)] hover:bg-[var(--surface-2)]",
                             !isSelected &&
                               isToday &&

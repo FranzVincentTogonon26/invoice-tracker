@@ -264,7 +264,7 @@ export function StatCard({
             <div className="flex min-w-0 items-center gap-2">
               <p
                 className={cn(
-                  "font-display min-w-0 truncate text-sm font-semibold tracking-tight",
+                  "font-display min-w-0 truncate text-sm font-medium tracking-tight",
                   accent ? "text-white/70" : "text-[var(--ink-muted)]",
                 )}
               >
@@ -272,7 +272,7 @@ export function StatCard({
               </p>
               <p
                 className={cn(
-                  "font-display shrink-0 tabular-nums text-xl sm:text-2xl font-semibold tracking-tight",
+                  "font-display shrink-0 tabular-nums text-xl sm:text-2xl font-medium tracking-tight",
                   valueColor,
                 )}
               >
@@ -326,7 +326,7 @@ export function StatCard({
                     <p className="mt-1 flex min-w-0 items-center justify-center gap-1.5">
                       <span
                         className={cn(
-                          "min-w-0 truncate text-sm font-semibold tabular-nums",
+                          "min-w-0 truncate text-sm font-medium tabular-nums",
                           breakdownValueTone(stat.tone, accent),
                         )}
                         title={
@@ -351,7 +351,7 @@ export function StatCard({
                   ) : (
                     <p
                       className={cn(
-                        "mt-1 truncate text-sm font-semibold tabular-nums",
+                        "mt-1 truncate text-sm font-medium tabular-nums",
                         breakdownValueTone(stat.tone, accent),
                       )}
                       title={
@@ -409,7 +409,7 @@ export function StatCard({
             )}
             <span
               className={cn(
-                "font-display truncate text-sm font-semibold tracking-tight",
+                "font-display truncate text-sm font-medium tracking-tight",
                 accent ? "text-white/70" : "text-[var(--ink-muted)]",
               )}
             >
@@ -419,7 +419,7 @@ export function StatCard({
           <div className="flex min-w-0 items-center gap-1">
             <span
               className={cn(
-                "font-display tabular-nums text-2xl sm:text-3xl font-semibold tracking-tight truncate",
+                "font-display tabular-nums text-2xl sm:text-3xl font-medium tracking-tight truncate",
                 valueColor,
               )}
             >
@@ -566,7 +566,7 @@ export function StatCard({
                       </span>
                       <span
                         className={cn(
-                          "shrink-0 font-semibold tabular-nums",
+                          "shrink-0 font-medium tabular-nums",
                           breakdownValueTone(item.tone, accent),
                         )}
                       >
@@ -625,7 +625,7 @@ export function StatCard({
                 <p className="mt-1 flex min-w-0 items-center gap-1.5">
                   <span
                     className={cn(
-                      "min-w-0 truncate text-sm font-semibold tabular-nums",
+                      "min-w-0 truncate text-sm font-medium tabular-nums",
                       breakdownValueTone(stat.tone, accent),
                     )}
                     title={
@@ -648,7 +648,7 @@ export function StatCard({
               ) : (
                 <p
                   className={cn(
-                    "mt-1 truncate text-sm font-semibold tabular-nums",
+                    "mt-1 truncate text-sm font-medium tabular-nums",
                     breakdownValueTone(stat.tone, accent),
                   )}
                   title={typeof stat.value === "string" ? stat.value : undefined}

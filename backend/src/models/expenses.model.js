@@ -259,10 +259,14 @@ class Expenses {
   // `expensesOverviewEmployee`) and the cutoff `createExpenses` uses to set
   // `expenses.flag`.
   static async firstIssuedAt(userId) {
+    // Closed sources leave no footsteps: only issuances under an open
+    // source count as "the first budget issued to you".
     const result = await query(
       `SELECT to_char(MIN(bir.created_at), 'YYYY-MM-DD') AS first_issued_at
          FROM budget_issued_reference bir
-        WHERE bir.user_id = $1`,
+         JOIN budget_reference br ON br.reference_id = bir.reference_id
+        WHERE bir.user_id = $1
+          AND br.status = 'open'`,
       [userId],
     );
     return result.rows[0]?.first_issued_at ?? null;
@@ -465,6 +469,7 @@ class Expenses {
           b.reference_id,
           b.label,
           b.created_at,
+          b.status,
           ( SELECT COUNT(id) FROM budget bi
              WHERE bi.reference_id = b.reference_id ) AS active,
           COALESCE((
@@ -523,6 +528,11 @@ class Expenses {
     const where = [];
     const params = [];
 
+    // Closed sources leave no footsteps: rows tagged to a cut-off source
+    // never list; untagged rows (reference_id IS NULL) connect to no source
+    // and stay visible.
+    where.push(`(e.reference_id IS NULL OR br.status = 'open')`);
+
     if (from) {
       params.push(from);
       where.push(`e.expense_date >= $${params.length}::date`);
@@ -574,6 +584,8 @@ class Expenses {
     // excluded). Employee spend is drawn from the budget already handed to
     // them as `issued`, so charging it here would count it twice — and
     // `expenses.user_id` is NOT NULL, so the join always resolves a role.
+    // Closed sources leave no footsteps: tagged rows under a cut-off source
+    // don't count (untagged rows connect to no source and still count).
     const stats = await query(
       `SELECT
           COALESCE(SUM(e.total_amount), 0)::float8 AS total_expenses,
@@ -583,8 +595,10 @@ class Expenses {
           COUNT(*)::int AS total_transactions
        FROM expenses e
        JOIN users u ON u.user_id = e.user_id
+       LEFT JOIN budget_reference br ON br.reference_id = e.reference_id
        WHERE e.status = 'paid'
-         AND u.role = 'admin'`,
+         AND u.role = 'admin'
+         AND (e.reference_id IS NULL OR br.status = 'open')`,
       [],
     );
 
@@ -598,6 +612,7 @@ class Expenses {
        JOIN issued_budget i ON i.issued_ref_id = bir.id
        JOIN budget_reference br ON br.reference_id = bir.reference_id
        WHERE bir.status = 'open'
+         AND br.status = 'open'
        GROUP BY br.reference_id, br.label, br.created_at
        ORDER BY br.created_at DESC`,
       [],
@@ -612,6 +627,7 @@ class Expenses {
        FROM budget_reference br
        LEFT JOIN budget b ON b.reference_id = br.reference_id
        WHERE b.status != 'cancelled'
+         AND br.status = 'open'
        GROUP BY br.reference_id, br.label, br.created_at
        ORDER BY br.created_at DESC`,
       [],
@@ -625,12 +641,13 @@ class Expenses {
           COALESCE(SUM(e.total_amount), 0) AS amount
        FROM expenses e
        JOIN budget_reference br ON br.reference_id = e.reference_id
-       WHERE NOT EXISTS (
-         -- Employee rows are tagged now, but their spend already left the
-         -- reference as "issued" (see budgetReference above).
-         SELECT 1 FROM users u
-          WHERE u.user_id = e.user_id AND u.role = 'employee'
-       )
+       WHERE br.status = 'open'
+         AND NOT EXISTS (
+          -- Employee rows are tagged now, but their spend already left the
+          -- reference as "issued" (see budgetReference above).
+          SELECT 1 FROM users u
+           WHERE u.user_id = e.user_id AND u.role = 'employee'
+        )
        GROUP BY br.reference_id, br.label, br.created_at
        ORDER BY br.created_at DESC`,
       [],
@@ -638,13 +655,15 @@ class Expenses {
 
     // Scalar count — the previous query mixed COUNT with GROUP BY/ORDER BY,
     // which returned a raw pg result object instead of a single number.
+    // Closed sources leave no footsteps here either.
     const totalTransaction = await query(
       `SELECT COUNT(e.id)::int AS total
          FROM expenses e
          JOIN budget_reference br ON br.reference_id = e.reference_id
-        WHERE NOT EXISTS (
-          SELECT 1 FROM users u
-           WHERE u.user_id = e.user_id AND u.role = 'employee'
+        WHERE br.status = 'open'
+          AND NOT EXISTS (
+           SELECT 1 FROM users u
+            WHERE u.user_id = e.user_id AND u.role = 'employee'
         )`,
       [],
     );
@@ -711,6 +730,9 @@ class Expenses {
          JOIN budget_reference br ON br.reference_id = bir.reference_id
          LEFT JOIN issued_budget ib ON ib.issued_ref_id = bir.id
         WHERE bir.user_id = $1 AND bir.status = 'open'
+          -- A cut-off source connects to nothing: holdings under it never
+          -- surface as a usable source of funds.
+          AND br.status = 'open'
         GROUP BY bir.reference_id, br.label, br.created_at
         ORDER BY MIN(bir.created_at) ASC, br.created_at ASC`,
       [userId],
@@ -737,12 +759,15 @@ class Expenses {
     // rows fund the employee (settled/draft rows are reimbursed or parked —
     // same rule as the dashboard totals), and abono sitting on a reference
     // without an open issuance still funds the employee, so it is credited to
-    // the oldest open source instead of silently disappearing.
+    // the oldest open source instead of silently disappearing. Abono booked
+    // to a cut-off source connects to nothing and never credits any source.
     const abono = await query(
       `SELECT ea.reference_id,
               COALESCE(SUM(ea.amount), 0)::float8 AS abono
          FROM employee_abono ea
+         JOIN budget_reference br ON br.reference_id = ea.reference_id
         WHERE ea.user_id = $1 AND ea.status = 'open'
+          AND br.status = 'open'
         GROUP BY ea.reference_id`,
       [userId],
     );
@@ -843,6 +868,10 @@ class Expenses {
 
     params.push(userId);
     where.push(`e.user_id = $${params.length}::uuid`);
+    // Closed sources leave no footsteps: rows tagged to a cut-off source
+    // never list; untagged rows (reference_id IS NULL) connect to no source
+    // and stay visible.
+    where.push(`(e.reference_id IS NULL OR br.status = 'open')`);
 
     if (from) {
       params.push(from);
@@ -906,12 +935,16 @@ class Expenses {
               SELECT SUM(ib.amount)
               FROM budget_issued_reference bir
               JOIN issued_budget ib ON ib.issued_ref_id = bir.id
+              JOIN budget_reference br ON br.reference_id = bir.reference_id
               WHERE bir.user_id = $1 AND bir.status = 'open'
+                AND br.status = 'open'
             ), 0)::float8 AS total_budget,
             COALESCE((
               SELECT SUM(ea.amount)
               FROM employee_abono ea
+              JOIN budget_reference br ON br.reference_id = ea.reference_id
               WHERE ea.user_id = $1 AND ea.status = 'open'
+                AND br.status = 'open'
             ), 0)::float8 AS total_abono,
             COALESCE((
               SELECT SUM(bt.amount)
@@ -924,7 +957,9 @@ class Expenses {
               WHERE btr.transfer_to = $1 AND btr.status = 'success'
             ), 0)::float8 AS total_received
          FROM expenses e
-         WHERE e.user_id = $1 AND e.status = 'paid'`,
+         LEFT JOIN budget_reference br ON br.reference_id = e.reference_id
+        WHERE e.user_id = $1 AND e.status = 'paid'
+          AND (e.reference_id IS NULL OR br.status = 'open')`,
       [userId],
     );
 

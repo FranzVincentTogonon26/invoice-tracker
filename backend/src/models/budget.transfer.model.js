@@ -311,21 +311,25 @@ class BudgetTransfer {
                     JOIN budget_reference br ON br.reference_id = b.reference_id
                    WHERE br.status = 'open' AND b.status != 'cancelled'
                 ), 0)::float8 AS allocated,
-                COALESCE((
-                  SELECT SUM(ib.amount)
-                    FROM budget_issued_reference bir
-                    JOIN issued_budget ib ON ib.issued_ref_id = bir.id
-                   WHERE bir.status = 'open'
-                ), 0)::float8 AS issued,
-                COALESCE((
-                  SELECT SUM(e.total_amount)
-                    FROM expenses e
-                   WHERE e.status = 'paid'
-                     AND NOT EXISTS (
-                       SELECT 1 FROM users u
-                        WHERE u.user_id = e.user_id AND u.role = 'employee'
-                     )
-                ), 0)::float8 AS expenses,
+            COALESCE((
+              SELECT SUM(ib.amount)
+                FROM budget_issued_reference bir
+                JOIN issued_budget ib ON ib.issued_ref_id = bir.id
+                JOIN budget_reference br ON br.reference_id = bir.reference_id
+               WHERE bir.status = 'open'
+                 AND br.status = 'open'
+            ), 0)::float8 AS issued,
+            COALESCE((
+              SELECT SUM(e.total_amount)
+                FROM expenses e
+                LEFT JOIN budget_reference br ON br.reference_id = e.reference_id
+               WHERE e.status = 'paid'
+                 AND (e.reference_id IS NULL OR br.status = 'open')
+                 AND NOT EXISTS (
+                   SELECT 1 FROM users u
+                    WHERE u.user_id = e.user_id AND u.role = 'employee'
+                 )
+            ), 0)::float8 AS expenses,
                 COALESCE((
                   SELECT SUM(bt.amount)
                     FROM budget_transfer bt
@@ -413,11 +417,14 @@ class BudgetTransfer {
       } else {
         // Lock the sender's open issuances for the rest of the transaction so
         // a parallel transfer / expense can't interleave between read and
-        // write.
+        // write. Cut-off sources are skipped: they connect to no activity,
+        // so an employee whose only holdings sit under one can't move funds.
         const locked = await q(
           `SELECT bir.reference_id
              FROM budget_issued_reference bir
+             JOIN budget_reference br ON br.reference_id = bir.reference_id
             WHERE bir.user_id = $1 AND bir.status = 'open'
+              AND br.status = 'open'
             ORDER BY bir.created_at ASC
             FOR UPDATE`,
           [senderId],
@@ -437,22 +444,28 @@ class BudgetTransfer {
         const balance = (
           await q(
             `SELECT
-                COALESCE((
-                  SELECT SUM(ib.amount)
-                    FROM budget_issued_reference bir
-                    JOIN issued_budget ib ON ib.issued_ref_id = bir.id
-                   WHERE bir.user_id = $1 AND bir.status = 'open'
-                ), 0)::float8 AS total_budget,
-                COALESCE((
-                  SELECT SUM(e.total_amount)
-                    FROM expenses e
-                   WHERE e.user_id = $1 AND e.status = 'paid'
-                ), 0)::float8 AS total_expenses,
-                COALESCE((
-                  SELECT SUM(ea.amount)
-                    FROM employee_abono ea
-                   WHERE ea.user_id = $1 AND ea.status = 'open'
-                ), 0)::float8 AS total_abono,
+          COALESCE((
+            SELECT SUM(ib.amount)
+              FROM budget_issued_reference bir
+              JOIN issued_budget ib ON ib.issued_ref_id = bir.id
+              JOIN budget_reference br ON br.reference_id = bir.reference_id
+             WHERE bir.user_id = $1 AND bir.status = 'open'
+               AND br.status = 'open'
+          ), 0)::float8 AS total_budget,
+          COALESCE((
+            SELECT SUM(e.total_amount)
+              FROM expenses e
+              LEFT JOIN budget_reference br ON br.reference_id = e.reference_id
+             WHERE e.user_id = $1 AND e.status = 'paid'
+               AND (e.reference_id IS NULL OR br.status = 'open')
+          ), 0)::float8 AS total_expenses,
+          COALESCE((
+            SELECT SUM(ea.amount)
+              FROM employee_abono ea
+              JOIN budget_reference br ON br.reference_id = ea.reference_id
+             WHERE ea.user_id = $1 AND ea.status = 'open'
+               AND br.status = 'open'
+          ), 0)::float8 AS total_abono,
                 COALESCE((
                   SELECT SUM(bt.amount)
                     FROM budget_transfer bt
@@ -514,14 +527,16 @@ class BudgetTransfer {
   // "received" legs. Sender + recipient accounts are joined (never the
   // password hash) together with the source-of-funds label, so the ledger can
   // show exactly who moved money to whom and from which reference.
+  // Closed sources leave no footsteps: legs tied to a cut-off source never
+  // list (`reference_id` is NOT NULL, so the inner condition is safe).
   // Optional filter:
   //   - `search`: matched against notes, method and both account names (ILIKE)
   static async listAll({ search } = {}) {
     const params = [];
-    let where = "";
+    let where = "br.status = 'open'";
     if (search && search.trim()) {
       params.push(`%${search.trim()}%`);
-      where = `WHERE (bt.notes ILIKE $1
+      where = `(${where}) AND (bt.notes ILIKE $1
                     OR bt.method ILIKE $1
                     OR su.name ILIKE $1
                     OR ru.name ILIKE $1
@@ -552,7 +567,7 @@ class BudgetTransfer {
          LEFT JOIN budget_reference br ON br.reference_id = bt.reference_id
          LEFT JOIN users su ON su.user_id = bt.user_id
          LEFT JOIN users ru ON ru.user_id = bt.transfer_to
-         ${where}
+         WHERE ${where}
         ORDER BY bt.created_at DESC`,
       params,
     );

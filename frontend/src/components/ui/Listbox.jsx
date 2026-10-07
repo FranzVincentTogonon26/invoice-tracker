@@ -40,7 +40,7 @@ function OptionAvatar({ option, size = "sm" }) {
       <span
         aria-hidden
         className={cn(
-          "flex shrink-0 items-center justify-center rounded-full bg-[var(--surface-2)] font-semibold text-[var(--ink-muted)]",
+          "flex shrink-0 items-center justify-center rounded-full bg-[var(--surface-2)] font-medium text-[var(--ink-muted)]",
           sizing,
         )}
       >
@@ -407,7 +407,7 @@ export default function Listbox({
             <OptionAvatar option={selectedOption} size="sm" />
             <span
               className={cn(
-                "min-w-0 flex-1 truncate text-xs font-semibold text-[var(--ink-muted)] transition-colors",
+                "min-w-0 flex-1 truncate text-xs font-medium text-[var(--ink-muted)] transition-colors",
                 !selectedOption && "text-[var(--ink-muted)]",
               )}
             >

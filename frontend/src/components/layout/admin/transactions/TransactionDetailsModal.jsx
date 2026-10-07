@@ -25,7 +25,7 @@ import {
   methodLabel,
 } from "../../../../lib/utils";
 import { isReceiptPdf, openReceiptFile } from "../../../../lib/receiptMedia";
-import { TRANSACTION_KIND_META } from "./TransactionsTable";
+import { TRANSACTION_KIND_META } from "@/constants";
 
 const DIALOG_EASE = [0.16, 1, 0.3, 1];
 
@@ -37,7 +37,7 @@ const PersonRow = ({ row }) => (
       className="h-8 w-8 shrink-0 text-xs"
     />
     <div className="min-w-0 flex-1">
-      <p className="truncate text-xs font-semibold leading-tight text-[var(--ink)]">
+      <p className="truncate text-xs font-medium leading-tight text-[var(--ink)]">
         {row?.employeeName || "Unknown"}
       </p>
       <p className="mt-0.5 truncate text-[11px] capitalize text-[var(--ink-muted)]">
@@ -154,7 +154,7 @@ const TransactionDetailsModal = ({ open, row, onClose }) => {
               <div className="min-w-0 flex-1">
                 <p
                   id={titleId}
-                  className="truncate font-display text-base font-semibold tracking-tight text-[var(--ink)]"
+                  className="truncate font-display text-base font-medium tracking-tight text-[var(--ink)]"
                 >
                   {title}
                 </p>
@@ -179,7 +179,7 @@ const TransactionDetailsModal = ({ open, row, onClose }) => {
                 <button
                   type="button"
                   className={cn(
-                    "flex-1 rounded-lg py-1.5 text-xs font-semibold transition-all",
+                    "flex-1 rounded-lg py-1.5 text-xs font-medium transition-all",
                     activeTab === "details"
                       ? "bg-[var(--surface)] text-[var(--ink)] shadow-xs"
                       : "text-[var(--ink-muted)] hover:text-[var(--ink)]",
@@ -190,7 +190,7 @@ const TransactionDetailsModal = ({ open, row, onClose }) => {
                 <button
                   type="button"
                   className={cn(
-                    "flex-1 flex items-center justify-center gap-1.5 rounded-lg py-1.5 text-xs font-semibold transition-all",
+                    "flex-1 flex items-center justify-center gap-1.5 rounded-lg py-1.5 text-xs font-medium transition-all",
                     activeTab === "receipt"
                       ? "bg-[var(--surface)] text-[var(--ink)] shadow-xs"
                       : "text-[var(--ink-muted)] hover:text-[var(--ink)]",
@@ -244,7 +244,7 @@ const TransactionDetailsModal = ({ open, row, onClose }) => {
                     </p>
                     <p
                       className={cn(
-                        "mt-1 font-display text-2xl font-semibold leading-none tracking-tight tabular-nums",
+                        "mt-1 font-display text-2xl font-medium leading-none tracking-tight tabular-nums",
                         row.direction === "in" && "text-[var(--success)]",
                         row.direction === "out" && "text-[var(--danger)]",
                         row.direction !== "in" &&
@@ -289,7 +289,7 @@ const TransactionDetailsModal = ({ open, row, onClose }) => {
                         )}
                       </span>
                       <div>
-                        <p className="text-xs font-semibold text-[var(--ink)]">
+                        <p className="text-xs font-medium text-[var(--ink)]">
                           {receiptIsPdf
                             ? "PDF receipt document attached"
                             : "Receipt image attached"}
@@ -410,12 +410,12 @@ const TransactionDetailsModal = ({ open, row, onClose }) => {
                       <div className="flex items-center gap-2.5 rounded-xl border border-[var(--border)] bg-[var(--surface)] p-2.5">
                         <span
                           aria-hidden
-                          className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-[var(--surface-2)] text-xs font-semibold text-[var(--ink-muted)]"
+                          className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-[var(--surface-2)] text-xs font-medium text-[var(--ink-muted)]"
                         >
                           B
                         </span>
                         <div className="min-w-0 flex-1">
-                          <p className="truncate text-xs font-semibold leading-tight text-[var(--ink)]">
+                          <p className="truncate text-xs font-medium leading-tight text-[var(--ink)]">
                             Boss
                           </p>
                           <p className="mt-0.5 truncate text-[11px] text-[var(--ink-muted)]">
@@ -550,7 +550,7 @@ const TransactionDetailsModal = ({ open, row, onClose }) => {
                       <button
                         type="button"
                         onClick={() => openReceiptFile(receiptUrl)}
-                        className="inline-flex items-center gap-1 rounded-lg bg-[var(--accent-soft)] px-2.5 py-1 text-xs font-semibold text-[var(--accent-strong)] transition-opacity hover:opacity-90"
+                        className="inline-flex items-center gap-1 rounded-lg bg-[var(--accent-soft)] px-2.5 py-1 text-xs font-medium text-[var(--accent-strong)] transition-opacity hover:opacity-90"
                       >
                         <Maximize2 size={12} aria-hidden />
                         Full size
@@ -578,7 +578,7 @@ const TransactionDetailsModal = ({ open, row, onClose }) => {
                         )}
                       </span>
                       <div className="max-w-[280px] space-y-1">
-                        <p className="text-sm font-semibold text-[var(--ink)]">
+                        <p className="text-sm font-medium text-[var(--ink)]">
                           {receiptIsPdf
                             ? "PDF document receipt"
                             : "Receipt attachment"}
@@ -611,7 +611,7 @@ const TransactionDetailsModal = ({ open, row, onClose }) => {
                 <button
                   type="button"
                   onClick={() => setActiveTab("details")}
-                  className="text-xs font-semibold text-[var(--accent-strong)] hover:underline"
+                  className="text-xs font-medium text-[var(--accent-strong)] hover:underline"
                 >
                   ← Back to overview
                 </button>
@@ -622,7 +622,7 @@ const TransactionDetailsModal = ({ open, row, onClose }) => {
                 type="button"
                 variant="outline"
                 onClick={onClose}
-                className="rounded-full px-5 text-xs font-semibold"
+                className="rounded-full px-5 text-xs font-medium"
               >
                 Close
               </Button>

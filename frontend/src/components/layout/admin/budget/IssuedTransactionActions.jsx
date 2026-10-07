@@ -395,7 +395,7 @@ export function IssuedTransactionActions({
               </DialogIcon>
               <h2
                 id={titleId}
-                className="mt-4 font-display text-lg font-semibold tracking-tight text-[var(--ink)]"
+                className="mt-4 font-display text-lg font-medium tracking-tight text-[var(--ink)]"
               >
                 Cancel this budget issuance?
               </h2>
@@ -405,7 +405,7 @@ export function IssuedTransactionActions({
               >
                 Are you sure you want to cancel this budget issuance? Its status
                 will be updated to{" "}
-                <span className="font-semibold text-[var(--danger)]">
+                <span className="font-medium text-[var(--danger)]">
                   cancelled
                 </span>
                 .
@@ -415,14 +415,14 @@ export function IssuedTransactionActions({
                   they're reversing. */}
               <div className="mt-4 flex items-center gap-3 rounded-2xl border border-[var(--border)] bg-[var(--surface-2)]/60 px-4 py-3">
                 <div className="min-w-0 flex-1">
-                  <p className="truncate text-base font-semibold text-[var(--ink)]">
+                  <p className="truncate text-base font-medium text-[var(--ink)]">
                     {transaction.description || "Budget issuance"}
                   </p>
                   <p className="mt-0.5 text-sm text-[var(--ink-muted)]">
                     Amount to reverse
                   </p>
                 </div>
-                <span className="shrink-0 text-sm font-semibold text-[var(--ink)] tabular-nums">
+                <span className="shrink-0 text-sm font-medium text-[var(--ink)] tabular-nums">
                   {formatMoney(amount)}
                 </span>
               </div>
@@ -463,7 +463,7 @@ export function IssuedTransactionActions({
               </DialogIcon>
               <h2
                 id={deleteTitleId}
-                className="mt-4 font-display text-lg font-semibold tracking-tight text-[var(--ink)]"
+                className="mt-4 font-display text-lg font-medium tracking-tight text-[var(--ink)]"
               >
                 Delete this issued record?
               </h2>
@@ -472,7 +472,7 @@ export function IssuedTransactionActions({
                 className="mt-1.5 text-sm leading-relaxed text-[var(--ink-muted)]"
               >
                 This permanently removes the issuance record and{" "}
-                <span className="font-semibold text-[var(--danger)]">
+                <span className="font-medium text-[var(--danger)]">
                   can&apos;t be undone
                 </span>
                 . Only cancelled issuances can be deleted.
@@ -482,7 +482,7 @@ export function IssuedTransactionActions({
                   they're destroying. */}
               <div className="mt-4 flex items-center gap-3 rounded-2xl border border-[var(--border)] bg-[var(--surface-2)]/60 px-4 py-3">
                 <div className="min-w-0 flex-1">
-                  <p className="truncate text-base font-semibold text-[var(--ink)]">
+                  <p className="truncate text-base font-medium text-[var(--ink)]">
                     {transaction.description || "Budget issuance"}
                   </p>
                   <p className="mt-0.5 truncate text-sm text-[var(--ink-muted)]">
@@ -491,7 +491,7 @@ export function IssuedTransactionActions({
                       .join(" · ")}
                   </p>
                 </div>
-                <span className="shrink-0 text-sm font-semibold text-[var(--ink)] tabular-nums">
+                <span className="shrink-0 text-sm font-medium text-[var(--ink)] tabular-nums">
                   {formatMoney(amount)}
                 </span>
               </div>

@@ -111,14 +111,14 @@ const SettleAbonoModal = ({ open, onClose, openRows = [], totalBalance = 0 }) =>
   const confirmSummary = (
     <div className="mt-4 flex items-center gap-3 rounded-2xl border border-[var(--border)] bg-[var(--surface-2)]/60 px-4 py-3">
       <div className="min-w-0 flex-1">
-        <p className="truncate text-base font-semibold text-[var(--ink)]">
+        <p className="truncate text-base font-medium text-[var(--ink)]">
           {checkedRows.length} selected
         </p>
         <p className="mt-0.5 truncate text-xs text-[var(--ink-muted)]">
           Remaining after settle: {formatMoney(projected)}
         </p>
       </div>
-      <span className="shrink-0 text-sm font-semibold tabular-nums text-[var(--ink)]">
+      <span className="shrink-0 text-sm font-medium tabular-nums text-[var(--ink)]">
         {formatMoney(selectedTotal)}
       </span>
     </div>
@@ -173,7 +173,7 @@ const SettleAbonoModal = ({ open, onClose, openRows = [], totalBalance = 0 }) =>
                 <div className="min-w-0">
                   <h2
                     id={titleId}
-                    className="font-display truncate text-base font-semibold tracking-tight text-[var(--ink)]"
+                    className="font-display truncate text-base font-medium tracking-tight text-[var(--ink)]"
                   >
                     Settle Abono
                   </h2>
@@ -201,7 +201,7 @@ const SettleAbonoModal = ({ open, onClose, openRows = [], totalBalance = 0 }) =>
                 </p>
                 <p
                   className={cn(
-                    "mt-1.5 font-display text-3xl font-semibold leading-none tracking-tight tabular-nums",
+                    "mt-1.5 font-display text-3xl font-medium leading-none tracking-tight tabular-nums",
                     insufficient ? "text-[var(--danger)]" : "text-[var(--ink)]",
                   )}
                 >
@@ -221,7 +221,7 @@ const SettleAbonoModal = ({ open, onClose, openRows = [], totalBalance = 0 }) =>
                   <p className="type-eyebrow text-[var(--ink-muted)]">
                     Open abono
                   </p>
-                  <p className="mt-1 font-display text-lg font-semibold leading-none tracking-tight tabular-nums text-[var(--ink)]">
+                  <p className="mt-1 font-display text-lg font-medium leading-none tracking-tight tabular-nums text-[var(--ink)]">
                     {formatMoney(openTotal)}
                   </p>
                   <p className="mt-1 text-[11px] font-medium text-[var(--ink-muted)]">
@@ -232,7 +232,7 @@ const SettleAbonoModal = ({ open, onClose, openRows = [], totalBalance = 0 }) =>
                   <p className="type-eyebrow text-[var(--ink-muted)]">
                     Checked
                   </p>
-                  <p className="mt-1 font-display text-lg font-semibold leading-none tracking-tight tabular-nums text-[var(--ink)]">
+                  <p className="mt-1 font-display text-lg font-medium leading-none tracking-tight tabular-nums text-[var(--ink)]">
                     {formatMoney(selectedTotal)}
                   </p>
                   <p className="mt-1 text-[11px] font-medium text-[var(--ink-muted)]">
@@ -290,7 +290,7 @@ const SettleAbonoModal = ({ open, onClose, openRows = [], totalBalance = 0 }) =>
                         )}
                       >
                         <span className="min-w-0">
-                          <span className="block truncate text-xs font-semibold text-[var(--ink)]">
+                          <span className="block truncate text-xs font-medium text-[var(--ink)]">
                             {row.description || "Abono"}
                           </span>
                           <span className="mt-1 block truncate text-[11px] font-medium text-[var(--ink-muted)]">
@@ -301,7 +301,7 @@ const SettleAbonoModal = ({ open, onClose, openRows = [], totalBalance = 0 }) =>
                           </span>
                         </span>
                         <span className="flex shrink-0 items-center gap-3">
-                          <span className="font-display text-sm font-semibold tabular-nums text-[var(--ink)]">
+                          <span className="font-display text-sm font-medium tabular-nums text-[var(--ink)]">
                             {formatMoney(row.amount)}
                           </span>
                           <input

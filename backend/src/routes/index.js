@@ -8,6 +8,7 @@ import abonoRoutes from "./abono.route.js";
 import transactionsRoutes from "./transactions.route.js";
 import auditRoutes from "./audit.route.js";
 import aiRoutes from "./ai.route.js";
+import sourceOfFundsRoutes from "./source.of.funds.route.js";
 import employeeOverviewRoutes from "./employee.overview.route.js";
 import employeeSettingsRoutes from "./employee.settings.route.js";
 
@@ -30,6 +31,7 @@ router.use("/abono", abonoRoutes);
 router.use("/transactions", transactionsRoutes);
 router.use("/audit-logs", auditRoutes);
 router.use("/ai", aiRoutes);
+router.use("/source-of-funds", sourceOfFundsRoutes);
 router.use("/employee_overview", employeeOverviewRoutes);
 router.use("/employee_settings", employeeSettingsRoutes);
 
