@@ -16,6 +16,7 @@ const MONEY_KEYS = [
   ["employeeOverview"],
   ["employeeBudget"],
   ["employees"],
+  ["reimbursements"],
   // Admin audit trail (sourced from backend/logs/transactions.md) — every
   // money event appends a row there, so the visible page refetches live.
   ["auditLogs"],

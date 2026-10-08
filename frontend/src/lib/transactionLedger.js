@@ -33,12 +33,13 @@ export const rowsWindow = (rows) => {
   return start && end ? { start, end } : null;
 };
 
-export const buildRangeSeries = (range, rows, measure) => {
+export const buildRangeSeries = (range, rows, measure, maxBuckets = 14) => {
   const start = range?.start ? startOfDay(range.start) : null;
   const end = range?.end ? startOfDay(range.end) : null;
   if (!start || !end || end < start) return [];
   const days = countDays(start, end);
-  const bucketDays = days <= 14 ? 1 : Math.ceil(days / 14);
+  const bucketDays =
+    days <= maxBuckets ? 1 : Math.ceil(days / maxBuckets);
   const totals = new Array(Math.ceil(days / bucketDays)).fill(0);
   for (const row of rows) {
     const day = rowDay(row);

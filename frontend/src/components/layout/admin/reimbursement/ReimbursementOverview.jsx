@@ -3,12 +3,12 @@ import {
   CircleAlert,
   CircleX,
   ClipboardList,
-  HandCoins,
-  ReceiptText,
+  TrendingUp,
   Wallet,
 } from "lucide-react";
 import { StatCard } from "../../../ui/StatCard";
 import { formatMoney } from "@/lib/utils";
+import { AbonoStatCard } from "./AbonoStatCard";
 
 const container = {
   hidden: {},
@@ -24,24 +24,22 @@ const item = {
   },
 };
 
-export function ExpenseOverview({
+export function ReimbursementOverview({
   isLoading,
-  totalSpend,
-  spendSeries,
-  heroStats,
+  totals,
+  inSeries,
   cashOnHand,
   isBalanceOverdrawn,
   isBalanceDepleted,
   balanceStats,
-  totalIssued,
-  issuedStats,
+  abono,
+  abonoSeries,
   recordCount,
   recordSeries,
-  statusStats,
-  flaggedCount,
+  recordStats,
 }) {
   return (
-    <section aria-label="Expenses overview" className="space-y-4">
+    <section aria-label="Reimbursement overview" className="space-y-4">
       <motion.div
         variants={container}
         initial="hidden"
@@ -50,20 +48,29 @@ export function ExpenseOverview({
       >
         <motion.div variants={item} className="h-full min-w-0 [&>div]:h-full">
           <StatCard
-            label="Total Expenses"
-            value={formatMoney(totalSpend)}
-            icon={ReceiptText}
+            label="Money In"
+            value={formatMoney(totals.moneyIn)}
+            icon={TrendingUp}
             loading={isLoading}
             accent
             chart="bars"
-            data={spendSeries}
-            stats={heroStats}
+            data={inSeries}
+            stats={[
+              {
+                key: "given",
+                label: "Budget Given",
+                value: formatMoney(totals.given),
+                hint: `${totals.givenSources} ${
+                  totals.givenSources === 1 ? "source" : "sources"
+                }`,
+              },
+            ]}
           />
         </motion.div>
 
         <motion.div variants={item} className="h-full min-w-0 [&>div]:h-full">
           <StatCard
-            label="My Balance"
+            label="Fund Balance"
             value={formatMoney(cashOnHand)}
             icon={Wallet}
             loading={isLoading}
@@ -94,49 +101,36 @@ export function ExpenseOverview({
         </motion.div>
 
         <motion.div variants={item} className="h-full min-w-0 [&>div]:h-full">
-          <StatCard
-            label="Total Issued Budget"
-            value={formatMoney(totalIssued)}
-            icon={HandCoins}
-            loading={isLoading}
-            stats={issuedStats}
+          <AbonoStatCard
+            isLoading={isLoading}
+            openTotal={abono.openTotal}
+            openCount={abono.openCount}
+            employees={abono.employees}
+            series={abonoSeries}
           />
         </motion.div>
 
         <motion.div variants={item} className="h-full min-w-0 [&>div]:h-full">
           <StatCard
-            label="Total Expenses Transactions"
+            label="Abono Records"
             value={recordCount}
             icon={ClipboardList}
             loading={isLoading}
             chart="bars"
             data={recordSeries}
-            stats={statusStats}
-            status={
-              flaggedCount > 0
-                ? {
-                    tone: "danger",
-                    label:
-                      flaggedCount === 1 ? "1 flag" : `${flaggedCount} flag`,
-                  }
-                : undefined
-            }
+            stats={recordStats}
           />
         </motion.div>
       </motion.div>
 
       <p className="px-1 text-xs text-[var(--ink-muted)]">
-        Money figures — My Balance, Spent, Total Expenses, Avg / day and the
-        ledger footer total — count admin spend only: cancelled lines and
-        employee rows are excluded (employee spend is drawn from the budget
-        already issued to them) · Total Expenses adds open budget issuances to
-        expenses · Transactions counts every expense row, cancelled and
-        employee included · The overview cards above are always all-time —
-        charts and Avg / day span the records from first to last, and the date
-        range only filters the table below
+        Fund-pool view — Money In counts live budget allocations only · Fund
+        Balance is Budget Given − Issued − Open Abono · Settled abono was
+        reimbursed and no longer funds the pool · Rows under a cut-off source
+        leave no footsteps anywhere on this page
       </p>
     </section>
   );
 }
 
-export default ExpenseOverview;
+export default ReimbursementOverview;

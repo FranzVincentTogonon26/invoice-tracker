@@ -111,9 +111,6 @@ export function StatCard({
   const hasBreakdown = Array.isArray(breakdown);
   const hasStats = Array.isArray(stats) && stats.length > 0;
   const hasCaption = !hasBreakdown && !hasStats && Boolean(breakdownCaption);
-  // Hug the bars: a fixed 110px lane stretches a handful of bars across the
-  // full width (wide gaps). ~12px per bar keeps them tight; full width only
-  // when there are enough bars to fill it.
   const chartWidth = hasData ? Math.min(110, Math.max(data.length * 12, 24)) : 110;
 
   const iconTile = accent
