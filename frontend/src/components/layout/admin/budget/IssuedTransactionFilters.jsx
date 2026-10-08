@@ -60,12 +60,19 @@ function initialsOf(name) {
 }
 
 function FilterAvatar({ name, avatarUrl, size = "h-7 w-7 text-xs" }) {
-  if (avatarUrl) {
+  // Tracks WHICH url failed so a new avatarUrl auto-retries with no useEffect.
+  const [failedUrl, setFailedUrl] = useState(null);
+  const cleanUrl =
+    typeof avatarUrl === "string" ? avatarUrl.trim() : avatarUrl;
+  const showImage = !!cleanUrl && failedUrl !== cleanUrl;
+
+  if (showImage) {
     return (
       <img
-        src={avatarUrl}
+        src={cleanUrl}
         alt=""
         aria-hidden
+        onError={() => setFailedUrl(cleanUrl)}
         className={cn(
           "shrink-0 rounded-full object-cover ring-1 ring-[var(--border)]",
           size,

@@ -3,12 +3,12 @@ import {
   CircleAlert,
   CircleX,
   ClipboardList,
-  TrendingUp,
+  PhilippinePeso,
+  ReceiptText,
   Wallet,
 } from "lucide-react";
 import { StatCard } from "../../../ui/StatCard";
-import { formatMoney } from "@/lib/utils";
-import { AbonoStatCard } from "./AbonoStatCard";
+import { formatDate, formatMoney } from "@/lib/utils";
 
 const container = {
   hidden: {},
@@ -27,16 +27,15 @@ const item = {
 export function ReimbursementOverview({
   isLoading,
   totals,
-  inSeries,
+  givenBreakdown = [],
   cashOnHand,
   isBalanceOverdrawn,
   isBalanceDepleted,
-  balanceStats,
-  abono,
-  abonoSeries,
-  recordCount,
-  recordSeries,
-  recordStats,
+  cashOnHandBreakdown = [],
+  totalSpend,
+  expensesSummary = [],
+  openTotal,
+  reimbursementRows = [],
 }) {
   return (
     <section aria-label="Reimbursement overview" className="space-y-4">
@@ -48,29 +47,24 @@ export function ReimbursementOverview({
       >
         <motion.div variants={item} className="h-full min-w-0 [&>div]:h-full">
           <StatCard
-            label="Money In"
+            label="Total Budget Allocated"
             value={formatMoney(totals.moneyIn)}
-            icon={TrendingUp}
-            loading={isLoading}
+            icon={PhilippinePeso}
             accent
-            chart="bars"
-            data={inSeries}
-            stats={[
-              {
-                key: "given",
-                label: "Budget Given",
-                value: formatMoney(totals.given),
-                hint: `${totals.givenSources} ${
-                  totals.givenSources === 1 ? "source" : "sources"
-                }`,
-              },
-            ]}
+            loading={isLoading}
+            breakdownCaption="Allocated"
+            breakdown={givenBreakdown.map((row, i) => ({
+              key: row.reference_id ?? i,
+              label: row.label ?? "Untitled reference",
+              value: formatMoney(row.amount),
+              hint: formatDate(row.created_at),
+            }))}
           />
         </motion.div>
 
         <motion.div variants={item} className="h-full min-w-0 [&>div]:h-full">
           <StatCard
-            label="Fund Balance"
+            label="Remaining Balance"
             value={formatMoney(cashOnHand)}
             icon={Wallet}
             loading={isLoading}
@@ -96,38 +90,41 @@ export function ReimbursementOverview({
                     }
                   : undefined
             }
-            stats={balanceStats}
-          />
-        </motion.div>
-
-        <motion.div variants={item} className="h-full min-w-0 [&>div]:h-full">
-          <AbonoStatCard
-            isLoading={isLoading}
-            openTotal={abono.openTotal}
-            openCount={abono.openCount}
-            employees={abono.employees}
-            series={abonoSeries}
+            breakdownCaption="Remaining"
+            breakdown={cashOnHandBreakdown}
           />
         </motion.div>
 
         <motion.div variants={item} className="h-full min-w-0 [&>div]:h-full">
           <StatCard
-            label="Abono Records"
-            value={recordCount}
+            label="Total Expenses"
+            value={formatMoney(totalSpend)}
+            icon={ReceiptText}
+            loading={isLoading}
+            breakdownCaption="Summary"
+            breakdown={expensesSummary}
+          />
+        </motion.div>
+
+        <motion.div variants={item} className="h-full min-w-0 [&>div]:h-full">
+          <StatCard
+            label="Total Abono"
+            value={formatMoney(openTotal)}
             icon={ClipboardList}
             loading={isLoading}
-            chart="bars"
-            data={recordSeries}
-            stats={recordStats}
+            breakdownCaption="Reimbursements"
+            breakdown={reimbursementRows}
           />
         </motion.div>
       </motion.div>
 
       <p className="px-1 text-xs text-[var(--ink-muted)]">
-        Fund-pool view — Money In counts live budget allocations only · Fund
-        Balance is Budget Given − Issued − Open Abono · Settled abono was
-        reimbursed and no longer funds the pool · Rows under a cut-off source
-        leave no footsteps anywhere on this page
+        Fund-pool view — Money In counts live budget allocations only · My
+        Balance is Budget Given − Issued − Spent (same as Expenses → My Balance)
+        · Expenses Summary hero matches Expenses → Total Expenses (Issued +
+        admin Spent); its Total Spent row adds all-personnel spend on top ·
+        Settled abono was reimbursed and no longer funds the pool · Rows under a
+        cut-off source leave no footsteps anywhere on this page
       </p>
     </section>
   );

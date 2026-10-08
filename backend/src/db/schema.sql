@@ -146,6 +146,8 @@ CREATE TABLE IF NOT EXISTS issued_budget (
                   ON DELETE CASCADE,
     amount        DECIMAL(12,2) NOT NULL,
     description   TEXT NOT NULL,
+    status          VARCHAR(20) NOT NULL DEFAULT 'added'
+                    CHECK (status IN ('added', 'cancel')),
     method        VARCHAR(255) NOT NULL,
     receipt_id    UUID
                   REFERENCES receipt(id)
@@ -263,20 +265,6 @@ CREATE TABLE IF NOT EXISTS expenses (
     created_at     TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     updated_at     TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     CHECK (total_amount >= 0)
-);
-
-
--- ============================================================
--- AUDIT LOGS
--- ============================================================
-
-CREATE TABLE IF NOT EXISTS audit_logs (
-    id             UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    user_id        UUID NOT NULL
-                   REFERENCES users(user_id)
-                   ON DELETE CASCADE,
-    log_description TEXT NOT NULL,
-    created_at     TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
 
@@ -460,18 +448,3 @@ CREATE INDEX IF NOT EXISTS idx_expenses_issued_ref_status
 CREATE INDEX IF NOT EXISTS idx_expenses_issued_ref_created
     ON expenses(issued_ref_id, created_at);
 
-
--- ------------------------------------------------------------
--- AUDIT LOG INDEXES
--- ------------------------------------------------------------
-
-CREATE INDEX IF NOT EXISTS idx_audit_logs_user_id
-    ON audit_logs(user_id);
-
-CREATE INDEX IF NOT EXISTS idx_audit_logs_created_at
-    ON audit_logs(created_at);
-
-
--- ============================================================
--- END OF SCHEMA
--- ============================================================

@@ -1,10 +1,15 @@
+import { useState } from "react";
 import { Check } from "lucide-react";
 
 // Avatar chip behind the employee dropdown — the same initials fallback the
 // ledger's EmployeeCell uses, so a user without a stored avatar still reads
 // as a person instead of an empty circle.
 const EmployeeAvatar = ({ option }) => {
-  const src = option?.avatar;
+  // Tracks WHICH url failed so a new avatar auto-retries with no useEffect.
+  const [failedUrl, setFailedUrl] = useState(null);
+  const rawSrc = option?.avatar;
+  const src = typeof rawSrc === "string" ? rawSrc.trim() : rawSrc;
+  const showImage = !!src && failedUrl !== src;
   const initials = String(option?.label ?? "")
     .split(" ")
     .filter(Boolean)
@@ -12,11 +17,12 @@ const EmployeeAvatar = ({ option }) => {
     .map((part) => part[0].toUpperCase())
     .join("");
 
-  if (src) {
+  if (showImage) {
     return (
       <img
         src={src}
         alt=""
+        onError={() => setFailedUrl(src)}
         className="h-6 w-6 shrink-0 rounded-full object-cover ring-1 ring-[var(--border)]"
       />
     );

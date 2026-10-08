@@ -5,7 +5,6 @@ import {
   EllipsisVertical,
   Eye,
   Flag,
-  ReceiptText,
   RotateCcw,
   Trash2,
   Wallet,
@@ -332,12 +331,20 @@ function initialsOf(name) {
 
 function EmployeeCell({ name, role, avatarUrl, size = "md" }) {
   const compact = size === "sm";
+  // Tracks WHICH url failed (not just a boolean) so a new avatarUrl
+  // automatically retries without needing a useEffect reset.
+  const [failedUrl, setFailedUrl] = useState(null);
+  // Normalize so empty strings / whitespace don't produce a broken <img>.
+  const cleanUrl = typeof avatarUrl === "string" ? avatarUrl.trim() : avatarUrl;
+  const showImage = !!cleanUrl && failedUrl !== cleanUrl;
+
   return (
     <div className="flex items-center gap-3">
-      {avatarUrl ? (
+      {showImage ? (
         <img
-          src={avatarUrl}
+          src={cleanUrl}
           alt=""
+          onError={() => setFailedUrl(cleanUrl)}
           className={cn(
             "shrink-0 rounded-full object-cover ring-1 ring-[var(--border)]",
             compact ? "h-8 w-8" : "h-8 w-8",

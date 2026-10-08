@@ -14,6 +14,10 @@ const toMoney = (value) => Math.round((Number(value) || 0) * 100) / 100;
 //                   budget_issued_reference rows.
 //   - openAbono:    SUM(employee_abono.amount) of OPEN rows — a settled
 //                   (reimbursed) abono no longer funds the pool.
+//   - spent:        SUM(expenses.total_amount) of PAID admin rows only —
+//                   mirrors ExpenseOverview's totalExpenses (employee spend
+//                   already left the pool as `issued`, so counting it again
+//                   would subtract it twice).
 //   - cash:         what the pool still holds (given − issued − open abono).
 //   - personnel:    one row per account holding an OPEN issuance, grouped by
 //                   budget_issued_reference.user_id joined through
@@ -26,8 +30,16 @@ class EmployeeReimbursement {
   }
 
   static async overview() {
-    const [totalsResult, byEmployeeResult, timelineResult, personnelRows] =
-      await Promise.all([
+    const [
+      totalsResult,
+      byEmployeeResult,
+      timelineResult,
+      personnelRows,
+      givenBreakdownResult,
+      issuedBreakdownResult,
+      spentBreakdownResult,
+      issuedStatusCountsResult,
+    ] = await Promise.all([
         query(
           `SELECT
              COALESCE((
@@ -44,14 +56,15 @@ class EmployeeReimbursement {
                 WHERE b.status != 'cancelled'
                   AND br.status = 'open'
              ), 0)::int AS given_sources,
-             COALESCE((
-               SELECT SUM(ib.amount)
-                 FROM budget_issued_reference bir
-                 JOIN issued_budget ib ON ib.issued_ref_id = bir.id
-                 JOIN budget_reference br ON br.reference_id = bir.reference_id
-                WHERE bir.status = 'open'
-                  AND br.status = 'open'
-             ), 0)::float8 AS issued,
+              COALESCE((
+                SELECT SUM(ib.amount)
+                  FROM budget_issued_reference bir
+                  JOIN issued_budget ib ON ib.issued_ref_id = bir.id
+                  JOIN budget_reference br ON br.reference_id = bir.reference_id
+                 WHERE bir.status = 'open'
+                   AND br.status = 'open'
+                   AND ib.status != 'cancel'
+              ), 0)::float8 AS issued,
              COALESCE((
                SELECT SUM(ea.amount)
                  FROM employee_abono ea
@@ -87,13 +100,15 @@ class EmployeeReimbursement {
                 WHERE bir.status = 'open'
                   AND br.status = 'open'
              ), 0)::int AS personnel_count,
-             COALESCE((
-               SELECT SUM(e.total_amount)
-                 FROM expenses e
-                 LEFT JOIN budget_reference br ON br.reference_id = e.reference_id
-                WHERE e.status = 'paid'
-                  AND (e.reference_id IS NULL OR br.status = 'open')
-             ), 0)::float8 AS spent`,
+              COALESCE((
+                SELECT SUM(e.total_amount)
+                  FROM expenses e
+                  JOIN users u ON u.user_id = e.user_id
+                  LEFT JOIN budget_reference br ON br.reference_id = e.reference_id
+                 WHERE e.status = 'paid'
+                   AND u.role = 'admin'
+                   AND (e.reference_id IS NULL OR br.status = 'open')
+              ), 0)::float8 AS spent`,
         ),
         query(
           `SELECT u.user_id,
@@ -136,16 +151,26 @@ class EmployeeReimbursement {
                   COALESCE(STRING_AGG(DISTINCT br.label, ', '), '') AS reference_labels,
                   COUNT(DISTINCT bir.reference_id)::int AS reference_count,
                   COALESCE(SUM(ib.amount), 0)::float8 AS issued,
+                  COUNT(ib.id)::int AS issued_count,
                   COALESCE(ab.open_abono, 0)::float8 AS open_abono,
                   COALESCE(ab.open_abono_count, 0)::int AS open_abono_count,
                   COALESCE(ex.spent, 0)::float8 AS spent,
-                  COALESCE(ex.expense_count, 0)::int AS expense_count
+                  COALESCE(ex.expense_count, 0)::int AS expense_count,
+                  COALESCE((
+                    SELECT STRING_AGG(DISTINCT bir2.status, ',' ORDER BY bir2.status)
+                      FROM budget_issued_reference bir2
+                      JOIN budget_reference br2 ON br2.reference_id = bir2.reference_id
+                       AND br2.status = 'open'
+                     WHERE bir2.user_id = u.user_id
+                  ), '') AS bir_statuses
              FROM users u
              JOIN budget_issued_reference bir ON bir.user_id = u.user_id
                AND bir.status = 'open'
              JOIN budget_reference br ON br.reference_id = bir.reference_id
                AND br.status = 'open'
-             LEFT JOIN issued_budget ib ON ib.issued_ref_id = bir.id
+              LEFT JOIN issued_budget ib
+                ON ib.issued_ref_id = bir.id
+               AND ib.status != 'cancel'
              LEFT JOIN (
                SELECT ea.user_id,
                       SUM(ea.amount)::float8 AS open_abono,
@@ -166,9 +191,72 @@ class EmployeeReimbursement {
                   AND (e.reference_id IS NULL OR br3.status = 'open')
                 GROUP BY e.user_id
              ) ex ON ex.user_id = u.user_id
-            GROUP BY u.user_id, u.name, u.email, u.avatar_url, u.role,
+             GROUP BY u.user_id, u.name, u.email, u.avatar_url, u.role,
                      ab.open_abono, ab.open_abono_count, ex.spent, ex.expense_count
-            ORDER BY issued DESC`,
+             ORDER BY issued DESC`,
+        ),
+        // Per-reference allocation list for the Money In card — same shape
+        // as Budget.budgetOverview().overviewBudget so the frontend can
+        // render the identical "Allocated" breakdown.
+        query(
+          `SELECT
+              br.reference_id,
+              br.label,
+              br.created_at,
+              COALESCE(SUM(b.amount), 0)::float8 AS amount
+             FROM budget_reference br
+             LEFT JOIN budget b ON b.reference_id = br.reference_id
+            WHERE b.status != 'cancelled'
+              AND br.status = 'open'
+            GROUP BY br.reference_id, br.label, br.created_at
+            ORDER BY br.created_at DESC`,
+        ),
+        // Per-reference issuance list for the My Balance "Remaining"
+        // breakdown — same shape as Budget's overviewIssuedBudget.
+        query(
+          `SELECT
+              br.reference_id,
+              br.label,
+              br.created_at,
+              COALESCE(SUM(ib.amount), 0)::float8 AS amount
+             FROM budget_issued_reference bir
+             JOIN issued_budget ib ON ib.issued_ref_id = bir.id
+             JOIN budget_reference br ON br.reference_id = bir.reference_id
+            WHERE bir.status = 'open'
+              AND br.status = 'open'
+              AND ib.status != 'cancel'
+            GROUP BY br.reference_id, br.label, br.created_at
+            ORDER BY br.created_at DESC`,
+        ),
+        // Per-reference admin-spend list for the My Balance "Remaining"
+        // breakdown. LEFT JOIN (not INNER) so untagged admin expenses land
+        // in their own NULL group instead of vanishing — the groups must
+        // partition the headline `spent` exactly.
+        query(
+          `SELECT
+              br.reference_id,
+              br.label,
+              br.created_at,
+              COALESCE(SUM(e.total_amount), 0)::float8 AS amount
+             FROM expenses e
+             JOIN users u ON u.user_id = e.user_id
+             LEFT JOIN budget_reference br ON br.reference_id = e.reference_id
+            WHERE e.status = 'paid'
+              AND u.role = 'admin'
+              AND (e.reference_id IS NULL OR br.status = 'open')
+            GROUP BY br.reference_id, br.label, br.created_at
+            ORDER BY br.created_at DESC NULLS LAST`,
+        ),
+        // Issuance counts by `budget_issued_reference.status` for the Total
+        // Abono card rows. Scoped to open sources like every other figure on
+        // the page (rows under a cut-off source leave no footsteps).
+        query(
+          `SELECT bir.status,
+                  COUNT(*)::int AS n
+             FROM budget_issued_reference bir
+             JOIN budget_reference br ON br.reference_id = bir.reference_id
+            WHERE br.status = 'open'
+            GROUP BY bir.status`,
         ),
       ]);
 
@@ -182,6 +270,31 @@ class EmployeeReimbursement {
       moneyIn: given,
       given,
       givenSources: Number(t.given_sources) || 0,
+      givenBreakdown: (givenBreakdownResult.rows ?? []).map((r) => ({
+        reference_id: r.reference_id,
+        label: r.label,
+        created_at: r.created_at,
+        amount: toMoney(r.amount),
+      })),
+      issuedBreakdown: (issuedBreakdownResult.rows ?? []).map((r) => ({
+        reference_id: r.reference_id,
+        label: r.label,
+        created_at: r.created_at,
+        amount: toMoney(r.amount),
+      })),
+      spentBreakdown: (spentBreakdownResult.rows ?? []).map((r) => ({
+        reference_id: r.reference_id,
+        label: r.label ?? "No source of funds",
+        created_at: r.created_at,
+        amount: toMoney(r.amount),
+      })),
+      issuedStatusCounts: (() => {
+        const counts = { open: 0, close: 0, cancel: 0 };
+        for (const r of issuedStatusCountsResult.rows ?? []) {
+          if (r.status in counts) counts[r.status] = Number(r.n) || 0;
+        }
+        return counts;
+      })(),
       abonoIn: openAbono,
       abonoCount,
       budget: given,
@@ -217,10 +330,12 @@ class EmployeeReimbursement {
           referenceLabels: r.reference_labels || "",
           referenceCount: Number(r.reference_count) || 0,
           issued: rowIssued,
+          issuedCount: Number(r.issued_count) || 0,
           openAbono: rowAbono,
           openAbonoCount: Number(r.open_abono_count) || 0,
           spent: rowSpent,
           expenseCount: Number(r.expense_count) || 0,
+          birStatuses: r.bir_statuses || "",
           balance: toMoney(rowIssued + rowAbono - rowSpent),
         };
       }),

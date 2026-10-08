@@ -39,6 +39,7 @@ class EmployeeOverview {
             JOIN budget_reference br ON br.reference_id = bir.reference_id
             WHERE bir.user_id = $1 AND bir.status = 'open'
               AND br.status = 'open'
+              AND ib.status != 'cancel'
           ), 0)::float8 AS total_budget,
           COALESCE((
             SELECT COUNT(*)

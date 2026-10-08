@@ -66,11 +66,11 @@ function DialogShell({
 }
 /**
  * Row-level actions for the Budget Issued Transaction table. The trigger
- * follows the issuance status:
- *   - 'open'   → a "Cancel" trigger that opens a destructive-confirmation
+ * follows the `issued_budget` row status:
+ *   - 'added'  → a "Cancel" trigger that opens a destructive-confirmation
  *                dialog; confirming calls `onAction("cancel", transaction)`.
  *   - 'cancel' → a "Restore" trigger that calls `onAction("restore", …)`
- *                directly (the issuance is put back to 'open'), plus a
+ *                directly (the issuance is put back to 'added'), plus a
  *                danger-toned "Delete record" trigger (separated in the menu)
  *                that opens a second confirmation dialog; confirming calls
  *                `onAction("delete", transaction)` for a permanent hard
@@ -225,10 +225,10 @@ export function IssuedTransactionActions({
   };
 
   // The menu holds the status-driven items, mirroring the inline pills:
-  // 'open' rows cancel through the confirmation dialog; 'cancel' rows restore
-  // directly and additionally offer a danger-toned "Delete record" item past
-  // a separator (permanent hard delete through its own confirm dialog).
-  // Closed rows never reach the menu — they keep the chip.
+  // 'added' rows cancel through the confirmation dialog; 'cancel' rows
+  // restore directly and additionally offer a danger-toned "Delete record"
+  // item past a separator (permanent hard delete through its own confirm
+  // dialog). Closed rows never reach the menu — they keep the chip.
   const closedChip = (
     <span className="inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-sm font-normal transition-colors focus-visible:outline-none focus-visible:ring-2 text-[var(--ink-muted)] bg-[var(--ink)]/14 text-[var(--ink)]">
       <Flag size={13} strokeWidth={2.5} aria-hidden />
@@ -239,7 +239,7 @@ export function IssuedTransactionActions({
   return (
     <>
       {variant === "menu" ? (
-        transaction.status === "open" || transaction.status === "cancel" ? (
+        transaction.status === "added" || transaction.status === "cancel" ? (
           <>
             <button
               ref={triggerRef}
@@ -267,7 +267,7 @@ export function IssuedTransactionActions({
                   style={{ top: position.top, right: position.right }}
                   className="fixed z-[70] min-w-[11rem] overflow-hidden rounded-2xl border border-[var(--border)] bg-[var(--surface)] py-1 shadow-hover"
                 >
-                  {transaction.status === "open" ? (
+                  {transaction.status === "added" ? (
                     <button
                       type="button"
                       role="menuitem"
@@ -329,7 +329,7 @@ export function IssuedTransactionActions({
         ) : (
           closedChip
         )
-      ) : transaction.status === "open" ? (
+      ) : transaction.status === "added" ? (
         <button
           ref={triggerRef}
           type="button"

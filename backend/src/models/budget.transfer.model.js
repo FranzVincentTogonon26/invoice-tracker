@@ -37,6 +37,7 @@ class BudgetTransfer {
                 FROM budget_issued_reference bir
                 JOIN issued_budget ib ON ib.issued_ref_id = bir.id
                WHERE bir.status = 'open'
+                 AND ib.status != 'cancel'
             ), 0)::float8 AS issued,
             COALESCE((
               SELECT SUM(e.total_amount)
@@ -71,6 +72,7 @@ class BudgetTransfer {
               FROM budget_issued_reference bir
               JOIN issued_budget ib ON ib.issued_ref_id = bir.id
              WHERE bir.user_id = $1 AND bir.status = 'open'
+               AND ib.status != 'cancel'
           ), 0)::float8 AS total_budget,
           COALESCE((
             SELECT SUM(e.total_amount)
@@ -120,6 +122,7 @@ class BudgetTransfer {
                 FROM budget_issued_reference bir
                 JOIN issued_budget ib ON ib.issued_ref_id = bir.id
                WHERE bir.status = 'open'
+                 AND ib.status != 'cancel'
             ), 0)::float8 AS issued,
             COALESCE((
               SELECT SUM(e.total_amount)
@@ -159,6 +162,7 @@ class BudgetTransfer {
               FROM budget_issued_reference bir
               JOIN issued_budget ib ON ib.issued_ref_id = bir.id
              WHERE bir.user_id = $1 AND bir.status = 'open'
+               AND ib.status != 'cancel'
           ), 0)::float8 AS total_budget,
           COALESCE((
             SELECT SUM(e.total_amount)
@@ -318,6 +322,7 @@ class BudgetTransfer {
                 JOIN budget_reference br ON br.reference_id = bir.reference_id
                WHERE bir.status = 'open'
                  AND br.status = 'open'
+                 AND ib.status != 'cancel'
             ), 0)::float8 AS issued,
             COALESCE((
               SELECT SUM(e.total_amount)
@@ -377,6 +382,7 @@ class BudgetTransfer {
                       JOIN issued_budget ib ON ib.issued_ref_id = bir.id
                      WHERE bir.status = 'open'
                        AND bir.reference_id = br.reference_id
+                       AND ib.status != 'cancel'
                   ), 0)
                   - COALESCE((
                     SELECT SUM(e.total_amount)
@@ -451,6 +457,7 @@ class BudgetTransfer {
               JOIN budget_reference br ON br.reference_id = bir.reference_id
              WHERE bir.user_id = $1 AND bir.status = 'open'
                AND br.status = 'open'
+               AND ib.status != 'cancel'
           ), 0)::float8 AS total_budget,
           COALESCE((
             SELECT SUM(e.total_amount)
@@ -630,6 +637,7 @@ class BudgetTransfer {
                   FROM budget_issued_reference bir
                   JOIN issued_budget ib ON ib.issued_ref_id = bir.id
                  WHERE bir.user_id = $1 AND bir.status = 'open'
+                   AND ib.status != 'cancel'
               ), 0)::float8 AS total_budget,
               COALESCE((
                 SELECT SUM(e.total_amount)

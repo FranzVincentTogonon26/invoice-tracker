@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { HandCoins } from "lucide-react";
 import { Badge, StatusBadge } from "../../../ui/Badge";
 import { MethodIcon } from "../../../ui/Select";
@@ -21,12 +22,20 @@ export function EmployeeCell({ name, role, avatarUrl, size = "md" }) {
   // "sm" fits narrow ledger columns (Expenses table); "md" is the original
   // Budget Issued Transaction sizing.
   const compact = size === "sm";
+  // Tracks WHICH url failed (not just a boolean) so a new avatarUrl
+  // automatically retries without needing a useEffect reset.
+  const [failedUrl, setFailedUrl] = useState(null);
+  // Normalize so empty strings / whitespace don't produce a broken <img>.
+  const cleanUrl = typeof avatarUrl === "string" ? avatarUrl.trim() : avatarUrl;
+  const showImage = !!cleanUrl && failedUrl !== cleanUrl;
+
   return (
     <div className="flex items-center gap-3">
-      {avatarUrl ? (
+      {showImage ? (
         <img
-          src={avatarUrl}
+          src={cleanUrl}
           alt=""
+          onError={() => setFailedUrl(cleanUrl)}
           className={cn(
             "shrink-0 rounded-full object-cover ring-1 ring-[var(--border)]",
             compact ? "h-8 w-8" : "h-8 w-8",
@@ -143,9 +152,8 @@ export function IssuedTransactionRow({ transaction: t, onAction }) {
         <DateIssuedCell date={t.date_issued} />
       </td>
       <td className="px-4 py-3.5 text-center align-middle">
-        {/* Shared StatusBadge so the tone follows the real status — a
-            cancelled issuance reads red, not the old hard-coded green. */}
-        <StatusBadge status={t.status} />
+        {/* Label-only pill in this column — dot hidden per design. */}
+        <StatusBadge status={t.status} dot={false} />
       </td>
       <td className="px-4 py-3.5 pr-5 align-middle">
         <div className="flex justify-end">

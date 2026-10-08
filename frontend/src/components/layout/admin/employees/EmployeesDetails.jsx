@@ -1,5 +1,5 @@
 import { useMemo, useRef, useState } from "react";
-import { useNavigate, useParams } from "react-router-dom";
+import { useNavigate, useParams, useSearchParams } from "react-router-dom";
 import toast from "react-hot-toast";
 import { CalendarDays, Files, Loader2, Pencil, UserX } from "lucide-react";
 import { Badge } from "@/components/ui/Badge";
@@ -40,8 +40,17 @@ import { TAB_META } from "@/lib/employeeDetailsTabs";
 export default function AdminEmployeesDetails() {
   const { id } = useParams();
   const nav = useNavigate();
+  const [searchParams] = useSearchParams();
 
-  const [tab, setTab] = useState("employee_transaction");
+  // Deep link support (e.g. `?tab=employee_abono` from the reimbursement
+  // personnel table) — unknown values fall back to the first panel, same as
+  // EmployeeDetailsTabs does for bad links.
+  const requestedTab = searchParams.get("tab");
+  const [tab, setTab] = useState(
+    TAB_META.some((t) => t.value === requestedTab)
+      ? requestedTab
+      : "employee_transaction",
+  );
   // +1 slides the next panel in from the right, -1 from the left — the panel
   // transition follows the tab order.
   const [direction, setDirection] = useState(1);

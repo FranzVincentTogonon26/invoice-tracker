@@ -124,8 +124,14 @@ const BudgetIssuedTransaction = () => {
     }
   };
 
-  // The hook already resolves `data` to an array.
-  const rows = useMemo(() => data ?? [], [data]);
+  // The hook already resolves `data` to an array. Normalize each row's
+  // status to the `issued_budget` child's own vocabulary ('added'/'cancel')
+  // — the badge, the status filter and the row actions below all speak it.
+  const rows = useMemo(
+    () =>
+      (data ?? []).map((r) => ({ ...r, status: r.issued_status ?? r.status })),
+    [data],
+  );
 
   // ── Dropdown options (derived client-side from the loaded rows) ─────────
 

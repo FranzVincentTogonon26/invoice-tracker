@@ -176,7 +176,11 @@ export const TransactionsSectionExpenses = ({
 
   const filteredTransactions = useMemo(
     () =>
-      filterExpenseSectionTransactions(transactions, debouncedSearch, dateRange),
+      filterExpenseSectionTransactions(
+        transactions,
+        debouncedSearch,
+        dateRange,
+      ),
     [transactions, debouncedSearch, dateRange],
   );
 

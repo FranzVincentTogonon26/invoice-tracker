@@ -4,32 +4,44 @@ import { cn } from "@/lib/utils";
 
 /**
  * Employee avatar: real `<img>` when `avatar_url` exists (falls back to the
- * initial-letter circle on load error), otherwise the initial-letter circle.
+ * initials circle on load error), otherwise the initials circle.
+ * Empty / whitespace URLs never render an <img> so no broken-image icon appears.
  */
 export function EmployeeAvatar({ name, avatarUrl, className }) {
-  const [failed, setFailed] = useState(false);
-  const initial = name?.[0]?.toUpperCase() || "?";
+  // Tracks WHICH url failed (not just a boolean) so a new avatarUrl
+  // automatically retries without needing a useEffect reset.
+  const [failedUrl, setFailedUrl] = useState(null);
+  const cleanUrl =
+    typeof avatarUrl === "string" ? avatarUrl.trim() : avatarUrl;
+  const showImage = !!cleanUrl && failedUrl !== cleanUrl;
+  const initials =
+    String(name || "?")
+      .split(" ")
+      .filter(Boolean)
+      .slice(0, 2)
+      .map((part) => part[0].toUpperCase())
+      .join("") || "?";
 
-  const fallback = (
-    <span
-      className={cn(
-        "h-8 w-8 rounded-full bg-[var(--accent-soft)] text-[var(--accent-strong)] font-medium flex items-center justify-center text-sm ring-1 ring-[var(--surface)] shrink-0",
-        className,
-      )}
-      aria-hidden
-    >
-      {initial}
-    </span>
-  );
-
-  if (!avatarUrl || failed) return fallback;
+  if (!showImage) {
+    return (
+      <span
+        className={cn(
+          "h-8 w-8 rounded-full bg-[var(--accent-soft)] text-[var(--accent-strong)] font-medium flex items-center justify-center text-sm ring-1 ring-[var(--surface)] shrink-0",
+          className,
+        )}
+        aria-hidden
+      >
+        {initials}
+      </span>
+    );
+  }
 
   return (
     <img
-      src={avatarUrl}
+      src={cleanUrl}
       alt=""
       aria-hidden
-      onError={() => setFailed(true)}
+      onError={() => setFailedUrl(cleanUrl)}
       className={cn(
         "h-8 w-8 rounded-full object-cover ring-2 ring-[var(--surface)] shrink-0",
         className,

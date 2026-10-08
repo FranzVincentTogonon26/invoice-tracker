@@ -1,4 +1,3 @@
-import { Flag } from "lucide-react";
 import { cn, formatMoney, methodLabel } from "@/lib/utils";
 import {
   formatShortExpenseDate,
@@ -33,8 +32,6 @@ export function ExpenseTransactionCard({ tx, meta, disabled, onOpen }) {
       className={cn(
         "relative flex items-center justify-between gap-3 overflow-hidden rounded-2xl border border-[var(--border)] bg-[var(--surface-2)]/60 px-2.5 py-3 transition-shadow hover:shadow-card",
         actionable && !disabled && "cursor-pointer active:scale-[0.99]",
-        flagged &&
-          "border-[var(--warning)]/50 bg-[var(--warning)]/[0.08] ring-1 ring-inset ring-[var(--warning)]/25",
       )}
     >
       <div className="flex min-w-0 flex-1 items-center gap-3">
@@ -60,7 +57,6 @@ export function ExpenseTransactionCard({ tx, meta, disabled, onOpen }) {
                 className="shrink-0 gap-1 px-1.5 py-0.5 text-[10px]"
                 title="Flagged — dated before the first budget issued to you"
               >
-                <Flag size={10} aria-hidden className="shrink-0" />
                 Flagged
               </Badge>
             )}

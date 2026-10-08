@@ -91,12 +91,21 @@ function initialsOf(name) {
 }
 
 function PersonCell({ name, role, avatarUrl, fallback = "System" }) {
+  // Tracks WHICH url failed (not just a boolean) so a new avatarUrl
+  // automatically retries without needing a useEffect reset.
+  const [failedUrl, setFailedUrl] = useState(null);
+  // Normalize so empty strings / whitespace don't produce a broken <img>.
+  const cleanUrl =
+    typeof avatarUrl === "string" ? avatarUrl.trim() : avatarUrl;
+  const showImage = !!cleanUrl && failedUrl !== cleanUrl;
+
   return (
     <div className="flex items-center gap-2.5">
-      {avatarUrl ? (
+      {showImage ? (
         <img
-          src={avatarUrl}
+          src={cleanUrl}
           alt=""
+          onError={() => setFailedUrl(cleanUrl)}
           className="h-7 w-7 shrink-0 rounded-full object-cover ring-1 ring-[var(--border)]"
         />
       ) : (

@@ -1,19 +1,24 @@
 import { useMemo } from "react";
+import { useNavigate } from "react-router-dom";
 import { Inbox } from "lucide-react";
 import { PageHeader } from "../../components/ui/PageHeader";
 import { Button } from "../../components/ui/Button";
 import { Card } from "../../components/ui/Card";
-import { formatMoney } from "@/lib/utils";
-import {
-  buildRangeSeries,
-  rowsWindow,
-} from "@/lib/transactionLedger";
+import { formatDate, formatMoney } from "@/lib/utils";
 import { useReimbursementOverview } from "../../hooks/useEmployeeReimbursement";
 import { ReimbursementOverview } from "../../components/layout/admin/reimbursement/ReimbursementOverview";
 import { ReimbursementPersonnelTable } from "../../components/layout/admin/reimbursement/ReimbursementPersonnelTable";
 
 const AdminEmployeeReimbursement = () => {
+  const nav = useNavigate();
   const { data, isLoading, error, refetch } = useReimbursementOverview();
+
+  const handleViewEmployee = (row) => {
+    if (row?.userId) nav(`/admin/employees/${row.userId}`);
+  };
+  const handleViewReimbursement = (row) => {
+    if (row?.userId) nav(`/admin/employees/${row.userId}?tab=employee_abono`);
+  };
 
   const moneyIn = Number(data?.moneyIn ?? 0);
   const given = Number(data?.given ?? 0);
@@ -24,13 +29,27 @@ const AdminEmployeeReimbursement = () => {
   const issued = Number(data?.issued ?? 0);
   const openAbono = Number(data?.openAbono ?? 0);
   const spent = Number(data?.spent ?? 0);
-  const settledAbonoCount = Number(data?.settledAbonoCount ?? 0);
-  const personnelCount = Number(data?.personnelCount ?? 0);
-  const abonoByEmployee = data?.abonoByEmployee ?? [];
-  const timeline = data?.timeline ?? [];
+  const openIssuedCount = Number(data?.issuedStatusCounts?.open ?? 0);
+  const closeIssuedCount = Number(data?.issuedStatusCounts?.close ?? 0);
   const personnel = data?.personnel ?? [];
+  const givenBreakdown = data?.givenBreakdown ?? [];
+  const issuedBreakdown = data?.issuedBreakdown ?? [];
+  const spentBreakdown = data?.spentBreakdown ?? [];
 
-  const cashOnHand = budget - issued - openAbono;
+  // Fund Balance mirrors ExpenseOverview's My Balance:
+  // MoneyIn − (Issued + Spent). (The reverse order would always read
+  // negative and falsely trip the Overdrawn state.)
+  const cashOnHand = budget - (issued + spent);
+  // Expenses Summary hero mirrors ExpenseOverview's Total Expenses headline:
+  // Issued + admin Spent. (The "Total Spent (Admin/Employee)" bullet row below
+  // additionally folds in all-personnel spend, so the rows no longer sum to
+  // the hero — that row is informational by design.)
+  const personnelSpentTotal = useMemo(
+    () => personnel.reduce((sum, row) => sum + (Number(row.spent) || 0), 0),
+    [personnel],
+  );
+  const combinedSpentTotal = personnelSpentTotal + spent;
+  const totalSpend = issued + spent;
   const isBalanceOverdrawn = cashOnHand < -0.004;
   const isBalanceDepleted =
     !isBalanceOverdrawn && Math.abs(cashOnHand) < 0.005 && budget > 0;
@@ -46,64 +65,72 @@ const AdminEmployeeReimbursement = () => {
     [moneyIn, given, givenSources, abonoIn, abonoCount],
   );
 
-  const balanceStats = useMemo(
-    () => [
-      {
-        key: "issued",
-        label: "Issued",
-        value: issued > 0 ? `-${formatMoney(issued)}` : formatMoney(0),
-        tone: "warning",
-      },
-      {
-        key: "expenses",
-        label: "Spent",
-        value: spent > 0 ? `-${formatMoney(spent)}` : formatMoney(0),
+  // Per-reference remaining = allocated − issued − spent (same formula as
+  // the headline balance, just scoped to each budget source — mirrors
+  // AdminBudget's cashOnHandBreakdown).
+  const issuedByReference = useMemo(
+    () =>
+      new Map(
+        issuedBreakdown.map((row) => [row.reference_id, Number(row.amount || 0)]),
+      ),
+    [issuedBreakdown],
+  );
+  const spentByReference = useMemo(
+    () =>
+      new Map(
+        spentBreakdown.map((row) => [
+          row.reference_id ?? "__untagged",
+          Number(row.amount || 0),
+        ]),
+      ),
+    [spentBreakdown],
+  );
+  const cashOnHandBreakdown = useMemo(() => {
+    const rows = givenBreakdown.map((row, i) => {
+      const issuedAmt = issuedByReference.get(row.reference_id) ?? 0;
+      const spentAmt = spentByReference.get(row.reference_id) ?? 0;
+      const remaining = Number(row.amount || 0) - issuedAmt - spentAmt;
+      return {
+        key: row.reference_id ?? i,
+        label: row.label ?? "Untitled reference",
+        value: formatMoney(remaining),
+        hint: formatDate(row.created_at),
+        tone: remaining < 0 ? "danger" : undefined,
+      };
+    });
+    // Untagged admin spend belongs to no source — show it as its own row so
+    // the breakdown still sums to the headline balance.
+    const untagged = spentByReference.get("__untagged") ?? 0;
+    if (untagged > 0) {
+      rows.push({
+        key: "untagged",
+        label: "No source of funds",
+        value: formatMoney(-untagged),
+        hint: "Untagged",
         tone: "danger",
-      },
-    ],
-    [issued, spent],
-  );
+      });
+    }
+    return rows;
+  }, [givenBreakdown, issuedByReference, spentByReference]);
 
-  const inEvents = useMemo(
-    () => timeline.filter((e) => e.kind === "given"),
-    [timeline],
-  );
-  const abonoEvents = useMemo(
-    () => timeline.filter((e) => e.kind === "open"),
-    [timeline],
-  );
-  const recordEvents = useMemo(
-    () => timeline.filter((e) => e.kind === "open" || e.kind === "settled"),
-    [timeline],
-  );
-
-  const inSeries = useMemo(
-    () =>
-      buildRangeSeries(rowsWindow(inEvents), inEvents, (r) => Number(r.amount) || 0, 7),
-    [inEvents],
-  );
-  const abonoSeries = useMemo(
-    () =>
-      buildRangeSeries(rowsWindow(abonoEvents), abonoEvents, (r) => Number(r.amount) || 0, 7),
-    [abonoEvents],
-  );
-  const recordSeries = useMemo(
-    () => buildRangeSeries(rowsWindow(recordEvents), recordEvents, () => 1, 7),
-    [recordEvents],
-  );
-
-  const recordStats = useMemo(
+  const expensesSummary = useMemo(
     () => [
-      { key: "open", label: "Open", value: abonoCount, tone: "warning" },
+      { key: "issued", label: "Total Issued", value: formatMoney(issued) },
       {
-        key: "settled",
-        label: "Settled",
-        value: settledAbonoCount,
-        tone: "success",
+        key: "spent",
+        label: "Total Spent (Admin/Employee)",
+        value: formatMoney(combinedSpentTotal),
       },
-      { key: "personnel", label: "Personnel", value: personnelCount },
     ],
-    [abonoCount, settledAbonoCount, personnelCount],
+    [issued, combinedSpentTotal],
+  );
+
+  const reimbursementRows = useMemo(
+    () => [
+      { key: "open", label: "Open reimbursement", value: openIssuedCount },
+      { key: "close", label: "Close reimbursement", value: closeIssuedCount },
+    ],
+    [openIssuedCount, closeIssuedCount],
   );
 
   return (
@@ -135,22 +162,22 @@ const AdminEmployeeReimbursement = () => {
           <ReimbursementOverview
             isLoading={isLoading}
             totals={totals}
-            inSeries={inSeries}
+            givenBreakdown={givenBreakdown}
             cashOnHand={cashOnHand}
             isBalanceOverdrawn={isBalanceOverdrawn}
             isBalanceDepleted={isBalanceDepleted}
-            balanceStats={balanceStats}
-            abono={{
-              openTotal: openAbono,
-              openCount: abonoCount,
-              employees: abonoByEmployee,
-            }}
-            abonoSeries={abonoSeries}
-            recordCount={abonoCount}
-            recordSeries={recordSeries}
-            recordStats={recordStats}
+            cashOnHandBreakdown={cashOnHandBreakdown}
+            totalSpend={totalSpend}
+            expensesSummary={expensesSummary}
+            openTotal={openAbono}
+            reimbursementRows={reimbursementRows}
           />
-          <ReimbursementPersonnelTable rows={personnel} isLoading={isLoading} />
+          <ReimbursementPersonnelTable
+            rows={personnel}
+            isLoading={isLoading}
+            onViewEmployee={handleViewEmployee}
+            onViewReimbursement={handleViewReimbursement}
+          />
         </>
       )}
     </div>

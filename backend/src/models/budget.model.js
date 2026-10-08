@@ -36,6 +36,7 @@ class Budget {
        JOIN budget_reference br ON br.reference_id = bir.reference_id
        WHERE bir.status = 'open'
          AND br.status = 'open'
+         AND i.status != 'cancel'
        GROUP BY br.reference_id, br.label, br.created_at
        ORDER BY br.created_at DESC`,
       [],
@@ -297,10 +298,11 @@ class Budget {
           JOIN budget_reference br
           ON br.reference_id = bir.reference_id
           AND br.status = 'open'
-          JOIN issued_budget ib
-          ON ib.issued_ref_id = bir.id
-       WHERE bir.status = 'open'
-       ORDER BY u.name ASC, ib.created_at DESC`,
+           JOIN issued_budget ib
+           ON ib.issued_ref_id = bir.id
+           AND ib.status != 'cancel'
+        WHERE bir.status = 'open'
+        ORDER BY u.name ASC, ib.created_at DESC`,
       [],
     );
 
@@ -349,12 +351,13 @@ class Budget {
                AND b.status != 'cancelled'
           ), 0)::float8 AS allocated,
           COALESCE((
-            SELECT SUM(ib.amount)
-              FROM budget_issued_reference bir
-              JOIN issued_budget ib ON ib.issued_ref_id = bir.id
-             WHERE bir.reference_id = br.reference_id
-               AND bir.status = 'open'
-          ), 0)::float8 AS issued,
+              SELECT SUM(ib.amount)
+                 FROM budget_issued_reference bir
+                 JOIN issued_budget ib ON ib.issued_ref_id = bir.id
+                WHERE bir.reference_id = br.reference_id
+                  AND bir.status = 'open'
+                  AND ib.status != 'cancel'
+             ), 0)::float8 AS issued,
           COALESCE((
             SELECT SUM(e.total_amount)
               FROM expenses e
@@ -549,6 +552,7 @@ class Budget {
             FROM issued_budget i
             JOIN budget_issued_reference bir ON i.issued_ref_id = bir.id
             WHERE bir.status = 'open' AND bir.reference_id = $1
+              AND i.status != 'cancel'
           ), 0) AS issued,
           COALESCE((
             SELECT SUM(e.total_amount)
@@ -638,6 +642,7 @@ class Budget {
             JOIN budget_reference br ON br.reference_id = bir.reference_id
             WHERE bir.user_id = $1 AND bir.status = 'open'
               AND br.status = 'open'
+              AND ib.status != 'cancel'
           ), 0)::float8 AS total_budget,
           COALESCE((
             SELECT SUM(e.total_amount)
@@ -840,6 +845,9 @@ class Budget {
     // `::float8` casts DECIMAL (returned by pg as strings) to a JS number.
     // Closed sources leave no footsteps: rows under a cut-off source never
     // list here (`bib.reference_id` is NOT NULL, so the condition is safe).
+    // The displayed status is the CHILD's when it is cancelled — a cancelled
+    // `issued_budget` row reads 'cancel' even while its parent stays 'open'
+    // for its live siblings.
     const result = await query(
       `SELECT
           ib.id,
@@ -856,7 +864,8 @@ class Budget {
           ib.method,
           ib.image_url,
           ib.created_at AS date_issued,
-          bib.status
+          CASE WHEN ib.status = 'cancel' THEN 'cancel' ELSE bib.status END AS status,
+          ib.status AS issued_status
        FROM budget_issued_reference bib
        JOIN issued_budget ib ON ib.issued_ref_id = bib.id
        JOIN users u ON u.user_id = bib.user_id
@@ -962,11 +971,12 @@ class Budget {
                  WHERE b2.reference_id = $1 AND b2.status != 'cancelled'
               ), 0)::float8 AS allocated,
               COALESCE((
-                SELECT SUM(i.amount)
-                  FROM budget_issued_reference bir
-                  JOIN issued_budget i ON i.issued_ref_id = bir.id
-                 WHERE bir.reference_id = $1 AND bir.status = 'open'
-              ), 0)::float8 AS issued,
+              SELECT SUM(i.amount)
+                 FROM budget_issued_reference bir
+                 JOIN issued_budget i ON i.issued_ref_id = bir.id
+                WHERE bir.reference_id = $1 AND bir.status = 'open'
+                  AND i.status != 'cancel'
+             ), 0)::float8 AS issued,
               COALESCE((
                 SELECT SUM(e.total_amount)
                   FROM expenses e
@@ -1067,32 +1077,26 @@ class Budget {
     return { notFound: false, notCancelled: true, status: found.status };
   }
 
-  // Cancel ONE issued budget transaction — the `issued_budget` row the admin
-  // picked, NOT every row that happens to share its parent reference.
+  // Cancel ONE issued budget transaction — flips the `issued_budget` row
+  // itself to status 'cancel' by its id (`ib.id` is the exact target). No new
+  // row is ever created and the parent `budget_issued_reference` keeps its
+  // status, so sibling issuances sharing the parent are untouched.
   //
-  // Why the split matters: since migration 003 a same-source top-up REUSES the
-  // employee's OPEN `budget_issued_reference` row (one parent per
-  // user_id + reference_id, enforced by a partial unique index), so several
-  // `issued_budget` rows sit under ONE parent while the list renders the
-  // PARENT's status on every row. Flipping the parent therefore cancelled the
-  // employee's whole history for that source — the "cancel hits every row"
-  // bug. This method now:
-  //   - flips the parent when our row is its ONLY child (nothing else can
-  //     change), or
-  //   - otherwise gives THIS row its own 'cancel' parent and moves just that
-  //     child onto it, leaving the shared parent 'open' for its siblings.
-  // 'cancel' parents never collide with the partial unique index (it only
-  // covers status = 'open'). Take-back guard: when the row's amount exceeds
-  // the employee's remaining balance the cancel is refused with
+  // Every issued-money sum counts only live children
+  // (`ib.status != 'cancel'`), so the cancelled amount drops out of the
+  // pool the moment this writes. Take-back guard: when the row's amount
+  // exceeds the employee's remaining balance the cancel is refused with
   // `{ insufficientBalance: true, amount, remaining, employeeName }`
   // (nothing is written). Returns `{ previousStatus, issuedReference }`
-  // like before, or null when the id does not exist.
+  // (`previousStatus` speaks the child vocabulary: 'added'), or null when
+  // the id does not exist.
   static async cancelIssuedTransaction(id) {
     return withTransaction(async (client) => {
       const q = (text, params) => client.query(text, params);
 
-      // Lock the parent so two concurrent cancels of siblings cannot both
-      // decide to split against a stale child count.
+      // Lock the parent row so two concurrent cancels serialize on it. The
+      // exact target is the `issued_budget` row itself (`ib.id`) — its own
+      // `status` flips, never the parent's.
       const found =
         (
           await q(
@@ -1100,18 +1104,9 @@ class Budget {
                 ib.id,
                 ib.issued_ref_id,
                 ib.amount::float8 AS amount,
+                ib.status AS ib_status,
                 bir.user_id,
-                bir.reference_id,
-                bir.status,
-                bir.notes,
-                bir.date_cut_off,
-                bir.date_forwarded,
-                u.name AS employee_name,
-                (
-                  SELECT COUNT(*)
-                    FROM issued_budget sib
-                   WHERE sib.issued_ref_id = bir.id
-                )::int AS sibling_count
+                u.name AS employee_name
                FROM issued_budget ib
                JOIN budget_issued_reference bir ON bir.id = ib.issued_ref_id
                JOIN users u ON u.user_id = bir.user_id
@@ -1123,11 +1118,11 @@ class Budget {
 
       if (!found) return null;
 
-      const previousStatus = found.status;
+      const previousStatus = found.ib_status;
 
-      // Idempotent: already cancelled — leave the parent (and its siblings) be.
+      // Idempotent: already cancelled — nothing to write.
       if (previousStatus === "cancel")
-        return { previousStatus, issuedReference: null, split: false };
+        return { previousStatus, issuedReference: null };
 
       // Take-back guard: cancelling pulls this issuance OUT of the
       // employee's pool, so when they already spent it (their remaining
@@ -1139,8 +1134,9 @@ class Budget {
       // Abono-first order: the employee's OPEN abono (the same figure the
       // AdminEmployeesDetails "abono" value shows) is minused from the
       // remaining balance BEFORE the issuance amount — the take-back may
-      // only draw from non-abono funds, so a cancel is allowed only when
-      // (remaining − abono) > amount. Settled/draft abono never fund the
+      // only draw from non-abono funds, so a cancel is allowed when
+      // (remaining − abono) >= amount (exact cover counts — refusing it
+      // stranded fully-coverable rows). Settled/draft abono never fund the
       // pool (the query above counts `status = 'open'` only).
       const pool = (
         await q(
@@ -1150,6 +1146,7 @@ class Budget {
                   FROM budget_issued_reference bir2
                   JOIN issued_budget ib2 ON ib2.issued_ref_id = bir2.id
                  WHERE bir2.user_id = $1 AND bir2.status = 'open'
+                   AND ib2.status != 'cancel'
               ), 0)::float8 AS total_budget,
               COALESCE((
                 SELECT SUM(ea.amount)
@@ -1188,7 +1185,10 @@ class Budget {
       const openAbono = Math.max(0, Number(pool.total_abono || 0));
       const coverable = toMoney(remaining - openAbono);
 
-      if (!(coverable > amount))
+      // Refuse only when the take-back truly exceeds what is coverable —
+      // an exact match still leaves the pool whole. Both sides are
+      // cent-rounded (toMoney), so `===` needs no epsilon here.
+      if (coverable < amount)
         return {
           insufficientBalance: true,
           amount,
@@ -1196,61 +1196,37 @@ class Budget {
           employeeName: found.employee_name,
         };
 
-      // Sole child → the parent's status is effectively this row's status, so
-      // flipping it touches no other row.
-      if (found.sibling_count <= 1) {
-        const updated = (
-          await q(
-            `UPDATE budget_issued_reference
-                SET status = 'cancel'
-              WHERE id = $1
-              RETURNING *`,
-            [found.issued_ref_id],
-          )
-        ).rows[0];
-        return {
-          previousStatus,
-          issuedReference: updated ?? null,
-          split: false,
-        };
-      }
-
-      // Shared parent → park THIS row on its own cancelled parent so the
-      // siblings keep reading 'open' from the one they share.
-      const split =
-        (
-          await q(
-            `INSERT INTO budget_issued_reference
-               (reference_id, user_id, notes, status, date_cut_off, date_forwarded)
-             VALUES ($1, $2, $3, 'cancel', $4, $5)
-             RETURNING *`,
-            [
-              found.reference_id,
-              found.user_id,
-              found.notes,
-              found.date_cut_off,
-              found.date_forwarded,
-            ],
-          )
-        ).rows[0];
-
+      // Flip THIS `issued_budget` row only — the parent keeps its status so
+      // sibling issuances sharing it are untouched, and no new row is ever
+      // created. ('added'/'cancel' is the child vocabulary; the parent keeps
+      // speaking 'open'/'cancel'.)
       await q(
         `UPDATE issued_budget
-            SET issued_ref_id = $2,
+            SET status = 'cancel',
                 updated_at = NOW()
           WHERE id = $1`,
-        [id, split.id],
+        [id],
       );
-
-      return { previousStatus, issuedReference: split, split: true };
+      const parent =
+        (
+          await q(`SELECT * FROM budget_issued_reference WHERE id = $1`, [
+            found.issued_ref_id,
+          ])
+        ).rows[0] ?? null;
+      return {
+        previousStatus,
+        issuedReference: parent,
+      };
     });
   }
 
-  // Undo an issued cancellation for ONE row — the mirror of the method above.
-  // If an OPEN parent still exists for the same (user_id, reference_id) — the
-  // usual case after a split — the row is moved back onto it (two OPEN parents
-  // for one pair would violate the partial unique index from migration 003).
-  // Otherwise the row's own parent is flipped back to the requested status.
+  // Undo an issued cancellation for ONE `issued_budget` row — flips the child
+  // back to live. The requested `status` speaks parent vocabulary (the UI
+  // sends 'open'), so it is translated to the child vocabulary ('added')
+  // here. If an OPEN parent still exists for the same (user_id,
+  // reference_id) that is NOT the row's current parent (leftover split rows
+  // from the old behavior), the row is moved back onto it — two OPEN parents
+  // for one pair would violate the partial unique index from migration 003.
   static async restoreIssuedTransaction(id, status) {
     return withTransaction(async (client) => {
       const q = (text, params) => client.query(text, params);
@@ -1261,9 +1237,9 @@ class Budget {
             `SELECT
                 ib.id,
                 ib.issued_ref_id,
+                ib.status AS ib_status,
                 bir.user_id,
-                bir.reference_id,
-                bir.status
+                bir.reference_id
                FROM issued_budget ib
                JOIN budget_issued_reference bir ON bir.id = ib.issued_ref_id
               WHERE ib.id = $1
@@ -1283,16 +1259,10 @@ class Budget {
       ).rows[0];
       if ((source?.status ?? null) !== "open") return { notOpen: true };
 
-      // Already in the requested state — nothing to move.
-      if (found.status === status) {
-        return (
-          (
-            await q(`SELECT * FROM budget_issued_reference WHERE id = $1`, [
-              found.issued_ref_id,
-            ])
-          ).rows[0] ?? null
-        );
-      }
+      // Parent vocabulary ('open') → child vocabulary ('added'). Anything
+      // else is not a live child state.
+      const targetChild = status === "open" ? "added" : null;
+      if (!targetChild) return null;
 
       // The live parent this employee's pair is supposed to share.
       const openParent =
@@ -1308,6 +1278,23 @@ class Budget {
           )
         ).rows[0] ?? null;
 
+      // Already live on the right parent — nothing to write.
+      if (
+        found.ib_status === targetChild &&
+        openParent &&
+        openParent.id === found.issued_ref_id
+      ) {
+        return openParent;
+      }
+
+      await q(
+        `UPDATE issued_budget
+            SET status = $2,
+                updated_at = NOW()
+          WHERE id = $1`,
+        [id, targetChild],
+      );
+
       if (openParent && openParent.id !== found.issued_ref_id) {
         await q(
           `UPDATE issued_budget
@@ -1319,16 +1306,13 @@ class Budget {
         return openParent;
       }
 
-      const updated = (
-        await q(
-          `UPDATE budget_issued_reference
-              SET status = $2
-            WHERE id = $1
-           RETURNING *`,
-          [found.issued_ref_id, status],
-        )
-      ).rows[0];
-      return updated ?? null;
+      return (
+        (
+          await q(`SELECT * FROM budget_issued_reference WHERE id = $1`, [
+            found.issued_ref_id,
+          ])
+        ).rows[0] ?? null
+      );
     });
   }
 
@@ -1336,8 +1320,9 @@ class Budget {
   // child. Business-rule refusals resolve (never throw — same style as the
   // transfer cancel guard):
   //   - row missing → `{ notFound: true }`
-  //   - parent status is not 'cancel' → `{ notCancelled: true, status }`.
-  //     Live rows must be cancelled first; cancel-then-delete is the path.
+  //   - the row itself is not 'cancel' → `{ notCancelled: true, status }`
+  //     (child vocabulary: 'added'). Live rows must be cancelled first;
+  //     cancel-then-delete is the path.
   //   - any `expenses` row points at the parent (`ON DELETE CASCADE` would
   //     silently destroy that audit trail) → `{ hasExpenses: true,
   //     expenseCount }`.
@@ -1351,9 +1336,9 @@ class Budget {
           await q(
             `SELECT ib.id,
                     ib.issued_ref_id,
+                    ib.status AS ib_status,
                     bir.user_id,
-                    bir.reference_id,
-                    bir.status
+                    bir.reference_id
                FROM issued_budget ib
                JOIN budget_issued_reference bir ON bir.id = ib.issued_ref_id
               WHERE ib.id = $1
@@ -1364,8 +1349,8 @@ class Budget {
 
       if (!found) return { notFound: true };
 
-      if (found.status !== "cancel")
-        return { notFound: false, notCancelled: true, status: found.status };
+      if (found.ib_status !== "cancel")
+        return { notFound: false, notCancelled: true, status: found.ib_status };
 
       const linked = (
         await q(

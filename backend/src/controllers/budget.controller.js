@@ -522,7 +522,10 @@ export const cancelIssuedTransaction = async (req, res, next) => {
       );
     if (result.insufficientBalance)
       throw ApiError.badRequest(
-        `Cannot proceed your request — ${result.employeeName || "The employee"} has only ${formatPeso(result.remaining)} remaining balance after their open abono.`,
+        // A negative coverable reads as debt and confuses the message — what
+        // matters here is that nothing is coverable, so floor it at zero.
+        // (The model's raw `remaining` is left untouched.)
+        `Cannot proceed your request — ${result.employeeName || "The employee"} has only ${formatPeso(Math.max(0, result.remaining))} remaining balance after their open abono.`,
         "INSUFFICIENT_BALANCE",
       );
 

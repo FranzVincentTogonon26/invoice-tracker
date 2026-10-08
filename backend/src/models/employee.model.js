@@ -157,6 +157,7 @@ class Employee {
             JOIN budget_reference br ON br.reference_id = bir.reference_id
             WHERE bir.user_id = u.user_id AND bir.status = 'open'
               AND br.status = 'open'
+              AND ib.status != 'cancel'
           ), 0)::float8 AS issued_budget,
           COALESCE((
             SELECT SUM(e.total_amount)
@@ -193,6 +194,7 @@ class Employee {
               JOIN budget_reference br ON br.reference_id = bir.reference_id
               WHERE bir.user_id = u.user_id AND bir.status = 'open'
                 AND br.status = 'open'
+                AND ib.status != 'cancel'
             ), 0)
             + COALESCE((
               SELECT SUM(ea.amount)
@@ -274,6 +276,7 @@ class Employee {
             JOIN budget_reference br ON br.reference_id = bir.reference_id
             WHERE bir.status = 'open'
               AND br.status = 'open'
+              AND i.status != 'cancel'
           ), 0) AS total_issued`,
       [],
     );

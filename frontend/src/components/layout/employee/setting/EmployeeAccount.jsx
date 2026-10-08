@@ -70,7 +70,11 @@ const EmployeeAccount = ({ user, loading = false }) => {
 
   const storedName = user?.name ?? sessionUser?.name ?? "";
   const storedEmail = user?.email ?? sessionUser?.email ?? "";
-  const storedAvatar = user?.avatar_url ?? sessionUser?.avatar_url ?? "";
+  const rawStoredAvatar = user?.avatar_url ?? sessionUser?.avatar_url ?? "";
+  const storedAvatar =
+    typeof rawStoredAvatar === "string"
+      ? rawStoredAvatar.trim()
+      : rawStoredAvatar || "";
 
   // Editable as soon as EITHER source has the row — the settings fetch only
   // blocks the form while nothing has loaded yet.

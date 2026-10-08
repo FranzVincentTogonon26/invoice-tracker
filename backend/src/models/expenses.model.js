@@ -484,6 +484,7 @@ class Expenses {
               JOIN budget_issued_reference bir ON i.issued_ref_id = bir.id
              WHERE bir.status = 'open'
                AND bir.reference_id = b.reference_id
+               AND i.status != 'cancel'
           ), 0)::float8 AS issued,
           COALESCE((
             SELECT SUM(e.total_amount)
@@ -607,12 +608,13 @@ class Expenses {
           br.reference_id,
           br.label,
           br.created_at,
-          COALESCE(SUM(i.amount), 0) AS amount
+           COALESCE(SUM(i.amount), 0) AS amount
        FROM budget_issued_reference bir
        JOIN issued_budget i ON i.issued_ref_id = bir.id
        JOIN budget_reference br ON br.reference_id = bir.reference_id
        WHERE bir.status = 'open'
          AND br.status = 'open'
+         AND i.status != 'cancel'
        GROUP BY br.reference_id, br.label, br.created_at
        ORDER BY br.created_at DESC`,
       [],
@@ -728,7 +730,9 @@ class Expenses {
           COALESCE(SUM(ib.amount), 0)::float8 AS issued
          FROM budget_issued_reference bir
          JOIN budget_reference br ON br.reference_id = bir.reference_id
-         LEFT JOIN issued_budget ib ON ib.issued_ref_id = bir.id
+         LEFT JOIN issued_budget ib
+           ON ib.issued_ref_id = bir.id
+          AND ib.status != 'cancel'
         WHERE bir.user_id = $1 AND bir.status = 'open'
           -- A cut-off source connects to nothing: holdings under it never
           -- surface as a usable source of funds.
@@ -938,6 +942,7 @@ class Expenses {
               JOIN budget_reference br ON br.reference_id = bir.reference_id
               WHERE bir.user_id = $1 AND bir.status = 'open'
                 AND br.status = 'open'
+                AND ib.status != 'cancel'
             ), 0)::float8 AS total_budget,
             COALESCE((
               SELECT SUM(ea.amount)

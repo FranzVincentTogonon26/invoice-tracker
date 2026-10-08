@@ -24,11 +24,16 @@ export function Badge({ className, tone, ...props }) {
   return <span className={cn(badgeVariants({ tone }), className)} {...props} />;
 }
 
-export function StatusBadge({ status, className }) {
+export function StatusBadge({ status, className, dot = true }) {
   const s = STATUS[status] ?? { tone: "neutral", label: status ?? "-" };
   return (
     <Badge tone={s.tone} className={className}>
-      <span className="h-2 w-2 rounded-full bg-current opacity-80" />
+      {dot && (
+        <span
+          aria-hidden
+          className="h-2 w-2 rounded-full bg-current opacity-80"
+        />
+      )}
       {s.label}
     </Badge>
   );

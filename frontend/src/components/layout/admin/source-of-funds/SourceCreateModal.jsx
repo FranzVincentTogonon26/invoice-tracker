@@ -25,6 +25,10 @@ export function SourceCreateModal({ open, saving, onClose, onSave }) {
       return;
     }
     await onSave({ label: trimmed, notes: notes.trim() });
+    // Success only — if onSave throws, the lines above throw too and the
+    // user's input is preserved for another attempt.
+    setLabel("");
+    setNotes("");
   };
 
   const handleClose = () => {
@@ -113,7 +117,7 @@ export function SourceCreateModal({ open, saving, onClose, onSave }) {
                 <Input
                   value={label}
                   onChange={(e) => setLabel(e.target.value)}
-                  placeholder="e.g. Q1 Operations"
+                  placeholder="e.g. Employee Budget, Office Budget, etc."
                   disabled={saving}
                   maxLength={LABEL_MAX}
                 />

@@ -24,11 +24,15 @@ function initialsOf(label) {
 }
 
 // Employee avatar: real `<img>` when the option carries an `avatar` URL,
-// initials fallback when the key exists but is empty. Options without an
-// `avatar` key (e.g. "All employees", plain text filters) render nothing.
+// initials fallback when the key exists but is empty or the image fails to
+// load. Options without an `avatar` key (e.g. "All employees", plain text
+// filters) render nothing.
 // "Boss" gets a temporary gray "B" avatar (same look as the ledger's
 // Boss fallback block) until a real photo exists.
 function OptionAvatar({ option, size = "sm" }) {
+  // Hooks must run unconditionally — track the failed URL even for options
+  // that render no avatar so list re-ordering never mismatches hook order.
+  const [failedUrl, setFailedUrl] = useState(null);
   if (!option) return null;
   const sizing = size === "sm" ? "h-7 w-7 text-[10px]" : "h-7 w-7 text-[11px]";
   if (
@@ -49,12 +53,15 @@ function OptionAvatar({ option, size = "sm" }) {
     );
   }
   if (!("avatar" in option)) return null;
-  if (option.avatar) {
+  const rawSrc = option.avatar;
+  const cleanSrc = typeof rawSrc === "string" ? rawSrc.trim() : rawSrc;
+  if (cleanSrc && failedUrl !== cleanSrc) {
     return (
       <img
-        src={option.avatar}
+        src={cleanSrc}
         alt=""
         aria-hidden
+        onError={() => setFailedUrl(cleanSrc)}
         className={cn(
           "shrink-0 rounded-full object-cover ring-1 ring-[var(--border)]",
           sizing,
