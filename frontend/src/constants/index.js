@@ -103,7 +103,7 @@ export const STATUS = {
   success: { tone: "success", label: "Success" },
   open: { tone: "warning", label: "Open" },
   cancel: { tone: "danger", label: "Cancelled" },
-  close: { tone: "warning", label: "Closed" },
+  close: { tone: "accent", label: "Closed" },
   active: { tone: "success", label: "Active" },
   inactive: { tone: "neutral", label: "Inactive" },
 };

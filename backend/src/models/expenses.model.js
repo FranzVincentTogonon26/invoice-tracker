@@ -167,7 +167,6 @@ class Expenses {
   static async createExpenses({
     items,
     user_id,
-    issued_ref_id = null,
     reference_id = null,
     receipts = [],
     image_url = null,
@@ -213,22 +212,21 @@ class Expenses {
 
         const result = await client.query(
           `INSERT INTO expenses
-             (user_id, issued_ref_id, reference_id, description, category_id,
+             (user_id, reference_id, description, category_id,
               total_amount, expense_date, notes, receipt_id, payment_method,
               image_url, receipt_date, flag)
            VALUES
-             ($1, $2, COALESCE($3::uuid, $11::uuid), $4, $5, $6,
-              COALESCE($7::date, CURRENT_DATE), $8, $9, $10, $12, $13,
+             ($1, COALESCE($2::uuid, $10::uuid), $3, $4, $5,
+              COALESCE($6::date, CURRENT_DATE), $7, $8, $9, $11, $12,
               CASE
-                WHEN $14::date IS NOT NULL
-                 AND COALESCE($7::date, CURRENT_DATE) < $14::date
+                WHEN $13::date IS NOT NULL
+                 AND COALESCE($6::date, CURRENT_DATE) < $13::date
                 THEN 1
                 ELSE 0
               END)
            RETURNING *`,
           [
             user_id,
-            issued_ref_id,
             reference_id ?? null,
             item.description,
             item.category_id ?? null,
@@ -294,6 +292,20 @@ class Expenses {
         RETURNING id, description, total_amount::float8 AS total_amount,
                   status, image_url`,
       [id, status],
+    );
+    return result.rows[0] ?? null;
+  }
+
+  // Reimbursement review checklist: flips one expense row's `review` flag
+  // ('yes' = reviewed, 'no' = reopened). Admin-only at the route layer; no
+  // ownership check needed because only admins ever call it.
+  static async setExpenseReview(id, review) {
+    const result = await query(
+      `UPDATE expenses
+          SET review = $2, updated_at = NOW()
+        WHERE id = $1
+        RETURNING id, review`,
+      [id, review],
     );
     return result.rows[0] ?? null;
   }
@@ -408,7 +420,6 @@ class Expenses {
            e.image_url,
            e.receipt_date,
            e.reference_id,
-           e.issued_ref_id,
            e.user_id,
            u.name AS created_by,
            u.role AS created_by_role,
@@ -566,7 +577,6 @@ class Expenses {
            e.image_url,
            e.receipt_date,
            e.reference_id,
-           e.issued_ref_id,
            e.user_id,
            u.name AS created_by,
            u.role AS created_by_role,
@@ -896,6 +906,7 @@ class Expenses {
             e.payment_method,
             e.status,
             e.flag,
+            e.review,
             e.notes,
             e.created_at,
             e.category_id,
@@ -904,7 +915,6 @@ class Expenses {
             e.image_url,
             e.receipt_date,
             e.reference_id,
-            e.issued_ref_id,
             e.user_id,
             u.name AS created_by,
             u.role AS created_by_role,

@@ -19,9 +19,12 @@ const toMoney = (value) => Math.round((Number(value) || 0) * 100) / 100;
 //                   already left the pool as `issued`, so counting it again
 //                   would subtract it twice).
 //   - cash:         what the pool still holds (given − issued − open abono).
-//   - personnel:    one row per account holding an OPEN issuance, grouped by
+//   - personnel:    one row per account with issuance history (any status)
+//                   under an open source, or holding open abono — grouped by
 //                   budget_issued_reference.user_id joined through
 //                   budget_reference.reference_id for the source label(s).
+//                   The issued leg counts every issuance (any status) under
+//                   open sources; abono stays open-only and spent stays paid.
 class EmployeeReimbursement {
   // Back-compat list for GET /employee-reimbursements — every abono row
   // across employees, same shape as the admin abono ledger.
@@ -149,7 +152,7 @@ class EmployeeReimbursement {
                   u.avatar_url,
                   u.role,
                   COALESCE(STRING_AGG(DISTINCT br.label, ', '), '') AS reference_labels,
-                  COUNT(DISTINCT bir.reference_id)::int AS reference_count,
+                  COUNT(DISTINCT br.reference_id)::int AS reference_count,
                   COALESCE(SUM(ib.amount), 0)::float8 AS issued,
                   COUNT(ib.id)::int AS issued_count,
                   COALESCE(ab.open_abono, 0)::float8 AS open_abono,
@@ -164,13 +167,19 @@ class EmployeeReimbursement {
                      WHERE bir2.user_id = u.user_id
                   ), '') AS bir_statuses
              FROM users u
-             JOIN budget_issued_reference bir ON bir.user_id = u.user_id
-               AND bir.status = 'open'
-             JOIN budget_reference br ON br.reference_id = bir.reference_id
+             -- Every account with issuance HISTORY under an open source (any
+             -- bir status, not just open) or holding open abono shows up, so
+             -- no recorded row stays hidden from the ledger. Pure
+             -- expense-only accounts (no issuance, no abono) still stay out.
+             -- The issued leg counts EVERY issuance (any parent/child status)
+             -- under open sources, so closed and cancelled money still reads
+             -- here; rows under a cut-off source stay excluded everywhere.
+             LEFT JOIN budget_issued_reference bir ON bir.user_id = u.user_id
+             LEFT JOIN budget_reference br ON br.reference_id = bir.reference_id
                AND br.status = 'open'
-              LEFT JOIN issued_budget ib
-                ON ib.issued_ref_id = bir.id
-               AND ib.status != 'cancel'
+             LEFT JOIN issued_budget ib
+               ON ib.issued_ref_id = bir.id
+              AND br.reference_id IS NOT NULL
              LEFT JOIN (
                SELECT ea.user_id,
                       SUM(ea.amount)::float8 AS open_abono,
@@ -191,6 +200,20 @@ class EmployeeReimbursement {
                   AND (e.reference_id IS NULL OR br3.status = 'open')
                 GROUP BY e.user_id
              ) ex ON ex.user_id = u.user_id
+             WHERE EXISTS (
+               SELECT 1
+                 FROM budget_issued_reference b2
+                 JOIN budget_reference br2 ON br2.reference_id = b2.reference_id
+                  AND br2.status = 'open'
+                WHERE b2.user_id = u.user_id
+             ) OR EXISTS (
+               SELECT 1
+                 FROM employee_abono ea2
+                 JOIN budget_reference br2 ON br2.reference_id = ea2.reference_id
+                  AND br2.status = 'open'
+                WHERE ea2.user_id = u.user_id
+                  AND ea2.status = 'open'
+             )
              GROUP BY u.user_id, u.name, u.email, u.avatar_url, u.role,
                      ab.open_abono, ab.open_abono_count, ex.spent, ex.expense_count
              ORDER BY issued DESC`,

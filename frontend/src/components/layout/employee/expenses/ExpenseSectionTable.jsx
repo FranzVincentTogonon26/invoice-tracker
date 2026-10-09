@@ -109,7 +109,7 @@ function ExpenseSectionTableRow({
         >
           <span
             className={cn(
-              "text-[13px] font-medium",
+              "text-[13px] font-normal",
               daysLabel === "Today"
                 ? "text-[var(--accent-strong)]"
                 : "text-[var(--ink)]",

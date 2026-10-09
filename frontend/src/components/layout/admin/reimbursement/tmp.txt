@@ -1,2 +1,0 @@
-import { HandCoins } from "lucide-react";
-import { Card } from "../../../ui/StatCard";

@@ -10,7 +10,6 @@ import {
   ScanLine,
   ShieldAlert,
   X,
-  Plus,
 } from "lucide-react";
 import { Input, TextArea } from "../../../ui/Input";
 import { Badge } from "../../../ui/Badge";
@@ -108,9 +107,7 @@ function BalanceCard({ summary, isLoading, referenceId, projection, exceeds }) {
           <WalletIcon size={15} />
         </div>
         <div className="flex-1 min-w-0">
-          <p className="text-sm font-medium text-[var(--ink-muted)]">
-            Balance
-          </p>
+          <p className="text-sm font-medium text-[var(--ink-muted)]">Balance</p>
           <p className="text-xs leading-snug text-[var(--ink-muted)]">
             Select a budget source to view its remaining balance.
           </p>
@@ -429,19 +426,19 @@ const BudgetModal = ({
   // `uploads/receipts_issued_budget` and its URL stored on the
   // `issued_budget` row. Discarding the form drops it with nothing written.
   const [scannedReceipt, setScannedReceipt] = useState(null);
-  const [scanPreviewUrl, setScanPreviewUrl] = useState("");
   // Retry reuse: if the upload succeeded but the create that followed failed,
   // a retry reuses the stored URL instead of writing the file twice.
   const uploadedIssuedUrlRef = useRef(null);
 
+  // The preview object URL lives ON the receipt object (created in the scan
+  // confirm handler, not in an effect). This cleanup-only effect revokes the
+  // previous receipt's URL whenever it is replaced or discarded, and on
+  // unmount — no setState here, so no cascading renders.
   useEffect(() => {
-    if (!scannedReceipt?.file) {
-      setScanPreviewUrl("");
-      return undefined;
-    }
-    const url = URL.createObjectURL(scannedReceipt.file);
-    setScanPreviewUrl(url);
-    return () => URL.revokeObjectURL(url);
+    const url = scannedReceipt?.previewUrl;
+    return () => {
+      if (url) URL.revokeObjectURL(url);
+    };
   }, [scannedReceipt]);
 
   const { uploadIssuedReceiptImage } = useBudgetMutations();
@@ -481,8 +478,14 @@ const BudgetModal = ({
     setRefsOpen(false);
     setScanOpen(false);
     setScannedReceipt(null);
-    uploadedIssuedUrlRef.current = null;
   }
+
+  // Refs must not be written during render — reset the cached upload URL in
+  // an effect instead, keyed on the same open/close transition as the form
+  // reset above.
+  useEffect(() => {
+    uploadedIssuedUrlRef.current = null;
+  }, [open]);
 
   const handleClose = () => {
     if (saving) return;
@@ -503,7 +506,12 @@ const BudgetModal = ({
     if (!(Number(total) > 0)) return;
     setForm((f) => ({ ...f, amount: String(total) }));
     if (file) {
-      setScannedReceipt({ file, fileName: fileName || "", vendor: vendor || "" });
+      setScannedReceipt({
+        file,
+        fileName: fileName || "",
+        vendor: vendor || "",
+        previewUrl: URL.createObjectURL(file),
+      });
       uploadedIssuedUrlRef.current = null;
     }
     notifySuccess(`Scanned amount ${formatMoney(Number(total))} applied.`);
@@ -821,17 +829,6 @@ const BudgetModal = ({
                             disabled={saving}
                           />
                         </div>
-                        <Button
-                          type="button"
-                          variant="soft"
-                          size="icon"
-                          onClick={() => setRefsOpen(true)}
-                          disabled={saving}
-                          aria-label="Add new reference"
-                          title="Add new reference"
-                        >
-                          <Plus size={16} />
-                        </Button>
                       </div>
                     </Field>
                     <AmountField
@@ -933,7 +930,7 @@ const BudgetModal = ({
                       scanned={
                         scannedReceipt
                           ? {
-                              previewUrl: scanPreviewUrl,
+                              previewUrl: scannedReceipt.previewUrl,
                               fileName: scannedReceipt.fileName,
                               vendor: scannedReceipt.vendor,
                             }

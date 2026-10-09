@@ -551,8 +551,7 @@ export const cancelIssuedTransaction = async (req, res, next) => {
 // the `issued_budget` row (its parent reference is pruned when left
 // childless). Admin-only at the route layer (`requireAdminAccess` re-checks
 // the token role, so a forged client or non-admin token is rejected before
-// this runs). Live rows and rows with linked expenses are refused with 409
-// instead of destroying the audit trail.
+// this runs). Live rows are refused with 409 — cancel first, then delete.
 export const removeIssuedTransaction = async (req, res, next) => {
   try {
     const { id } = req.params;
@@ -573,11 +572,6 @@ export const removeIssuedTransaction = async (req, res, next) => {
       throw ApiError.conflict(
         "Only a cancelled issuance can be permanently deleted. Cancel it first.",
         "ISSUED_NOT_CANCELLED",
-      );
-    if (result.hasExpenses)
-      throw ApiError.conflict(
-        "Cannot delete this record — it has linked expense records.",
-        "ISSUED_HAS_EXPENSES",
       );
 
     // Ownership lives on the parent `budget_issued_reference` (the child

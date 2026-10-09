@@ -44,3 +44,28 @@ export const settleAbonoSchema = z.object({
     .min(1, { message: "Select at least one abono to settle" })
     .max(500, { message: "Too many abono records in one request" }),
 });
+
+// Admin settlement (reimbursement personnel table): the employee whose abono
+// is settled, the checked OPEN row ids, the payment method booked on the
+// settlement issuance rows, and an optional note stored on them.
+export const settleAbonoForEmployeeSchema = z.object({
+  user_id: z.uuid({ message: "Invalid employee id" }),
+  ids: z
+    .array(z.uuid({ message: "Invalid abono id" }), {
+      error: "Select at least one abono to settle",
+    })
+    .min(1, { message: "Select at least one abono to settle" })
+    .max(500, { message: "Too many abono records in one request" }),
+  method: z.enum(["cash", "bank_transfer", "e_wallet"], {
+    message: "Invalid settlement method",
+  }),
+  note: z.string().trim().max(150).optional().nullable(),
+  // Optional custom amount (partial settlement): settles this much across
+  // the checked rows, oldest first. Omitted (or equal to the checked total)
+  // settles the checked rows in full.
+  amount: z
+    .number({ error: "Invalid settlement amount" })
+    .positive({ message: "Settlement amount must be greater than zero" })
+    .max(999999999, { message: "Settlement amount is too large" })
+    .optional(),
+});

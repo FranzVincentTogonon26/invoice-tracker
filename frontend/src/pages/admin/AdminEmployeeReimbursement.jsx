@@ -1,6 +1,6 @@
 import { useMemo } from "react";
 import { useNavigate } from "react-router-dom";
-import { Inbox } from "lucide-react";
+import { CircleAlert, Inbox } from "lucide-react";
 import { PageHeader } from "../../components/ui/PageHeader";
 import { Button } from "../../components/ui/Button";
 import { Card } from "../../components/ui/Card";
@@ -17,7 +17,7 @@ const AdminEmployeeReimbursement = () => {
     if (row?.userId) nav(`/admin/employees/${row.userId}`);
   };
   const handleViewReimbursement = (row) => {
-    if (row?.userId) nav(`/admin/employees/${row.userId}?tab=employee_abono`);
+    if (row?.userId) nav(`/admin/reimbursement/${row.userId}`);
   };
 
   const moneyIn = Number(data?.moneyIn ?? 0);
@@ -71,7 +71,10 @@ const AdminEmployeeReimbursement = () => {
   const issuedByReference = useMemo(
     () =>
       new Map(
-        issuedBreakdown.map((row) => [row.reference_id, Number(row.amount || 0)]),
+        issuedBreakdown.map((row) => [
+          row.reference_id,
+          Number(row.amount || 0),
+        ]),
       ),
     [issuedBreakdown],
   );
@@ -150,7 +153,8 @@ const AdminEmployeeReimbursement = () => {
               Couldn&apos;t load reimbursement
             </p>
             <p className="mt-1 text-xs text-[var(--ink-muted)]">
-              {error?.message || "Something went wrong while loading the overview."}
+              {error?.message ||
+                "Something went wrong while loading the overview."}
             </p>
           </div>
           <Button type="button" variant="outline" onClick={() => refetch()}>
@@ -159,6 +163,27 @@ const AdminEmployeeReimbursement = () => {
         </Card>
       ) : (
         <>
+          {abonoCount > 0 && (
+            <div
+              role="status"
+              className="flex items-start gap-2.5 rounded-2xl border border-[var(--warning)]/30 bg-[var(--warning)]/10 px-4 py-3"
+            >
+              <CircleAlert
+                size={17}
+                className="mt-px shrink-0 text-[var(--warning)]"
+                aria-hidden
+              />
+              <p className="text-sm leading-snug text-[var(--ink)]">
+                <span className="font-medium tabular-nums">
+                  {formatMoney(openAbono)}
+                </span>{" "}
+                open abono held by {abonoCount}{" "}
+                {abonoCount === 1 ? "employee needs" : "employees need"}{" "}
+                settlement — open the employee&apos;s Reimbursement page to
+                settle it.
+              </p>
+            </div>
+          )}
           <ReimbursementOverview
             isLoading={isLoading}
             totals={totals}

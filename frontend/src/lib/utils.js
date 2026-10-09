@@ -72,6 +72,30 @@ export function formatTime(date) {
   return d.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" });
 }
 
+/**
+ * Calendar-day label relative to today: "Today", "Yesterday",
+ * "Last <Weekday>" for 2–6 days ago, otherwise the standard short date.
+ * Future dates fall back to the short date. Pair with `formatTime` for
+ * stamps like "Yesterday · 2:33 PM".
+ */
+export function relativeDayLabel(value) {
+  const day = toDate(value);
+  if (!day) return "—";
+  const diffDays = Math.round(
+    (startOfDay(new Date()) - startOfDay(day)) / 86400000,
+  );
+  if (diffDays < 0) return formatDate(value);
+  if (diffDays === 0) return "Today";
+  if (diffDays === 1) return "Yesterday";
+  if (diffDays < 7) {
+    const weekday = startOfDay(day).toLocaleDateString("en-US", {
+      weekday: "long",
+    });
+    return `Last ${weekday}`;
+  }
+  return formatDate(value);
+}
+
 /* -------------------------------------------------------------------------- */
 /* Date-range helpers (used by the DateRangePicker and its consumers)          */
 /* -------------------------------------------------------------------------- */

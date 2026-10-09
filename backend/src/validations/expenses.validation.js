@@ -111,14 +111,6 @@ export const createExpensesSchema = z
     // table in the same transaction that saves the lines, then each line's
     // `receipt_id` is re-pointed at the stored row.
     receipts: z.array(receiptDraftSchema).optional(),
-    // Optional budget issuance the lines belong to. Admins logging expenses
-    // manually have no issued reference, so it stays nullable.
-    issued_ref_id: z
-      .preprocess(
-        (v) => (typeof v === "string" && v.trim() === "" ? undefined : v),
-        z.uuid({ message: "Invalid issued reference id" }).optional(),
-      ),
-
     // The budget reference the lines are funded from (SelectSourceFund). Empty
     // string = nothing picked → undefined → stored as NULL.
     reference_id: z
@@ -223,6 +215,13 @@ export const updateExpenseStatusSchema = z.object({
   status: z.enum(["paid", "draft", "cancel"], {
     message: "Invalid expense status",
   }),
+});
+
+// Review checklist on the reimbursement details page — one expense row
+// marked reviewed ('yes') or reopened ('no'). Mirrors the expenses.review
+// CHECK constraint.
+export const updateExpenseReviewSchema = z.object({
+  review: z.enum(["yes", "no"], { message: "Invalid review value" }),
 });
 
 // Description update for inline editing in the transaction sheet

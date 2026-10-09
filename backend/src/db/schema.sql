@@ -228,9 +228,6 @@ CREATE TABLE IF NOT EXISTS category (
 
 CREATE TABLE IF NOT EXISTS expenses (
     id             UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    issued_ref_id  UUID
-                   REFERENCES budget_issued_reference(id)
-                   ON DELETE CASCADE,
     reference_id   UUID
                    REFERENCES budget_reference(reference_id)
                    ON DELETE SET NULL,
@@ -262,6 +259,8 @@ CREATE TABLE IF NOT EXISTS expenses (
                    ),
     status         VARCHAR(20) NOT NULL DEFAULT 'paid'
                    CHECK (status IN ('paid', 'draft', 'cancel')),
+    review         VARCHAR(20) NOT NULL DEFAULT 'no'
+                   CHECK (review IN ('yes', 'no')),
     created_at     TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     updated_at     TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     CHECK (total_amount >= 0)

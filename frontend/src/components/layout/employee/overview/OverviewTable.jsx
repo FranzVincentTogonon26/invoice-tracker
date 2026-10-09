@@ -222,7 +222,7 @@ function OverviewTableRow({ tx, onView }) {
       </td>
       <td className="px-4 py-3 align-middle">
         <p
-          className="whitespace-nowrap text-left text-[13px] font-medium leading-none text-[var(--ink)]"
+          className="whitespace-nowrap text-left text-[13px] font-normal leading-none text-[var(--ink)]"
           title={`${formatDate(tx.date)} at ${formatTime(tx.date)}`}
         >
           {getDateGroupLabel(tx.date)}

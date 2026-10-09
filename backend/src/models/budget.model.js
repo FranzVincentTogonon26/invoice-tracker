@@ -801,6 +801,29 @@ class Budget {
     };
   }
 
+  // Close every OPEN issuance reference a user holds (status 'open' ->
+  // 'close'), scoped to open budget sources like every other page query.
+  // Used by the reimbursement submit flow: finalizing hands the holdings
+  // back, so the employee disappears from open-issuance ledgers and the
+  // issued amounts drop out of every money sum (they all read open parents
+  // with live children only). The partial unique index covers 'open' rows
+  // only, so a future issuance for the same pair can start fresh.
+  // Resolves `{ closedCount }`.
+  static async closeOpenIssuedReferences(userId) {
+    const result = await query(
+      `UPDATE budget_issued_reference bir
+          SET status = 'close'
+         FROM budget_reference br
+        WHERE bir.user_id = $1
+          AND bir.status = 'open'
+          AND br.reference_id = bir.reference_id
+          AND br.status = 'open'
+        RETURNING bir.id`,
+      [userId],
+    );
+    return { closedCount: result.rows.length };
+  }
+
   // Soft-delete a Budget Reference (status 'open' -> 'cut_off'). A hard
   // DELETE would cascade-destroy the dependent `budget` and
 
@@ -1323,9 +1346,6 @@ class Budget {
   //   - the row itself is not 'cancel' → `{ notCancelled: true, status }`
   //     (child vocabulary: 'added'). Live rows must be cancelled first;
   //     cancel-then-delete is the path.
-  //   - any `expenses` row points at the parent (`ON DELETE CASCADE` would
-  //     silently destroy that audit trail) → `{ hasExpenses: true,
-  //     expenseCount }`.
   // Resolves `{ deleted, parentPruned }` on success.
   static async removeIssuedTransaction(id) {
     return withTransaction(async (client) => {
@@ -1352,30 +1372,14 @@ class Budget {
       if (found.ib_status !== "cancel")
         return { notFound: false, notCancelled: true, status: found.ib_status };
 
-      const linked = (
-        await q(
-          `SELECT COUNT(*)::int AS count
-             FROM expenses
-            WHERE issued_ref_id = $1`,
-          [found.issued_ref_id],
-        )
-      ).rows[0];
-
-      if (linked && linked.count > 0)
-        return {
-          notFound: false,
-          hasExpenses: true,
-          expenseCount: linked.count,
-        };
-
       const deleted = (
         await q(`DELETE FROM issued_budget WHERE id = $1 RETURNING *`, [id])
       ).rows[0];
 
       // Prune the parent when no children remain — otherwise a childless
-      // cancelled shell lingers in guard/overview queries. Safe: linked
-      // expenses were just proven absent, and surviving siblings keep the
-      // parent alive otherwise.
+      // shell lingers in guard/overview queries. Safe: nothing else
+      // references a parent id (expenses track `reference_id`, not parents),
+      // and surviving siblings keep the parent alive otherwise.
       const remaining = (
         await q(
           `SELECT COUNT(*)::int AS count

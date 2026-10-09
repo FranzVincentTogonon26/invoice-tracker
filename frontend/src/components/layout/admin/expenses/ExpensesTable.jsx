@@ -500,7 +500,7 @@ function LedgerRow({
       <td className="px-4 py-4 align-middle">
         <div className="flex justify-left">
           <p
-            className="whitespace-nowrap text-left text-[13px] font-medium leading-none  text-[var(--ink-muted)]"
+            className="whitespace-nowrap text-left text-[13px] font-normal leading-none  text-[var(--ink-muted)]"
             title={`${formatDate(row.timeDate)} at ${formatTime(row.timeDate)}`}
           >
             {getDaysLabel(row.timeDate)}

@@ -8,7 +8,8 @@ import { EmployeeAvatar } from "../../../ui/SelectEmployee";
 import { cn, formatMoney } from "@/lib/utils";
 import { PersonnelActions } from "./PersonnelActions";
 
-// Personnel ledger: one row per account holding an OPEN issuance, grouped by
+// Personnel ledger: one row per account with issuance history (any status)
+// under an open source, or holding open abono — grouped by
 // budget_issued_reference.user_id and joined through
 // budget_reference.reference_id for the source label(s).
 export function ReimbursementPersonnelTable({
@@ -84,7 +85,7 @@ export function ReimbursementPersonnelTable({
           description={
             search
               ? `No personnel matched "${search}". Try clearing your search.`
-              : "No open issuances are held by anyone yet."
+              : "No issuance or abono records exist yet."
           }
         />
       ) : (
@@ -124,7 +125,7 @@ export function ReimbursementPersonnelTable({
                 <th className="truncate whitespace-nowrap border-b border-[var(--border)] px-4 py-3 text-right type-eyebrow text-[var(--ink-muted)]">
                   Remaining Balance
                 </th>
-                <th className="truncate whitespace-nowrap border-b border-[var(--border)] px-4 py-3 text-right type-eyebrow text-[var(--ink-muted)]">
+                <th className="truncate whitespace-nowrap border-b border-[var(--border)] px-4 py-3 text-center type-eyebrow text-[var(--ink-muted)]">
                   Total Transaction
                 </th>
                 <th className="truncate whitespace-nowrap border-b border-[var(--border)] px-4 py-3 type-eyebrow text-[var(--ink-muted)]">
@@ -190,13 +191,7 @@ export function ReimbursementPersonnelTable({
                   <td className="px-4 py-3.5 text-right align-middle">
                     <span className="whitespace-nowrap font-display text-[15px] font-medium tabular-nums text-[var(--warning)]">
                       {formatMoney(r.openAbono)}
-                    </span>
-                    {r.openAbonoCount > 0 && (
-                      <p className="mt-0.5 text-[11px] tabular-nums text-[var(--ink-muted)]">
-                        {r.openAbonoCount}{" "}
-                        {r.openAbonoCount === 1 ? "open" : "open"}
-                      </p>
-                    )}
+                    </span> 
                   </td>
                   <td className="px-4 py-3.5 text-right align-middle">
                     <span className="whitespace-nowrap font-display text-[15px] font-medium tabular-nums text-[var(--danger)]">
@@ -215,10 +210,10 @@ export function ReimbursementPersonnelTable({
                       {formatMoney(r.balance)}
                     </span>
                   </td>
-                  <td className="px-4 py-3.5 text-right align-middle">
-                    <span className="whitespace-nowrap text-sm font-medium tabular-nums text-[var(--ink)]">
+                  <td className="px-4 py-3.5 text-center align-middle">
+                    <Badge tone="accent" className="font-medium">
                       {r.issuedCount ?? 0}
-                    </span>
+                    </Badge>
                   </td>
                   <td className="px-4 py-3.5 align-middle">
                     <span className="flex flex-wrap items-center gap-1.5">
@@ -230,6 +225,7 @@ export function ReimbursementPersonnelTable({
                           <StatusBadge
                             key={`${r.userId}-${s}`}
                             status={s}
+                            dot={false}
                           />
                         ))}
                     </span>

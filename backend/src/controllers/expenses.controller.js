@@ -8,6 +8,7 @@ import {
   updateExpenseStatusSchema,
   updateExpenseDescriptionSchema,
   updateExpenseNotesSchema,
+  updateExpenseReviewSchema,
 } from "../validations/expenses.validation.js";
 import { deleteReceiptImage, saveReceiptImage } from "../utils/receiptImage.js";
 
@@ -160,7 +161,6 @@ export const create = async (req, res, next) => {
     const rows = await Expenses.createExpenses({
       items: payload.items,
       user_id: req.user.id,
-      issued_ref_id: payload.issued_ref_id ?? null,
       // authMiddleware guarantees req.user is an active users row. Employee
       // spend is already subtracted from the reference via `issued`, so the
       // admin-side sums exclude employee rows (see budget.model.js /
@@ -489,6 +489,33 @@ export const clearFlag = async (req, res, next) => {
     return res.status(200).json({
       expense,
       message: "Flag approved and cleared.",
+    });
+  } catch (err) {
+    next(err);
+  }
+};
+
+// Reimbursement review checklist: mark one expense row reviewed ('yes')
+// or reopen it ('no'). Admin-only at the route layer.
+export const setReview = async (req, res, next) => {
+  try {
+    const { id } = req.params;
+    if (!UUID_RE.test(id || ""))
+      throw ApiError.badRequest("Invalid expense id", "VALIDATION_ERROR");
+
+    const payload = validate(updateExpenseReviewSchema, req.body);
+
+    const existing = await Expenses.findExpenseById(id);
+    if (!existing)
+      throw ApiError.notFound("Expense not found", "EXPENSE_NOT_FOUND");
+
+    const expense = await Expenses.setExpenseReview(id, payload.review);
+    return res.status(200).json({
+      expense,
+      message:
+        payload.review === "yes"
+          ? "Expense marked as reviewed."
+          : "Expense reopened for review.",
     });
   } catch (err) {
     next(err);

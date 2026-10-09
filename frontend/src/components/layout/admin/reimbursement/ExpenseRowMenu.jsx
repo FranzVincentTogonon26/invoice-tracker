@@ -1,12 +1,21 @@
 import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
-import { EllipsisVertical, Eye, HandCoins } from "lucide-react";
+import {
+  Ban,
+  EllipsisVertical,
+  Eye,
+  Loader2,
+  RefreshCcw,
+} from "lucide-react";
+import { cn } from "@/lib/utils";
 
-// Row-actions dropdown for the reimbursement personnel ledger — "View
-// employee" opens the admin employee profile, "Reimbursement" opens the
-// per-employee reimbursement detail (settling happens there). Floating
-// portal menu with the same dismiss behavior as the other ledger row menus.
-export function PersonnelActions({ onViewEmployee, onViewReimbursement }) {
+// ── Per-row actions menu ─────────────────────────────────────────────────────
+//
+// Kebab dropdown: View opens the expense details modal (receipt tab included
+// when the row carries one); Cancel voids the row (status → 'cancel');
+// cancelled rows offer Restore (→ 'paid') instead so the void is undoable.
+export function ExpenseRowMenu({ status, busy, onView, onCancel, onRestore }) {
+  const cancelled = status === "cancel";
   const [open, setOpen] = useState(false);
   const [position, setPosition] = useState(null);
   const btnRef = useRef(null);
@@ -14,12 +23,10 @@ export function PersonnelActions({ onViewEmployee, onViewReimbursement }) {
 
   useEffect(() => {
     if (!open) return undefined;
-
     const close = () => {
       setOpen(false);
       btnRef.current?.focus();
     };
-
     const handlePointerDown = (e) => {
       if (
         !btnRef.current?.contains(e.target) &&
@@ -27,22 +34,16 @@ export function PersonnelActions({ onViewEmployee, onViewReimbursement }) {
       )
         close();
     };
-
     const handleKeyDown = (e) => {
       if (e.key === "Escape") {
         e.stopPropagation();
         close();
       }
     };
-
     window.addEventListener("pointerdown", handlePointerDown);
     window.addEventListener("keydown", handleKeyDown);
-    window.addEventListener("scroll", close, {
-      capture: true,
-      passive: true,
-    });
+    window.addEventListener("scroll", close, { capture: true, passive: true });
     window.addEventListener("resize", close);
-
     return () => {
       window.removeEventListener("pointerdown", handlePointerDown);
       window.removeEventListener("keydown", handleKeyDown);
@@ -57,7 +58,6 @@ export function PersonnelActions({ onViewEmployee, onViewReimbursement }) {
       const MENU_H = 120;
       const roomBelow = window.innerHeight - rect.bottom;
       const flipUp = roomBelow < MENU_H + 8 && rect.top > MENU_H + 8;
-
       setPosition({
         ...(flipUp
           ? { bottom: window.innerHeight - rect.top + 6 }
@@ -69,7 +69,7 @@ export function PersonnelActions({ onViewEmployee, onViewReimbursement }) {
   };
 
   const itemClass =
-    "flex w-full items-center gap-2.5 px-3.5 py-2 text-sm font-medium text-[var(--ink)] transition-colors hover:bg-[var(--surface-2)] disabled:pointer-events-none disabled:opacity-40";
+    "flex w-full items-center gap-2.5 px-3.5 py-2 text-sm font-medium transition-colors hover:bg-[var(--surface-2)] disabled:pointer-events-none disabled:opacity-40";
 
   return (
     <>
@@ -79,10 +79,15 @@ export function PersonnelActions({ onViewEmployee, onViewReimbursement }) {
         onClick={() => (open ? setOpen(false) : openMenu())}
         aria-haspopup="menu"
         aria-expanded={open}
-        aria-label="Row actions"
-        className="inline-flex h-8 w-8 items-center justify-center rounded-full text-[var(--ink-muted)] transition-colors hover:bg-[var(--surface-2)] hover:text-[var(--ink)]"
+        aria-label="Expense actions"
+        disabled={busy}
+        className="inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-[var(--ink-muted)] transition-colors hover:bg-[var(--surface-2)] hover:text-[var(--ink)] disabled:opacity-40"
       >
-        <EllipsisVertical size={16} aria-hidden />
+        {busy ? (
+          <Loader2 size={14} className="animate-spin" aria-hidden />
+        ) : (
+          <EllipsisVertical size={15} aria-hidden />
+        )}
       </button>
       {open &&
         position &&
@@ -90,7 +95,7 @@ export function PersonnelActions({ onViewEmployee, onViewReimbursement }) {
           <div
             ref={menuRef}
             role="menu"
-            aria-label="Row actions"
+            aria-label="Expense actions"
             style={{ ...position }}
             className="fixed z-[70] min-w-[12rem] overflow-hidden rounded-2xl border border-[var(--border)] bg-[var(--surface)] py-1 shadow-hover"
           >
@@ -99,25 +104,40 @@ export function PersonnelActions({ onViewEmployee, onViewReimbursement }) {
               role="menuitem"
               onClick={() => {
                 setOpen(false);
-                onViewEmployee?.();
+                onView?.();
               }}
-              className={itemClass}
+              className={cn(itemClass, "text-[var(--ink)]")}
             >
               <Eye size={15} aria-hidden />
-              View employee
+              View
             </button>
-            <button
-              type="button"
-              role="menuitem"
-              onClick={() => {
-                setOpen(false);
-                onViewReimbursement?.();
-              }}
-              className={itemClass}
-            >
-              <HandCoins size={15} aria-hidden />
-              Reimbursement
-            </button>
+            {cancelled ? (
+              <button
+                type="button"
+                role="menuitem"
+                onClick={() => {
+                  setOpen(false);
+                  onRestore?.();
+                }}
+                className={cn(itemClass, "text-[var(--ink)]")}
+              >
+                <RefreshCcw size={15} aria-hidden />
+                Restore
+              </button>
+            ) : (
+              <button
+                type="button"
+                role="menuitem"
+                onClick={() => {
+                  setOpen(false);
+                  onCancel?.();
+                }}
+                className={cn(itemClass, "text-[var(--danger)]")}
+              >
+                <Ban size={15} aria-hidden />
+                Cancel
+              </button>
+            )}
           </div>,
           document.body,
         )}
@@ -125,4 +145,4 @@ export function PersonnelActions({ onViewEmployee, onViewReimbursement }) {
   );
 }
 
-export default PersonnelActions;
+export default ExpenseRowMenu;

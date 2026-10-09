@@ -21,6 +21,7 @@ import AdminTransaction from "../pages/admin/AdminTransaction";
 import AdminExpenses from "../pages/admin/AdminExpenses";
 import AdminAuditLogs from "../pages/admin/AdminAuditLogs";
 import AdminEmployeeReimbursement from "../pages/admin/AdminEmployeeReimbursement";
+import AdminEmployeeReimbursementDetails from "../components/layout/admin/reimbursement/ReimbursementContent";
 import AdminReports from "../pages/admin/AdminReports";
 import AdminSourceFunds from "../pages/admin/AdminSourceFunds";
 import AdminSourceFundsOverview from "../components/layout/admin/source-of-funds/SourceFundsOverview";
@@ -67,6 +68,10 @@ export const router = createBrowserRouter([
               {
                 path: "reimbursement",
                 element: <AdminEmployeeReimbursement />,
+              },
+              {
+                path: "reimbursement/:id",
+                element: <AdminEmployeeReimbursementDetails />,
               },
               { path: "source-funds", element: <AdminSourceFunds /> },
               {

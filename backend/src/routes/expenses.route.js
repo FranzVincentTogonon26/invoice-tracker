@@ -99,6 +99,15 @@ router.patch(
 // Update expense description (inline editing from transaction sheet)
 router.patch("/:id/description", authMiddleware, expensesController.updateDescription);
 
+// Reimbursement review checklist: mark one expense row reviewed ('yes') or
+// reopen it ('no'). Admin-only.
+router.patch(
+  "/:id/review",
+  authMiddleware,
+  requireAdminAccess,
+  expensesController.setReview,
+);
+
 // Admin review notes (ExpenseDetailsModal, draft rows) — free-form comment
 // trail for suspicious lines. Admin-only.
 router.patch(

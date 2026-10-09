@@ -67,6 +67,9 @@ export function useExpensesMutations() {
     // The employee ledger lives under its own key (see useEmployeeExpenses)
     // and must refresh too when a row is saved or deleted from it.
     qc.invalidateQueries({ queryKey: ["employeeExpenses"] });
+    // Admin employee-details views (overview/budget/expenses/abono tabs and
+    // the reimbursement details checklist) read through this key.
+    qc.invalidateQueries({ queryKey: ["employeeDetails"] });
   };
   return {
     // Saves expense lines / adds a category / saves a receipt — dispatched by
@@ -122,6 +125,12 @@ export function useExpensesMutations() {
     // Deletes a category (UNIQUE-style feedback comes back as a 409).
     removeCategory: useMutation({
       mutationFn: expensesApi.removeCategory,
+      onSuccess: invalidate,
+    }),
+    // Reimbursement review checklist: mark one expense row reviewed ('yes')
+    // or reopen it ('no'). Ticks save instantly — no draft state.
+    setReview: useMutation({
+      mutationFn: ({ id, review }) => expensesApi.setReview(id, review),
       onSuccess: invalidate,
     }),
   };

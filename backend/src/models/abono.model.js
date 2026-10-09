@@ -242,6 +242,244 @@ class Abono {
     });
   }
 
+  // Admin settlement (reimbursement personnel table): settles an `amount`
+  // against the employee's checked OPEN abono rows (oldest first) and books
+  // each settled piece back as an `issued_budget` row under the SAME budget
+  // reference — the advance converts into regular issued holdings, so the
+  // fund pool stays whole. Omit `amount` (or pass the checked total) to
+  // settle the checked rows in full; pass less for a partial settlement,
+  // which shrinks the boundary row and records the settled piece as its own
+  // 'settled' row stamped with `date_settled`. One transaction:
+  //   1. lock the still-open rows (parallel settle/delete can't interleave),
+  //   2. re-apply the money rule: settling takes amounts OUT of the spendable
+  //      pool (open issuances + OPEN abono − PAID expenses − sent + received),
+  //      so a request the remaining balance can't cover — or one larger than
+  //      the checked rows — fails BEFORE writes,
+  //   3. flip whole rows / split the boundary row + stamp,
+  //   4. per settled piece, reuse the OPEN parent for (user, reference) — or
+  //      insert it when missing (same 23505 race handling as
+  //      Budget.issueBudgetToEmployee) — then insert the `issued_budget`
+  //      child carrying the settlement.
+  // Resolves `{ insufficient, requested, totalBalance, settled, issued }`.
+  static async settleAndReissue(userId, ids, { method, note = null, amount = null } = {}) {
+    return withTransaction(async (client) => {
+      const q = (text, params) => client.query(text, params);
+
+      const locked = await q(
+        `SELECT id, reference_id, amount::float8 AS amount, description
+           FROM employee_abono
+          WHERE user_id = $1
+            AND id = ANY($2::uuid[])
+            AND status = 'open'
+          ORDER BY created_at ASC
+          FOR UPDATE`,
+        [userId, ids],
+      );
+
+      if (locked.rows.length === 0) {
+        return {
+          insufficient: false,
+          requested: 0,
+          totalBalance: null,
+          settled: [],
+          issued: [],
+        };
+      }
+
+      const checkedSum = toMoney(
+        locked.rows.reduce((sum, row) => sum + Number(row.amount), 0),
+      );
+      const requested = toMoney(amount ?? checkedSum);
+
+      const balance = (
+        await q(
+          `SELECT
+              COALESCE((
+                SELECT SUM(ib.amount)
+                FROM budget_issued_reference bir
+                JOIN issued_budget ib ON ib.issued_ref_id = bir.id
+                WHERE bir.user_id = $1 AND bir.status = 'open'
+                  AND ib.status != 'cancel'
+              ), 0)::float8
+              + COALESCE((
+                SELECT SUM(ea.amount)
+                FROM employee_abono ea
+                WHERE ea.user_id = $1 AND ea.status = 'open'
+              ), 0)::float8
+              - COALESCE((
+                SELECT SUM(e.total_amount)
+                FROM expenses e
+                WHERE e.user_id = $1 AND e.status = 'paid'
+              ), 0)::float8
+              - COALESCE((
+                SELECT SUM(bt.amount)
+                FROM budget_transfer bt
+                WHERE bt.user_id = $1 AND bt.status = 'success'
+              ), 0)::float8
+              + COALESCE((
+                SELECT SUM(btr.amount)
+                FROM budget_transfer btr
+                WHERE btr.transfer_to = $1 AND btr.status = 'success'
+              ), 0)::float8 AS total_balance`,
+          [userId],
+        )
+      ).rows[0];
+      const totalBalance = toMoney(balance?.total_balance);
+
+      // The amount must be positive, must not exceed the checked rows, and
+      // must fit the spendable pool — anything else refuses BEFORE writes.
+      if (!(requested > 0)) {
+        return {
+          insufficient: false,
+          requested: 0,
+          totalBalance,
+          settled: [],
+          issued: [],
+        };
+      }
+      if (requested > checkedSum || requested > totalBalance) {
+        return {
+          insufficient: true,
+          requested,
+          totalBalance,
+          settled: [],
+          issued: [],
+        };
+      }
+
+      const resolveParent = async (referenceId) => {
+        let parent =
+          (
+            await q(
+              `SELECT *
+                 FROM budget_issued_reference
+                WHERE user_id = $1
+                  AND reference_id = $2
+                  AND status = 'open'
+                ORDER BY created_at DESC
+                LIMIT 1
+                FOR UPDATE`,
+              [userId, referenceId],
+            )
+          ).rows[0] ?? null;
+
+        if (!parent) {
+          try {
+            parent =
+              (
+                await q(
+                  `INSERT INTO budget_issued_reference
+                     (reference_id, user_id, date_cut_off)
+                   VALUES
+                     ($1, $2, NOW() + INTERVAL '1 month')
+                   RETURNING *`,
+                  [referenceId, userId],
+                )
+              ).rows[0] ?? null;
+          } catch (err) {
+            if (err?.code !== "23505") throw err;
+            parent =
+              (
+                await q(
+                  `SELECT *
+                     FROM budget_issued_reference
+                    WHERE user_id = $1
+                      AND reference_id = $2
+                      AND status = 'open'
+                    ORDER BY created_at DESC
+                    LIMIT 1`,
+                  [userId, referenceId],
+                )
+              ).rows[0] ?? null;
+          }
+        }
+
+        if (!parent)
+          throw new Error("Could not resolve issued budget reference.");
+        return parent;
+      };
+
+      // Allocate oldest-first: whole rows flip, and a short remainder splits
+      // the boundary row (open part shrinks, settled piece is recorded as its
+      // own 'settled' row). Every settled piece books one `issued_budget`
+      // child, so settled ⇄ issued stays 1:1 and traceable.
+      const settledShape = `id, reference_id, user_id, amount::float8 AS amount,
+                      description, status, date_settled, created_at, updated_at`;
+      let left = requested;
+      const settled = [];
+      const issued = [];
+      for (const ab of locked.rows) {
+        if (left <= 0) break;
+        const rowAmount = toMoney(ab.amount);
+        const take = toMoney(Math.min(left, rowAmount));
+        left = toMoney(left - take);
+        const partial = take < rowAmount;
+
+        let settledRow;
+        if (partial) {
+          await q(
+            `UPDATE employee_abono
+                SET amount = $2,
+                    updated_at = NOW()
+              WHERE id = $1 AND status = 'open'`,
+            [ab.id, toMoney(rowAmount - take)],
+          );
+          settledRow = (
+            await q(
+              `INSERT INTO employee_abono
+                 (user_id, reference_id, amount, description, status, date_settled)
+               VALUES
+                 ($1, $2, $3, $4, 'settled', NOW())
+               RETURNING ${settledShape}`,
+              [
+                userId,
+                ab.reference_id,
+                take,
+                `${String(ab.description || "Abono").slice(0, 100)} (partial settlement)`,
+              ],
+            )
+          ).rows[0];
+        } else {
+          settledRow = (
+            await q(
+              `UPDATE employee_abono
+                  SET status = 'settled',
+                      date_settled = NOW(),
+                      updated_at = NOW()
+                WHERE id = $1 AND status = 'open'
+                RETURNING ${settledShape}`,
+              [ab.id],
+            )
+          ).rows[0];
+          if (!settledRow)
+            throw new Error("Abono row changed mid-settlement.");
+        }
+        settled.push(settledRow);
+
+        const parent = await resolveParent(ab.reference_id);
+        const child = (
+          await q(
+            `INSERT INTO issued_budget
+               (issued_ref_id, amount, description, method, notes)
+             VALUES
+               ($1, $2, $3, $4, $5)
+             RETURNING *`,
+            [
+              parent.id,
+              take,
+              `${partial ? "Abono partial settlement" : "Abono settlement"} — ${String(ab.description || "abono").slice(0, 100)}`,
+              method,
+              note,
+            ],
+          )
+        ).rows[0];
+        issued.push(child);
+      }
+
+      return { insufficient: false, requested, totalBalance, settled, issued };
+    });
+  }
+
   // Default source of funds for a new abono: the employee's OLDEST open
   // issuance — the same "oldest-funding-first" order employeeReferenceList
   // uses to credit untagged abono, so create and reporting always agree.
