@@ -24,10 +24,13 @@ export function Badge({ className, tone, ...props }) {
   return <span className={cn(badgeVariants({ tone }), className)} {...props} />;
 }
 
-export function StatusBadge({ status, className, dot = true }) {
+// `tone` is an optional override for callers that re-tone a single status
+// (e.g. the issued-transaction table shows 'Closed' in warning) — the
+// shared STATUS map is left untouched for everyone else.
+export function StatusBadge({ status, className, dot = true, tone }) {
   const s = STATUS[status] ?? { tone: "neutral", label: status ?? "-" };
   return (
-    <Badge tone={s.tone} className={className}>
+    <Badge tone={tone ?? s.tone} className={className}>
       {dot && (
         <span
           aria-hidden

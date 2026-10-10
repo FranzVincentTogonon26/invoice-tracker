@@ -1,7 +1,14 @@
 import { useCallback, useEffect, useId, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { AnimatePresence, motion } from "framer-motion";
-import { Ban, EllipsisVertical, Flag, Loader2, RefreshCcw, Trash2 } from "lucide-react";
+import {
+  Ban,
+  EllipsisVertical,
+  EyeClosed,
+  Loader2,
+  RefreshCcw,
+  Trash2,
+} from "lucide-react";
 import { cn, formatMoney } from "../../../../lib/utils";
 import { Button } from "../../../ui/Button";
 
@@ -230,9 +237,8 @@ export function IssuedTransactionActions({
   // item past a separator (permanent hard delete through its own confirm
   // dialog). Closed rows never reach the menu — they keep the chip.
   const closedChip = (
-    <span className="inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-sm font-normal transition-colors focus-visible:outline-none focus-visible:ring-2 text-[var(--ink-muted)] bg-[var(--ink)]/14 text-[var(--ink)]">
-      <Flag size={13} strokeWidth={2.5} aria-hidden />
-      Closed
+    <span className="inline-flex h-8 w-8 items-center justify-center rounded-full text-[var(--ink-muted)] transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)]/30">
+      <EyeClosed size={16} aria-hidden />
     </span>
   );
 

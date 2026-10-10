@@ -14,7 +14,15 @@ import { cn } from "@/lib/utils";
 // Kebab dropdown: View opens the expense details modal (receipt tab included
 // when the row carries one); Cancel voids the row (status → 'cancel');
 // cancelled rows offer Restore (→ 'paid') instead so the void is undoable.
-export function ExpenseRowMenu({ status, busy, onView, onCancel, onRestore }) {
+// `viewOnly` (closed accounts) strips everything but View.
+export function ExpenseRowMenu({
+  status,
+  busy,
+  viewOnly,
+  onView,
+  onCancel,
+  onRestore,
+}) {
   const cancelled = status === "cancel";
   const [open, setOpen] = useState(false);
   const [position, setPosition] = useState(null);
@@ -111,33 +119,34 @@ export function ExpenseRowMenu({ status, busy, onView, onCancel, onRestore }) {
               <Eye size={15} aria-hidden />
               View
             </button>
-            {cancelled ? (
-              <button
-                type="button"
-                role="menuitem"
-                onClick={() => {
-                  setOpen(false);
-                  onRestore?.();
-                }}
-                className={cn(itemClass, "text-[var(--ink)]")}
-              >
-                <RefreshCcw size={15} aria-hidden />
-                Restore
-              </button>
-            ) : (
-              <button
-                type="button"
-                role="menuitem"
-                onClick={() => {
-                  setOpen(false);
-                  onCancel?.();
-                }}
-                className={cn(itemClass, "text-[var(--danger)]")}
-              >
-                <Ban size={15} aria-hidden />
-                Cancel
-              </button>
-            )}
+            {!viewOnly &&
+              (cancelled ? (
+                <button
+                  type="button"
+                  role="menuitem"
+                  onClick={() => {
+                    setOpen(false);
+                    onRestore?.();
+                  }}
+                  className={cn(itemClass, "text-[var(--ink)]")}
+                >
+                  <RefreshCcw size={15} aria-hidden />
+                  Restore
+                </button>
+              ) : (
+                <button
+                  type="button"
+                  role="menuitem"
+                  onClick={() => {
+                    setOpen(false);
+                    onCancel?.();
+                  }}
+                  className={cn(itemClass, "text-[var(--danger)]")}
+                >
+                  <Ban size={15} aria-hidden />
+                  Cancel
+                </button>
+              ))}
           </div>,
           document.body,
         )}

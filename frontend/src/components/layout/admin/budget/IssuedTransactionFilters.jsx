@@ -102,7 +102,12 @@ const STATUS_DOT = {
 };
 
 function StatusDot({ statusValue, className }) {
-  const tone = STATUS[statusValue]?.tone ?? "neutral";
+  // 'close' reads warning to match the issued table's status pill (the
+  // shared STATUS map keeps accent for every other page).
+  const tone =
+    statusValue === "close"
+      ? "warning"
+      : (STATUS[statusValue]?.tone ?? "neutral");
   return (
     <span
       aria-hidden

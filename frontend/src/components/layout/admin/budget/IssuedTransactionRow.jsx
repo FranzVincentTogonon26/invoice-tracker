@@ -152,8 +152,12 @@ export function IssuedTransactionRow({ transaction: t, onAction }) {
         <DateIssuedCell date={t.date_issued} />
       </td>
       <td className="px-4 py-3.5 text-center align-middle">
-        {/* Label-only pill in this column — dot hidden per design. */}
-        <StatusBadge status={t.status} dot={false} />
+        {/* Closed rows read warning here (the shared map says accent). */}
+        <StatusBadge
+          status={t.status}
+          dot={false}
+          tone={t.status === "close" ? "warning" : undefined}
+        />
       </td>
       <td className="px-4 py-3.5 pr-5 align-middle">
         <div className="flex justify-end">
@@ -185,7 +189,10 @@ export function IssuedTransactionCard({ transaction: t, onAction }) {
           role={t.employee_role}
           avatarUrl={t.avatar_url}
         />
-        <StatusBadge status={t.status} />
+        <StatusBadge
+          status={t.status}
+          tone={t.status === "close" ? "warning" : undefined}
+        />
       </div>
 
       <div className="mt-3 flex items-start justify-between gap-3">

@@ -802,7 +802,8 @@ class Budget {
   }
 
   // Close every OPEN issuance reference a user holds (status 'open' ->
-  // 'close'), scoped to open budget sources like every other page query.
+  // 'close', stamping `date_forwarded` with the confirmation moment),
+  // scoped to open budget sources like every other page query.
   // Used by the reimbursement submit flow: finalizing hands the holdings
   // back, so the employee disappears from open-issuance ledgers and the
   // issued amounts drop out of every money sum (they all read open parents
@@ -812,7 +813,8 @@ class Budget {
   static async closeOpenIssuedReferences(userId) {
     const result = await query(
       `UPDATE budget_issued_reference bir
-          SET status = 'close'
+          SET status = 'close',
+              date_forwarded = NOW()
          FROM budget_reference br
         WHERE bir.user_id = $1
           AND bir.status = 'open'
@@ -868,9 +870,11 @@ class Budget {
     // `::float8` casts DECIMAL (returned by pg as strings) to a JS number.
     // Closed sources leave no footsteps: rows under a cut-off source never
     // list here (`bib.reference_id` is NOT NULL, so the condition is safe).
-    // The displayed status is the CHILD's when it is cancelled — a cancelled
-    // `issued_budget` row reads 'cancel' even while its parent stays 'open'
-    // for its live siblings.
+    // The displayed status is the PARENT's when it is closed — every child
+    // under a 'close' parent reads 'Closed' and its actions lock — else the
+    // CHILD's when it is cancelled, else the parent's. `parent_status` is
+    // also returned so callers that speak child vocabulary can still tell a
+    // closed parent apart from a live one.
     const result = await query(
       `SELECT
           ib.id,
@@ -887,8 +891,11 @@ class Budget {
           ib.method,
           ib.image_url,
           ib.created_at AS date_issued,
-          CASE WHEN ib.status = 'cancel' THEN 'cancel' ELSE bib.status END AS status,
-          ib.status AS issued_status
+          CASE WHEN bib.status = 'close' THEN 'close'
+               WHEN ib.status = 'cancel' THEN 'cancel'
+               ELSE bib.status END AS status,
+          ib.status AS issued_status,
+          bib.status AS parent_status
        FROM budget_issued_reference bib
        JOIN issued_budget ib ON ib.issued_ref_id = bib.id
        JOIN users u ON u.user_id = bib.user_id

@@ -32,6 +32,10 @@ const AdminEmployeeReimbursement = () => {
   const openIssuedCount = Number(data?.issuedStatusCounts?.open ?? 0);
   const closeIssuedCount = Number(data?.issuedStatusCounts?.close ?? 0);
   const personnel = data?.personnel ?? [];
+  // Per-record issuance rows for the personnel table (one per
+  // budget_issued_reference, keyed by its own id). Falls back to the
+  // per-user personnel ledger when the backend predates the field.
+  const issuanceRecords = data?.records ?? personnel;
   const givenBreakdown = data?.givenBreakdown ?? [];
   const issuedBreakdown = data?.issuedBreakdown ?? [];
   const spentBreakdown = data?.spentBreakdown ?? [];
@@ -198,7 +202,7 @@ const AdminEmployeeReimbursement = () => {
             reimbursementRows={reimbursementRows}
           />
           <ReimbursementPersonnelTable
-            rows={personnel}
+            rows={issuanceRecords}
             isLoading={isLoading}
             onViewEmployee={handleViewEmployee}
             onViewReimbursement={handleViewReimbursement}

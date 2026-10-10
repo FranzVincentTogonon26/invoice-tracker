@@ -126,10 +126,16 @@ const BudgetIssuedTransaction = () => {
 
   // The hook already resolves `data` to an array. Normalize each row's
   // status to the `issued_budget` child's own vocabulary ('added'/'cancel')
-  // — the badge, the status filter and the row actions below all speak it.
+  // — except under a closed parent, which keeps reading 'close' so the
+  // badge, the status filter and the row actions below all agree the row
+  // is finalized (actions collapse to the non-interactive Closed chip).
   const rows = useMemo(
     () =>
-      (data ?? []).map((r) => ({ ...r, status: r.issued_status ?? r.status })),
+      (data ?? []).map((r) => ({
+        ...r,
+        status:
+          r.parent_status === "close" ? "close" : (r.issued_status ?? r.status),
+      })),
     [data],
   );
 

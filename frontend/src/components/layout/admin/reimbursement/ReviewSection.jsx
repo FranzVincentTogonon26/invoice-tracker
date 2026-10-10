@@ -49,7 +49,12 @@ const TIP_ICONS = {
 // it is ticked — no save/discard step. The sticky summary rail counts total
 // vs. checked transactions and lists data-driven reimbursement
 // recommendations (unreviewed, flagged, open abono, overdrawn).
-export function ReviewSection({ employeeId, row, onSettleAbono, hasOpenAbono }) {
+export function ReviewSection({
+  employeeId,
+  row,
+  onSettleAbono,
+  hasOpenAbono,
+}) {
   const nav = useNavigate();
   const { expenses, isLoading, refetch } =
     useEmployeeDetailsExpenses(employeeId);
@@ -70,7 +75,22 @@ export function ReviewSection({ employeeId, row, onSettleAbono, hasOpenAbono }) 
     [expenses],
   );
 
+  // Fully-closed account (a 'close' status with no 'open' issuance left):
+  // everything locks — checkboxes, bulk actions, row actions and summary
+  // actions all go read-only. Only Discard stays available.
+  const birStatuses = useMemo(
+    () =>
+      String(row?.birStatuses || "")
+        .split(",")
+        .map((s) => s.trim())
+        .filter(Boolean),
+    [row],
+  );
+  const accountClosed =
+    birStatuses.includes("close") && !birStatuses.includes("open");
+
   const toggle = async (expense) => {
+    if (accountClosed) return;
     const next = expense.review === "yes" ? "no" : "yes";
     setTogglingId(expense.id);
     try {
@@ -121,6 +141,7 @@ export function ReviewSection({ employeeId, row, onSettleAbono, hasOpenAbono }) 
   // target state, then the shared invalidation refetches once per write
   // (last one wins, all cheap).
   const checkAll = async (review) => {
+    if (accountClosed) return;
     // Cancelled rows are pinned at reviewed — never bulk-flip them.
     const targets = expenses.filter(
       (e) =>
@@ -186,7 +207,10 @@ export function ReviewSection({ employeeId, row, onSettleAbono, hasOpenAbono }) 
                   <button
                     type="button"
                     onClick={() => checkAll("yes")}
-                    disabled={bulkBusy}
+                    disabled={bulkBusy || accountClosed}
+                    title={
+                      accountClosed ? "Account closed — read-only" : undefined
+                    }
                     className="inline-flex h-7 items-center gap-1.5 rounded-full bg-[var(--accent-soft)] px-3 text-xs font-medium text-[var(--accent-strong)] transition-opacity hover:opacity-80 disabled:opacity-50"
                   >
                     {bulkBusy ? (
@@ -200,7 +224,10 @@ export function ReviewSection({ employeeId, row, onSettleAbono, hasOpenAbono }) 
                   <button
                     type="button"
                     onClick={() => checkAll("no")}
-                    disabled={bulkBusy}
+                    disabled={bulkBusy || accountClosed}
+                    title={
+                      accountClosed ? "Account closed — read-only" : undefined
+                    }
                     className="inline-flex h-7 items-center gap-1.5 rounded-full border border-[var(--border)] px-3 text-xs font-medium text-[var(--ink-muted)] transition-colors hover:text-[var(--ink)] disabled:opacity-50"
                   >
                     {bulkBusy ? (
@@ -257,13 +284,15 @@ export function ReviewSection({ employeeId, row, onSettleAbono, hasOpenAbono }) 
                     >
                       <label
                         title={
-                          isCancelled
-                            ? "Cancelled rows can't be reviewed"
-                            : `Mark "${e.description || "expense"}" as reviewed`
+                          accountClosed
+                            ? "Account closed — read-only"
+                            : isCancelled
+                              ? "Cancelled rows can't be reviewed"
+                              : `Mark "${e.description || "expense"}" as reviewed`
                         }
                         className={cn(
                           "flex min-w-0 flex-1 items-center gap-3",
-                          isCancelled || busy || bulkBusy
+                          isCancelled || busy || bulkBusy || accountClosed
                             ? "cursor-not-allowed"
                             : "cursor-pointer",
                         )}
@@ -272,7 +301,9 @@ export function ReviewSection({ employeeId, row, onSettleAbono, hasOpenAbono }) 
                           type="checkbox"
                           className="sr-only"
                           checked={isChecked}
-                          disabled={busy || bulkBusy || isCancelled}
+                          disabled={
+                            busy || bulkBusy || isCancelled || accountClosed
+                          }
                           onChange={() => toggle(e)}
                           aria-label={`Mark "${e.description || "expense"}" as reviewed`}
                         />
@@ -285,10 +316,19 @@ export function ReviewSection({ employeeId, row, onSettleAbono, hasOpenAbono }) 
                               : isChecked
                                 ? "border-transparent bg-[var(--success)] text-white"
                                 : "border-[var(--border)] text-transparent",
-                            !(busy || bulkBusy || isCancelled) &&
+                            !(
+                              busy ||
+                              bulkBusy ||
+                              isCancelled ||
+                              accountClosed
+                            ) &&
                               !isChecked &&
                               "hover:border-[var(--success)]/60",
-                            (busy || bulkBusy || isCancelled) && "opacity-60",
+                            (busy ||
+                              bulkBusy ||
+                              isCancelled ||
+                              accountClosed) &&
+                              "opacity-60",
                           )}
                         >
                           {busy ? (
@@ -366,6 +406,7 @@ export function ReviewSection({ employeeId, row, onSettleAbono, hasOpenAbono }) 
                         <ExpenseRowMenu
                           status={e.status}
                           busy={acting}
+                          viewOnly={accountClosed}
                           onView={() => setViewRow(toExpenseModalRow(e))}
                           onCancel={() => changeStatus(e, "cancel", "cancel")}
                           onRestore={() => changeStatus(e, "paid", "restore")}
@@ -483,35 +524,36 @@ export function ReviewSection({ employeeId, row, onSettleAbono, hasOpenAbono }) 
             </div>
 
             <div className="mt-4 space-y-2">
-              {hasOpenAbono ? (
-                <Button
-                  type="button"
-                  variant="accent"
-                  onClick={() => onSettleAbono?.()}
-                  title={`Settle ${row?.name || "employee"}'s open abono`}
-                  className="w-full"
-                >
-                  <Wallet size={15} aria-hidden />
-                  Settle abono
-                </Button>
-              ) : (
-                <Button
-                  type="button"
-                  variant="accent"
-                  onClick={() => setSubmitConfirmOpen(true)}
-                  disabled={total === 0 || pending > 0}
-                  title={
-                    total === 0
-                      ? "No transactions to submit"
-                      : pending > 0
-                        ? `${pending} of ${total} still unreviewed`
-                        : "All transactions reviewed — ready to submit"
-                  }
-                  className="w-full transition-transform active:scale-[0.98]"
-                >
-                  Confirm review reimbursement
-                </Button>
-              )}
+              {!accountClosed &&
+                (hasOpenAbono ? (
+                  <Button
+                    type="button"
+                    variant="accent"
+                    onClick={() => onSettleAbono?.()}
+                    title={`Settle ${row?.name || "employee"}'s open abono`}
+                    className="w-full"
+                  >
+                    <Wallet size={15} aria-hidden />
+                    Settle abono
+                  </Button>
+                ) : (
+                  <Button
+                    type="button"
+                    variant="accent"
+                    onClick={() => setSubmitConfirmOpen(true)}
+                    disabled={total === 0 || pending > 0}
+                    title={
+                      total === 0
+                        ? "No transactions to submit"
+                        : pending > 0
+                          ? `${pending} of ${total} still unreviewed`
+                          : "All transactions reviewed — ready to submit"
+                    }
+                    className="w-full transition-transform active:scale-[0.98]"
+                  >
+                    Confirm review reimbursement
+                  </Button>
+                ))}
               <Button
                 type="button"
                 variant="outline"
@@ -580,6 +622,16 @@ export function ReviewSection({ employeeId, row, onSettleAbono, hasOpenAbono }) 
                 <span className="shrink-0 font-display text-2xl font-medium tabular-nums text-[var(--accent-strong)]">
                   {pct}%
                 </span>
+              </div>
+              <div className="mt-3 rounded-2xl border border-[var(--border)] bg-[var(--surface-2)]/60 px-4 py-3 text-center">
+                <p className="type-eyebrow text-[var(--ink-muted)]">
+                  Balance forwarded
+                </p>
+                <p className="mt-1 text-lg font-medium tabular-nums text-[var(--ink)]">
+                  {Math.abs(Number(row?.balance) || 0) < 0.005
+                    ? "No more remaining balance forwarded"
+                    : `${formatMoney(row?.balance ?? 0)}`}
+                </p>
               </div>
               <p className="mt-3 text-xs leading-snug text-[var(--ink-muted)]">
                 Submitting closes this reimbursement for processing.

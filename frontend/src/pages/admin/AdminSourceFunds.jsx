@@ -178,7 +178,7 @@ export default function AdminSourceFunds() {
         actions={
           <div className="flex w-full flex-wrap items-center gap-2 sm:w-auto justify-end">
             <Button variant="accent" onClick={() => setRefsOpen(true)}>
-              <Plus size={16} /> Add Source
+              <Plus size={16} /> Create Source of Funds
             </Button>
           </div>
         }

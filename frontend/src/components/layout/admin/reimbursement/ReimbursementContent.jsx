@@ -3,6 +3,7 @@ import { useNavigate, useParams } from "react-router-dom";
 import {
   HandCoins,
   Inbox,
+  Lock,
   PhilippinePesoIcon,
   ReceiptText,
   Wallet,
@@ -79,6 +80,11 @@ export function AdminEmployeeReimbursementDetails() {
     .split(",")
     .map((s) => s.trim())
     .filter(Boolean);
+  // Fully-closed account (a 'close' status with no 'open' issuance left):
+  // the record below is finalized, so it announces itself as read-only —
+  // same rule the review section uses to lock its actions.
+  const isClosed =
+    statuses.includes("close") && !statuses.includes("open");
 
   return (
     <div className="space-y-4 pb-2">
@@ -89,6 +95,29 @@ export function AdminEmployeeReimbursementDetails() {
           description="Personnel reimbursement detail."
         />
       </div>
+
+      {isClosed && (
+        <div
+          role="status"
+          className="flex items-start gap-2.5 rounded-2xl border border-[var(--accent)]/30 bg-[var(--accent-soft)]/40 px-4 py-3"
+        >
+          <Lock
+            size={17}
+            className="mt-px shrink-0 text-[var(--accent-strong)]"
+            aria-hidden
+          />
+          <div className="min-w-0 flex-1">
+            <p className="flex flex-wrap items-center gap-2 text-sm font-medium text-[var(--ink)]">
+              Reimbursement already closed
+              <StatusBadge status="close" dot={false} />
+            </p>
+            <p className="mt-0.5 text-xs leading-snug text-[var(--ink-muted)]">
+              {row.name || "This employee"}&apos;s issued holdings were
+              finalized — this record is now read-only.
+            </p>
+          </div>
+        </div>
+      )}
 
       <Card className="overflow-hidden p-0">
         <div className="grid grid-cols-1 lg:grid-cols-4">

@@ -178,7 +178,7 @@ export default function AdminBudget() {
               tone={isOverdrawn ? "danger" : isDepleted ? "warning" : undefined}
               status={
                 isOverdrawn
-                  ? { 
+                  ? {
                       tone: "danger",
                       label: "Overdrawn — over budget",
                       icon: CircleX,

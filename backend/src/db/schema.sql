@@ -1,13 +1,9 @@
 -- ============================================================
 -- BUDGET & INVOICE TRACKING SYSTEM
--- ============================================================
-
 -- PostgreSQL Schema
-
 -- ============================================================
 
 CREATE EXTENSION IF NOT EXISTS "pgcrypto";
-
 
 -- ============================================================
 -- USERS
@@ -28,7 +24,6 @@ CREATE TABLE IF NOT EXISTS users (
     updated_at     TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
-
 -- ============================================================
 -- OTP
 -- ============================================================
@@ -41,7 +36,6 @@ CREATE TABLE IF NOT EXISTS otp (
     created_at  TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
-
 -- ============================================================
 -- GEMINI MODEL
 -- ============================================================
@@ -51,7 +45,6 @@ CREATE TABLE IF NOT EXISTS geminiModel (
     model       VARCHAR(255) NOT NULL,
     created_at  TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
-
 
 -- ============================================================
 -- BUDGET REFERENCES
@@ -72,7 +65,6 @@ CREATE TABLE IF NOT EXISTS budget_reference (
         OR balance_amount >= 0
     )
 );
-
 
 -- ============================================================
 -- BUDGET
@@ -97,7 +89,6 @@ CREATE TABLE IF NOT EXISTS budget (
     CHECK (amount >= 0)
 );
 
-
 -- ============================================================
 -- BUDGET ISSUED REFERENCES
 -- ============================================================
@@ -118,7 +109,6 @@ CREATE TABLE IF NOT EXISTS budget_issued_reference (
     created_at      TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
-
 -- ============================================================
 -- RECEIPT
 -- ============================================================
@@ -134,7 +124,6 @@ CREATE TABLE IF NOT EXISTS receipt (
     created_at  TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
-
 -- ============================================================
 -- ISSUED BUDGET
 -- ============================================================
@@ -146,8 +135,8 @@ CREATE TABLE IF NOT EXISTS issued_budget (
                   ON DELETE CASCADE,
     amount        DECIMAL(12,2) NOT NULL,
     description   TEXT NOT NULL,
-    status          VARCHAR(20) NOT NULL DEFAULT 'added'
-                    CHECK (status IN ('added', 'cancel')),
+    status        VARCHAR(20) NOT NULL DEFAULT 'added'
+                  CHECK (status IN ('added', 'cancel')),
     method        VARCHAR(255) NOT NULL,
     receipt_id    UUID
                   REFERENCES receipt(id)
@@ -161,7 +150,6 @@ CREATE TABLE IF NOT EXISTS issued_budget (
     CHECK (amount >= 0)
 );
 
-
 -- ============================================================
 -- EMPLOYEE ABONO
 -- ============================================================
@@ -170,6 +158,9 @@ CREATE TABLE IF NOT EXISTS employee_abono (
     id            UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     reference_id  UUID NOT NULL
                   REFERENCES budget_reference(reference_id)
+                  ON DELETE CASCADE,
+    issued_ref_id UUID NOT NULL
+                  REFERENCES budget_issued_reference(id)
                   ON DELETE CASCADE,
     user_id       UUID NOT NULL
                   REFERENCES users(user_id)
@@ -184,32 +175,33 @@ CREATE TABLE IF NOT EXISTS employee_abono (
     CHECK (amount >= 0)
 );
 
-
 -- ============================================================
 -- BUDGET TRANSFER
 -- ============================================================
 
 CREATE TABLE IF NOT EXISTS budget_transfer (
-    id           UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    reference_id UUID NOT NULL
-                 REFERENCES budget_reference(reference_id)
-                 ON DELETE CASCADE,
-    user_id      UUID NOT NULL
-                 REFERENCES users(user_id)
-                 ON DELETE CASCADE,
-    amount       DECIMAL(12,2) NOT NULL,
-    notes        TEXT,
-    method       VARCHAR(255) NOT NULL,
-    status       VARCHAR(20) NOT NULL DEFAULT 'success'
-                 CHECK (status IN ('success', 'cancel')),
-    transfer_to  UUID NOT NULL
-                 REFERENCES users(user_id)
-                 ON DELETE CASCADE,
-    created_at   TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-    updated_at   TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    id            UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    reference_id  UUID NOT NULL
+                  REFERENCES budget_reference(reference_id)
+                  ON DELETE CASCADE,
+    issued_ref_id UUID NOT NULL
+                  REFERENCES budget_issued_reference(id)
+                  ON DELETE CASCADE,
+    user_id       UUID NOT NULL
+                  REFERENCES users(user_id)
+                  ON DELETE CASCADE,
+    amount        DECIMAL(12,2) NOT NULL,
+    notes         TEXT,
+    method        VARCHAR(255) NOT NULL,
+    status        VARCHAR(20) NOT NULL DEFAULT 'success'
+                  CHECK (status IN ('success', 'cancel')),
+    transfer_to   UUID NOT NULL
+                  REFERENCES users(user_id)
+                  ON DELETE CASCADE,
+    created_at    TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    updated_at    TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     CHECK (amount >= 0)
 );
-
 
 -- ============================================================
 -- CATEGORY
@@ -221,7 +213,6 @@ CREATE TABLE IF NOT EXISTS category (
     created_at    TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
-
 -- ============================================================
 -- EXPENSES
 -- ============================================================
@@ -231,6 +222,9 @@ CREATE TABLE IF NOT EXISTS expenses (
     reference_id   UUID
                    REFERENCES budget_reference(reference_id)
                    ON DELETE SET NULL,
+    issued_ref_id  UUID NOT NULL
+                   REFERENCES budget_issued_reference(id)
+                   ON DELETE CASCADE,
     user_id        UUID NOT NULL
                    REFERENCES users(user_id)
                    ON DELETE CASCADE,
@@ -266,184 +260,117 @@ CREATE TABLE IF NOT EXISTS expenses (
     CHECK (total_amount >= 0)
 );
 
-
 -- ============================================================
 -- INDEXES
 -- ============================================================
 
-
--- ------------------------------------------------------------
--- USERS INDEXES
--- ------------------------------------------------------------
-
-CREATE INDEX IF NOT EXISTS idx_users_status
-    ON users(status);
-
+-- USERS
 CREATE INDEX IF NOT EXISTS idx_users_role_status
-    ON users(role, status);
+    ON users (role, status);
 
 CREATE INDEX IF NOT EXISTS idx_users_last_activity
-    ON users(last_activity);
+    ON users (last_activity DESC);
 
-
--- ------------------------------------------------------------
--- OTP INDEXES
--- ------------------------------------------------------------
-
+-- OTP
 CREATE INDEX IF NOT EXISTS idx_otp_expires_at
-    ON otp(expires_at);
+    ON otp (expires_at);
 
+-- BUDGET REFERENCES
+CREATE INDEX IF NOT EXISTS idx_budget_reference_status_created
+    ON budget_reference (status, created_at DESC);
 
--- ------------------------------------------------------------
--- GEMINI MODEL INDEXES
--- ------------------------------------------------------------
+-- BUDGET
+CREATE INDEX IF NOT EXISTS idx_budget_reference_submitted
+    ON budget (reference_id, submitted_at DESC);
 
-CREATE INDEX IF NOT EXISTS idx_geminimodel_model
-    ON geminiModel(model);
+CREATE INDEX IF NOT EXISTS idx_budget_status_submitted
+    ON budget (status, submitted_at DESC);
 
+-- BUDGET ISSUED REFERENCES
+CREATE INDEX IF NOT EXISTS idx_budget_issued_reference_user_created
+    ON budget_issued_reference (user_id, created_at DESC);
 
--- ------------------------------------------------------------
--- BUDGET REFERENCE INDEXES
--- ------------------------------------------------------------
+CREATE INDEX IF NOT EXISTS idx_budget_issued_reference_reference
+    ON budget_issued_reference (reference_id);
 
-CREATE INDEX IF NOT EXISTS idx_budget_reference_status
-    ON budget_reference(status);
+CREATE INDEX IF NOT EXISTS idx_budget_issued_reference_status_created
+    ON budget_issued_reference (status, created_at DESC);
 
-CREATE INDEX IF NOT EXISTS idx_budget_reference_date_cut_off
-    ON budget_reference(date_cut_off);
-
-CREATE INDEX IF NOT EXISTS idx_budget_reference_created_at
-    ON budget_reference(created_at);
-
-
--- ------------------------------------------------------------
--- BUDGET INDEXES
--- ------------------------------------------------------------
-
-CREATE INDEX IF NOT EXISTS idx_budget_status
-    ON budget(status);
-
-CREATE INDEX IF NOT EXISTS idx_budget_submitted_at
-    ON budget(submitted_at);
-
-CREATE INDEX IF NOT EXISTS idx_budget_approved_at
-    ON budget(approved_at);
-
-CREATE INDEX IF NOT EXISTS idx_budget_cancelled_at
-    ON budget(cancelled_at);
-
-CREATE INDEX IF NOT EXISTS idx_budget_reference_id_status
-    ON budget(reference_id, status);
-
-
--- ------------------------------------------------------------
--- BUDGET ISSUED REFERENCE INDEXES
--- ------------------------------------------------------------
-
-CREATE INDEX IF NOT EXISTS idx_budget_issued_reference_reference_id
-    ON budget_issued_reference(reference_id);
-
-CREATE INDEX IF NOT EXISTS idx_budget_issued_reference_status
-    ON budget_issued_reference(status);
-
-CREATE INDEX IF NOT EXISTS idx_budget_issued_reference_user_status
-    ON budget_issued_reference(user_id, status);
-
-CREATE INDEX IF NOT EXISTS idx_budget_issued_reference_date_cut_off
-    ON budget_issued_reference(date_cut_off);
-
-CREATE INDEX IF NOT EXISTS idx_budget_issued_reference_date_forwarded
-    ON budget_issued_reference(date_forwarded);
-
--- At most ONE open issuance per employee per budget source. Repeated issues
--- to the same employee from the same source reuse that row (see
--- `Budget.issueBudgetToEmployee`) instead of stacking duplicate parents.
--- Closed/cancelled rows are excluded so re-issuing after a cancel/close can
--- still open a fresh row. Migration 003 backfills this onto existing DBs
--- (merging duplicates first).
-CREATE UNIQUE INDEX IF NOT EXISTS uq_budget_issued_reference_open_user_reference
-    ON budget_issued_reference(user_id, reference_id)
-    WHERE status = 'open';
-
-
--- ------------------------------------------------------------
--- ISSUED BUDGET INDEXES
--- ------------------------------------------------------------
-
-CREATE INDEX IF NOT EXISTS idx_issued_budget_created_at
-    ON issued_budget(created_at);
-
-CREATE INDEX IF NOT EXISTS idx_issued_budget_issued_ref_created
-    ON issued_budget(issued_ref_id, created_at);
-
-
--- ------------------------------------------------------------
--- EMPLOYEE ABONO INDEXES
--- ------------------------------------------------------------
-
-CREATE INDEX IF NOT EXISTS idx_employee_abono_reference_id
-    ON employee_abono(reference_id);
-
-CREATE INDEX IF NOT EXISTS idx_employee_abono_user_id
-    ON employee_abono(user_id);
-
-CREATE INDEX IF NOT EXISTS idx_employee_abono_status
-    ON employee_abono(status);
-
-CREATE INDEX IF NOT EXISTS idx_employee_abono_created_at
-    ON employee_abono(created_at);
-
-
--- ------------------------------------------------------------
--- CATEGORY INDEXES
--- ------------------------------------------------------------
-
-CREATE INDEX IF NOT EXISTS idx_category_name
-    ON category(category_name);
-
-
--- ------------------------------------------------------------
--- RECEIPT INDEXES
--- ------------------------------------------------------------
+-- RECEIPT
+CREATE INDEX IF NOT EXISTS idx_receipt_receipt_id
+    ON receipt (receipt_id);
 
 CREATE INDEX IF NOT EXISTS idx_receipt_created_at
-    ON receipt(created_at);
+    ON receipt (created_at DESC);
 
-CREATE INDEX IF NOT EXISTS idx_receipt_receipt_id
-    ON receipt(receipt_id);
+-- ISSUED BUDGET
+CREATE INDEX IF NOT EXISTS idx_issued_budget_ref_created
+    ON issued_budget (issued_ref_id, created_at DESC);
 
+CREATE INDEX IF NOT EXISTS idx_issued_budget_receipt
+    ON issued_budget (receipt_id);
 
--- ------------------------------------------------------------
--- EXPENSE INDEXES
--- ------------------------------------------------------------
+CREATE INDEX IF NOT EXISTS idx_issued_budget_status_created
+    ON issued_budget (status, created_at DESC);
 
-CREATE INDEX IF NOT EXISTS idx_expenses_reference_id
-    ON expenses(reference_id);
+-- EMPLOYEE ABONO
+CREATE INDEX IF NOT EXISTS idx_employee_abono_reference_created
+    ON employee_abono (reference_id, created_at DESC);
 
-CREATE INDEX IF NOT EXISTS idx_expenses_category_id
-    ON expenses(category_id);
+CREATE INDEX IF NOT EXISTS idx_employee_abono_issued_ref_created
+    ON employee_abono (issued_ref_id, created_at DESC);
 
-CREATE INDEX IF NOT EXISTS idx_expenses_receipt_id
-    ON expenses(receipt_id);
+CREATE INDEX IF NOT EXISTS idx_employee_abono_user_created
+    ON employee_abono (user_id, created_at DESC);
 
-CREATE INDEX IF NOT EXISTS idx_expenses_status
-    ON expenses(status);
+CREATE INDEX IF NOT EXISTS idx_employee_abono_status_created
+    ON employee_abono (status, created_at DESC);
 
-CREATE INDEX IF NOT EXISTS idx_expenses_payment_method
-    ON expenses(payment_method);
+-- BUDGET TRANSFER
+CREATE INDEX IF NOT EXISTS idx_budget_transfer_reference_created
+    ON budget_transfer (reference_id, created_at DESC);
+
+CREATE INDEX IF NOT EXISTS idx_budget_transfer_issued_ref_created
+    ON budget_transfer (issued_ref_id, created_at DESC);
+
+CREATE INDEX IF NOT EXISTS idx_budget_transfer_user_created
+    ON budget_transfer (user_id, created_at DESC);
+
+CREATE INDEX IF NOT EXISTS idx_budget_transfer_recipient_created
+    ON budget_transfer (transfer_to, created_at DESC);
+
+CREATE INDEX IF NOT EXISTS idx_budget_transfer_status_created
+    ON budget_transfer (status, created_at DESC);
+
+-- CATEGORY
+CREATE INDEX IF NOT EXISTS idx_category_name
+    ON category (category_name);
+
+-- EXPENSES
+CREATE INDEX IF NOT EXISTS idx_expenses_reference_date
+    ON expenses (reference_id, expense_date DESC);
+
+CREATE INDEX IF NOT EXISTS idx_expenses_issued_ref_date
+    ON expenses (issued_ref_id, expense_date DESC);
+
+CREATE INDEX IF NOT EXISTS idx_expenses_user_date
+    ON expenses (user_id, expense_date DESC);
+
+CREATE INDEX IF NOT EXISTS idx_expenses_category_date
+    ON expenses (category_id, expense_date DESC);
+
+CREATE INDEX IF NOT EXISTS idx_expenses_receipt
+    ON expenses (receipt_id);
+
+CREATE INDEX IF NOT EXISTS idx_expenses_status_date
+    ON expenses (status, expense_date DESC);
+
+CREATE INDEX IF NOT EXISTS idx_expenses_review_date
+    ON expenses (review, expense_date DESC);
 
 CREATE INDEX IF NOT EXISTS idx_expenses_created_at
-    ON expenses(created_at);
+    ON expenses (created_at DESC);
 
-CREATE INDEX IF NOT EXISTS idx_expenses_expense_date
-    ON expenses(expense_date);
-
-CREATE INDEX IF NOT EXISTS idx_expenses_user_status
-    ON expenses(user_id, status);
-
-CREATE INDEX IF NOT EXISTS idx_expenses_issued_ref_status
-    ON expenses(issued_ref_id, status);
-
-CREATE INDEX IF NOT EXISTS idx_expenses_issued_ref_created
-    ON expenses(issued_ref_id, created_at);
-
+-- ============================================================
+-- END OF SCHEMA
+-- ============================================================

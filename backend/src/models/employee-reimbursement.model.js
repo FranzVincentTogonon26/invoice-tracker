@@ -42,6 +42,7 @@ class EmployeeReimbursement {
       issuedBreakdownResult,
       spentBreakdownResult,
       issuedStatusCountsResult,
+      issuanceRecordsResult,
     ] = await Promise.all([
         query(
           `SELECT
@@ -159,6 +160,11 @@ class EmployeeReimbursement {
                   COALESCE(ab.open_abono_count, 0)::int AS open_abono_count,
                   COALESCE(ex.spent, 0)::float8 AS spent,
                   COALESCE(ex.expense_count, 0)::int AS expense_count,
+                  -- First issuance date and latest close date across the
+                  -- employee's references under open sources (NULL when the
+                  -- side never happened — e.g. never closed yet).
+                  MIN(CASE WHEN br.reference_id IS NOT NULL THEN bir.created_at END) AS first_issued_at,
+                  MAX(CASE WHEN br.reference_id IS NOT NULL THEN bir.date_forwarded END) AS last_forwarded_at,
                   COALESCE((
                     SELECT STRING_AGG(DISTINCT bir2.status, ',' ORDER BY bir2.status)
                       FROM budget_issued_reference bir2
@@ -281,6 +287,64 @@ class EmployeeReimbursement {
             WHERE br.status = 'open'
             GROUP BY bir.status`,
         ),
+        // One row per `budget_issued_reference` record (any status) under an
+        // open source — the personnel table lists every record keyed by its
+        // own id, with its holder, source, status, dates and per-record
+        // legs. Issued counts every child (any status); abono stays
+        // open-only and spent stays paid, same rules as the personnel rows.
+        query(
+          `SELECT bir.id,
+                  bir.user_id,
+                  bir.reference_id,
+                  bir.status,
+                  bir.created_at,
+                  bir.date_cut_off,
+                  bir.date_forwarded,
+                  u.name,
+                  u.email,
+                  u.avatar_url,
+                  u.role,
+                  br.label AS reference_label,
+                  COALESCE(SUM(ib.amount), 0)::float8 AS issued,
+                  COUNT(ib.id)::int AS issued_count,
+                  COALESCE(ab.open_abono, 0)::float8 AS open_abono,
+                  COALESCE(ab.open_abono_count, 0)::int AS open_abono_count,
+                  COALESCE(sp.spent, 0)::float8 AS spent,
+                  COALESCE(sp.expense_count, 0)::int AS expense_count
+             FROM budget_issued_reference bir
+             JOIN users u ON u.user_id = bir.user_id
+             JOIN budget_reference br ON br.reference_id = bir.reference_id
+              AND br.status = 'open'
+             LEFT JOIN issued_budget ib ON ib.issued_ref_id = bir.id
+             LEFT JOIN (
+               SELECT ea.user_id,
+                      ea.reference_id,
+                      SUM(ea.amount)::float8 AS open_abono,
+                      COUNT(*)::int AS open_abono_count
+                 FROM employee_abono ea
+                 JOIN budget_reference br2 ON br2.reference_id = ea.reference_id
+                WHERE ea.status = 'open'
+                  AND br2.status = 'open'
+                GROUP BY ea.user_id, ea.reference_id
+             ) ab ON ab.user_id = bir.user_id AND ab.reference_id = bir.reference_id
+             LEFT JOIN (
+               SELECT e.user_id,
+                      e.reference_id,
+                      SUM(e.total_amount)::float8 AS spent,
+                      COUNT(*)::int AS expense_count
+                 FROM expenses e
+                 JOIN budget_reference br3 ON br3.reference_id = e.reference_id
+                WHERE e.status = 'paid'
+                  AND br3.status = 'open'
+                GROUP BY e.user_id, e.reference_id
+             ) sp ON sp.user_id = bir.user_id AND sp.reference_id = bir.reference_id
+             GROUP BY bir.id, bir.user_id, bir.reference_id, bir.status,
+                     bir.created_at, bir.date_cut_off, bir.date_forwarded,
+                     u.name, u.email, u.avatar_url, u.role, br.label,
+                     ab.open_abono, ab.open_abono_count, sp.spent, sp.expense_count
+             -- Open records first, then newest first inside each group.
+             ORDER BY (bir.status = 'open') DESC, bir.created_at DESC`,
+        ),
       ]);
 
     const t = totalsResult.rows[0] ?? {};
@@ -359,6 +423,34 @@ class EmployeeReimbursement {
           spent: rowSpent,
           expenseCount: Number(r.expense_count) || 0,
           birStatuses: r.bir_statuses || "",
+          dateCreated: r.first_issued_at ?? null,
+          dateClosed: r.last_forwarded_at ?? null,
+          balance: toMoney(rowIssued + rowAbono - rowSpent),
+        };
+      }),
+      records: (issuanceRecordsResult.rows ?? []).map((r) => {
+        const rowIssued = toMoney(r.issued);
+        const rowAbono = toMoney(r.open_abono);
+        const rowSpent = toMoney(r.spent);
+        return {
+          id: r.id,
+          userId: r.user_id,
+          name: r.name,
+          email: r.email,
+          avatarUrl: r.avatar_url ?? null,
+          role: r.role,
+          referenceId: r.reference_id,
+          referenceLabel: r.reference_label || "",
+          status: r.status,
+          dateCreated: r.created_at,
+          dateClosed: r.date_forwarded ?? null,
+          dateCutOff: r.date_cut_off ?? null,
+          issued: rowIssued,
+          issuedCount: Number(r.issued_count) || 0,
+          openAbono: rowAbono,
+          openAbonoCount: Number(r.open_abono_count) || 0,
+          spent: rowSpent,
+          expenseCount: Number(r.expense_count) || 0,
           balance: toMoney(rowIssued + rowAbono - rowSpent),
         };
       }),
