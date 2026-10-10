@@ -28,10 +28,13 @@ export const employeesApi = {
   },
 
   /* ── Admin → Employee Details tabs (`/admin/employees/:id`) ──
-   * One SELECTED employee's records, read-only. Each endpoint re-validates
-   * the id against the users table server-side (any account status) and
-   * returns the same payload shape the employee-facing endpoint returns, so
-   * the shared transaction sections render identically. */
+   * One SELECTED employee's records, read-only (whole profile on a user id,
+   * single issuance on a `budget_issued_reference` row id). Each endpoint
+   * re-validates the id server-side (any account status) and returns the same
+   * payload shape the employee-facing endpoint returns, so the shared
+   * transaction sections render identically — plus `issuedRef` (null on
+   * plain user-id links). Bir-id links scope every ledger through
+   * `issued_ref_id = budget_issued_reference.id`. */
   detailsOverview: (id, params = {}) =>
     apiClient.get(`/employees/${id}/overview`, { params }).then((r) => r.data),
   detailsBudget: (id, params = {}) =>
@@ -40,4 +43,9 @@ export const employeesApi = {
     apiClient.get(`/employees/${id}/expenses`, { params }).then((r) => r.data),
   detailsAbono: (id, params = {}) =>
     apiClient.get(`/employees/${id}/abono`, { params }).then((r) => r.data),
+  // Holder of one issuance record (`{ holder: { user_id, ... } }`) — lets
+  // bir-id deep links into `/admin/employees/:id` render the holder's roster
+  // header while the tabs keep querying by the issuance record id.
+  holderByIssuance: (birId) =>
+    apiClient.get(`/employees/by-issuance/${birId}`).then((r) => r.data),
 };

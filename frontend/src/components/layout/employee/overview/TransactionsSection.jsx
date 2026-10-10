@@ -58,7 +58,12 @@ export const TransactionsSection = ({
   );
 
   const filteredTransactions = useMemo(
-    () => filterOverviewTransactions(sortedTransactions, debouncedSearch, dateRange),
+    () =>
+      filterOverviewTransactions(
+        sortedTransactions,
+        debouncedSearch,
+        dateRange,
+      ),
     [sortedTransactions, debouncedSearch, dateRange],
   );
 

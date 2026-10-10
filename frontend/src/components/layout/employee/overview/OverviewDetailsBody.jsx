@@ -23,9 +23,14 @@ export function OverviewDetailsBody({ row, meta }) {
   const sent = isSentTransfer(row);
   const counterparty = transferCounterparty(row);
   const sign = row?.kind === "expense" || sent ? "-" : "+";
+  // Issued status is validated against the `issued_budget` row:
+  // `status = 'added'` → live "Received", `status = 'cancel'` → void
+  // "Cancelled" (danger). Anything else live (e.g. legacy 'open' rows)
+  // still reads Received so cached pages never go blank mid-session.
+  const cancelledIssued = isCancelledIssued(row);
   const statusBadge =
     kind === "issued" ? (
-      row?.status === "cancel" ? (
+      cancelledIssued ? (
         <Badge tone="danger">
           <span className="h-2 w-2 rounded-full bg-current opacity-80" />
           Cancelled
@@ -144,7 +149,8 @@ export function OverviewDetailsBody({ row, meta }) {
           <p
             className={cn(
               "mt-1 font-display text-2xl font-medium leading-none tracking-tight tabular-nums text-[var(--ink)]",
-              isCancelledIssued(row) && "line-through",
+              (isCancelled(row) || isCancelledIssued(row)) && "line-through",
+              isCancelledIssued(row) && "text-[var(--danger)]",
             )}
           >
             {sign}

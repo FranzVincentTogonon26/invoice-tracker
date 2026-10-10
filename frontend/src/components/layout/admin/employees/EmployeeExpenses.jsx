@@ -4,9 +4,11 @@ import { TransactionsSectionExpenses } from "../../employee/expenses/Transaction
 import { useEmployeeDetailsExpenses } from "../../../../hooks/useEmployeeDetails";
 import { expenseToTransaction } from "../../../../lib/employeeLedger";
 
-const EmployeeExpenses = ({ userId }) => {
-  const { expenses, isLoading, error, refetch } =
-    useEmployeeDetailsExpenses(userId);
+const EmployeeExpenses = ({ userId, view }) => {
+  const { expenses, isLoading, error, refetch } = useEmployeeDetailsExpenses(
+    userId,
+    view,
+  );
 
   const transactions = useMemo(
     () => expenses.map(expenseToTransaction),
@@ -31,6 +33,11 @@ const EmployeeExpenses = ({ userId }) => {
       transactions={transactions}
       isLoading={isLoading}
       readOnly
+      // Reimbursement view (`…/employees/:id/reimbursement`): no "Add to
+      // draft" / "Restore from draft" row actions — the issuance record is
+      // final-reviewed from the reimbursement ledger. Overview/plain views
+      // keep the draft lifecycle.
+      hideDraftActions={view === "reimbursement"}
     />
   );
 };

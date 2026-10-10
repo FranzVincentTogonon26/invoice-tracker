@@ -625,7 +625,19 @@ class Budget {
   // Optional filter:
   //   - `search`: matched against description, notes, method and the source
   //     of funds label (ILIKE)
-  static async employeeBudget(userId, { search } = {}) {
+  static async employeeBudget(userId, { search, issuedRefId, openOnly } = {}) {
+    // Single-issuance view: scope every leg by `budget_issued_reference.id`
+    // via `issued_ref_id` (see AdminEmployeesDetails). Transfers expose their
+    // real `issued_ref_id` — never NULL — so a bir-id link shows exactly the
+    // moves funded by that record. Received legs are excluded when scoped:
+    // they carry the sender's issuance id, never this record's.
+    if (issuedRefId) {
+      return this.employeeBudgetByIssuedRef(userId, issuedRefId, { search });
+    }
+    // Overview view (`openOnly`): every leg keys on the user's OPEN holdings
+    // (`budget_issued_reference.status = 'open'`) — closed holdings leave no
+    // footsteps in sums OR lists. Defaults off so employee-facing pages keep
+    // showing full history.
     // Overview mirrors employee.overview.model: the hero reads money the
     // employee still HOLDS (open issuances only) and the "Remaining" mini
     // stat reads the SAME balance the Overview page hero shows —
@@ -650,6 +662,7 @@ class Budget {
             LEFT JOIN budget_reference br ON br.reference_id = e.reference_id
             WHERE e.user_id = $1 AND e.status = 'paid'
               AND (e.reference_id IS NULL OR br.status = 'open')
+              ${openOnly ? "AND (e.reference_id IS NULL OR EXISTS (SELECT 1 FROM budget_issued_reference bir2 WHERE bir2.user_id = e.user_id AND bir2.reference_id = e.reference_id AND bir2.status = 'open' AND (e.issued_ref_id IS NULL OR bir2.id = e.issued_ref_id)))" : ""}
           ), 0)::float8 AS total_expenses,
           COALESCE((
             SELECT SUM(ea.amount)
@@ -657,10 +670,12 @@ class Budget {
             JOIN budget_reference br ON br.reference_id = ea.reference_id
             WHERE ea.user_id = $1 AND ea.status = 'open'
               AND br.status = 'open'
+              ${openOnly ? "AND EXISTS (SELECT 1 FROM budget_issued_reference bir2 WHERE bir2.user_id = ea.user_id AND bir2.reference_id = ea.reference_id AND bir2.status = 'open' AND (ea.issued_ref_id IS NULL OR bir2.id = ea.issued_ref_id))" : ""}
           ), 0)::float8 AS total_abono,
           COALESCE((
             SELECT SUM(bt.amount)
             FROM budget_transfer bt
+            ${openOnly ? "JOIN budget_issued_reference birf ON birf.id = bt.issued_ref_id AND birf.status = 'open' AND birf.user_id = bt.user_id" : ""}
             WHERE bt.user_id = $1 AND bt.status = 'success'
           ), 0)::float8 AS total_sent,
           COALESCE((
@@ -711,7 +726,7 @@ class Budget {
             ib.notes,
             ib.amount::float8 AS amount,
             ib.method,
-            bir.status,
+            ib.status,
             bir.date_cut_off,
             NULL AS counterparty,
             ib.created_at AS date,
@@ -721,10 +736,11 @@ class Budget {
            JOIN budget_reference br ON br.reference_id = bir.reference_id
               AND br.status = 'open'
           WHERE bir.user_id = $1
+            ${openOnly ? "AND bir.status = 'open'" : ""}
         UNION ALL
          SELECT
             bt.id,
-            NULL::uuid AS issued_ref_id,
+            bt.issued_ref_id,
             bt.reference_id,
             br.label AS source_of_funds,
             'transfer' AS kind,
@@ -744,12 +760,13 @@ class Budget {
            FROM budget_transfer bt
            LEFT JOIN budget_reference br ON br.reference_id = bt.reference_id
            LEFT JOIN users ru ON ru.user_id = bt.transfer_to
+           ${openOnly ? "JOIN budget_issued_reference birf ON birf.id = bt.issued_ref_id AND birf.status = 'open' AND birf.user_id = bt.user_id" : ""}
           WHERE bt.user_id = $1 AND bt.status = 'success'
             AND br.status = 'open'
         UNION ALL
          SELECT
             bt.id,
-            NULL::uuid AS issued_ref_id,
+            bt.issued_ref_id,
             bt.reference_id,
             br.label AS source_of_funds,
             'transfer' AS kind,
@@ -801,6 +818,140 @@ class Budget {
     };
   }
 
+  // Single-issuance budget ledger — every leg keyed on
+  // `budget_issued_reference.id` via `issued_ref_id`.
+  static async employeeBudgetByIssuedRef(userId, issuedRefId, { search } = {}) {
+    const overviewResult = await query(
+      `SELECT
+          COALESCE((
+            SELECT SUM(ib.amount)
+            FROM budget_issued_reference bir
+            JOIN issued_budget ib ON ib.issued_ref_id = bir.id
+            JOIN budget_reference br ON br.reference_id = bir.reference_id
+            WHERE bir.id = $2 AND bir.user_id = $1
+              AND br.status = 'open'
+              AND ib.status != 'cancel'
+          ), 0)::float8 AS total_budget,
+          COALESCE((
+            SELECT SUM(e.total_amount)
+            FROM expenses e
+            LEFT JOIN budget_reference br ON br.reference_id = e.reference_id
+            WHERE e.issued_ref_id = $2 AND e.user_id = $1 AND e.status = 'paid'
+              AND (e.reference_id IS NULL OR br.status = 'open')
+          ), 0)::float8 AS total_expenses,
+          COALESCE((
+            SELECT SUM(ea.amount)
+            FROM employee_abono ea
+            JOIN budget_reference br ON br.reference_id = ea.reference_id
+            WHERE ea.issued_ref_id = $2 AND ea.user_id = $1 AND ea.status = 'open'
+              AND br.status = 'open'
+          ), 0)::float8 AS total_abono,
+          COALESCE((
+            SELECT SUM(bt.amount)
+            FROM budget_transfer bt
+            WHERE bt.issued_ref_id = $2 AND bt.user_id = $1 AND bt.status = 'success'
+          ), 0)::float8 AS total_sent,
+          0::float8 AS total_received,
+          COALESCE((
+            SELECT COUNT(*)
+            FROM budget_issued_reference bir
+            JOIN budget_reference br ON br.reference_id = bir.reference_id
+            WHERE bir.id = $2 AND bir.user_id = $1
+              AND bir.status = 'open'
+              AND br.status = 'open'
+          ), 0)::int AS active_references`,
+      [userId, issuedRefId],
+    );
+
+    const txParams = [userId, issuedRefId];
+    let searchClause = "";
+    if (search && search.trim()) {
+      txParams.push(`%${search.trim()}%`);
+      searchClause = `WHERE (t.description ILIKE $3
+              OR t.notes ILIKE $3
+              OR t.method ILIKE $3
+              OR t.source_of_funds ILIKE $3
+              OR t.counterparty ILIKE $3
+              OR t.kind ILIKE $3
+              OR t.direction ILIKE $3)`;
+    }
+
+    const txResult = await query(
+      `SELECT * FROM (
+         SELECT
+            ib.id,
+            ib.issued_ref_id,
+            bir.reference_id,
+            br.label AS source_of_funds,
+            'issued' AS kind,
+            NULL AS direction,
+            ib.description,
+            ib.notes,
+            ib.amount::float8 AS amount,
+            ib.method,
+            ib.status,
+            bir.date_cut_off,
+            NULL AS counterparty,
+            ib.created_at AS date,
+            ib.created_at AS created_at
+           FROM budget_issued_reference bir
+           JOIN issued_budget ib ON ib.issued_ref_id = bir.id
+           JOIN budget_reference br ON br.reference_id = bir.reference_id
+              AND br.status = 'open'
+          WHERE bir.id = $2 AND bir.user_id = $1
+        UNION ALL
+         SELECT
+            bt.id,
+            bt.issued_ref_id,
+            bt.reference_id,
+            br.label AS source_of_funds,
+            'transfer' AS kind,
+            'sent' AS direction,
+            COALESCE(
+              NULLIF(TRIM(bt.notes), ''),
+              'Budget transfer to ' || COALESCE(ru.name, 'employee')
+            ) AS description,
+            bt.notes,
+            bt.amount::float8 AS amount,
+            bt.method,
+            bt.status,
+            NULL::timestamptz AS date_cut_off,
+            ru.name AS counterparty,
+            bt.created_at AS date,
+            bt.created_at AS created_at
+           FROM budget_transfer bt
+           LEFT JOIN budget_reference br ON br.reference_id = bt.reference_id
+           LEFT JOIN users ru ON ru.user_id = bt.transfer_to
+          WHERE bt.issued_ref_id = $2 AND bt.user_id = $1 AND bt.status = 'success'
+            AND br.status = 'open'
+       ) t
+       ${searchClause}
+       ORDER BY t.created_at DESC`,
+      txParams,
+    );
+
+    const row = overviewResult.rows[0] ?? {};
+    const totalBudget = toMoney(row.total_budget);
+    const totalExpenses = toMoney(row.total_expenses);
+    const totalAbono = toMoney(row.total_abono);
+    const totalSent = toMoney(row.total_sent);
+
+    return {
+      overview: {
+        totalBudget,
+        totalExpenses,
+        totalAbono,
+        totalSent,
+        totalReceived: 0,
+        totalBalance: toMoney(
+          totalBudget + totalAbono - totalExpenses - totalSent,
+        ),
+        activeReferences: Number(row.active_references) || 0,
+      },
+      transactions: txResult.rows,
+    };
+  }
+
   // Close every OPEN issuance reference a user holds (status 'open' ->
   // 'close', stamping `date_forwarded` with the confirmation moment),
   // scoped to open budget sources like every other page query.
@@ -809,19 +960,56 @@ class Budget {
   // issued amounts drop out of every money sum (they all read open parents
   // with live children only). The partial unique index covers 'open' rows
   // only, so a future issuance for the same pair can start fresh.
+  // Each closed row also records its handover state in the same write:
+  //   - `notes`: the submit dialog's optional note (keeps the row's existing
+  //     notes when no note was given).
+  //   - `balance_forwarded`: that record's leftover at close time — live
+  //     issued children + OPEN abono − PAID expenses under open sources
+  //     (the per-record `balance` the reimbursement ledger displays; 0 stays
+  //     0). Computed BEFORE the status flips, in the same statement, so the
+  //     stored figure can never disagree with the pre-submit ledger.
   // Resolves `{ closedCount }`.
-  static async closeOpenIssuedReferences(userId) {
+  static async closeOpenIssuedReferences(userId, { note } = {}) {
     const result = await query(
       `UPDATE budget_issued_reference bir
           SET status = 'close',
-              date_forwarded = NOW()
+              date_forwarded = NOW(),
+              notes = COALESCE($2, bir.notes),
+              balance_forwarded = (
+                COALESCE((
+                  SELECT SUM(ib.amount)
+                    FROM issued_budget ib
+                    JOIN budget_reference br2 ON br2.reference_id = bir.reference_id
+                   WHERE ib.issued_ref_id = bir.id
+                     AND ib.status != 'cancel'
+                     AND br2.status = 'open'
+                ), 0)
+                + COALESCE((
+                  SELECT SUM(ea.amount)
+                    FROM employee_abono ea
+                    JOIN budget_reference br2 ON br2.reference_id = ea.reference_id
+                   WHERE ea.user_id = bir.user_id
+                     AND ea.reference_id = bir.reference_id
+                     AND ea.status = 'open'
+                     AND br2.status = 'open'
+                ), 0)
+                - COALESCE((
+                  SELECT SUM(e.total_amount)
+                    FROM expenses e
+                    JOIN budget_reference br2 ON br2.reference_id = e.reference_id
+                   WHERE e.user_id = bir.user_id
+                     AND e.reference_id = bir.reference_id
+                     AND e.status = 'paid'
+                     AND br2.status = 'open'
+                ), 0)
+              )
          FROM budget_reference br
         WHERE bir.user_id = $1
           AND bir.status = 'open'
           AND br.reference_id = bir.reference_id
           AND br.status = 'open'
         RETURNING bir.id`,
-      [userId],
+      [userId, note ?? null],
     );
     return { closedCount: result.rows.length };
   }
@@ -1157,17 +1345,23 @@ class Budget {
       // Take-back guard: cancelling pulls this issuance OUT of the
       // employee's pool, so when they already spent it (their remaining
       // can't cover the take-back) the cancel is refused — same protection
-      // as the transfer cancel guard. Remaining mirrors
-      // EmployeeOverview.totalBalance: open issuances + OPEN abono −
-      // PAID expenses − sent transfers + received transfers. It includes
-      // this row (still open).
+      // as the transfer cancel guard. Remaining mirrors the strict
+      // (open-holdings-only) totalBalance the AdminEmployeesDetails overview
+      // shows: OPEN issuances + OPEN abono − PAID expenses − sent transfers
+      // + received transfers. It includes this row (still open).
+      // Every leg keys on that user's `budget_issued_reference` rows with
+      // `status = 'open'` — closed holdings (and cut-off sources) never fund
+      // the pool, so a cancel can no longer be approved against money the
+      // pages no longer display. Received transfers stay keyed by recipient:
+      // inbound money carries the sender's `issued_ref_id`, never a holding
+      // of this user.
       // Abono-first order: the employee's OPEN abono (the same figure the
       // AdminEmployeesDetails "abono" value shows) is minused from the
       // remaining balance BEFORE the issuance amount — the take-back may
       // only draw from non-abono funds, so a cancel is allowed when
       // (remaining − abono) >= amount (exact cover counts — refusing it
       // stranded fully-coverable rows). Settled/draft abono never fund the
-      // pool (the query above counts `status = 'open'` only).
+      // pool (the query below counts `status = 'open'` only).
       const pool = (
         await q(
           `SELECT
@@ -1175,22 +1369,45 @@ class Budget {
                 SELECT SUM(ib2.amount)
                   FROM budget_issued_reference bir2
                   JOIN issued_budget ib2 ON ib2.issued_ref_id = bir2.id
+                  JOIN budget_reference br ON br.reference_id = bir2.reference_id
                  WHERE bir2.user_id = $1 AND bir2.status = 'open'
+                   AND br.status = 'open'
                    AND ib2.status != 'cancel'
               ), 0)::float8 AS total_budget,
               COALESCE((
                 SELECT SUM(ea.amount)
                   FROM employee_abono ea
+                  JOIN budget_reference br ON br.reference_id = ea.reference_id
                  WHERE ea.user_id = $1 AND ea.status = 'open'
+                   AND br.status = 'open'
+                   AND EXISTS (
+                     SELECT 1 FROM budget_issued_reference bir2
+                     WHERE bir2.user_id = ea.user_id
+                       AND bir2.reference_id = ea.reference_id
+                       AND bir2.status = 'open'
+                       AND (ea.issued_ref_id IS NULL OR bir2.id = ea.issued_ref_id)
+                   )
               ), 0)::float8 AS total_abono,
               COALESCE((
                 SELECT SUM(e.total_amount)
                   FROM expenses e
+                  LEFT JOIN budget_reference br ON br.reference_id = e.reference_id
                  WHERE e.user_id = $1 AND e.status = 'paid'
+                   AND (e.reference_id IS NULL OR br.status = 'open')
+                   AND (e.reference_id IS NULL OR EXISTS (
+                     SELECT 1 FROM budget_issued_reference bir2
+                     WHERE bir2.user_id = e.user_id
+                       AND bir2.reference_id = e.reference_id
+                       AND bir2.status = 'open'
+                       AND (e.issued_ref_id IS NULL OR bir2.id = e.issued_ref_id)
+                   ))
               ), 0)::float8 AS total_expenses,
               COALESCE((
                 SELECT SUM(bt.amount)
                   FROM budget_transfer bt
+                  JOIN budget_issued_reference birf ON birf.id = bt.issued_ref_id
+                    AND birf.status = 'open'
+                    AND birf.user_id = bt.user_id
                  WHERE bt.user_id = $1 AND bt.status = 'success'
               ), 0)::float8 AS total_sent,
               COALESCE((

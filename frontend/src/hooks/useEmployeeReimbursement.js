@@ -39,12 +39,17 @@ export function useSettleAbono() {
 }
 
 // Admin submit: finalize an employee's reimbursement (closes every OPEN
-// issuance reference they hold). Refreshes the same surfaces settlement
-// moves money on.
+// issuance reference they hold, stamping the optional note and each
+// record's leftover). Refreshes the same surfaces settlement moves money on.
+// Call as `mutate({ userId, note })` — `note` is optional free text.
 export function useSubmitReimbursement() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: (userId) => employeeReimbursementApi.submit(userId),
+    mutationFn: ({ userId, note }) =>
+      employeeReimbursementApi.submit(
+        userId,
+        note?.trim() ? { note: note.trim() } : undefined,
+      ),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: reimbursementOverviewKey });
       qc.invalidateQueries({ queryKey: reimbursementsKey });

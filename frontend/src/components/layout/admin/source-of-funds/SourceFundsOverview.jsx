@@ -7,7 +7,7 @@ import { Button } from "../../../ui/Button";
 import { StatCard } from "../../../ui/StatCard";
 import { Badge } from "../../../ui/Badge";
 import { Card, CardDescription, CardTitle } from "../../../ui/Card";
-import { EmptyState, LoadingSkeleton } from "../../../ui/DataState";
+import { EmptyState } from "../../../ui/DataState";
 import { EmployeeAvatar } from "../../../ui/SelectEmployee";
 import { useSourceFunds } from "../../../../hooks/useSourceFunds";
 import { formatDate, formatMoney, formatTime, toMoney } from "@/lib/utils";
@@ -43,12 +43,78 @@ export function AdminSourceFundsOverview() {
     );
   }
 
+  // Loading mirror — same frames as the loaded page (header, 4 stat cards
+  // via their built-in loading state, utilization block, people list) so
+  // nothing shifts when the source paints.
   if (isLoading) {
     return (
-      <div className="space-y-4">
-        <BackButton onClick={backToList} />
-        <Card padding="lg">
-          <LoadingSkeleton rows={4} />
+      <div
+        className="space-y-5"
+        role="status"
+        aria-label="Loading source overview"
+      >
+        <div className="flex items-center gap-3">
+          <BackButton onClick={backToList} />
+          <div aria-hidden className="min-w-0 flex-1 space-y-2">
+            <div className="h-6 w-52 max-w-full animate-pulse rounded-lg bg-[var(--border)]" />
+            <div className="h-3.5 w-72 max-w-full animate-pulse rounded bg-[var(--border)]" />
+          </div>
+          <div
+            aria-hidden
+            className="hidden h-8 w-24 shrink-0 animate-pulse rounded-full bg-[var(--border)] sm:block"
+          />
+        </div>
+        <div
+          aria-hidden
+          className="grid grid-cols-1 gap-4 sm:grid-cols-2 sm:gap-5 xl:grid-cols-4"
+        >
+          <StatCard label="" value={0} icon={TrendingUp} accent loading />
+          <StatCard label="" value={0} icon={Wallet} loading />
+          <StatCard label="" value={0} icon={HandCoins} loading />
+          <StatCard label="" value={0} icon={Inbox} loading />
+        </div>
+        <Card padding="lg" className="relative overflow-hidden rounded-3xl">
+          <div aria-hidden className="flex items-center justify-between gap-3">
+            <div className="h-5 w-28 animate-pulse rounded bg-[var(--border)]" />
+            <div className="h-4 w-16 animate-pulse rounded bg-[var(--border)]" />
+          </div>
+          <div
+            aria-hidden
+            className="mt-3 h-2.5 animate-pulse overflow-hidden rounded-full bg-[var(--surface-2)]"
+          />
+          <div aria-hidden className="mt-3 grid grid-cols-3 gap-2">
+            {[0, 1, 2].map((i) => (
+              <div
+                key={i}
+                className="rounded-2xl border border-[var(--border)] px-2 py-3"
+              >
+                <div className="mx-auto h-3 w-14 animate-pulse rounded bg-[var(--border)]" />
+                <div className="mx-auto mt-2 h-4 w-16 animate-pulse rounded bg-[var(--border)]" />
+              </div>
+            ))}
+          </div>
+        </Card>
+        <Card padding="lg" className="relative overflow-hidden rounded-3xl">
+          <div aria-hidden className="flex items-center justify-between gap-3">
+            <div className="h-5 w-36 animate-pulse rounded bg-[var(--border)]" />
+            <div className="h-5 w-10 animate-pulse rounded-full bg-[var(--border)]" />
+          </div>
+          <div aria-hidden className="mt-1 h-3.5 w-64 max-w-full animate-pulse rounded bg-[var(--border)]" />
+          <ul
+            aria-hidden
+            className="mt-3 divide-y divide-[var(--border)] overflow-hidden rounded-2xl border border-[var(--border)]"
+          >
+            {[0, 1, 2].map((i) => (
+              <li
+                key={i}
+                className="flex items-center gap-3 px-4 py-2.5"
+              >
+                <div className="h-9 w-9 shrink-0 animate-pulse rounded-full bg-[var(--border)]" />
+                <div className="h-4 min-w-0 flex-1 animate-pulse rounded bg-[var(--border)]" />
+                <div className="h-3 w-12 shrink-0 animate-pulse rounded bg-[var(--border)]" />
+              </li>
+            ))}
+          </ul>
         </Card>
       </div>
     );

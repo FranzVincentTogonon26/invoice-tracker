@@ -13,7 +13,7 @@ import {
 import toast from "react-hot-toast";
 import { Badge } from "../../../ui/Badge";
 import { Card, CardDescription, CardTitle } from "../../../ui/Card";
-import { EmptyState, LoadingSkeleton } from "../../../ui/DataState";
+import { EmptyState } from "../../../ui/DataState";
 import { Button } from "../../../ui/Button";
 import ExpenseDetailsModal from "../expenses/ExpenseDetailsModal";
 import { ExpenseRowMenu } from "./ExpenseRowMenu";
@@ -42,22 +42,113 @@ const TIP_ICONS = {
   success: CircleCheck,
 };
 
+// Loading mirror shared with `AdminEmployeeReimbursementDetails`: same grid
+// and card frames as the loaded checklist + summary rail, so the detail page
+// skeleton and the section paint into identical frames with no layout shift.
+export function ReviewSectionSkeleton() {
+  return (
+    <div
+      role="status"
+      aria-label="Loading review checklist"
+      className="grid grid-cols-1 items-start gap-5 lg:grid-cols-[minmax(0,1fr)_320px]"
+    >
+      <Card className="px-2 sm:px-6">
+        <div
+          aria-hidden
+          className="mb-1 flex flex-wrap items-center justify-between gap-2"
+        >
+          <div className="space-y-2">
+            <div className="h-5 w-48 animate-pulse rounded bg-[var(--border)]" />
+            <div className="h-3 w-64 max-w-full animate-pulse rounded bg-[var(--border)]" />
+          </div>
+          <div className="flex items-center gap-2">
+            <div className="h-6 w-28 animate-pulse rounded-full bg-[var(--border)]" />
+            <div className="h-7 w-24 animate-pulse rounded-full bg-[var(--border)]" />
+          </div>
+        </div>
+        <div aria-hidden className="space-y-2.5 pt-4">
+          {[0, 1, 2, 3].map((i) => (
+            <div
+              key={i}
+              className="flex items-center gap-3 rounded-2xl border border-[var(--border)] px-3.5 py-3 sm:gap-4"
+            >
+              <div className="h-5 w-5 shrink-0 animate-pulse rounded-md bg-[var(--border)]" />
+              <div className="min-w-0 flex-1 space-y-1.5">
+                <div className="h-4 w-2/5 animate-pulse rounded bg-[var(--border)]" />
+                <div className="h-3 w-1/3 animate-pulse rounded bg-[var(--border)]" />
+              </div>
+              <div className="hidden h-4 w-16 shrink-0 animate-pulse rounded bg-[var(--border)] min-[400px]:block" />
+              <div className="h-4 w-20 shrink-0 animate-pulse rounded bg-[var(--border)]" />
+            </div>
+          ))}
+        </div>
+      </Card>
+      <div className="lg:sticky lg:top-4">
+        <Card className="px-2 sm:px-6">
+          <div aria-hidden className="space-y-2">
+            <div className="h-5 w-24 animate-pulse rounded bg-[var(--border)]" />
+            <div className="h-3 w-40 animate-pulse rounded bg-[var(--border)]" />
+          </div>
+          <div
+            aria-hidden
+            className="mt-4 rounded-2xl border border-[var(--accent)]/20 bg-[var(--accent-soft)]/40 px-4 py-4"
+          >
+            <div className="mx-auto h-3 w-28 animate-pulse rounded bg-[var(--border)]" />
+            <div className="mx-auto mt-2 h-8 w-24 animate-pulse rounded bg-[var(--border)]" />
+            <div className="mt-3 h-2 animate-pulse rounded-full bg-[var(--surface-2)]" />
+          </div>
+          <div aria-hidden className="mt-4 space-y-1.5">
+            {[0, 1, 2].map((i) => (
+              <div key={i} className="flex items-center justify-between gap-2">
+                <div className="h-3 w-24 animate-pulse rounded bg-[var(--border)]" />
+                <div className="h-3 w-10 animate-pulse rounded bg-[var(--border)]" />
+              </div>
+            ))}
+          </div>
+          <div
+            aria-hidden
+            className="my-4 space-y-2 border-t border-[var(--border)] pt-4"
+          >
+            <div className="h-3 w-28 animate-pulse rounded bg-[var(--border)]" />
+            <div className="h-16 animate-pulse rounded-xl border border-[var(--border)]" />
+          </div>
+          <div aria-hidden className="mt-4 space-y-2">
+            <div className="h-9 animate-pulse rounded-full bg-[var(--border)]" />
+            <div className="h-9 animate-pulse rounded-full bg-[var(--border)]" />
+          </div>
+        </Card>
+      </div>
+    </div>
+  );
+}
+
 // ── Review checklist + summary ─────────────────────────────────────────────
 //
-// To-do list of every expense transaction of the employee, each with a
-// checkbox that persists to `expenses.review` ('yes' = reviewed) the moment
-// it is ticked — no save/discard step. The sticky summary rail counts total
-// vs. checked transactions and lists data-driven reimbursement
-// recommendations (unreviewed, flagged, open abono, overdrawn).
+// To-do list of expense transactions, each with a checkbox that persists to
+// `expenses.review` ('yes' = reviewed) the moment it is ticked — no
+// save/discard step. The sticky summary rail counts total vs. checked
+// transactions and lists data-driven reimbursement recommendations
+// (unreviewed, flagged, open abono, overdrawn).
+// When `recordId` is present (per-record detail page), the list connects
+// through that `budget_issued_reference.id` (`expenses.issued_ref_id`) so the
+// checklist shows exactly the record's expenses — the same scope as the hero
+// stats above. Otherwise it falls back to the employee's whole ledger.
 export function ReviewSection({
   employeeId,
+  recordId = null,
   row,
   onSettleAbono,
   hasOpenAbono,
+  // Closed status from the detail page (`record.status` in record mode, the
+  // account rule in legacy mode): when closed, the Settle/Submit summary
+  // actions below stay hidden — only Discard remains.
+  isClosed = false,
 }) {
   const nav = useNavigate();
-  const { expenses, isLoading, refetch } =
-    useEmployeeDetailsExpenses(employeeId);
+  const { expenses, isLoading, refetch } = useEmployeeDetailsExpenses(
+    recordId ?? employeeId,
+    recordId ? "reimbursement" : undefined,
+  );
   const { setReview, setStatus } = useExpensesMutations();
   const submit = useSubmitReimbursement();
   const [togglingId, setTogglingId] = useState(null);
@@ -65,6 +156,15 @@ export function ReviewSection({
   const [actingId, setActingId] = useState(null);
   const [submitConfirmOpen, setSubmitConfirmOpen] = useState(false);
   const [viewRow, setViewRow] = useState(null);
+  // Optional submit note (stored on each closed issuance record). Cleared
+  // whenever the confirm dialog closes so a stale note never leaks into the
+  // next submit.
+  const [note, setNote] = useState("");
+  const closeSubmitConfirm = () => {
+    if (submit.isPending) return;
+    setSubmitConfirmOpen(false);
+    setNote("");
+  };
 
   // Latest transactions on top — sorted client-side so refetches and
   // toggles can never reshuffle the list out from under the checkboxes.
@@ -182,7 +282,10 @@ export function ReviewSection({
     [pending, total, flagged, row],
   );
 
-  if (isLoading) return <LoadingSkeleton rows={4} />;
+  // Loading mirror — same grid and card frames as the loaded section
+  // (checklist card + sticky summary rail) so nothing shifts when the real
+  // rows paint. Shared with the detail page skeleton below.
+  if (isLoading) return <ReviewSectionSkeleton />;
 
   return (
     <>
@@ -524,7 +627,12 @@ export function ReviewSection({
             </div>
 
             <div className="mt-4 space-y-2">
+              {/* Hidden when closed — the record status (`isClosed`) covers
+                  record mode where the account aggregate may still look open;
+                  `accountClosed` covers legacy per-user mode. Only Discard
+                  remains. */}
               {!accountClosed &&
+                !isClosed &&
                 (hasOpenAbono ? (
                   <Button
                     type="button"
@@ -592,7 +700,7 @@ export function ReviewSection({
               animate={{ opacity: 1, y: 0, scale: 1 }}
               exit={{ opacity: 0, y: 8, scale: 0.97 }}
               transition={{ duration: 0.22 }}
-              className="w-full max-w-sm rounded-3xl border border-[var(--border)] bg-[var(--surface)] p-6 shadow-hover"
+              className="max-h-[calc(100dvh-3rem)] w-full max-w-md overflow-y-auto rounded-3xl border border-[var(--border)] bg-[var(--surface)] p-6 shadow-hover scrollbar-slim"
             >
               <div className="flex items-start gap-3">
                 <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-[var(--accent-strong)] text-white shadow-card">
@@ -633,6 +741,32 @@ export function ReviewSection({
                     : `${formatMoney(row?.balance ?? 0)}`}
                 </p>
               </div>
+              <div className="mt-3">
+                <div className="flex items-baseline justify-between gap-2">
+                  <label
+                    htmlFor="submit-note"
+                    className="type-eyebrow text-[var(--ink-muted)]"
+                  >
+                    Note{" "}
+                    <span className="font-normal normal-case opacity-70">
+                      (optional)
+                    </span>
+                  </label>
+                  <span className="text-[11px] tabular-nums text-[var(--ink-muted)]">
+                    {note.trim().length}/500
+                  </span>
+                </div>
+                <textarea
+                  id="submit-note"
+                  value={note}
+                  maxLength={500}
+                  rows={3}
+                  onChange={(e) => setNote(e.target.value)}
+                  placeholder="Handover note recorded on the closed issuance — e.g. where the forwarded balance goes."
+                  disabled={submit.isPending}
+                  className="mt-1.5 block w-full resize-y rounded-2xl border border-[var(--border)] bg-[var(--surface)] px-3.5 py-2.5 text-sm leading-relaxed text-[var(--ink)] placeholder:text-[var(--ink-muted)]/70 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)]/30 disabled:opacity-60"
+                />
+              </div>
               <p className="mt-3 text-xs leading-snug text-[var(--ink-muted)]">
                 Submitting closes this reimbursement for processing.
                 Transactions stay viewable afterward, but no further edits are
@@ -642,7 +776,8 @@ export function ReviewSection({
                 <Button
                   type="button"
                   variant="outline"
-                  onClick={() => setSubmitConfirmOpen(false)}
+                  onClick={closeSubmitConfirm}
+                  disabled={submit.isPending}
                 >
                   Go back
                 </Button>
@@ -650,19 +785,22 @@ export function ReviewSection({
                   type="button"
                   variant="accent"
                   onClick={() => {
-                    submit.mutate(employeeId, {
-                      onSuccess: (res) => {
-                        setSubmitConfirmOpen(false);
-                        toast.success(
-                          res?.message ??
-                            `Reimbursement submitted for ${row?.name || "this employee"}.`,
-                        );
+                    submit.mutate(
+                      { userId: employeeId, note },
+                      {
+                        onSuccess: (res) => {
+                          closeSubmitConfirm();
+                          toast.success(
+                            res?.message ??
+                              `Reimbursement submitted for ${row?.name || "this employee"}.`,
+                          );
+                        },
+                        onError: (err) =>
+                          toast.error(
+                            err?.message || "Couldn't submit reimbursement",
+                          ),
                       },
-                      onError: (err) =>
-                        toast.error(
-                          err?.message || "Couldn't submit reimbursement",
-                        ),
-                    });
+                    );
                   }}
                   disabled={submit.isPending}
                   className="transition-transform active:scale-[0.98]"

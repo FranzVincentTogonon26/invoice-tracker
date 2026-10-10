@@ -16,6 +16,49 @@ class Employee {
     return result.rows[0];
   }
 
+  // Holder of one issuance record — resolves a `budget_issued_reference` row
+  // id to the account that holds it. Powers bir-id deep links into the
+  // employee profile (see loadEmployee + GET /employees/by-issuance/:birId).
+  // Columns are qualified: `budget_issued_reference` carries its own
+  // `user_id`, so the shared SAFE_COLUMNS list would be ambiguous here.
+  static async findHolderByIssuedReferenceId(issuedRefId) {
+    const result = await query(
+      `SELECT u.user_id, u.name, u.email, u.avatar_url, u.role, u.status
+         FROM users u
+         JOIN budget_issued_reference bir ON bir.user_id = u.user_id
+        WHERE bir.id = $1
+        LIMIT 1`,
+      [issuedRefId],
+    );
+    return result.rows[0];
+  }
+
+  // One issuance record by its `budget_issued_reference.id` — the key the
+  // AdminEmployeesDetails page uses to connect an issuance to its child rows
+  // (`issued_budget`, `expenses`, `employee_abono` and `budget_transfer` all
+  // carry `issued_ref_id`). Returns the full parent row (id, user, source,
+  // status, dates) or null.
+  static async findIssuedReferenceById(issuedRefId) {
+    const result = await query(
+      `SELECT bir.id,
+              bir.reference_id,
+              bir.user_id,
+              bir.notes,
+              bir.status,
+              bir.date_cut_off,
+              bir.date_forwarded,
+              bir.created_at,
+              br.label AS reference_label,
+              br.status AS reference_status
+         FROM budget_issued_reference bir
+         LEFT JOIN budget_reference br ON br.reference_id = bir.reference_id
+        WHERE bir.id = $1
+        LIMIT 1`,
+      [issuedRefId],
+    );
+    return result.rows[0] ?? null;
+  }
+
   //   Find Employee by email (used to catch duplicate accounts on create)
   static async findEmployeeByEmail(email) {
     const result = await query(

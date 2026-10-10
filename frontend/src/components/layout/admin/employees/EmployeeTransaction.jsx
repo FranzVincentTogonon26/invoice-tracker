@@ -2,9 +2,11 @@ import { ErrorState } from "../../../ui/DataState";
 import { TransactionsSection } from "../../employee/overview/TransactionsSection";
 import { useEmployeeDetailsOverview } from "../../../../hooks/useEmployeeDetails";
 
-const EmployeeTransaction = ({ userId }) => {
-  const { data, isLoading, error, refetch } =
-    useEmployeeDetailsOverview(userId);
+const EmployeeTransaction = ({ userId, view }) => {
+  const { data, isLoading, error, refetch } = useEmployeeDetailsOverview(
+    userId,
+    view,
+  );
 
   if (error) {
     return (

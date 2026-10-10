@@ -293,6 +293,7 @@ class BudgetTransfer {
       }
 
       let referenceId = null;
+      let issuedRefId = null;
       let totalBalance = 0;
 
       if (senderRole === "admin") {
@@ -425,8 +426,11 @@ class BudgetTransfer {
         // a parallel transfer / expense can't interleave between read and
         // write. Cut-off sources are skipped: they connect to no activity,
         // so an employee whose only holdings sit under one can't move funds.
+        // The OLDEST holding funds the move and its `budget_issued_reference.id`
+        // is stamped as `budget_transfer.issued_ref_id` — the key that
+        // connects the transfer to its issuance record.
         const locked = await q(
-          `SELECT bir.reference_id
+          `SELECT bir.id AS issued_ref_id, bir.reference_id
              FROM budget_issued_reference bir
              JOIN budget_reference br ON br.reference_id = bir.reference_id
             WHERE bir.user_id = $1 AND bir.status = 'open'
@@ -446,6 +450,8 @@ class BudgetTransfer {
           };
         }
         referenceId = locked.rows[0].reference_id;
+        // Employee sends draw from their own issuance record.
+        issuedRefId = locked.rows[0].issued_ref_id;
 
         const balance = (
           await q(
@@ -509,12 +515,12 @@ class BudgetTransfer {
       const transfer = (
         await q(
           `INSERT INTO budget_transfer
-              (reference_id, user_id, amount, notes, method, status, transfer_to)
-           VALUES ($1, $2, $3, $4, $5, 'success', $6)
-           RETURNING id, reference_id, user_id, amount::float8 AS amount,
+              (reference_id, issued_ref_id, user_id, amount, notes, method, status, transfer_to)
+           VALUES ($1, $2, $3, $4, $5, $6, 'success', $7)
+           RETURNING id, reference_id, issued_ref_id, user_id, amount::float8 AS amount,
                      notes, method, status, transfer_to,
                      created_at, updated_at`,
-          [referenceId, senderId, requested, notes ?? null, method, transferTo],
+          [referenceId, issuedRefId, senderId, requested, notes ?? null, method, transferTo],
         )
       ).rows[0];
 
@@ -553,6 +559,7 @@ class BudgetTransfer {
     const result = await query(
       `SELECT bt.id,
               bt.reference_id,
+              bt.issued_ref_id,
               br.label AS reference_label,
               bt.user_id AS sender_id,
               su.name AS sender_name,
@@ -585,7 +592,7 @@ class BudgetTransfer {
   // controller — same pattern as Abono.findById + canTouchRow.
   static async findById(id) {
     const result = await query(
-      `SELECT id, reference_id, user_id, amount::float8 AS amount,
+      `SELECT id, reference_id, issued_ref_id, user_id, amount::float8 AS amount,
               notes, method, status, transfer_to, created_at, updated_at
          FROM budget_transfer
         WHERE id = $1`,
@@ -691,7 +698,7 @@ class BudgetTransfer {
         await q(
           `DELETE FROM budget_transfer
             WHERE id = $1
-            RETURNING id, reference_id, user_id, amount::float8 AS amount,
+            RETURNING id, reference_id, issued_ref_id, user_id, amount::float8 AS amount,
                       notes, method, status, transfer_to,
                       created_at, updated_at`,
           [id],

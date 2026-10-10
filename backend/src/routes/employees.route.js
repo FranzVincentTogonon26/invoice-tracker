@@ -20,6 +20,16 @@ router.get(
   employeesController.employees,
 );
 
+// Resolves a `budget_issued_reference` row id to its holder (bir-id deep
+// links into the employee profile). Static segment, so it sits above the
+// "/:id" routes.
+router.get(
+  "/by-issuance/:birId",
+  authMiddleware,
+  requireAdminAccess,
+  employeesController.holderByIssuance,
+);
+
 // Admin → Employees → Details tabs — one selected employee's records
 // (read-only). Declared before the destructive "/:id" routes; every handler
 // re-validates the target account (exists, any status) server-side.

@@ -14,10 +14,15 @@ export function BackButton({ onClick, label = "Back to employees" }) {
   );
 }
 
-export function DetailsHeader({ onBack, actions, description }) {
+export function DetailsHeader({
+  onBack,
+  actions,
+  description,
+  backLabel,
+}) {
   return (
     <div className="flex items-center gap-3">
-      <BackButton onClick={onBack} />
+      <BackButton onClick={onBack} label={backLabel} />
       <div className="min-w-0 flex-1">
         <nav
           aria-label="Breadcrumb"

@@ -153,7 +153,7 @@ export const updateAvatar = async (req, res, next) => {
   let committed = false;
 
   try {
-    const employee = await loadEmployee(req.params.id);
+    const { employee } = await loadEmployee(req.params.id);
 
     if (!req.file) {
       throw ApiError.badRequest("No photo uploaded.", "NO_AVATAR_FILE");
@@ -204,35 +204,134 @@ export const updateAvatar = async (req, res, next) => {
 };
 
 /* ── Admin → Employees → Details tabs ──────────────────────────────────────
- * Feeds /admin/employees/:id with ONE selected employee's records. Each
- * handler resolves `:id` to a real `users` row first (ANY status — an admin
- * must be able to inspect pending and inactive accounts too), then reuses the
- * exact model call the employee-facing endpoint uses, only swapping in the
- * target user_id. Read-only by design: nothing in this block can mutate the
- * employee's rows, and the employee id never comes from the caller's token.
+ * Feeds the AdminEmployeesDetails page (`/admin/employees/:id`,
+ * `/admin/employees/:id/overview`, `/admin/employees/:id/reimbursement` —
+ * one shared element). The page URL's trailing section arrives as
+ * `?view=reimbursement|overview` and DRIVES the scoping (see details*
+ * below) — never the id shape alone:
+ *   - `view=reimbursement` (`…/:birId/reimbursement`): `:id` IS the
+ *     `budget_issued_reference.id`. Every child table (`issued_budget`,
+ *     `expenses`, `employee_abono`, `budget_transfer`) carries
+ *     `issued_ref_id → budget_issued_reference.id`, so all four detail
+ *     payloads scope to that ONE record. A non-record id is a 404.
+ *   - `view=overview` (`…/:userId/overview`, the default): `:id` IS the
+ *     `users.user_id` and every leg is keyed on
+ *     `budget_issued_reference.user_id` with
+ *     `budget_issued_reference.status = 'open'` — closed holdings leave no
+ *     footsteps in sums OR lists. A bir id still resolves through its
+ *     holder (same open-only user scope); anything else is a 404.
+ * Each handler resolves `:id` to a real `users` row first (ANY status — an
+ * admin must be able to inspect pending and inactive accounts too), then
+ * reuses the exact model call the employee-facing endpoint uses, only
+ * swapping in the target user_id (+ optional issuedRefId / openOnly).
+ * Read-only by design: nothing in this block can mutate the employee's rows,
+ * and the employee id never comes from the caller's token.
  */
-const loadEmployee = async (id) => {
+const loadEmployee = async (id, view) => {
   if (!UUID_RE.test(id || ""))
     throw ApiError.badRequest("Invalid employee id", "VALIDATION_ERROR");
 
+  // Reimbursement view: the id is ALWAYS the issuance record id.
+  if (view === "reimbursement") {
+    const issuedRef = await Employee.findIssuedReferenceById(id);
+    if (!issuedRef)
+      throw ApiError.notFound(
+        "Issuance record not found",
+        "ISSUANCE_NOT_FOUND",
+      );
+    const owner = await Employee.findEmployeeById(issuedRef.user_id);
+    if (!owner)
+      throw ApiError.notFound("Employee not found", "EMPLOYEE_NOT_FOUND");
+    return { employee: owner, issuedRef, openOnly: false };
+  }
+
+  // Overview view: the id is the user id and everything keys on that user's
+  // OPEN holdings only.
   const employee = await Employee.findEmployeeById(id);
-  if (!employee)
+  if (employee)
+    return { employee, issuedRef: null, openOnly: view === "overview" };
+
+  const issuedRef = await Employee.findIssuedReferenceById(id);
+  if (!issuedRef)
+    throw ApiError.notFound("Employee not found", "EMPLOYEE_NOT_FOUND");
+  const owner = await Employee.findEmployeeById(issuedRef.user_id);
+  if (!owner)
     throw ApiError.notFound("Employee not found", "EMPLOYEE_NOT_FOUND");
 
-  return employee;
+  if (!view) {
+    // Legacy pre-view links: a bir id scopes to its record (historic
+    // behaviour, kept so direct API callers never break).
+    return { employee: owner, issuedRef, openOnly: false };
+  }
+  // Overview view: a bir id resolves through its holder but stays
+  // user-scoped (open holdings only) — never record-scoped.
+  return { employee: owner, issuedRef: null, openOnly: true };
+};
+
+// The page URL suffix arrives here as `?view=` (see employeesApi details*).
+// Unknown/missing values keep the legacy id-shape behaviour so direct API
+// callers never break.
+const detailsView = (req) => {
+  const view = req.query?.view;
+  return view === "reimbursement" || view === "overview" ? view : null;
+};
+
+// GET /employees/by-issuance/:birId — holder + issuance record for one
+// `budget_issued_reference` row id. Lets bir-id deep links render the holder's
+// roster header while the tabs keep querying by the record id (scoped via
+// `issued_ref_id`).
+export const holderByIssuance = async (req, res, next) => {
+  try {
+    const { birId } = req.params;
+    if (!UUID_RE.test(birId || ""))
+      throw ApiError.badRequest(
+        "Invalid issuance reference id",
+        "VALIDATION_ERROR",
+      );
+    const [holder, issuedRef] = await Promise.all([
+      Employee.findHolderByIssuedReferenceId(birId),
+      Employee.findIssuedReferenceById(birId),
+    ]);
+    if (!holder || !issuedRef)
+      throw ApiError.notFound(
+        "Issuance record not found",
+        "ISSUANCE_NOT_FOUND",
+      );
+    return res.status(200).json({ holder, issuedRef });
+  } catch (err) {
+    next(err);
+  }
 };
 
 // GET /employees/:id/overview — the employee's balance stats plus every
 // merged transaction (issued / expense / abono / transfer), exactly the
 // payload the employee's own Overview page renders.
+// `?view=reimbursement`: `:id` is a `budget_issued_reference` row id and
+// every leg scopes to that ONE issuance via `issued_ref_id`.
+// `?view=overview`: `:id` is a user id and every leg keys on that user's
+// OPEN holdings only (`budget_issued_reference.status = 'open'`).
+// (see EmployeeOverview.employeeOverview).
 export const detailsOverview = async (req, res, next) => {
   try {
-    const employee = await loadEmployee(req.params.id);
+    const view = detailsView(req);
+    const { employee, issuedRef, openOnly } = await loadEmployee(
+      req.params.id,
+      view,
+    );
     const employeeOverview = await EmployeeOverview.employeeOverview(
       employee.user_id,
-      req.query,
+      {
+        search: req.query?.search,
+        issuedRefId: issuedRef?.id ?? null,
+        openOnly: openOnly ?? false,
+      },
     );
-    return res.status(200).json({ employeeOverview });
+    return res.status(200).json({
+      employeeOverview,
+      // Echo the issuance record so the page can label a record-scoped view
+      // without a second round-trip (null on plain user-id links).
+      issuedRef: issuedRef ?? null,
+    });
   } catch (err) {
     next(err);
   }
@@ -240,14 +339,28 @@ export const detailsOverview = async (req, res, next) => {
 
 // GET /employees/:id/budget — every issuance + transfer the employee holds,
 // with the balance overview (same payload as GET /budgets/employee).
+// `?view=reimbursement` scopes to that ONE issuance via `issued_ref_id`;
+// `?view=overview` keys on the user's OPEN holdings only.
 export const detailsBudget = async (req, res, next) => {
   try {
-    const employee = await loadEmployee(req.params.id);
+    const view = detailsView(req);
+    const { employee, issuedRef, openOnly } = await loadEmployee(
+      req.params.id,
+      view,
+    );
     const { overview, transactions } = await Budget.employeeBudget(
       employee.user_id,
-      req.query,
+      {
+        search: req.query?.search,
+        issuedRefId: issuedRef?.id ?? null,
+        openOnly: openOnly ?? false,
+      },
     );
-    return res.status(200).json({ overview, transactions });
+    return res.status(200).json({
+      overview,
+      transactions,
+      issuedRef: issuedRef ?? null,
+    });
   } catch (err) {
     next(err);
   }
@@ -255,18 +368,32 @@ export const detailsBudget = async (req, res, next) => {
 
 // GET /employees/:id/expenses — the employee's expense ledger, categories,
 // source references and totals (same payload as GET /expenses/employee).
+// `?view=reimbursement` lists only expenses stamped with that issuance
+// record; `?view=overview` lists only expenses under the user's OPEN holdings.
 export const detailsExpenses = async (req, res, next) => {
   try {
-    const employee = await loadEmployee(req.params.id);
+    const view = detailsView(req);
+    const { employee, issuedRef, openOnly } = await loadEmployee(
+      req.params.id,
+      view,
+    );
     const {
       categories,
       expenses: rows,
       overview,
       references,
-    } = await Expenses.expensesOverviewEmployee(req.query, employee.user_id);
-    return res
-      .status(200)
-      .json({ expenses: rows, categories, overview, references });
+    } = await Expenses.expensesOverviewEmployee(
+      req.query,
+      employee.user_id,
+      { issuedRefId: issuedRef?.id ?? null, openOnly: openOnly ?? false },
+    );
+    return res.status(200).json({
+      expenses: rows,
+      categories,
+      overview,
+      references,
+      issuedRef: issuedRef ?? null,
+    });
   } catch (err) {
     next(err);
   }
@@ -274,13 +401,24 @@ export const detailsExpenses = async (req, res, next) => {
 
 // GET /employees/:id/abono — the employee's abono rows plus the overview the
 // Abono page's hero/mini stats render (same payload as GET /abono/employee).
+// `?view=reimbursement` lists only abono stamped with that issuance record;
+// `?view=overview` lists only abono under the user's OPEN holdings.
 export const detailsAbono = async (req, res, next) => {
   try {
-    const employee = await loadEmployee(req.params.id);
+    const view = detailsView(req);
+    const { employee, issuedRef, openOnly } = await loadEmployee(
+      req.params.id,
+      view,
+    );
     const { abono: rows, overview } = await Abono.employeeAbonoOverview(
       employee.user_id,
+      { issuedRefId: issuedRef?.id ?? null, openOnly: openOnly ?? false },
     );
-    return res.status(200).json({ abono: rows, overview });
+    return res.status(200).json({
+      abono: rows,
+      overview,
+      issuedRef: issuedRef ?? null,
+    });
   } catch (err) {
     next(err);
   }

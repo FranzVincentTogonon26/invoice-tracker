@@ -118,9 +118,11 @@ export default function AdminEmployees() {
 
   const handleAction = async (action, employee) => {
     // "View employee" leaves the roster for the read-only detail route —
-    // no mutation involved, so navigate immediately.
+    // no mutation involved, so navigate immediately. The trailing `overview`
+    // segment selects the Overview tab (same `AdminEmployeesDetails` element
+    // as the plain profile URL).
     if (action === "view") {
-      nav(`/admin/employees/${employee.user_id}`);
+      nav(`/admin/employees/${employee.user_id}/overview`);
       return;
     }
     try {

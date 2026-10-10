@@ -172,6 +172,12 @@ class Expenses {
     image_url = null,
     receipt_date = null,
     first_issued_at = null,
+    // Employee-only: the OPEN `budget_issued_reference.id` this spend was
+    // issued from (resolved server-side from the verified token's user_id +
+    // the picked reference_id — never trusted from the client). NULL for
+    // admin saves and for employees with no open holding. Requires migration
+    // 007 (`expenses.issued_ref_id`) on migrated databases.
+    issued_ref_id = null,
   }) {
     return withTransaction(async (client) => {
       const receiptRowIds = new Map();
@@ -214,7 +220,7 @@ class Expenses {
           `INSERT INTO expenses
              (user_id, reference_id, description, category_id,
               total_amount, expense_date, notes, receipt_id, payment_method,
-              image_url, receipt_date, flag)
+              image_url, receipt_date, flag, issued_ref_id)
            VALUES
              ($1, COALESCE($2::uuid, $10::uuid), $3, $4, $5,
               COALESCE($6::date, CURRENT_DATE), $7, $8, $9, $11, $12,
@@ -223,7 +229,8 @@ class Expenses {
                  AND COALESCE($6::date, CURRENT_DATE) < $13::date
                 THEN 1
                 ELSE 0
-              END)
+              END,
+              $14::uuid)
            RETURNING *`,
           [
             user_id,
@@ -239,6 +246,7 @@ class Expenses {
             item.image_url ?? image_url ?? null,
             item.receipt_date ?? receipt_date ?? null,
             first_issued_at,
+            issued_ref_id ?? null,
           ],
         );
 
@@ -401,7 +409,9 @@ class Expenses {
   }
 
   // One saved expense for the View expense modal — the same joined shape as
-  // the overview list, plus the source-of-funds label.
+  // the overview list, plus the source-of-funds label. Includes
+  // `issued_ref_id` (`budget_issued_reference.id`) so the modal can trace the
+  // line back to its issuance record.
   static async findExpenseById(id) {
     const result = await query(
       `SELECT
@@ -420,6 +430,7 @@ class Expenses {
            e.image_url,
            e.receipt_date,
            e.reference_id,
+           e.issued_ref_id,
            e.user_id,
            u.name AS created_by,
            u.role AS created_by_role,
@@ -875,16 +886,37 @@ class Expenses {
     });
   }
 
-  static async expensesOverviewEmployee({ from, to } = {}, userId) {
+  static async expensesOverviewEmployee({ from, to } = {}, userId, { issuedRefId, openOnly } = {}) {
     const categories = await this.categoryList();
     const where = [];
     const params = [];
 
     params.push(userId);
     where.push(`e.user_id = $${params.length}::uuid`);
+    // Single-issuance view: connect expenses to their issuance record via
+    // `expenses.issued_ref_id = budget_issued_reference.id` (see
+    // AdminEmployeesDetails). Otherwise the whole-account behaviour applies.
+    if (issuedRefId) {
+      params.push(issuedRefId);
+      where.push(`e.issued_ref_id = $${params.length}::uuid`);
+    }
+    // Overview view (`openOnly`): tagged rows list only while their holding
+    // is still OPEN (`budget_issued_reference.status = 'open'`, pinned to the
+    // row's own `issued_ref_id` when stamped). Defaults off so employee pages
+    // keep showing full history.
+    if (openOnly && !issuedRefId) {
+      where.push(`(e.reference_id IS NULL OR EXISTS (
+        SELECT 1 FROM budget_issued_reference bir2
+        WHERE bir2.user_id = e.user_id
+          AND bir2.reference_id = e.reference_id
+          AND bir2.status = 'open'
+          AND (e.issued_ref_id IS NULL OR bir2.id = e.issued_ref_id)
+      ))`);
+    }
     // Closed sources leave no footsteps: rows tagged to a cut-off source
     // never list; untagged rows (reference_id IS NULL) connect to no source
-    // and stay visible.
+    // and stay visible (whole-account view only — a record-scoped view is
+    // always tagged to its issuance).
     where.push(`(e.reference_id IS NULL OR br.status = 'open')`);
 
     if (from) {
@@ -915,6 +947,7 @@ class Expenses {
             e.image_url,
             e.receipt_date,
             e.reference_id,
+            e.issued_ref_id,
             e.user_id,
             u.name AS created_by,
             u.role AS created_by_role,
@@ -938,32 +971,75 @@ class Expenses {
     // OPEN rows fund the balance (settled = reimbursed, draft = parked).
     // Successful budget transfers move money too (sent out shrinks the pool,
     // received widens it), so the balance matches the Overview hero exactly.
-    const stats = await query(
-      `SELECT
-            COALESCE(SUM(e.total_amount), 0)::float8 AS total_expenses,
-            COALESCE(SUM(e.total_amount) FILTER (
-              WHERE e.expense_date >= date_trunc('month', CURRENT_DATE)
-            ), 0)::float8 AS this_month,
-            COUNT(*)::int AS total_transactions,
-            COALESCE((
-              SELECT SUM(ib.amount)
-              FROM budget_issued_reference bir
-              JOIN issued_budget ib ON ib.issued_ref_id = bir.id
-              JOIN budget_reference br ON br.reference_id = bir.reference_id
-              WHERE bir.user_id = $1 AND bir.status = 'open'
-                AND br.status = 'open'
-                AND ib.status != 'cancel'
-            ), 0)::float8 AS total_budget,
+    // Record-scoped view (`issuedRefId`): every sum is keyed on
+    // `budget_issued_reference.id` via `issued_ref_id`; received transfers are
+    // excluded (they carry the sender's issuance id).
+    // Overview view (`openOnly`): same whole-account sums but every leg keys
+    // on OPEN holdings only.
+    const stats = issuedRefId
+      ? await query(
+          `SELECT
+                COALESCE(SUM(e.total_amount), 0)::float8 AS total_expenses,
+                COALESCE(SUM(e.total_amount) FILTER (
+                  WHERE e.expense_date >= date_trunc('month', CURRENT_DATE)
+                ), 0)::float8 AS this_month,
+                COUNT(*)::int AS total_transactions,
+                COALESCE((
+                  SELECT SUM(ib.amount)
+                  FROM budget_issued_reference bir
+                  JOIN issued_budget ib ON ib.issued_ref_id = bir.id
+                  JOIN budget_reference br ON br.reference_id = bir.reference_id
+                  WHERE bir.id = $2 AND bir.user_id = $1
+                    AND br.status = 'open'
+                    AND ib.status != 'cancel'
+                ), 0)::float8 AS total_budget,
+                COALESCE((
+                  SELECT SUM(ea.amount)
+                  FROM employee_abono ea
+                  JOIN budget_reference br ON br.reference_id = ea.reference_id
+                  WHERE ea.issued_ref_id = $2 AND ea.user_id = $1 AND ea.status = 'open'
+                    AND br.status = 'open'
+                ), 0)::float8 AS total_abono,
+                COALESCE((
+                  SELECT SUM(bt.amount)
+                  FROM budget_transfer bt
+                  WHERE bt.issued_ref_id = $2 AND bt.user_id = $1 AND bt.status = 'success'
+                ), 0)::float8 AS total_sent,
+                0::float8 AS total_received
+             FROM expenses e
+             LEFT JOIN budget_reference br ON br.reference_id = e.reference_id
+            WHERE e.user_id = $1 AND e.issued_ref_id = $2 AND e.status = 'paid'
+              AND (e.reference_id IS NULL OR br.status = 'open')`,
+          [userId, issuedRefId],
+        )
+      : await query(
+          `SELECT
+                COALESCE(SUM(e.total_amount), 0)::float8 AS total_expenses,
+                COALESCE(SUM(e.total_amount) FILTER (
+                  WHERE e.expense_date >= date_trunc('month', CURRENT_DATE)
+                ), 0)::float8 AS this_month,
+                COUNT(*)::int AS total_transactions,
+                COALESCE((
+                  SELECT SUM(ib.amount)
+                  FROM budget_issued_reference bir
+                  JOIN issued_budget ib ON ib.issued_ref_id = bir.id
+                  JOIN budget_reference br ON br.reference_id = bir.reference_id
+                  WHERE bir.user_id = $1 AND bir.status = 'open'
+                    AND br.status = 'open'
+                    AND ib.status != 'cancel'
+                ), 0)::float8 AS total_budget,
             COALESCE((
               SELECT SUM(ea.amount)
               FROM employee_abono ea
               JOIN budget_reference br ON br.reference_id = ea.reference_id
               WHERE ea.user_id = $1 AND ea.status = 'open'
                 AND br.status = 'open'
+                ${openOnly ? "AND EXISTS (SELECT 1 FROM budget_issued_reference bir2 WHERE bir2.user_id = ea.user_id AND bir2.reference_id = ea.reference_id AND bir2.status = 'open' AND (ea.issued_ref_id IS NULL OR bir2.id = ea.issued_ref_id))" : ""}
             ), 0)::float8 AS total_abono,
             COALESCE((
               SELECT SUM(bt.amount)
               FROM budget_transfer bt
+              ${openOnly ? "JOIN budget_issued_reference birf ON birf.id = bt.issued_ref_id AND birf.status = 'open' AND birf.user_id = bt.user_id" : ""}
               WHERE bt.user_id = $1 AND bt.status = 'success'
             ), 0)::float8 AS total_sent,
             COALESCE((
@@ -974,7 +1050,8 @@ class Expenses {
          FROM expenses e
          LEFT JOIN budget_reference br ON br.reference_id = e.reference_id
         WHERE e.user_id = $1 AND e.status = 'paid'
-          AND (e.reference_id IS NULL OR br.status = 'open')`,
+          AND (e.reference_id IS NULL OR br.status = 'open')
+          ${openOnly ? "AND (e.reference_id IS NULL OR EXISTS (SELECT 1 FROM budget_issued_reference bir2 WHERE bir2.user_id = e.user_id AND bir2.reference_id = e.reference_id AND bir2.status = 'open' AND (e.issued_ref_id IS NULL OR bir2.id = e.issued_ref_id)))" : ""}`,
       [userId],
     );
 

@@ -10,8 +10,9 @@ const toMoney = (value) => Math.round((Number(value) || 0) * 100) / 100;
 // `budget_reference`, mirroring the employee overview + source-funds rules.
 //   - given:        SUM(budget.amount) of live rows ('added' | 'closed');
 //                   cancelled rows move no money.
-//   - issued:       SUM(issued_budget.amount) through OPEN
-//                   budget_issued_reference rows.
+//   - issued:       SUM(issued_budget.amount) of 'added' rows only through
+//                   OPEN budget_issued_reference rows — cancelled children
+//                   move no money.
 //   - openAbono:    SUM(employee_abono.amount) of OPEN rows — a settled
 //                   (reimbursed) abono no longer funds the pool.
 //   - spent:        SUM(expenses.total_amount) of PAID admin rows only —
@@ -23,8 +24,9 @@ const toMoney = (value) => Math.round((Number(value) || 0) * 100) / 100;
 //                   under an open source, or holding open abono — grouped by
 //                   budget_issued_reference.user_id joined through
 //                   budget_reference.reference_id for the source label(s).
-//                   The issued leg counts every issuance (any status) under
-//                   open sources; abono stays open-only and spent stays paid.
+//                   The issued leg counts only live ('added') issuance
+//                   children under open sources; abono stays open-only and
+//                   spent stays paid.
 class EmployeeReimbursement {
   // Back-compat list for GET /employee-reimbursements — every abono row
   // across employees, same shape as the admin abono ledger.
@@ -173,19 +175,23 @@ class EmployeeReimbursement {
                      WHERE bir2.user_id = u.user_id
                   ), '') AS bir_statuses
              FROM users u
-             -- Every account with issuance HISTORY under an open source (any
-             -- bir status, not just open) or holding open abono shows up, so
-             -- no recorded row stays hidden from the ledger. Pure
-             -- expense-only accounts (no issuance, no abono) still stay out.
-             -- The issued leg counts EVERY issuance (any parent/child status)
-             -- under open sources, so closed and cancelled money still reads
-             -- here; rows under a cut-off source stay excluded everywhere.
+              -- Every account with issuance HISTORY under an open source (any
+              -- bir status, not just open) or holding open abono shows up, so
+              -- no recorded row stays hidden from the ledger. Pure
+              -- expense-only accounts (no issuance, no abono) still stay out.
+              -- The issued leg below sums live ('added') children only, so
+              -- cancelled money never inflates a holding; rows under a
+              -- cut-off source stay excluded everywhere.
              LEFT JOIN budget_issued_reference bir ON bir.user_id = u.user_id
              LEFT JOIN budget_reference br ON br.reference_id = bir.reference_id
                AND br.status = 'open'
-             LEFT JOIN issued_budget ib
-               ON ib.issued_ref_id = bir.id
-              AND br.reference_id IS NOT NULL
+              LEFT JOIN issued_budget ib
+                ON ib.issued_ref_id = bir.id
+               AND br.reference_id IS NOT NULL
+               -- Live money only: cancelled children (status = 'cancel')
+               -- move no money, so only 'added' rows reach the per-user
+               -- issued sum / issued_count below.
+               AND ib.status = 'added'
              LEFT JOIN (
                SELECT ea.user_id,
                       SUM(ea.amount)::float8 AS open_abono,
@@ -287,19 +293,31 @@ class EmployeeReimbursement {
             WHERE br.status = 'open'
             GROUP BY bir.status`,
         ),
-        // One row per `budget_issued_reference` record (any status) under an
-        // open source — the personnel table lists every record keyed by its
-        // own id, with its holder, source, status, dates and per-record
-        // legs. Issued counts every child (any status); abono stays
-        // open-only and spent stays paid, same rules as the personnel rows.
+        // One row per `budget_issued_reference` record holding LIVE money
+        // under an open source — the personnel table lists only records
+        // with at least one `status = 'added'` child (a record whose
+        // children are ALL 'cancel' — or which has no children — holds
+        // nothing and stays hidden). The INNER JOIN enforces both halves
+        // at once: it drops childless / fully-cancelled records AND keeps
+        // cancelled amounts out of the per-record issued sum / issued_count.
+        // Abono stays open-only and spent stays paid, same rules as the
+        // personnel rows.
+        // Every leg keys on the record's own id (`issued_ref_id =
+        // `budget_issued_reference.id`), NOT on `(user_id, reference_id)`: an
+        // employee can hold several records for one source over time (closed
+        // holdings plus a reopened one), and pooling by source would print
+        // the same abono/spent on every sibling row instead of each record's
+        // real figures. Legacy rows with no stamped `issued_ref_id` belong to
+        // no record and stay out of these legs.
         query(
-          `SELECT bir.id,
-                  bir.user_id,
-                  bir.reference_id,
-                  bir.status,
-                  bir.created_at,
-                  bir.date_cut_off,
-                  bir.date_forwarded,
+           `SELECT bir.id,
+                   bir.user_id,
+                   bir.reference_id,
+                   bir.status,
+                   bir.notes,
+                   bir.created_at,
+                   bir.date_cut_off,
+                   bir.date_forwarded,
                   u.name,
                   u.email,
                   u.avatar_url,
@@ -315,31 +333,33 @@ class EmployeeReimbursement {
              JOIN users u ON u.user_id = bir.user_id
              JOIN budget_reference br ON br.reference_id = bir.reference_id
               AND br.status = 'open'
-             LEFT JOIN issued_budget ib ON ib.issued_ref_id = bir.id
-             LEFT JOIN (
-               SELECT ea.user_id,
-                      ea.reference_id,
+              JOIN issued_budget ib ON ib.issued_ref_id = bir.id
+               AND ib.status = 'added'
+              LEFT JOIN (
+               SELECT ea.issued_ref_id AS bir_id,
                       SUM(ea.amount)::float8 AS open_abono,
                       COUNT(*)::int AS open_abono_count
                  FROM employee_abono ea
                  JOIN budget_reference br2 ON br2.reference_id = ea.reference_id
                 WHERE ea.status = 'open'
                   AND br2.status = 'open'
-                GROUP BY ea.user_id, ea.reference_id
-             ) ab ON ab.user_id = bir.user_id AND ab.reference_id = bir.reference_id
+                  AND ea.issued_ref_id IS NOT NULL
+                GROUP BY ea.issued_ref_id
+             ) ab ON ab.bir_id = bir.id
              LEFT JOIN (
-               SELECT e.user_id,
-                      e.reference_id,
+               SELECT e.issued_ref_id AS bir_id,
                       SUM(e.total_amount)::float8 AS spent,
                       COUNT(*)::int AS expense_count
                  FROM expenses e
-                 JOIN budget_reference br3 ON br3.reference_id = e.reference_id
+                 LEFT JOIN budget_reference br3 ON br3.reference_id = e.reference_id
                 WHERE e.status = 'paid'
-                  AND br3.status = 'open'
-                GROUP BY e.user_id, e.reference_id
-             ) sp ON sp.user_id = bir.user_id AND sp.reference_id = bir.reference_id
+                  AND (e.reference_id IS NULL OR br3.status = 'open')
+                  AND e.issued_ref_id IS NOT NULL
+                GROUP BY e.issued_ref_id
+             ) sp ON sp.bir_id = bir.id
              GROUP BY bir.id, bir.user_id, bir.reference_id, bir.status,
-                     bir.created_at, bir.date_cut_off, bir.date_forwarded,
+                      bir.notes,
+                      bir.created_at, bir.date_cut_off, bir.date_forwarded,
                      u.name, u.email, u.avatar_url, u.role, br.label,
                      ab.open_abono, ab.open_abono_count, sp.spent, sp.expense_count
              -- Open records first, then newest first inside each group.
@@ -442,6 +462,7 @@ class EmployeeReimbursement {
           referenceId: r.reference_id,
           referenceLabel: r.reference_label || "",
           status: r.status,
+          notes: r.notes ?? null,
           dateCreated: r.created_at,
           dateClosed: r.date_forwarded ?? null,
           dateCutOff: r.date_cut_off ?? null,

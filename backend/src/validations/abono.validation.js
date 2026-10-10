@@ -45,6 +45,13 @@ export const settleAbonoSchema = z.object({
     .max(500, { message: "Too many abono records in one request" }),
 });
 
+// Admin submit (reimbursement review dialog): optional free-form note
+// stamped onto every issuance record the submit closes
+// (`budget_issued_reference.notes`). Blank/absent keeps existing notes.
+export const submitReimbursementSchema = z.object({
+  note: z.string().trim().max(500).optional().nullable(),
+});
+
 // Admin settlement (reimbursement personnel table): the employee whose abono
 // is settled, the checked OPEN row ids, the payment method booked on the
 // settlement issuance rows, and an optional note stored on them.

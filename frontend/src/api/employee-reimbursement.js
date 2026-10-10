@@ -10,7 +10,11 @@ export const employeeReimbursementApi = {
   settle: (payload) =>
     apiClient.post("/employee-reimbursements/settle", payload).then((r) => r.data),
   // Admin submit: finalize an employee's reimbursement by closing every
-  // OPEN issuance reference they hold.
-  submit: (userId) =>
-    apiClient.post(`/employee-reimbursements/${userId}/submit`).then((r) => r.data),
+  // OPEN issuance reference they hold. Optional `payload.note` is stamped
+  // onto each closed record; each record's leftover is stored as
+  // `balance_forwarded`.
+  submit: (userId, payload) =>
+    apiClient
+      .post(`/employee-reimbursements/${userId}/submit`, payload ?? {})
+      .then((r) => r.data),
 };

@@ -6,10 +6,13 @@ const toMoney = (value) => Math.round((Number(value) || 0) * 100) / 100;
 
 // The row shape every endpoint hands back — DECIMAL amount cast to float8 so
 // the client never parses a string, plus the source-of-funds label the
-// ledger / details portal display.
+// ledger / details portal display. `issued_ref_id` is the
+// `budget_issued_reference.id` this row was booked against — the key that
+// connects abono to its issuance record (see AdminEmployeesDetails).
 const ABONO_COLUMNS = `
     ea.id,
     ea.reference_id,
+    ea.issued_ref_id,
     ea.user_id,
     ea.amount::float8 AS amount,
     ea.description,
@@ -25,15 +28,36 @@ class Abono {
   // One employee's abono rows, newest first — the list the Abono page renders.
   // Closed sources leave no footsteps: rows booked to a cut-off source never
   // list (`reference_id` is NOT NULL, so the inner condition is safe).
-  static async listByUser(userId) {
+  // When `issuedRefId` is present (AdminEmployeesDetails bir-id link), only
+  // rows stamped with that `budget_issued_reference.id` list.
+  // Overview view (`openOnly`): rows list only while their holding is still
+  // OPEN (`budget_issued_reference.status = 'open'`). Defaults off so
+  // employee pages keep showing full history.
+  static async listByUser(userId, { issuedRefId, openOnly } = {}) {
+    const params = [userId];
+    let extra = "";
+    if (issuedRefId) {
+      params.push(issuedRefId);
+      extra = `AND ea.issued_ref_id = $2`;
+    }
+    if (openOnly && !issuedRefId) {
+      extra += ` AND EXISTS (
+        SELECT 1 FROM budget_issued_reference bir2
+        WHERE bir2.user_id = ea.user_id
+          AND bir2.reference_id = ea.reference_id
+          AND bir2.status = 'open'
+          AND (ea.issued_ref_id IS NULL OR bir2.id = ea.issued_ref_id)
+      )`;
+    }
     const result = await query(
       `SELECT ${ABONO_COLUMNS}
          FROM employee_abono ea
          LEFT JOIN budget_reference br ON br.reference_id = ea.reference_id
         WHERE ea.user_id = $1
+          ${extra}
           AND br.status = 'open'
         ORDER BY ea.created_at DESC`,
-      [userId],
+      params,
     );
     return result.rows;
   }
@@ -72,47 +96,95 @@ class Abono {
   // PAID expenses − sent transfers + received transfers, so an out-of-pocket
   // top-up immediately widens what the employee can spend while a
   // settled/draft row never funds it. Only 'success' transfers move money.
-  static async employeeAbonoOverview(userId) {
+  // When `issuedRefId` is present (AdminEmployeesDetails bir-id link), every
+  // leg is scoped to that `budget_issued_reference.id` via `issued_ref_id`;
+  // received transfers are excluded (they carry the sender's issuance id).
+  // Overview view (`openOnly`): every leg keys on the user's OPEN holdings
+  // only. Defaults off so employee-facing pages never change.
+  static async employeeAbonoOverview(userId, { issuedRefId, openOnly } = {}) {
     const [abono, statsResult] = await Promise.all([
-      this.listByUser(userId),
-      query(
-        `SELECT
-            COALESCE((
-              SELECT SUM(ea.amount)
-                FROM employee_abono ea
-                JOIN budget_reference br ON br.reference_id = ea.reference_id
-               WHERE ea.user_id = $1 AND ea.status = 'open'
-                 AND br.status = 'open'
-            ), 0)::float8 AS total_abono,
-            COALESCE((
-              SELECT COUNT(*)
-                FROM employee_abono ea
-               WHERE ea.user_id = $1
-            ), 0)::int AS abono_count,
-            COALESCE((
-              SELECT SUM(ib.amount)
-                FROM budget_issued_reference bir
-                JOIN issued_budget ib ON ib.issued_ref_id = bir.id
-               WHERE bir.user_id = $1 AND bir.status = 'open'
-                 AND ib.status != 'cancel'
-            ), 0)::float8 AS total_budget,
-            COALESCE((
-              SELECT SUM(e.total_amount)
-                 FROM expenses e
-                WHERE e.user_id = $1 AND e.status = 'paid'
-             ), 0)::float8 AS total_expenses,
-            COALESCE((
-              SELECT SUM(bt.amount)
-                FROM budget_transfer bt
-               WHERE bt.user_id = $1 AND bt.status = 'success'
-            ), 0)::float8 AS total_sent,
-            COALESCE((
-              SELECT SUM(btr.amount)
-                FROM budget_transfer btr
-               WHERE btr.transfer_to = $1 AND btr.status = 'success'
-            ), 0)::float8 AS total_received`,
-        [userId],
-      ),
+      this.listByUser(userId, { issuedRefId, openOnly }),
+      issuedRefId
+        ? query(
+            `SELECT
+                COALESCE((
+                  SELECT SUM(ea.amount)
+                    FROM employee_abono ea
+                    JOIN budget_reference br ON br.reference_id = ea.reference_id
+                   WHERE ea.issued_ref_id = $2 AND ea.user_id = $1 AND ea.status = 'open'
+                     AND br.status = 'open'
+                ), 0)::float8 AS total_abono,
+                COALESCE((
+                  SELECT COUNT(*)
+                    FROM employee_abono ea
+                   WHERE ea.issued_ref_id = $2 AND ea.user_id = $1
+                ), 0)::int AS abono_count,
+                COALESCE((
+                  SELECT SUM(ib.amount)
+                    FROM budget_issued_reference bir
+                    JOIN issued_budget ib ON ib.issued_ref_id = bir.id
+                    JOIN budget_reference br ON br.reference_id = bir.reference_id
+                   WHERE bir.id = $2 AND bir.user_id = $1
+                     AND br.status = 'open'
+                     AND ib.status != 'cancel'
+                ), 0)::float8 AS total_budget,
+                COALESCE((
+                  SELECT SUM(e.total_amount)
+                     FROM expenses e
+                    WHERE e.issued_ref_id = $2 AND e.user_id = $1 AND e.status = 'paid'
+                 ), 0)::float8 AS total_expenses,
+                COALESCE((
+                  SELECT SUM(bt.amount)
+                    FROM budget_transfer bt
+                   WHERE bt.issued_ref_id = $2 AND bt.user_id = $1 AND bt.status = 'success'
+                ), 0)::float8 AS total_sent,
+                0::float8 AS total_received`,
+            [userId, issuedRefId],
+          )
+        : query(
+            `SELECT
+                COALESCE((
+                  SELECT SUM(ea.amount)
+                    FROM employee_abono ea
+                    JOIN budget_reference br ON br.reference_id = ea.reference_id
+                   WHERE ea.user_id = $1 AND ea.status = 'open'
+                     AND br.status = 'open'
+                     ${openOnly ? "AND EXISTS (SELECT 1 FROM budget_issued_reference bir2 WHERE bir2.user_id = ea.user_id AND bir2.reference_id = ea.reference_id AND bir2.status = 'open' AND (ea.issued_ref_id IS NULL OR bir2.id = ea.issued_ref_id))" : ""}
+                ), 0)::float8 AS total_abono,
+                COALESCE((
+                  SELECT COUNT(*)
+                    FROM employee_abono ea
+                   WHERE ea.user_id = $1
+                   ${openOnly ? "AND EXISTS (SELECT 1 FROM budget_issued_reference bir2 WHERE bir2.user_id = ea.user_id AND bir2.reference_id = ea.reference_id AND bir2.status = 'open' AND (ea.issued_ref_id IS NULL OR bir2.id = ea.issued_ref_id))" : ""}
+                ), 0)::int AS abono_count,
+                COALESCE((
+                  SELECT SUM(ib.amount)
+                    FROM budget_issued_reference bir
+                    JOIN issued_budget ib ON ib.issued_ref_id = bir.id
+                   WHERE bir.user_id = $1 AND bir.status = 'open'
+                     AND ib.status != 'cancel'
+                ), 0)::float8 AS total_budget,
+                COALESCE((
+                  SELECT SUM(e.total_amount)
+                     FROM expenses e
+                     LEFT JOIN budget_reference br ON br.reference_id = e.reference_id
+                    WHERE e.user_id = $1 AND e.status = 'paid'
+                      AND (e.reference_id IS NULL OR br.status = 'open')
+                      ${openOnly ? "AND (e.reference_id IS NULL OR EXISTS (SELECT 1 FROM budget_issued_reference bir2 WHERE bir2.user_id = e.user_id AND bir2.reference_id = e.reference_id AND bir2.status = 'open' AND (e.issued_ref_id IS NULL OR bir2.id = e.issued_ref_id)))" : ""}
+                 ), 0)::float8 AS total_expenses,
+                COALESCE((
+                  SELECT SUM(bt.amount)
+                    FROM budget_transfer bt
+                    ${openOnly ? "JOIN budget_issued_reference birf ON birf.id = bt.issued_ref_id AND birf.status = 'open' AND birf.user_id = bt.user_id" : ""}
+                   WHERE bt.user_id = $1 AND bt.status = 'success'
+                ), 0)::float8 AS total_sent,
+                COALESCE((
+                  SELECT SUM(btr.amount)
+                    FROM budget_transfer btr
+                   WHERE btr.transfer_to = $1 AND btr.status = 'success'
+                ), 0)::float8 AS total_received`,
+            [userId],
+          ),
     ]);
 
     const s = statsResult.rows[0] ?? {};
@@ -120,7 +192,7 @@ class Abono {
     const totalAbono = toMoney(s.total_abono);
     const totalExpenses = toMoney(s.total_expenses);
     const totalSent = toMoney(s.total_sent);
-    const totalReceived = toMoney(s.total_received);
+    const totalReceived = toMoney(s.total_received ?? 0);
 
     return {
       abono,
@@ -266,7 +338,7 @@ class Abono {
       const q = (text, params) => client.query(text, params);
 
       const locked = await q(
-        `SELECT id, reference_id, amount::float8 AS amount, description
+        `SELECT id, reference_id, issued_ref_id, amount::float8 AS amount, description
            FROM employee_abono
           WHERE user_id = $1
             AND id = ANY($2::uuid[])
@@ -403,7 +475,7 @@ class Abono {
       // the boundary row (open part shrinks, settled piece is recorded as its
       // own 'settled' row). Every settled piece books one `issued_budget`
       // child, so settled ⇄ issued stays 1:1 and traceable.
-      const settledShape = `id, reference_id, user_id, amount::float8 AS amount,
+      const settledShape = `id, reference_id, issued_ref_id, user_id, amount::float8 AS amount,
                       description, status, date_settled, created_at, updated_at`;
       let left = requested;
       const settled = [];
@@ -427,13 +499,14 @@ class Abono {
           settledRow = (
             await q(
               `INSERT INTO employee_abono
-                 (user_id, reference_id, amount, description, status, date_settled)
+                 (user_id, reference_id, issued_ref_id, amount, description, status, date_settled)
                VALUES
-                 ($1, $2, $3, $4, 'settled', NOW())
+                 ($1, $2, $3, $4, $5, 'settled', NOW())
                RETURNING ${settledShape}`,
               [
                 userId,
                 ab.reference_id,
+                ab.issued_ref_id,
                 take,
                 `${String(ab.description || "Abono").slice(0, 100)} (partial settlement)`,
               ],
@@ -484,10 +557,13 @@ class Abono {
   // issuance — the same "oldest-funding-first" order employeeReferenceList
   // uses to credit untagged abono, so create and reporting always agree.
   // Cut-off sources never qualify: abono can't be booked against a
-  // disconnected source.
+  // disconnected source. Returns the issuance record id
+  // (`budget_issued_reference.id`) alongside the source reference so callers
+  // can stamp `employee_abono.issued_ref_id` — the key that connects abono
+  // to its issuance record.
   static async defaultReferenceForUser(userId) {
     const result = await query(
-      `SELECT bir.reference_id, br.label
+      `SELECT bir.id AS issued_ref_id, bir.reference_id, br.label
          FROM budget_issued_reference bir
          LEFT JOIN budget_reference br ON br.reference_id = bir.reference_id
         WHERE bir.user_id = $1 AND bir.status = 'open'
@@ -501,10 +577,12 @@ class Abono {
 
   // Guard for an explicitly passed reference_id — an employee may only book
   // abono against a source they currently hold as an open issuance AND whose
-  // source itself is still open.
+  // source itself is still open. Resolves the issuance record
+  // (`budget_issued_reference.id`) so the caller can stamp
+  // `employee_abono.issued_ref_id`.
   static async holdsOpenReference(userId, referenceId) {
     const result = await query(
-      `SELECT 1
+      `SELECT bir.id AS issued_ref_id
          FROM budget_issued_reference bir
          JOIN budget_reference br ON br.reference_id = bir.reference_id
         WHERE bir.user_id = $1 AND bir.reference_id = $2 AND bir.status = 'open'
@@ -512,16 +590,16 @@ class Abono {
         LIMIT 1`,
       [userId, referenceId],
     );
-    return result.rowCount > 0;
+    return result.rows[0] ?? null;
   }
 
-  static async create({ user_id, reference_id, amount, description }) {
+  static async create({ user_id, reference_id, issued_ref_id, amount, description }) {
     const result = await query(
-      `INSERT INTO employee_abono (reference_id, user_id, amount, description)
-       VALUES ($1, $2, $3, $4)
-       RETURNING id, reference_id, user_id, amount::float8 AS amount,
+      `INSERT INTO employee_abono (reference_id, issued_ref_id, user_id, amount, description)
+       VALUES ($1, $2, $3, $4, $5)
+       RETURNING id, reference_id, issued_ref_id, user_id, amount::float8 AS amount,
                  description, status, date_settled, created_at, updated_at`,
-      [reference_id, user_id, amount, description],
+      [reference_id, issued_ref_id, user_id, amount, description],
     );
     return result.rows[0];
   }
@@ -545,7 +623,7 @@ class Abono {
       `UPDATE employee_abono
           SET description = $2, updated_at = NOW()
         WHERE id = $1
-        RETURNING id, reference_id, user_id, amount::float8 AS amount,
+        RETURNING id, reference_id, issued_ref_id, user_id, amount::float8 AS amount,
                   description, status, date_settled, created_at, updated_at`,
       [id, description],
     );

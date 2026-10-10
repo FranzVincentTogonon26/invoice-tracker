@@ -19,9 +19,9 @@ import { abonoToTransaction } from "../../../../lib/employeeLedger";
  * `userId` comes from the route param; the server re-validates it against the
  * users table before returning anything.
  */
-const EmployeeAbono = ({ userId }) => {
+const EmployeeAbono = ({ userId, view }) => {
   const { abono, overview, isLoading, error, refetch } =
-    useEmployeeDetailsAbono(userId);
+    useEmployeeDetailsAbono(userId, view);
 
   const transactions = useMemo(
     () => abono.map(abonoToTransaction),

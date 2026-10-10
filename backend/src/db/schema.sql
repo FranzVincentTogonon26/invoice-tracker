@@ -94,19 +94,20 @@ CREATE TABLE IF NOT EXISTS budget (
 -- ============================================================
 
 CREATE TABLE IF NOT EXISTS budget_issued_reference (
-    id              UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    reference_id    UUID NOT NULL
-                    REFERENCES budget_reference(reference_id)
-                    ON DELETE CASCADE,
-    user_id         UUID NOT NULL
-                    REFERENCES users(user_id)
-                    ON DELETE CASCADE,
-    notes           TEXT,
-    status          VARCHAR(20) NOT NULL DEFAULT 'open'
-                    CHECK (status IN ('open', 'close', 'cancel')),
-    date_cut_off    TIMESTAMPTZ,
-    date_forwarded  TIMESTAMPTZ,
-    created_at      TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    id                  UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    reference_id        UUID NOT NULL
+                        REFERENCES budget_reference(reference_id)
+                        ON DELETE CASCADE,
+    user_id             UUID NOT NULL
+                        REFERENCES users(user_id)
+                        ON DELETE CASCADE,
+    notes               TEXT,
+    balance_forwarded   DECIMAL(12,2) DEFAULT 0,
+    status              VARCHAR(20) NOT NULL DEFAULT 'open'
+                        CHECK (status IN ('open', 'close', 'cancel')),
+    date_cut_off        TIMESTAMPTZ,
+    date_forwarded      TIMESTAMPTZ,
+    created_at          TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
 -- ============================================================
@@ -184,7 +185,7 @@ CREATE TABLE IF NOT EXISTS budget_transfer (
     reference_id  UUID NOT NULL
                   REFERENCES budget_reference(reference_id)
                   ON DELETE CASCADE,
-    issued_ref_id UUID NOT NULL
+    issued_ref_id UUID
                   REFERENCES budget_issued_reference(id)
                   ON DELETE CASCADE,
     user_id       UUID NOT NULL
@@ -222,7 +223,7 @@ CREATE TABLE IF NOT EXISTS expenses (
     reference_id   UUID
                    REFERENCES budget_reference(reference_id)
                    ON DELETE SET NULL,
-    issued_ref_id  UUID NOT NULL
+    issued_ref_id  UUID
                    REFERENCES budget_issued_reference(id)
                    ON DELETE CASCADE,
     user_id        UUID NOT NULL

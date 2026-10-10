@@ -6,6 +6,7 @@ import { SearchInput } from "../../../ui/Input";
 import { EmptyState, LoadingSkeleton } from "../../../ui/DataState";
 import { EmployeeAvatar } from "../../../ui/SelectEmployee";
 import { cn, formatDate, formatMoney, formatTime } from "@/lib/utils";
+import { PersonnelActions } from "./PersonnelActions";
 
 // Date + AM/PM time stacked cell (used by the Date Created / Date Closed
 // columns). Renders "—" when there is no date — e.g. never closed yet.
@@ -22,11 +23,14 @@ function DateTimeCell({ value }) {
     </>
   );
 }
-import { PersonnelActions } from "./PersonnelActions";
 
-// Personnel ledger: one row per `budget_issued_reference` record (any
-// status) under an open source — keyed by the record's own id, with its
-// holder, source, status, dates and per-record legs.
+// Personnel ledger: one row per `budget_issued_reference` record holding
+// LIVE money under an open source — keyed by the record's own id, with its
+// holder, source, status, dates and per-record legs. A record appears only
+// when at least one of its `issued_budget` children has `status = 'added'`;
+// fully-cancelled (or childless) records hold nothing and stay hidden, and
+// the Issued Budget / Total Transaction legs sum and count `added` children
+// only.
 export function ReimbursementPersonnelTable({
   rows = [],
   isLoading,
@@ -61,7 +65,7 @@ export function ReimbursementPersonnelTable({
           <div>
             <CardTitle className="text-base">Personnel</CardTitle>
             <CardDescription className="mt-0.5">
-              Every issuance reference, live or closed — holdings, abono and
+              Issuance references holding live budget — holdings, abono and
               spending per record
             </CardDescription>
           </div>
@@ -103,11 +107,11 @@ export function ReimbursementPersonnelTable({
       ) : filtered.length === 0 ? (
         <EmptyState
           icon={Inbox}
-          title={search ? "No matching records" : "No issuance records found"}
+          title={search ? "No matching records" : "No live issuance records"}
           description={
             search
               ? `No records matched "${search}". Try clearing your search.`
-              : "No issuance references exist yet."
+              : "No issuance references hold live budget yet."
           }
         />
       ) : (
@@ -221,7 +225,7 @@ export function ReimbursementPersonnelTable({
                   <td className="px-4 py-3.5 text-right align-middle">
                     <span className="whitespace-nowrap font-display text-[15px] font-medium tabular-nums text-[var(--warning)]">
                       {formatMoney(r.openAbono)}
-                    </span> 
+                    </span>
                   </td>
                   <td className="px-4 py-3.5 text-right align-middle">
                     <span className="whitespace-nowrap font-display text-[15px] font-medium tabular-nums text-[var(--danger)]">
@@ -236,12 +240,16 @@ export function ReimbursementPersonnelTable({
                           ? "text-[var(--danger)]"
                           : "text-[var(--accent-strong)]",
                       )}
-                    > 
+                    >
                       {formatMoney(r.balance)}
                     </span>
                   </td>
                   <td className="px-4 py-3.5 text-center align-middle">
-                    <Badge tone="accent" className="font-medium">
+                    <Badge
+                      tone="accent"
+                      className="font-medium"
+                      title={`${r.issuedCount ?? 0} live issuance entries`}
+                    >
                       {r.issuedCount ?? 0}
                     </Badge>
                   </td>

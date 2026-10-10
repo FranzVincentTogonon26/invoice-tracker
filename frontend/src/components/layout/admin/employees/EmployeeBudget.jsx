@@ -14,9 +14,9 @@ import { useEmployeeDetailsBudget } from "../../../../hooks/useEmployeeDetails";
  * `userId` comes from the route param; the server re-validates it against the
  * users table before returning anything.
  */
-const EmployeeBudget = ({ userId }) => {
+const EmployeeBudget = ({ userId, view }) => {
   const { transactions, isLoading, error, refetch } =
-    useEmployeeDetailsBudget(userId);
+    useEmployeeDetailsBudget(userId, view);
 
   if (error) {
     return (

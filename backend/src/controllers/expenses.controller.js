@@ -132,6 +132,12 @@ export const create = async (req, res, next) => {
     // Either way the source must still be open: a closed source connects to
     // no activity, so tagging it is refused instead of silently nulled.
     let referenceId = payload.reference_id ?? null;
+    // Employee-only: the OPEN `budget_issued_reference.id` backing this
+    // spend (same reference_id + same user_id, `status = 'open'`). Resolved
+    // here from the verified token — never from the client — and stamped
+    // onto every saved line. Admin saves keep NULL: their spend is drawn
+    // from the pool, not from a personal issuance.
+    let issuedRefId = null;
     if (referenceId && !(await Budget.isReferenceOpen(referenceId))) {
       throw ApiError.conflict(
         "This budget source is closed — only open sources accept activity.",
@@ -142,8 +148,16 @@ export const create = async (req, res, next) => {
       const held = await Budget.employeeOpenIssuedReferences({
         user_id: req.user.id,
       });
-      if (!held.some((row) => row.reference_id === referenceId)) {
+      // The OPEN issuance record backing this spend: same reference_id +
+      // same user_id with `budget_issued_reference.status = 'open'`. The
+      // partial unique index guarantees at most one such row, so the match
+      // is unambiguous. Stamped onto every saved line as
+      // `expenses.issued_ref_id` (see createExpenses below).
+      const openHolding = held.find((row) => row.reference_id === referenceId);
+      if (!openHolding) {
         referenceId = null;
+      } else {
+        issuedRefId = openHolding.id;
       }
     }
 
@@ -170,6 +184,7 @@ export const create = async (req, res, next) => {
       image_url: payload.image_url ?? null,
       receipt_date: payload.receipt_date ?? null,
       first_issued_at: firstIssuedAt,
+      issued_ref_id: issuedRefId,
     });
     {
       const total = rows.reduce((s, r) => s + (Number(r.amount) || 0), 0);

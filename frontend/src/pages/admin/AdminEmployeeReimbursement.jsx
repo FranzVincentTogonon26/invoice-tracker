@@ -13,11 +13,18 @@ const AdminEmployeeReimbursement = () => {
   const nav = useNavigate();
   const { data, isLoading, error, refetch } = useReimbursementOverview();
 
+  // "View employee" opens the issuance record under the employees section:
+  // `/admin/employees/:id/reimbursement` (where `:id` is the
+  // `budget_issued_reference` row id). Same `AdminEmployeesDetails` element
+  // as the plain profile — the trailing `reimbursement` segment marks the
+  // reimbursement origin (Overview tab first, Back returns here).
   const handleViewEmployee = (row) => {
-    if (row?.userId) nav(`/admin/employees/${row.userId}`);
+    const target = row?.id;
+    if (target) nav(`/admin/employees/${target}/reimbursement`);
   };
   const handleViewReimbursement = (row) => {
-    if (row?.userId) nav(`/admin/reimbursement/${row.userId}`);
+    const target = row?.id;
+    if (target) nav(`/admin/reimbursement/${target}`);
   };
 
   const moneyIn = Number(data?.moneyIn ?? 0);

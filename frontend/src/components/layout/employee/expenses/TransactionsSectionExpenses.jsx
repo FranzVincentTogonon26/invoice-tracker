@@ -41,6 +41,12 @@ export const TransactionsSectionExpenses = ({
   // Admin → Employee Details renders the section as a read-only record view:
   // no soft delete, no inline description editing.
   readOnly = false,
+  // Reimbursement-originated details view (`…/employees/:id/reimbursement`):
+  // hides the admin "Add to draft" / "Restore from draft" row actions — the
+  // record is reviewed/settled from the reimbursement ledger instead.
+  // Defaults off so the employee pages and the overview details view keep
+  // the draft lifecycle.
+  hideDraftActions = false,
 }) => {
   const [search, setSearch] = useState("");
   const [debouncedSearch, setDebouncedSearch] = useState("");
@@ -289,7 +295,7 @@ export const TransactionsSectionExpenses = ({
             onView={setViewRow}
             onDelete={setDeleteRow}
             canDelete={!readOnly}
-            canManageDraft={isAdmin}
+            canManageDraft={isAdmin && !hideDraftActions}
             onAddToDraft={(row) => setDraftRow({ row, to: "draft" })}
             onRestoreFromDraft={(row) => setDraftRow({ row, to: "paid" })}
           />

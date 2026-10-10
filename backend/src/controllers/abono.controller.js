@@ -73,6 +73,10 @@ export const create = async (req, res, next) => {
     const payload = validate(createAbonoSchema, req.body);
 
     let referenceId = payload.reference_id ?? null;
+    // The issuance record (`budget_issued_reference.id`) backing this abono —
+    // resolved here from the verified token + reference, never from the
+    // client, and stamped as `employee_abono.issued_ref_id`.
+    let issuedRefId = null;
     if (referenceId) {
       const held = await Abono.holdsOpenReference(req.user.id, referenceId);
       if (!held) {
@@ -81,6 +85,7 @@ export const create = async (req, res, next) => {
           "VALIDATION_ERROR",
         );
       }
+      issuedRefId = held.issued_ref_id;
     } else {
       const fallback = await Abono.defaultReferenceForUser(req.user.id);
       if (!fallback) {
@@ -90,11 +95,13 @@ export const create = async (req, res, next) => {
         );
       }
       referenceId = fallback.reference_id;
+      issuedRefId = fallback.issued_ref_id;
     }
 
     const abono = await Abono.create({
       user_id: req.user.id,
       reference_id: referenceId,
+      issued_ref_id: issuedRefId,
       amount: payload.amount,
       description: payload.description,
     });

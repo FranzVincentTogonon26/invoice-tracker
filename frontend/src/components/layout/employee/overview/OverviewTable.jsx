@@ -11,6 +11,7 @@ import {
   isDraftOrCancelled,
   isFlagged,
   isNegative,
+  isReceivedIssued,
   isSentTransfer,
   isTransfer,
   overviewConfigFor,
@@ -21,10 +22,12 @@ import { ExpenseStatusBadge } from "../../admin/expenses/ExpensesTable";
 import { OverviewMethodBadge, OverviewReceiptBadge } from "./OverviewBadges";
 import { OverviewRowActions } from "./OverviewRowActions";
 
-// Status column: expenses in draft/cancel read their own status, cancelled
-// issuances get a danger identifier, transfers read Sent/Transfer, settled
-// abono reads Settled + date, open abono reads Open — everything else keeps
-// the kind badge. Never contradicts the Type column (see getTypeBadge).
+// Status column: expenses in draft/cancel read their own status, issued rows
+// are validated against the `issued_budget` row status — 'added' reads a
+// success "Received" badge, 'cancel' reads a danger "Cancelled" identifier.
+// Transfers read Sent/Transfer, settled abono reads Settled + date, open
+// abono reads Open — everything else keeps the kind badge. Never contradicts
+// the Type column (see getTypeBadge).
 function StatusCell({ tx, meta }) {
   const transfer = isTransfer(tx);
   const sent = isSentTransfer(tx);
@@ -39,8 +42,8 @@ function StatusCell({ tx, meta }) {
     );
   }
   if (isCancelledIssued(tx)) {
-    // Cancelled issuance: danger identifier only — every
-    // tone on the row stays untouched.
+    // Cancelled issuance (`issued_budget.status = 'cancel'`): danger
+    // identifier — the amount below strikes through in danger tone too.
     return (
       <Badge
         tone="danger"
@@ -48,6 +51,19 @@ function StatusCell({ tx, meta }) {
       >
         <span className="h-2 w-2 rounded-full bg-current opacity-80" />
         <span className="truncate">Cancelled</span>
+      </Badge>
+    );
+  }
+  if (tx?.kind === "issued" || isReceivedIssued(tx)) {
+    // Live issuance (`issued_budget.status = 'added'`): success "Received"
+    // badge, mirroring the details body hero.
+    return (
+      <Badge
+        tone="success"
+        className="max-w-full gap-1.5 px-2 py-1 text-[11px]"
+      >
+        <span className="h-2 w-2 rounded-full bg-current opacity-80" />
+        <span className="truncate">Received</span>
       </Badge>
     );
   }
@@ -115,11 +131,16 @@ function OverviewTableRow({ tx, onView }) {
   const negative = isNegative(tx);
   const typeBadge = getTypeBadge(tx);
   const TypeIcon = typeBadge.Icon;
-  const amountColor = negative
+  const cancelledIssued = isCancelledIssued(tx);
+  // A cancelled issuance is void money: danger amount + strikethrough. It
+  // takes precedence over the live issued accent tone below.
+  const amountColor = cancelledIssued
     ? "text-[var(--danger)]"
-    : tx.kind === "issued" || (!sent && transfer)
-      ? "text-[var(--accent-strong)]"
-      : "text-[var(--ink)]";
+    : negative
+      ? "text-[var(--danger)]"
+      : tx.kind === "issued" || (!sent && transfer)
+        ? "text-[var(--accent-strong)]"
+        : "text-[var(--ink)]";
   const flagged = isFlagged(tx);
   const hasReceipt = hasOverviewReceipt(tx);
 

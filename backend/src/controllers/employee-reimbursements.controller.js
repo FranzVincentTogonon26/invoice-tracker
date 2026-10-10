@@ -4,7 +4,10 @@ import Budget from "../models/budget.model.js";
 import ApiError from "../utils/ApiError.js";
 import { validate } from "../utils/validate.js";
 import { emitTransaction } from "../realtime/index.js";
-import { settleAbonoForEmployeeSchema } from "../validations/abono.validation.js";
+import {
+  settleAbonoForEmployeeSchema,
+  submitReimbursementSchema,
+} from "../validations/abono.validation.js";
 
 const UUID_RE =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -35,7 +38,9 @@ export async function overview(req, res, next) {
 // POST /employee-reimbursements/submit — admin finalizes an employee's
 // reimbursement: every OPEN issuance reference they hold flips to 'close'.
 // Their issued amounts leave every money sum and they disappear from
-// open-issuance ledgers (a future issuance starts fresh).
+// open-issuance ledgers (a future issuance starts fresh). The optional `note`
+// body field is stamped onto each closed record (`notes`), and each record's
+// leftover at close time is stored (`balance_forwarded`, 0 stays 0).
 export async function submit(req, res, next) {
   try {
     const { id } = req.params;
@@ -43,14 +48,19 @@ export async function submit(req, res, next) {
     if (!UUID_RE.test(id || ""))
       throw ApiError.badRequest("Invalid employee id", "VALIDATION_ERROR");
 
-    const { closedCount } = await Budget.closeOpenIssuedReferences(id);
+    const { note } = validate(submitReimbursementSchema, req.body ?? {});
+    const trimmedNote = note?.trim() ? note.trim() : null;
+
+    const { closedCount } = await Budget.closeOpenIssuedReferences(id, {
+      note: trimmedNote,
+    });
 
     emitTransaction({
       action: "status",
       entity: "reimbursement",
       actor: req.user,
       message: `Submitted reimbursement for ${id} (${closedCount} issuance${closedCount === 1 ? "" : "s"} closed).`,
-      metadata: { userId: id, closedCount },
+      metadata: { userId: id, closedCount, note: trimmedNote },
       notifyUserIds: [id],
     });
 

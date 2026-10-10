@@ -59,10 +59,20 @@ export const isCancelled = (row) =>
   row?.kind === "expense" && row?.status === "cancel";
 
 // A cancelled issuance no longer funds the employee — mark it with a danger
-// "Cancelled" badge and strike its amount, but leave every tone alone: row,
-// badge family and amount color stay exactly as a live row renders.
+// "Cancelled" badge and strike its amount in danger tone. Validated against
+// the `issued_budget` row status: only `status = 'cancel'` counts as void.
+// Every other live tone (row, badge family) stays exactly as a live row
+// renders, except the amount which flips to danger + line-through.
 export const isCancelledIssued = (row) =>
   row?.kind === "issued" && row?.status === "cancel";
+
+// A live issuance — validated against the `issued_budget` row status
+// `status = 'added'`. ('open' is tolerated as live for rows fetched before
+// the feed started returning the child status, so cached pages never lose
+// their Received badge mid-session.)
+export const isReceivedIssued = (row) =>
+  row?.kind === "issued" &&
+  (row?.status === "added" || row?.status === "open" || !row?.status);
 
 // Draft expenses read warning-toned; cancelled rows danger-toned — the same
 // status colors their badges use, so the row and badge speak one language.

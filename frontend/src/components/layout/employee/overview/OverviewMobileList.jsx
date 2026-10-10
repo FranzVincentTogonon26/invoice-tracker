@@ -21,11 +21,16 @@ function OverviewMobileCard({ tx, onOpen }) {
   const meta = overviewConfigFor(tx.kind);
   const negative = isNegative(tx);
   const sent = isSentTransfer(tx);
-  const amountColor = negative
+  const cancelledIssued = isCancelledIssued(tx);
+  // A cancelled issuance is void money: danger amount + strikethrough,
+  // taking precedence over the live issued accent tone.
+  const amountColor = cancelledIssued
     ? "text-[var(--danger)]"
-    : tx.kind === "issued" || (!sent && isTransfer(tx))
-      ? "text-[var(--accent-strong)]"
-      : "text-[var(--warning)]";
+    : negative
+      ? "text-[var(--danger)]"
+      : tx.kind === "issued" || (!sent && isTransfer(tx))
+        ? "text-[var(--accent-strong)]"
+        : "text-[var(--warning)]";
   const flagged = isFlagged(tx);
   const hasReceipt = hasOverviewReceipt(tx);
 
@@ -50,6 +55,8 @@ function OverviewMobileCard({ tx, onOpen }) {
         isDraftExpense(tx) &&
           "border-[var(--warning)]/50 bg-[var(--warning)]/[0.08]",
         isCancelled(tx) &&
+          "border-[var(--danger)]/40 bg-[var(--danger)]/[0.08]",
+        cancelledIssued &&
           "border-[var(--danger)]/40 bg-[var(--danger)]/[0.08]",
       )}
       title={
