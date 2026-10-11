@@ -23,7 +23,12 @@ const toMoney = (value) => Math.round((Number(value) || 0) * 100) / 100;
 // insufficient-balance notice). Portalled to `document.body` like the rest of
 // the app's dialogs (the page sits inside an animated framer-motion card
 // whose transform would otherwise trap this `fixed` overlay).
-const SettleAbonoModal = ({ open, onClose, openRows = [], totalBalance = 0 }) => {
+const SettleAbonoModal = ({
+  open,
+  onClose,
+  openRows = [],
+  totalBalance = 0,
+}) => {
   const titleId = useId();
   const [checked, setChecked] = useState(() => new Set());
   const [confirmOpen, setConfirmOpen] = useState(false);

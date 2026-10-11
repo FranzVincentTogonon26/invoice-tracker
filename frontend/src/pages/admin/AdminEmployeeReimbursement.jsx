@@ -4,7 +4,7 @@ import { CircleAlert, Inbox } from "lucide-react";
 import { PageHeader } from "../../components/ui/PageHeader";
 import { Button } from "../../components/ui/Button";
 import { Card } from "../../components/ui/Card";
-import { formatDate, formatMoney } from "@/lib/utils";
+import { formatMoney } from "@/lib/utils";
 import { useReimbursementOverview } from "../../hooks/useEmployeeReimbursement";
 import { ReimbursementOverview } from "../../components/layout/admin/reimbursement/ReimbursementOverview";
 import { ReimbursementPersonnelTable } from "../../components/layout/admin/reimbursement/ReimbursementPersonnelTable";
@@ -36,6 +36,8 @@ const AdminEmployeeReimbursement = () => {
   const issued = Number(data?.issued ?? 0);
   const openAbono = Number(data?.openAbono ?? 0);
   const spent = Number(data?.spent ?? 0);
+  const employeeSpent = Number(data?.employeeSpent ?? 0);
+  const forwarded = Number(data?.forwarded ?? 0);
   const openIssuedCount = Number(data?.issuedStatusCounts?.open ?? 0);
   const closeIssuedCount = Number(data?.issuedStatusCounts?.close ?? 0);
   const personnel = data?.personnel ?? [];
@@ -46,21 +48,16 @@ const AdminEmployeeReimbursement = () => {
   const givenBreakdown = data?.givenBreakdown ?? [];
   const issuedBreakdown = data?.issuedBreakdown ?? [];
   const spentBreakdown = data?.spentBreakdown ?? [];
+  const forwardedBreakdown = data?.forwardedBreakdown ?? [];
 
-  // Fund Balance mirrors ExpenseOverview's My Balance:
-  // MoneyIn − (Issued + Spent). (The reverse order would always read
+  // Fund Balance mirrors AdminBudget's My Balance exactly:
+  // budget − issued − spent + forwarded. (The reverse order would always read
   // negative and falsely trip the Overdrawn state.)
-  const cashOnHand = budget - (issued + spent);
-  // Expenses Summary hero mirrors ExpenseOverview's Total Expenses headline:
-  // Issued + admin Spent. (The "Total Spent (Admin/Employee)" bullet row below
-  // additionally folds in all-personnel spend, so the rows no longer sum to
-  // the hero — that row is informational by design.)
-  const personnelSpentTotal = useMemo(
-    () => personnel.reduce((sum, row) => sum + (Number(row.spent) || 0), 0),
-    [personnel],
-  );
-  const combinedSpentTotal = personnelSpentTotal + spent;
-  const totalSpend = issued + spent;
+  const cashOnHand = budget - issued - spent + forwarded;
+  // Total Expenses mirrors AdminBudget's headline: admin + employee spend
+  // for display. The balance math above intentionally keeps admin-only
+  // `spent` (employee spend already left as `issued`).
+  const totalSpend = spent + employeeSpent;
   const isBalanceOverdrawn = cashOnHand < -0.004;
   const isBalanceDepleted =
     !isBalanceOverdrawn && Math.abs(cashOnHand) < 0.005 && budget > 0;
@@ -76,9 +73,9 @@ const AdminEmployeeReimbursement = () => {
     [moneyIn, given, givenSources, abonoIn, abonoCount],
   );
 
-  // Per-reference remaining = allocated − issued − spent (same formula as
-  // the headline balance, just scoped to each budget source — mirrors
-  // AdminBudget's cashOnHandBreakdown).
+  // Per-reference remaining = allocated − issued − spent + forwarded (same
+  // formula as the headline balance, just scoped to each budget source —
+  // mirrors AdminBudget's cashOnHandBreakdown).
   const issuedByReference = useMemo(
     () =>
       new Map(
@@ -93,39 +90,41 @@ const AdminEmployeeReimbursement = () => {
     () =>
       new Map(
         spentBreakdown.map((row) => [
-          row.reference_id ?? "__untagged",
+          row.reference_id,
           Number(row.amount || 0),
         ]),
       ),
     [spentBreakdown],
   );
+  const forwardedByReference = useMemo(
+    () =>
+      new Map(
+        forwardedBreakdown.map((row) => [
+          row.reference_id,
+          Number(row.amount || 0),
+        ]),
+      ),
+    [forwardedBreakdown],
+  );
+  // Per-reference remaining = allocated − issued − spent + forwarded (same
+  // formula as the headline balance, just scoped to each budget source —
+  // mirrors AdminBudget's cashOnHandBreakdown).
   const cashOnHandBreakdown = useMemo(() => {
     const rows = givenBreakdown.map((row, i) => {
       const issuedAmt = issuedByReference.get(row.reference_id) ?? 0;
       const spentAmt = spentByReference.get(row.reference_id) ?? 0;
-      const remaining = Number(row.amount || 0) - issuedAmt - spentAmt;
+      const forwardedAmt = forwardedByReference.get(row.reference_id) ?? 0;
+      const remaining =
+        Number(row.amount || 0) - issuedAmt - spentAmt + forwardedAmt;
       return {
         key: row.reference_id ?? i,
         label: row.label ?? "Untitled reference",
         value: formatMoney(remaining),
-        hint: formatDate(row.created_at),
         tone: remaining < 0 ? "danger" : undefined,
       };
     });
-    // Untagged admin spend belongs to no source — show it as its own row so
-    // the breakdown still sums to the headline balance.
-    const untagged = spentByReference.get("__untagged") ?? 0;
-    if (untagged > 0) {
-      rows.push({
-        key: "untagged",
-        label: "No source of funds",
-        value: formatMoney(-untagged),
-        hint: "Untagged",
-        tone: "danger",
-      });
-    }
     return rows;
-  }, [givenBreakdown, issuedByReference, spentByReference]);
+  }, [givenBreakdown, issuedByReference, spentByReference, forwardedByReference]);
 
   const expensesSummary = useMemo(
     () => [
@@ -133,10 +132,10 @@ const AdminEmployeeReimbursement = () => {
       {
         key: "spent",
         label: "Total Spent (Admin/Employee)",
-        value: formatMoney(combinedSpentTotal),
+        value: formatMoney(totalSpend),
       },
     ],
-    [issued, combinedSpentTotal],
+    [issued, totalSpend],
   );
 
   const reimbursementRows = useMemo(

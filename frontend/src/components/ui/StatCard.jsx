@@ -76,6 +76,11 @@ export function StatCard({
   data = [],
   breakdown,
   breakdownCaption = "Per reference",
+  // Singular noun for the breakdown count pill (e.g. "source" renders
+  // "2 sources"). Omitted → the pill keeps showing the bare number.
+  breakdownCountNoun,
+  // Set false to hide the breakdown count pill entirely.
+  showBreakdownCount = true,
   stats,
   loading = false,
   icon: Icon,
@@ -111,7 +116,9 @@ export function StatCard({
   const hasBreakdown = Array.isArray(breakdown);
   const hasStats = Array.isArray(stats) && stats.length > 0;
   const hasCaption = !hasBreakdown && !hasStats && Boolean(breakdownCaption);
-  const chartWidth = hasData ? Math.min(110, Math.max(data.length * 12, 24)) : 110;
+  const chartWidth = hasData
+    ? Math.min(110, Math.max(data.length * 12, 24))
+    : 110;
 
   const iconTile = accent
     ? "bg-white/15 text-white"
@@ -327,7 +334,9 @@ export function StatCard({
                           breakdownValueTone(stat.tone, accent),
                         )}
                         title={
-                          typeof stat.value === "string" ? stat.value : undefined
+                          typeof stat.value === "string"
+                            ? stat.value
+                            : undefined
                         }
                       >
                         {stat.value ?? "—"}
@@ -502,16 +511,20 @@ export function StatCard({
                 >
                   {breakdownCaption}
                 </span>
-                <span
-                  className={cn(
-                    "text-xs font-normal tabular-nums rounded-full px-1.5 py-0.5",
-                    accent
-                      ? "bg-white/10 text-white/70"
-                      : "bg-[var(--surface-2)] text-[var(--ink-muted)]",
-                  )}
-                >
-                  {breakdown.length}
-                </span>
+                {showBreakdownCount && (
+                  <span
+                    className={cn(
+                      "text-xs font-normal tabular-nums rounded-full px-1.5 py-0.5",
+                      accent
+                        ? "bg-white/10 text-white/70"
+                        : "bg-[var(--surface-2)] text-[var(--ink-muted)]",
+                    )}
+                  >
+                    {breakdownCountNoun
+                      ? `${breakdown.length} ${breakdown.length === 1 ? breakdownCountNoun : `${breakdownCountNoun}s`}`
+                      : breakdown.length}
+                  </span>
+                )}
               </div>
 
               {breakdown.length === 0 ? (
@@ -637,7 +650,9 @@ export function StatCard({
                       "ml-auto shrink-0 px-1.5 py-0.5 text-[11px]",
                       accent && "border-transparent bg-white/15 text-white",
                     )}
-                    title={typeof stat.hint === "string" ? stat.hint : undefined}
+                    title={
+                      typeof stat.hint === "string" ? stat.hint : undefined
+                    }
                   >
                     {stat.hint}
                   </Badge>
@@ -648,7 +663,9 @@ export function StatCard({
                     "mt-1 truncate text-sm font-medium tabular-nums",
                     breakdownValueTone(stat.tone, accent),
                   )}
-                  title={typeof stat.value === "string" ? stat.value : undefined}
+                  title={
+                    typeof stat.value === "string" ? stat.value : undefined
+                  }
                 >
                   {stat.value ?? "—"}
                 </p>

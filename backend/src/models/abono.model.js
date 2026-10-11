@@ -680,6 +680,11 @@ class Abono {
         settled.push(settledRow);
 
         const parent = await resolveParent(ab.reference_id);
+        // Settlement booking shape: a clean `description` label plus the
+        // settled abono's own description in `notes` (truncated like the
+        // ledger displays it), so the issued row reads on its own. (Any
+        // caller-supplied `note` is intentionally not stored here — the
+        // row's note is always its abono's description.)
         const child = (
           await q(
             `INSERT INTO issued_budget
@@ -690,9 +695,9 @@ class Abono {
             [
               parent.id,
               take,
-              `${partial ? "Abono partial settlement" : "Abono settlement"} — ${String(ab.description || "abono").slice(0, 100)}`,
+              partial ? "Abono partial settlement" : "Abono settlement",
               method,
-              note,
+              String(ab.description || "abono").slice(0, 100),
             ],
           )
         ).rows[0];

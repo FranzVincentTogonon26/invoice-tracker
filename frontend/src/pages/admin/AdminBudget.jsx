@@ -81,23 +81,25 @@ export default function AdminBudget() {
     );
   const totalForwarded = overview.totalForwarded ?? 0;
 
-  // "My Expenses" breakdown shows both legs per open source: the admin spend
-  // (the headline total — employee spend already left as `issued`, so it is
-  // never added to the headline) plus a display-only employee row with that
-  // source's employee-spend total, so no spend stays invisible.
+  // "Total Expenses" drill-down shows just the two legs side by side:
+  // employee spend and the admin ("My") spend. The per-source splits stay
+  // available in the Remaining breakdown; the balance math below keeps
+  // admin-only `totalExpenses` (employee spend already left as `issued`).
+  const totalEmployeeExpenses = overviewEmployeeExpenses.reduce(
+    (sum, row) => sum + Number(row.amount || 0),
+    0,
+  );
   const expensesBreakdown = [
-    ...overviewExpenses.map((row, i) => ({
-      key: `admin-${row.reference_id ?? i}`,
-      label: row.label ?? "Untitled reference",
-      value: formatMoney(row.amount),
-    })),
-    ...overviewEmployeeExpenses
-      .filter((row) => Number(row.amount || 0) !== 0)
-      .map((row) => ({
-        key: `employee-${row.reference_id ?? row.label ?? ""}`,
-        label: `${row.label ?? "Untitled reference"} · employee`,
-        value: formatMoney(row.amount),
-      })),
+    {
+      key: "employee",
+      label: "Employee Expense",
+      value: formatMoney(totalEmployeeExpenses),
+    },
+    {
+      key: "mine",
+      label: "My Expenses",
+      value: formatMoney(totalExpenses),
+    },
   ];
 
   // Balance = total budget − total issued − total expenses + forwarded
@@ -199,6 +201,7 @@ export default function AdminBudget() {
               accent
               loading={isLoading}
               breakdownCaption="Allocated"
+              breakdownCountNoun="source"
               breakdown={overviewBudget.map((row, i) => ({
                 key: i,
                 label: row.label ?? "Untitled reference",
@@ -230,18 +233,8 @@ export default function AdminBudget() {
                     : undefined
               }
               breakdownCaption="Remaining"
+              breakdownCountNoun="source"
               breakdown={cashOnHandBreakdown}
-            />
-          </motion.div>
-
-          <motion.div variants={item} className="h-full min-w-0 [&>div]:h-full">
-            <StatCard
-              label="Total Expenses"
-              value={formatMoney(totalExpensesAll)}
-              icon={ReceiptText}
-              loading={isLoading}
-              breakdownCaption="Expenses"
-              breakdown={expensesBreakdown}
             />
           </motion.div>
 
@@ -252,11 +245,24 @@ export default function AdminBudget() {
               icon={HandCoins}
               loading={isLoading}
               breakdownCaption="Issued"
+              breakdownCountNoun="source"
               breakdown={overviewIssuedBudget.map((row, i) => ({
                 key: i,
                 label: row.label ?? "Untitled reference",
                 value: formatMoney(row.amount),
               }))}
+            />
+          </motion.div>
+
+          <motion.div variants={item} className="h-full min-w-0 [&>div]:h-full">
+            <StatCard
+              label="Total Expenses"
+              value={formatMoney(totalExpensesAll)}
+              icon={ReceiptText}
+              loading={isLoading}
+              breakdownCaption="Expenses Summary"
+              showBreakdownCount={false}
+              breakdown={expensesBreakdown}
             />
           </motion.div>
         </motion.div>

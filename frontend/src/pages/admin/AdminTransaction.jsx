@@ -176,14 +176,22 @@ const AdminTransaction = () => {
     },
     [dateFilteredRows, debouncedSearch],
   );
+  // Pool-level handed-back leftovers (finalized holdings, open sources) —
+  // not attributable to filter dimensions, so it stays global while the
+  // legs below follow the active filters.
+  const forwarded = Number(data?.summary?.forwarded ?? 0) || 0;
   const totals = useMemo(() => {
     let given = 0;
     let abonoIn = 0;
     let abonoCount = 0;
     let issued = 0;
     let issuedCount = 0;
+    let issuedLive = 0;
     let spent = 0;
     let spentCount = 0;
+    let employeeSpent = 0;
+    let employeeSpentCount = 0;
+    let spentAdminTagged = 0;
     const givenSourceKeys = new Set();
     for (const row of statsRows) {
       if (row.kind === "budget") {
@@ -197,10 +205,32 @@ const AdminTransaction = () => {
       if (row.kind === "issued") {
         issued += Number(row.moneyOut) || 0;
         issuedCount += 1;
+        // Budget's issued leg counts live children (open AND closed
+        // holdings) — cancelled rows are void and stay out.
+        if (row.status !== "cancel") {
+          issuedLive += Number(row.moneyOut) || 0;
+        }
       }
       if (row.kind === "expense" && row.employeeRole !== "employee") {
         spent += Number(row.moneyOut) || 0;
         spentCount += 1;
+        // Budget's expenses leg is source-driven: tagged rows only
+        // (untagged admin spend connects to no source). All statuses count,
+        // mirroring the backend leg.
+        if (row.referenceId != null) {
+          spentAdminTagged += Number(row.amount) || 0;
+        }
+      }
+      // Employee spend leg — mirrors AdminBudget's employee-expenses leg
+      // (paid rows tagged to an open source; upstream already drops cut-off
+      // rows, and moneyOut is nonzero only for paid rows).
+      if (
+        row.kind === "expense" &&
+        row.employeeRole === "employee" &&
+        row.referenceId != null
+      ) {
+        employeeSpent += Number(row.moneyOut) || 0;
+        employeeSpentCount += 1;
       }
     }
     const r = (n) => Math.round(n * 100) / 100;
@@ -209,6 +239,9 @@ const AdminTransaction = () => {
     return {
       moneyIn,
       moneyOut,
+      // Mirrors AdminBudget's My Balance (allocated − issued − admin
+      // expenses + forwarded) over the same legs, so both pages agree.
+      remainingBalance: r(given - issuedLive - spentAdminTagged + forwarded),
       given: r(given),
       givenSources: givenSourceKeys.size,
       abonoIn: r(abonoIn),
@@ -217,8 +250,10 @@ const AdminTransaction = () => {
       issuedCount,
       spent: r(spent),
       spentCount,
+      employeeSpent: r(employeeSpent),
+      employeeSpentCount,
     };
-  }, [statsRows]);
+  }, [statsRows, forwarded]);
   const kindCounts = useMemo(() => {
     const counts = {};
     for (const row of filteredRows)

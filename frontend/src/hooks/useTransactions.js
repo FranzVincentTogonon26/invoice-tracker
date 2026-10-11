@@ -29,6 +29,7 @@ export function useTransactions(params, options = {}) {
       net: 0,
       count: 0,
       byKind: {},
+      forwarded: 0,
     },
     categories: query.data?.categories ?? [],
     references: query.data?.references ?? [],

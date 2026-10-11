@@ -2,6 +2,7 @@ import Budget from "./budget.model.js";
 import Expenses from "./expenses.model.js";
 import Abono from "./abono.model.js";
 import BudgetTransfer from "./budget.transfer.model.js";
+import { query } from "../config/db.js";
 
 // Round to centavos so ledger totals read exactly 0 instead of a
 // floating-point residue (same helper every overview model uses).
@@ -19,8 +20,10 @@ const toMoney = (value) => Math.round((Number(value) || 0) * 100) / 100;
 //   - Expense: Money Out only while 'paid'. Drafts are parked and cancelled
 //     rows are void — neither counts as spent.
 //   - Abono (out-of-pocket top-up from an employee): Money In while 'open'.
-//     Settled (reimbursed) and draft rows no longer fund the pool, so they
-//     are void.
+//     Settled (reimbursed) rows are consumed spend — the settle flow re-books
+//     every settled peso as an issued child, so they read as Money Out (this
+//     keeps ledger outflows in agreement with every hero that counts settled
+//     spend). Draft rows are parked and stay void.
 //   - Budget Transfer: each `budget_transfer` row is split into its two legs
 //     — "Transfer Sent" (Money Out of the sender) and "Transfer Received"
 //     (Money In to the recipient). Employee-to-employee moves therefore net
@@ -34,9 +37,11 @@ const issuedFlow = (row) => (row.status === "cancel" ? "void" : "out");
 
 const expenseFlow = (row) => (row.status === "paid" ? "out" : "void");
 
-// Abono rows that no longer fund the pool ('settled' | 'draft') are 'void' —
-// they stay in the ledger with their status badge but move no money.
-const abonoDirection = (row) => (row.status === "open" ? "in" : "void");
+// Open abono funds the pool ('in'); settled abono is consumed spend ('out',
+// matching the heroes); drafts are parked ('void'). Every status stays in
+// the ledger with its badge.
+const abonoDirection = (row) =>
+  row.status === "open" ? "in" : row.status === "settled" ? "out" : "void";
 
 const transferLegFlow = (row) => (row.status === "success" ? null : "void");
 
@@ -60,14 +65,31 @@ class Transactions {
   // Also returns `summary` (all-time gross Money In / Out / net / counts)
   // and the `categories` + `references` lists the filters are built from.
   static async ledger() {
-    const [budgetRows, issuedRows, expensesData, abonoRows, transferRows] =
-      await Promise.all([
-        Budget.budgetTransaction({}),
-        Budget.budgetIssuedTransaction({}),
-        Expenses.expensesOverview({}),
-        Abono.listAll({}),
-        BudgetTransfer.listAll({}),
-      ]);
+    const [
+      budgetRows,
+      issuedRows,
+      expensesData,
+      abonoRows,
+      transferRows,
+      forwardedResult,
+    ] = await Promise.all([
+      Budget.budgetTransaction({}),
+      Budget.budgetIssuedTransaction({}),
+      Expenses.expensesOverview({}),
+      Abono.listAll({}),
+      BudgetTransfer.listAll({}),
+      // Handed-back leftovers from finalized holdings under open sources —
+      // pool-level money with no per-transaction row, so it rides the
+      // summary (same figure as Budget's totalForwarded).
+      query(
+        `SELECT COALESCE(SUM(bir.balance_forwarded), 0)::float8 AS forwarded
+           FROM budget_issued_reference bir
+           JOIN budget_reference br ON br.reference_id = bir.reference_id
+          WHERE bir.status = 'close'
+            AND br.status = 'open'`,
+        [],
+      ),
+    ]);
 
     const transactions = [];
 
@@ -187,7 +209,7 @@ class Transactions {
         notes: null,
         amount,
         moneyIn: direction === "in" ? amount : 0,
-        moneyOut: 0,
+        moneyOut: direction === "out" ? amount : 0,
         direction,
         status: row.status,
         method: null,
@@ -292,6 +314,7 @@ class Transactions {
       net: 0,
       count: transactions.length,
       byKind: {},
+      forwarded: toMoney(forwardedResult.rows[0]?.forwarded),
     };
     for (const tx of transactions) {
       summary.moneyIn = toMoney(summary.moneyIn + tx.moneyIn);

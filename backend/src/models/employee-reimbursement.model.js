@@ -8,18 +8,25 @@ const toMoney = (value) => Math.round((Number(value) || 0) * 100) / 100;
 // Admin → Employee Reimbursement aggregates. Closed sources leave no
 // footsteps: every sum below only counts rows under an open
 // `budget_reference`, mirroring the employee overview + source-funds rules.
+// The fund-pool cards share Budget.budgetOverview()'s exact rules so both
+// pages show identical values:
 //   - given:        SUM(budget.amount) of live rows ('added' | 'closed');
 //                   cancelled rows move no money.
-//   - issued:       SUM(issued_budget.amount) of 'added' rows only through
-//                   OPEN budget_issued_reference rows — cancelled children
-//                   move no money.
+//   - issued:       SUM(issued_budget.amount) of 'added' rows through OPEN
+//                   or CLOSED holdings alike — handed-out money left the
+//                   source either way. Cancelled children move no money.
 //   - openAbono:    SUM(employee_abono.amount) of OPEN rows — a settled
 //                   (reimbursed) abono no longer funds the pool.
-//   - spent:        SUM(expenses.total_amount) of PAID admin rows only —
-//                   mirrors ExpenseOverview's totalExpenses (employee spend
+//   - spent:        SUM(expenses.total_amount) of PAID admin rows under open
+//                   sources only (untagged rows connect to no source) —
+//                   mirrors the budget page's totalExpenses (employee spend
 //                   already left the pool as `issued`, so counting it again
 //                   would subtract it twice).
-//   - cash:         what the pool still holds (given − issued − open abono).
+//   - forwarded:    SUM(budget_issued_reference.balance_forwarded) of
+//                   finalized (`close`) holdings under open sources —
+//                   spendable again.
+//   - cash:         what the pool still holds
+//                   (given − issued − spent + forwarded).
 //   - personnel:    one row per account with issuance history (any status)
 //                   under an open source, or holding open abono — grouped by
 //                   budget_issued_reference.user_id joined through
@@ -43,6 +50,7 @@ class EmployeeReimbursement {
       givenBreakdownResult,
       issuedBreakdownResult,
       spentBreakdownResult,
+      forwardedBreakdownResult,
       issuedStatusCountsResult,
       issuanceRecordsResult,
     ] = await Promise.all([
@@ -67,8 +75,7 @@ class EmployeeReimbursement {
                   FROM budget_issued_reference bir
                   JOIN issued_budget ib ON ib.issued_ref_id = bir.id
                   JOIN budget_reference br ON br.reference_id = bir.reference_id
-                 WHERE bir.status = 'open'
-                   AND br.status = 'open'
+                 WHERE br.status = 'open'
                    AND ib.status != 'cancel'
               ), 0)::float8 AS issued,
              COALESCE((
@@ -110,11 +117,27 @@ class EmployeeReimbursement {
                 SELECT SUM(e.total_amount)
                   FROM expenses e
                   JOIN users u ON u.user_id = e.user_id
-                  LEFT JOIN budget_reference br ON br.reference_id = e.reference_id
+                  JOIN budget_reference br ON br.reference_id = e.reference_id
                  WHERE e.status = 'paid'
                    AND u.role = 'admin'
-                   AND (e.reference_id IS NULL OR br.status = 'open')
-              ), 0)::float8 AS spent`,
+                   AND br.status = 'open'
+              ), 0)::float8 AS spent,
+              COALESCE((
+                SELECT SUM(e.total_amount)
+                  FROM expenses e
+                  JOIN users u ON u.user_id = e.user_id
+                  JOIN budget_reference br ON br.reference_id = e.reference_id
+                 WHERE e.status = 'paid'
+                   AND u.role = 'employee'
+                   AND br.status = 'open'
+              ), 0)::float8 AS employee_spent,
+              COALESCE((
+                SELECT SUM(bir.balance_forwarded)
+                  FROM budget_issued_reference bir
+                  JOIN budget_reference br ON br.reference_id = bir.reference_id
+                 WHERE bir.status = 'close'
+                   AND br.status = 'open'
+              ), 0)::float8 AS forwarded`,
         ),
         query(
           `SELECT u.user_id,
@@ -232,7 +255,9 @@ class EmployeeReimbursement {
         ),
         // Per-reference allocation list for the Money In card — same shape
         // as Budget.budgetOverview().overviewBudget so the frontend can
-        // render the identical "Allocated" breakdown.
+        // render the identical "Allocated" breakdown. The cancelled filter
+        // lives in the JOIN (not the WHERE) so empty references read 0
+        // instead of vanishing.
         query(
           `SELECT
               br.reference_id,
@@ -241,46 +266,66 @@ class EmployeeReimbursement {
               COALESCE(SUM(b.amount), 0)::float8 AS amount
              FROM budget_reference br
              LEFT JOIN budget b ON b.reference_id = br.reference_id
-            WHERE b.status != 'cancelled'
-              AND br.status = 'open'
+               AND b.status != 'cancelled'
+            WHERE br.status = 'open'
             GROUP BY br.reference_id, br.label, br.created_at
             ORDER BY br.created_at DESC`,
         ),
         // Per-reference issuance list for the My Balance "Remaining"
-        // breakdown — same shape as Budget's overviewIssuedBudget.
+        // breakdown — same shape as Budget's overviewIssuedBudget (open AND
+        // closed holdings; only the source gates).
         query(
           `SELECT
               br.reference_id,
               br.label,
               br.created_at,
               COALESCE(SUM(ib.amount), 0)::float8 AS amount
-             FROM budget_issued_reference bir
-             JOIN issued_budget ib ON ib.issued_ref_id = bir.id
-             JOIN budget_reference br ON br.reference_id = bir.reference_id
-            WHERE bir.status = 'open'
-              AND br.status = 'open'
-              AND ib.status != 'cancel'
+             FROM budget_reference br
+             LEFT JOIN budget_issued_reference bir
+               ON bir.reference_id = br.reference_id
+             LEFT JOIN issued_budget ib ON ib.issued_ref_id = bir.id
+               AND ib.status != 'cancel'
+            WHERE br.status = 'open'
             GROUP BY br.reference_id, br.label, br.created_at
             ORDER BY br.created_at DESC`,
         ),
         // Per-reference admin-spend list for the My Balance "Remaining"
-        // breakdown. LEFT JOIN (not INNER) so untagged admin expenses land
-        // in their own NULL group instead of vanishing — the groups must
-        // partition the headline `spent` exactly.
+        // breakdown — driven from open references (same shape as Budget's
+        // overviewExpenses) so the groups partition the headline `spent`
+        // exactly. Untagged admin expenses connect to no source and stay
+        // out, matching the budget page.
         query(
           `SELECT
               br.reference_id,
               br.label,
               br.created_at,
               COALESCE(SUM(e.total_amount), 0)::float8 AS amount
-             FROM expenses e
-             JOIN users u ON u.user_id = e.user_id
-             LEFT JOIN budget_reference br ON br.reference_id = e.reference_id
-            WHERE e.status = 'paid'
-              AND u.role = 'admin'
-              AND (e.reference_id IS NULL OR br.status = 'open')
+             FROM budget_reference br
+             LEFT JOIN expenses e ON e.reference_id = br.reference_id
+               AND e.status = 'paid'
+               AND EXISTS (
+                 SELECT 1 FROM users u
+                  WHERE u.user_id = e.user_id AND u.role = 'admin'
+               )
+            WHERE br.status = 'open'
             GROUP BY br.reference_id, br.label, br.created_at
-            ORDER BY br.created_at DESC NULLS LAST`,
+            ORDER BY br.created_at DESC`,
+        ),
+        // Per-reference forwarded list for the My Balance "Remaining"
+        // breakdown — same shape as Budget's overviewForwarded.
+        query(
+          `SELECT
+              br.reference_id,
+              br.label,
+              br.created_at,
+              COALESCE(SUM(bir.balance_forwarded), 0)::float8 AS amount
+             FROM budget_reference br
+             LEFT JOIN budget_issued_reference bir
+               ON bir.reference_id = br.reference_id
+              AND bir.status = 'close'
+            WHERE br.status = 'open'
+            GROUP BY br.reference_id, br.label, br.created_at
+            ORDER BY br.created_at DESC`,
         ),
         // Issuance counts by `budget_issued_reference.status` for the Total
         // Abono card rows. Scoped to open sources like every other figure on
@@ -411,6 +456,12 @@ class EmployeeReimbursement {
         created_at: r.created_at,
         amount: toMoney(r.amount),
       })),
+      forwardedBreakdown: (forwardedBreakdownResult.rows ?? []).map((r) => ({
+        reference_id: r.reference_id,
+        label: r.label ?? "Untitled reference",
+        created_at: r.created_at,
+        amount: toMoney(r.amount),
+      })),
       issuedStatusCounts: (() => {
         const counts = { open: 0, close: 0, cancel: 0 };
         for (const r of issuedStatusCountsResult.rows ?? []) {
@@ -427,6 +478,8 @@ class EmployeeReimbursement {
       settledAbono: toMoney(t.settled_abono),
       settledAbonoCount: Number(t.settled_abono_count) || 0,
       spent: toMoney(t.spent),
+      employeeSpent: toMoney(t.employee_spent),
+      forwarded: toMoney(t.forwarded),
       personnelCount: Number(t.personnel_count) || 0,
       abonoByEmployee: (byEmployeeResult.rows ?? []).map((r) => ({
         userId: r.user_id,

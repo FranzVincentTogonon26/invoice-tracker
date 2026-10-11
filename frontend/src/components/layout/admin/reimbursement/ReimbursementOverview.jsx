@@ -8,7 +8,7 @@ import {
   Wallet,
 } from "lucide-react";
 import { StatCard } from "../../../ui/StatCard";
-import { formatDate, formatMoney } from "@/lib/utils";
+import { formatMoney } from "@/lib/utils";
 
 const container = {
   hidden: {},
@@ -53,11 +53,11 @@ export function ReimbursementOverview({
             accent
             loading={isLoading}
             breakdownCaption="Allocated"
+            breakdownCountNoun="source"
             breakdown={givenBreakdown.map((row, i) => ({
               key: row.reference_id ?? i,
               label: row.label ?? "Untitled reference",
               value: formatMoney(row.amount),
-              hint: formatDate(row.created_at),
             }))}
           />
         </motion.div>
@@ -91,6 +91,7 @@ export function ReimbursementOverview({
                   : undefined
             }
             breakdownCaption="Remaining"
+            breakdownCountNoun="source"
             breakdown={cashOnHandBreakdown}
           />
         </motion.div>
@@ -101,7 +102,8 @@ export function ReimbursementOverview({
             value={formatMoney(totalSpend)}
             icon={ReceiptText}
             loading={isLoading}
-            breakdownCaption="Summary"
+            breakdownCaption="Expenses Summary"
+            showBreakdownCount={false}
             breakdown={expensesSummary}
           />
         </motion.div>
@@ -113,6 +115,7 @@ export function ReimbursementOverview({
             icon={ClipboardList}
             loading={isLoading}
             breakdownCaption="Reimbursements"
+            showBreakdownCount={false}
             breakdown={reimbursementRows}
           />
         </motion.div>
@@ -120,11 +123,11 @@ export function ReimbursementOverview({
 
       <p className="px-1 text-xs text-[var(--ink-muted)]">
         Fund-pool view — Money In counts live budget allocations only · My
-        Balance is Budget Given − Issued − Spent (same as Expenses → My Balance)
-        · Expenses Summary hero matches Expenses → Total Expenses (Issued +
-        admin Spent); its Total Spent row adds all-personnel spend on top ·
-        Settled abono was reimbursed and no longer funds the pool · Rows under a
-        cut-off source leave no footsteps anywhere on this page
+        Balance is Budget Given − Issued − Spent + Forwarded (same as Budget →
+        My Balance) · Total Expenses is admin + employee spend (same as Budget →
+        Total Expenses) · Settled abono was reimbursed and counts as spent, no
+        longer funding the pool · Rows under a cut-off source leave no footsteps
+        anywhere on this page
       </p>
     </section>
   );

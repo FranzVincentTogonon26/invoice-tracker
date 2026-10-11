@@ -1,9 +1,5 @@
 import { motion } from "framer-motion";
-import {
-  ArrowLeftRight,
-  ClipboardList,
-  Plus,
-} from "lucide-react";
+import { ArrowLeftRight, ClipboardList, Plus } from "lucide-react";
 import { StatCard } from "../../../ui/StatCard";
 import { formatMoney } from "@/lib/utils";
 
@@ -52,17 +48,16 @@ export function TransactionOverview({
                 key: "given",
                 label: "Budget Given",
                 value: formatMoney(totals.given),
-                hint: `${totals.givenSources} ${
-                  totals.givenSources === 1 ? "source" : "sources"
-                }`,
               },
               {
                 key: "abono",
                 label: "Abono",
                 value: formatMoney(totals.abonoIn),
-                hint: `${totals.abonoCount} ${
-                  totals.abonoCount === 1 ? "abono" : "abonos"
-                }`,
+              },
+              {
+                key: "remaining_balance",
+                label: "Remaining Balance",
+                value: formatMoney(totals.remainingBalance),
               },
             ]}
           />
@@ -70,7 +65,11 @@ export function TransactionOverview({
         <motion.div variants={item} className="min-w-0 [&>div]:h-full">
           <StatCard
             label="Money Out"
-            value={formatMoney(totals.moneyOut)}
+            value={formatMoney(
+              Math.round(
+                (Number(totals.spent) + Number(totals.employeeSpent)) * 100,
+              ) / 100,
+            )}
             icon={ArrowLeftRight}
             loading={isLoading}
             tone="danger"
@@ -81,15 +80,16 @@ export function TransactionOverview({
                 key: "issued",
                 label: "Total Issued",
                 value: formatMoney(totals.issued),
-                hint: `${totals.issuedCount} issued`,
               },
               {
                 key: "spent",
-                label: "Expenses",
+                label: "My Expenses",
                 value: formatMoney(totals.spent),
-                hint: `${totals.spentCount} ${
-                  totals.spentCount === 1 ? "expense" : "expenses"
-                }`,
+              },
+              {
+                key: "employee_spent",
+                label: "Employee Expenses",
+                value: formatMoney(totals.employeeSpent),
               },
             ]}
           />
