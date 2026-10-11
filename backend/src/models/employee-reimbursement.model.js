@@ -327,7 +327,7 @@ class EmployeeReimbursement {
                   COUNT(ib.id)::int AS issued_count,
                   COALESCE(ab.open_abono, 0)::float8 AS open_abono,
                   COALESCE(ab.open_abono_count, 0)::int AS open_abono_count,
-                  COALESCE(sp.spent, 0)::float8 AS spent,
+                  (COALESCE(sp.spent, 0) + COALESCE(st.settled, 0))::float8 AS spent,
                   COALESCE(sp.expense_count, 0)::int AS expense_count
              FROM budget_issued_reference bir
              JOIN users u ON u.user_id = bir.user_id
@@ -346,7 +346,7 @@ class EmployeeReimbursement {
                   AND ea.issued_ref_id IS NOT NULL
                 GROUP BY ea.issued_ref_id
              ) ab ON ab.bir_id = bir.id
-             LEFT JOIN (
+              LEFT JOIN (
                SELECT e.issued_ref_id AS bir_id,
                       SUM(e.total_amount)::float8 AS spent,
                       COUNT(*)::int AS expense_count
@@ -357,11 +357,27 @@ class EmployeeReimbursement {
                   AND e.issued_ref_id IS NOT NULL
                 GROUP BY e.issued_ref_id
              ) sp ON sp.bir_id = bir.id
-             GROUP BY bir.id, bir.user_id, bir.reference_id, bir.status,
-                      bir.notes,
-                      bir.created_at, bir.date_cut_off, bir.date_forwarded,
-                     u.name, u.email, u.avatar_url, u.role, br.label,
-                     ab.open_abono, ab.open_abono_count, sp.spent, sp.expense_count
+             -- Settled abono of this record counts as its spent: settling
+             -- re-books every settled peso as an issued child, so without
+             -- this leg the record's spent undercounts and its balance
+             -- overstates. Independent join so records with settled abono
+             -- but no paid expenses still resolve.
+             LEFT JOIN (
+               SELECT ea.issued_ref_id AS bir_id,
+                      SUM(ea.amount)::float8 AS settled
+                 FROM employee_abono ea
+                 LEFT JOIN budget_reference br4 ON br4.reference_id = ea.reference_id
+                WHERE ea.status = 'settled'
+                  AND (ea.reference_id IS NULL OR br4.status = 'open')
+                  AND ea.issued_ref_id IS NOT NULL
+                GROUP BY ea.issued_ref_id
+             ) st ON st.bir_id = bir.id
+              GROUP BY bir.id, bir.user_id, bir.reference_id, bir.status,
+                       bir.notes,
+                       bir.created_at, bir.date_cut_off, bir.date_forwarded,
+                      u.name, u.email, u.avatar_url, u.role, br.label,
+                      ab.open_abono, ab.open_abono_count, sp.spent, sp.expense_count,
+                      st.settled
              -- Open records first, then newest first inside each group.
              ORDER BY (bir.status = 'open') DESC, bir.created_at DESC`,
         ),

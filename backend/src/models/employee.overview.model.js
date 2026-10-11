@@ -72,7 +72,26 @@ class EmployeeOverview {
               AND br.status = 'open'
           ), 0)::int AS active_references,
           COALESCE((
-            SELECT SUM(e.total_amount)
+            SELECT COALESCE(SUM(e.total_amount), 0)
+              -- Settled abono is consumed spend: the settle flow books every
+              -- settled peso back as an issued_budget child, so without
+              -- this leg the pool permanently overstates by the settled
+              -- amount. Pinned to its own OPEN holding like every other leg.
+              + COALESCE((
+                SELECT SUM(ea.amount)
+                FROM employee_abono ea
+                JOIN budget_reference br2 ON br2.reference_id = ea.reference_id
+                WHERE ea.user_id = $1 AND ea.status = 'settled'
+                  AND br2.status = 'open'
+                  AND EXISTS (
+                    SELECT 1
+                      FROM budget_issued_reference bir3
+                     WHERE bir3.user_id = ea.user_id
+                       AND bir3.reference_id = ea.reference_id
+                       AND bir3.status = 'open'
+                       AND bir3.id = ea.issued_ref_id
+                  )
+              ), 0)
             FROM expenses e
             LEFT JOIN budget_reference br ON br.reference_id = e.reference_id
             WHERE e.user_id = $1 AND e.status = 'paid'
@@ -421,7 +440,17 @@ class EmployeeOverview {
               AND br.status = 'open'
           ), 0)::int AS active_references,
           COALESCE((
-            SELECT SUM(e.total_amount)
+            SELECT COALESCE(SUM(e.total_amount), 0)
+              -- Settled abono of this record counts as its spent (see the
+              -- whole-account hero above for why).
+              + COALESCE((
+                SELECT SUM(ea.amount)
+                FROM employee_abono ea
+                JOIN budget_reference br2 ON br2.reference_id = ea.reference_id
+                WHERE ea.issued_ref_id = $2 AND ea.user_id = $1
+                  AND ea.status = 'settled'
+                  AND (ea.reference_id IS NULL OR br2.status = 'open')
+              ), 0)
             FROM expenses e
             LEFT JOIN budget_reference br ON br.reference_id = e.reference_id
             WHERE e.issued_ref_id = $2 AND e.user_id = $1 AND e.status = 'paid'

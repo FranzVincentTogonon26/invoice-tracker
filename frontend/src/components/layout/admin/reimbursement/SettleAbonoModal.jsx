@@ -1,14 +1,7 @@
 import { useMemo, useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { AnimatePresence, motion } from "framer-motion";
-import {
-  CircleAlert,
-  HandCoins,
-  Loader2,
-  Plus,
-  Wallet,
-  X,
-} from "lucide-react";
+import { CircleAlert, HandCoins, Loader2, Plus, Wallet, X } from "lucide-react";
 import toast from "react-hot-toast";
 import { Button } from "../../../ui/Button";
 import { Badge } from "../../../ui/Badge";
@@ -352,7 +345,10 @@ function SettleBody({ employee, onClose }) {
                   Loading open abono…
                 </p>
               ) : openRows.length === 0 ? (
-                <Badge tone="warning" className="w-full text-center py-4 rounded-2xl">
+                <Badge
+                  tone="warning"
+                  className="w-full text-center py-4 rounded-2xl"
+                >
                   No open abono left to settle for this employee.
                 </Badge>
               ) : (
@@ -575,10 +571,9 @@ function SettleBody({ employee, onClose }) {
               {selectedRows.length}{" "}
               {selectedRows.length === 1 ? "abono" : "abonos"}
             </span>{" "}
-            ({formatMoney(requested)}) for{" "}
-            {employee?.name || "the employee"}? Each amount returns to the
-            pool as issued budget, and the rows flip to settled — this
-            can&apos;t be undone.
+            ({formatMoney(requested)}) for {employee?.name || "the employee"}?
+            Each amount returns to the pool as issued budget, and the rows flip
+            to settled — this can&apos;t be undone.
           </>
         }
         cancelLabel="Go back"

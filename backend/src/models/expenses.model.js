@@ -854,7 +854,9 @@ class Expenses {
     // source only while connected to their own OPEN issuance record for the
     // same (reference_id, user_id) via `issued_ref_id`
     // (`budget_issued_reference.status = 'open'`) — spend under closed
-    // holdings or cut-off sources never reaches any source. Untagged rows
+    // holdings or cut-off sources never reaches any source. Settled abono
+    // counts as spend of its own record's source (same pinning — it is
+    // consumed money the settle flow re-booked as issued). Untagged rows
     // (reference_id IS NULL) connect to no holding and join the spread pool
     // below (oldest-source-first, capped at what each source received so no
     // source ever offers more cash than the pool holds). Grouping by
@@ -873,7 +875,22 @@ class Expenses {
               AND bir2.status = 'open'
               AND bir2.id = e.issued_ref_id
           ))
-        GROUP BY e.reference_id`,
+        GROUP BY e.reference_id
+        UNION ALL
+       SELECT ea.reference_id,
+              COALESCE(SUM(ea.amount), 0)::float8 AS expenses
+         FROM employee_abono ea
+         JOIN budget_reference br ON br.reference_id = ea.reference_id
+        WHERE ea.user_id = $1 AND ea.status = 'settled'
+          AND br.status = 'open'
+          AND EXISTS (
+            SELECT 1 FROM budget_issued_reference bir2
+            WHERE bir2.user_id = ea.user_id
+              AND bir2.reference_id = ea.reference_id
+              AND bir2.status = 'open'
+              AND bir2.id = ea.issued_ref_id
+          )
+        GROUP BY ea.reference_id`,
       [userId],
     );
 
@@ -1047,7 +1064,27 @@ class Expenses {
         )
       : await query(
           `SELECT
-                COALESCE(SUM(e.total_amount), 0)::float8 AS total_expenses,
+                (COALESCE(SUM(e.total_amount), 0)
+                 -- Settled abono counts as spent: the settle flow books every
+                 -- settled peso back as an issued child, so omitting it
+                 -- overstates the pool. Pinned to its own OPEN holding like
+                 -- every other leg ($1 only — this branch has no record id).
+                 + COALESCE((
+                   SELECT SUM(ea.amount)
+                   FROM employee_abono ea
+                   JOIN budget_reference br2 ON br2.reference_id = ea.reference_id
+                   WHERE ea.user_id = $1
+                     AND ea.status = 'settled'
+                     AND br2.status = 'open'
+                     AND EXISTS (
+                       SELECT 1
+                         FROM budget_issued_reference bir3
+                        WHERE bir3.user_id = ea.user_id
+                          AND bir3.reference_id = ea.reference_id
+                          AND bir3.status = 'open'
+                          AND bir3.id = ea.issued_ref_id
+                     )
+                 ), 0))::float8 AS total_expenses,
                 COALESCE(SUM(e.total_amount) FILTER (
                   WHERE e.expense_date >= date_trunc('month', CURRENT_DATE)
                 ), 0)::float8 AS this_month,

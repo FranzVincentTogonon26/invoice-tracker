@@ -1,4 +1,4 @@
-import { motion } from "framer-motion";
+import { motion, AnimatePresence } from "framer-motion";
 import {
   ArrowLeftRight,
   CircleAlert,
@@ -18,7 +18,7 @@ import { StatCard } from "../../components/ui/StatCard";
 import { Card } from "../../components/ui/Card";
 import { Badge } from "../../components/ui/Badge";
 
-import { formatMoney, formatDate } from "../../lib/utils";
+import { formatMoney } from "../../lib/utils";
 import {
   Tabs,
   TabsContent,
@@ -90,7 +90,6 @@ export default function AdminBudget() {
       key: `admin-${row.reference_id ?? i}`,
       label: row.label ?? "Untitled reference",
       value: formatMoney(row.amount),
-      hint: formatDate(row.created_at),
     })),
     ...overviewEmployeeExpenses
       .filter((row) => Number(row.amount || 0) !== 0)
@@ -98,7 +97,6 @@ export default function AdminBudget() {
         key: `employee-${row.reference_id ?? row.label ?? ""}`,
         label: `${row.label ?? "Untitled reference"} · employee`,
         value: formatMoney(row.amount),
-        hint: formatDate(row.created_at),
       })),
   ];
 
@@ -143,7 +141,6 @@ export default function AdminBudget() {
       key: i,
       label: row.label ?? "Untitled reference",
       value: formatMoney(remaining),
-      hint: formatDate(row.created_at),
       tone: remaining < 0 ? "danger" : undefined,
     };
   });
@@ -206,7 +203,6 @@ export default function AdminBudget() {
                 key: i,
                 label: row.label ?? "Untitled reference",
                 value: formatMoney(row.amount),
-                hint: formatDate(row.created_at),
               }))}
             />
           </motion.div>
@@ -260,7 +256,6 @@ export default function AdminBudget() {
                 key: i,
                 label: row.label ?? "Untitled reference",
                 value: formatMoney(row.amount),
-                hint: formatDate(row.created_at),
               }))}
             />
           </motion.div>
@@ -434,21 +429,51 @@ export default function AdminBudget() {
           />
         </div>
 
-        <div>
+        <AnimatePresence mode="wait">
           <TabsContent value="employee_budget">
-            <EmployeeBudget
-              employeeIssuedBudget={budgets}
-              isLoading={isLoading}
-              onOpen={(id) => nav(`/admin/employees/${id}`)}
-            />
+            {tab === "employee_budget" && (
+              <motion.div
+                key="employee_budget"
+                variants={item}
+                initial="hidden"
+                animate="show"
+                exit="hidden"
+              >
+                <EmployeeBudget
+                  employeeIssuedBudget={budgets}
+                  isLoading={isLoading}
+                  onOpen={(id) => nav(`/admin/employees/${id}`)}
+                />
+              </motion.div>
+            )}
           </TabsContent>
           <TabsContent value="budget_transaction">
-            <BudgetTransaction breakdown={cashOnHandBreakdown} />
+            {tab === "budget_transaction" && (
+              <motion.div
+                key="budget_transaction"
+                variants={item}
+                initial="hidden"
+                animate="show"
+                exit="hidden"
+              >
+                <BudgetTransaction breakdown={cashOnHandBreakdown} />
+              </motion.div>
+            )}
           </TabsContent>
           <TabsContent value="budget_issued_transaction">
-            <BudgetIssuedTransaction />
+            {tab === "budget_issued_transaction" && (
+              <motion.div
+                key="budget_issued_transaction"
+                variants={item}
+                initial="hidden"
+                animate="show"
+                exit="hidden"
+              >
+                <BudgetIssuedTransaction />
+              </motion.div>
+            )}
           </TabsContent>
-        </div>
+        </AnimatePresence>
       </Tabs>
 
       <BudgetModal

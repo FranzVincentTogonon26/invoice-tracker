@@ -5,9 +5,9 @@ import {
   HandCoins,
   Inbox,
   Lock,
+  MessageCircleQuestionMark,
   PhilippinePesoIcon,
   ReceiptText,
-  StickyNote,
   Wallet,
 } from "lucide-react";
 import { PageHeader } from "../../../ui/PageHeader";
@@ -323,16 +323,13 @@ export function AdminEmployeeReimbursementDetails() {
           {showRecordNote ? (
             <div className="border-t border-[var(--border)] px-4 py-3 sm:px-5">
               <div className="flex items-start gap-2.5 rounded-2xl border border-[var(--accent)]/25 bg-[var(--accent-soft)]/40 px-3.5 py-3">
-                <StickyNote
+                <MessageCircleQuestionMark
                   size={16}
                   className="mt-0.5 shrink-0 text-[var(--accent-strong)]"
                   aria-hidden
                 />
                 <div className="min-w-0 flex-1">
-                  <p className="type-eyebrow text-[var(--accent-strong)]">
-                    Issuance note
-                  </p>
-                  <p className="mt-1 whitespace-pre-wrap break-words text-sm font-medium leading-relaxed text-[var(--ink)]">
+                  <p className="whitespace-pre-wrap break-words text-sm font-medium leading-relaxed  text-[var(--accent-strong)]">
                     {recordNote}
                   </p>
                 </div>

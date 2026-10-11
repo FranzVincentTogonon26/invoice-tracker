@@ -11,7 +11,8 @@ import { PersonnelActions } from "./PersonnelActions";
 // Date + AM/PM time stacked cell (used by the Date Created / Date Closed
 // columns). Renders "—" when there is no date — e.g. never closed yet.
 function DateTimeCell({ value }) {
-  if (!value) return <span className="text-[13px] text-[var(--ink-muted)]">—</span>;
+  if (!value)
+    return <span className="text-[13px] text-[var(--ink-muted)]">—</span>;
   return (
     <>
       <p className="whitespace-nowrap text-[13px] text-[var(--ink)]">
@@ -142,19 +143,19 @@ export function ReimbursementPersonnelTable({
                   Reference
                 </th>
                 <th className="truncate whitespace-nowrap border-b border-[var(--border)] px-4 py-3 text-right type-eyebrow text-[var(--ink-muted)]">
-                  Issued Budget
+                  Budget
                 </th>
                 <th className="truncate whitespace-nowrap border-b border-[var(--border)] px-4 py-3 text-right type-eyebrow text-[var(--ink-muted)]">
-                  Total Open Abono
+                  Abono
                 </th>
                 <th className="truncate whitespace-nowrap border-b border-[var(--border)] px-4 py-3 text-right type-eyebrow text-[var(--ink-muted)]">
-                  Total Spent
+                  Spent
                 </th>
                 <th className="truncate whitespace-nowrap border-b border-[var(--border)] px-4 py-3 text-right type-eyebrow text-[var(--ink-muted)]">
                   Remaining Balance
                 </th>
                 <th className="truncate whitespace-nowrap border-b border-[var(--border)] px-4 py-3 text-center type-eyebrow text-[var(--ink-muted)]">
-                  Total Transaction
+                  Transaction
                 </th>
                 <th className="truncate whitespace-nowrap border-b border-[var(--border)] px-4 py-3 type-eyebrow text-[var(--ink-muted)]">
                   Date Created
@@ -194,7 +195,7 @@ export function ReimbursementPersonnelTable({
                     </div>
                   </td>
                   <td className="px-4 py-3.5 align-middle">
-                    {r.referenceLabel ?? r.referenceLabels ? (
+                    {(r.referenceLabel ?? r.referenceLabels) ? (
                       <span className="flex flex-wrap items-center gap-1.5">
                         {String(r.referenceLabel ?? r.referenceLabels)
                           .split(",")

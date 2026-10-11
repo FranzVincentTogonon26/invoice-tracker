@@ -12,8 +12,8 @@ import {
   Files,
   Loader2,
   Lock,
+  MessageCircleQuestionMark,
   Pencil,
-  StickyNote,
   UserX,
 } from "lucide-react";
 import { Badge, StatusBadge } from "@/components/ui/Badge";
@@ -204,6 +204,11 @@ export default function AdminEmployeesDetails() {
     );
     const cumSum = (head, pred) =>
       round(head.filter(pred).reduce((s, t) => s + amountOf(t), 0));
+    // Settled abono rides the spent line (consumed spend); the abono line
+    // keeps tracking all abono activity.
+    const isSpent = (t) =>
+      (!isIssued(t) && !isAbono(t)) ||
+      (t.kind === "abono" && t.status === "settled");
 
     return sorted.map((t, i) => {
       const head = sorted.slice(0, i + 1);
@@ -216,7 +221,7 @@ export default function AdminEmployeesDetails() {
         amount,
         signed: "",
         cumIssued: cumSum(head, isIssued),
-        cumSpent: cumSum(head, (x) => !isIssued(x) && !isAbono(x)),
+        cumSpent: cumSum(head, isSpent),
         cumAbono: cumSum(head, isAbono),
         kindLabel: t.kind || "record",
         dot: "bg-[var(--ink-muted)]",
@@ -273,7 +278,12 @@ export default function AdminEmployeesDetails() {
 
     return {
       issued: sum((t) => t.kind === "issued" && t.status !== "cancel"),
-      spent: sum((t) => t.kind === "expense" && t.status === "paid"),
+      // Settled abono is consumed spend (re-booked as issued on settle).
+      spent: sum(
+        (t) =>
+          (t.kind === "expense" && t.status === "paid") ||
+          (t.kind === "abono" && t.status === "settled"),
+      ),
       abono: sum((t) => t.kind === "abono" && t.status === "open"),
       sent: sum((t) => t.direction === "sent" && t.status === "success"),
       received: 0,
@@ -522,16 +532,13 @@ export default function AdminEmployeesDetails() {
           {showRecordNote ? (
             <div className="border-t border-[var(--border)] px-4 py-3 sm:px-5">
               <div className="flex items-start gap-2.5 rounded-2xl border border-[var(--accent)]/25 bg-[var(--accent-soft)]/40 px-3.5 py-3">
-                <StickyNote
+                <MessageCircleQuestionMark
                   size={16}
                   className="mt-0.5 shrink-0 text-[var(--accent-strong)]"
                   aria-hidden
                 />
                 <div className="min-w-0 flex-1">
-                  <p className="type-eyebrow text-[var(--accent-strong)]">
-                    Issuance note
-                  </p>
-                  <p className="mt-1 whitespace-pre-wrap break-words text-sm font-medium leading-relaxed text-[var(--ink)]">
+                  <p className="whitespace-pre-wrap break-words text-sm font-medium leading-relaxed  text-[var(--accent-strong)]">
                     {recordRef.notes.trim()}
                   </p>
                 </div>

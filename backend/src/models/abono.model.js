@@ -134,10 +134,17 @@ class Abono {
                      AND ib.status != 'cancel'
                 ), 0)::float8 AS total_budget,
                 COALESCE((
-                  SELECT SUM(e.total_amount)
-                     FROM expenses e
-                    WHERE e.issued_ref_id = $2 AND e.user_id = $1 AND e.status = 'paid'
-                 ), 0)::float8 AS total_expenses,
+                  SELECT COALESCE(SUM(e.total_amount), 0)
+                    -- Settled abono of this record counts as its spent.
+                    + COALESCE((
+                      SELECT SUM(ea.amount)
+                      FROM employee_abono ea
+                      WHERE ea.issued_ref_id = $2 AND ea.user_id = $1
+                        AND ea.status = 'settled'
+                    ), 0)
+                   FROM expenses e
+                   WHERE e.issued_ref_id = $2 AND e.user_id = $1 AND e.status = 'paid'
+                ), 0)::float8 AS total_expenses,
                 COALESCE((
                   SELECT SUM(bt.amount)
                     FROM budget_transfer bt
@@ -182,13 +189,33 @@ class Abono {
                   SELECT SUM(ib.amount)
                     FROM budget_issued_reference bir
                     JOIN issued_budget ib ON ib.issued_ref_id = bir.id
+                    JOIN budget_reference br ON br.reference_id = bir.reference_id
                    WHERE bir.user_id = $1 AND bir.status = 'open'
+                     AND br.status = 'open'
                      AND ib.status != 'cancel'
                 ), 0)::float8 AS total_budget,
                 COALESCE((
-                  SELECT SUM(e.total_amount)
-                     FROM expenses e
-                     LEFT JOIN budget_reference br ON br.reference_id = e.reference_id
+                  SELECT COALESCE(SUM(e.total_amount), 0)
+                    -- Settled abono is consumed spend (see the employee
+                    -- overview hero): without this leg the pool overstates
+                    -- by the settled amount.
+                    + COALESCE((
+                      SELECT SUM(ea.amount)
+                      FROM employee_abono ea
+                      JOIN budget_reference br2 ON br2.reference_id = ea.reference_id
+                      WHERE ea.user_id = $1 AND ea.status = 'settled'
+                        AND br2.status = 'open'
+                        AND EXISTS (
+                          SELECT 1
+                            FROM budget_issued_reference bir3
+                           WHERE bir3.user_id = ea.user_id
+                             AND bir3.reference_id = ea.reference_id
+                             AND bir3.status = 'open'
+                             AND bir3.id = ea.issued_ref_id
+                        )
+                    ), 0)
+                   FROM expenses e
+                   LEFT JOIN budget_reference br ON br.reference_id = e.reference_id
                     WHERE e.user_id = $1 AND e.status = 'paid'
                       AND (e.reference_id IS NULL OR br.status = 'open')
                       AND (e.reference_id IS NULL OR EXISTS (
@@ -282,9 +309,12 @@ class Abono {
         locked.rows.reduce((sum, row) => sum + Number(row.amount), 0),
       );
 
-      // Same money rules every overview model uses (employee.overview.model):
-      // what the employee can still spend right now, counting OPEN abono
-      // only, minus sent transfers plus received transfers (success only).
+      // Same money rules the displayed overview uses
+      // (employeeAbonoOverview, whole-account view): what the employee can
+      // still spend right now — every leg keyed on their OPEN holdings for
+      // the same (reference_id, user_id) via issued_ref_id, plus inbound
+      // transfers. An ungated recompute here would disagree with the cover
+      // balance the dialog shows and wrongly refuse coverable settles.
       const balance = (
         await q(
           `SELECT
@@ -292,22 +322,65 @@ class Abono {
                 SELECT SUM(ib.amount)
                 FROM budget_issued_reference bir
                 JOIN issued_budget ib ON ib.issued_ref_id = bir.id
+                JOIN budget_reference br ON br.reference_id = bir.reference_id
                 WHERE bir.user_id = $1 AND bir.status = 'open'
+                  AND br.status = 'open'
                   AND ib.status != 'cancel'
               ), 0)::float8
               + COALESCE((
                 SELECT SUM(ea.amount)
                 FROM employee_abono ea
+                JOIN budget_reference br ON br.reference_id = ea.reference_id
                 WHERE ea.user_id = $1 AND ea.status = 'open'
+                  AND br.status = 'open'
+                  AND EXISTS (
+                    SELECT 1
+                      FROM budget_issued_reference bir2
+                     WHERE bir2.user_id = ea.user_id
+                       AND bir2.reference_id = ea.reference_id
+                       AND bir2.status = 'open'
+                       AND bir2.id = ea.issued_ref_id
+                  )
               ), 0)::float8
-              - COALESCE((
+              - (COALESCE((
                 SELECT SUM(e.total_amount)
                 FROM expenses e
+                LEFT JOIN budget_reference br ON br.reference_id = e.reference_id
                 WHERE e.user_id = $1 AND e.status = 'paid'
-              ), 0)::float8
+                  AND (e.reference_id IS NULL OR br.status = 'open')
+                  AND (e.reference_id IS NULL OR EXISTS (
+                    SELECT 1
+                      FROM budget_issued_reference bir2
+                     WHERE bir2.user_id = e.user_id
+                       AND bir2.reference_id = e.reference_id
+                       AND bir2.status = 'open'
+                       AND bir2.id = e.issued_ref_id
+                  ))
+              ), 0)
+              -- Settled abono is consumed spend (same rule as the displayed
+              -- heroes): without it the guard disagrees with the dialog cover
+              -- balance and refuses coverable settles.
+              + COALESCE((
+                SELECT SUM(ea.amount)
+                FROM employee_abono ea
+                JOIN budget_reference br2 ON br2.reference_id = ea.reference_id
+                WHERE ea.user_id = $1 AND ea.status = 'settled'
+                  AND br2.status = 'open'
+                  AND EXISTS (
+                    SELECT 1
+                      FROM budget_issued_reference bir3
+                     WHERE bir3.user_id = ea.user_id
+                       AND bir3.reference_id = ea.reference_id
+                       AND bir3.status = 'open'
+                       AND bir3.id = ea.issued_ref_id
+                  )
+              ), 0))::float8
               - COALESCE((
                 SELECT SUM(bt.amount)
                 FROM budget_transfer bt
+                JOIN budget_issued_reference birf ON birf.id = bt.issued_ref_id
+                  AND birf.status = 'open'
+                  AND birf.user_id = bt.user_id
                 WHERE bt.user_id = $1 AND bt.status = 'success'
               ), 0)::float8
               + COALESCE((
@@ -393,6 +466,10 @@ class Abono {
       );
       const requested = toMoney(amount ?? checkedSum);
 
+      // Same strict money rules as the settle guard above (and the displayed
+      // overview): every leg keyed on OPEN holdings via issued_ref_id, so a
+      // coverable settlement is never refused on money the pages no longer
+      // display.
       const balance = (
         await q(
           `SELECT
@@ -400,22 +477,65 @@ class Abono {
                 SELECT SUM(ib.amount)
                 FROM budget_issued_reference bir
                 JOIN issued_budget ib ON ib.issued_ref_id = bir.id
+                JOIN budget_reference br ON br.reference_id = bir.reference_id
                 WHERE bir.user_id = $1 AND bir.status = 'open'
+                  AND br.status = 'open'
                   AND ib.status != 'cancel'
               ), 0)::float8
               + COALESCE((
                 SELECT SUM(ea.amount)
                 FROM employee_abono ea
+                JOIN budget_reference br ON br.reference_id = ea.reference_id
                 WHERE ea.user_id = $1 AND ea.status = 'open'
+                  AND br.status = 'open'
+                  AND EXISTS (
+                    SELECT 1
+                      FROM budget_issued_reference bir2
+                     WHERE bir2.user_id = ea.user_id
+                       AND bir2.reference_id = ea.reference_id
+                       AND bir2.status = 'open'
+                       AND bir2.id = ea.issued_ref_id
+                  )
               ), 0)::float8
-              - COALESCE((
+              - (COALESCE((
                 SELECT SUM(e.total_amount)
                 FROM expenses e
+                LEFT JOIN budget_reference br ON br.reference_id = e.reference_id
                 WHERE e.user_id = $1 AND e.status = 'paid'
-              ), 0)::float8
+                  AND (e.reference_id IS NULL OR br.status = 'open')
+                  AND (e.reference_id IS NULL OR EXISTS (
+                    SELECT 1
+                      FROM budget_issued_reference bir2
+                     WHERE bir2.user_id = e.user_id
+                       AND bir2.reference_id = e.reference_id
+                       AND bir2.status = 'open'
+                       AND bir2.id = e.issued_ref_id
+                  ))
+              ), 0)
+              -- Settled abono is consumed spend (same rule as the displayed
+              -- heroes): without it the guard disagrees with the dialog cover
+              -- balance and refuses coverable settles.
+              + COALESCE((
+                SELECT SUM(ea.amount)
+                FROM employee_abono ea
+                JOIN budget_reference br2 ON br2.reference_id = ea.reference_id
+                WHERE ea.user_id = $1 AND ea.status = 'settled'
+                  AND br2.status = 'open'
+                  AND EXISTS (
+                    SELECT 1
+                      FROM budget_issued_reference bir3
+                     WHERE bir3.user_id = ea.user_id
+                       AND bir3.reference_id = ea.reference_id
+                       AND bir3.status = 'open'
+                       AND bir3.id = ea.issued_ref_id
+                  )
+              ), 0))::float8
               - COALESCE((
                 SELECT SUM(bt.amount)
                 FROM budget_transfer bt
+                JOIN budget_issued_reference birf ON birf.id = bt.issued_ref_id
+                  AND birf.status = 'open'
+                  AND birf.user_id = bt.user_id
                 WHERE bt.user_id = $1 AND bt.status = 'success'
               ), 0)::float8
               + COALESCE((
@@ -676,47 +796,14 @@ class Abono {
   // OPEN abono OUT of this pool, so a delete whose amount the balance can't
   // cover means the money is already spent.
   static async spendableBalance(userId) {
-    // Closed sources leave no footsteps: holdings, abono and spend tied to
-    // a cut-off source never enter the pool (untagged expenses connect to
-    // no source and still count).
-    const result = await query(
-      `SELECT
-          COALESCE((
-            SELECT SUM(ib.amount)
-              FROM budget_issued_reference bir
-              JOIN issued_budget ib ON ib.issued_ref_id = bir.id
-              JOIN budget_reference br ON br.reference_id = bir.reference_id
-             WHERE bir.user_id = $1 AND bir.status = 'open'
-               AND br.status = 'open'
-               AND ib.status != 'cancel'
-          ), 0)::float8
-          + COALESCE((
-            SELECT SUM(ea.amount)
-              FROM employee_abono ea
-              JOIN budget_reference br ON br.reference_id = ea.reference_id
-             WHERE ea.user_id = $1 AND ea.status = 'open'
-               AND br.status = 'open'
-          ), 0)::float8
-          - COALESCE((
-            SELECT SUM(e.total_amount)
-              FROM expenses e
-              LEFT JOIN budget_reference br ON br.reference_id = e.reference_id
-             WHERE e.user_id = $1 AND e.status = 'paid'
-               AND (e.reference_id IS NULL OR br.status = 'open')
-          ), 0)::float8
-          - COALESCE((
-            SELECT SUM(bt.amount)
-              FROM budget_transfer bt
-             WHERE bt.user_id = $1 AND bt.status = 'success'
-          ), 0)::float8
-          + COALESCE((
-            SELECT SUM(btr.amount)
-              FROM budget_transfer btr
-             WHERE btr.transfer_to = $1 AND btr.status = 'success'
-          ), 0)::float8 AS total_balance`,
-      [userId],
-    );
-    return toMoney(result.rows[0]?.total_balance);
+    // Delete guard for one OPEN abono row: removing it takes its amount OUT
+    // of the pool, so the delete proceeds exactly when the displayed
+    // remaining covers it (`remaining >= amount`, epsilon-tolerant in the
+    // controller). Delegates to the same strict hero the Abono page shows
+    // (`employeeAbonoOverview`) instead of a second hand-rolled formula, so
+    // the guard and the display can never disagree about the balance.
+    const { overview } = await this.employeeAbonoOverview(userId);
+    return toMoney(overview.totalBalance);
   }
 }
 

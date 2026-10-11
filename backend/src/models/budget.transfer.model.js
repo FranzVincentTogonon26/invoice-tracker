@@ -71,22 +71,65 @@ class BudgetTransfer {
             SELECT SUM(ib.amount)
               FROM budget_issued_reference bir
               JOIN issued_budget ib ON ib.issued_ref_id = bir.id
+              JOIN budget_reference br ON br.reference_id = bir.reference_id
              WHERE bir.user_id = $1 AND bir.status = 'open'
+               AND br.status = 'open'
                AND ib.status != 'cancel'
           ), 0)::float8 AS total_budget,
           COALESCE((
-            SELECT SUM(e.total_amount)
-              FROM expenses e
-             WHERE e.user_id = $1 AND e.status = 'paid'
+            SELECT COALESCE(SUM(e.total_amount), 0)
+              -- Settled abono is consumed spend (same rule as the displayed
+              -- heroes): without it the transfer form disagrees with the
+              -- Overview balance and lets settled money be moved twice.
+              + COALESCE((
+                SELECT SUM(ea.amount)
+                FROM employee_abono ea
+                JOIN budget_reference br2 ON br2.reference_id = ea.reference_id
+                WHERE ea.user_id = $1 AND ea.status = 'settled'
+                  AND br2.status = 'open'
+                  AND EXISTS (
+                    SELECT 1
+                      FROM budget_issued_reference bir3
+                     WHERE bir3.user_id = ea.user_id
+                       AND bir3.reference_id = ea.reference_id
+                       AND bir3.status = 'open'
+                       AND bir3.id = ea.issued_ref_id
+                  )
+              ), 0)
+            FROM expenses e
+            LEFT JOIN budget_reference br ON br.reference_id = e.reference_id
+            WHERE e.user_id = $1 AND e.status = 'paid'
+              AND (e.reference_id IS NULL OR br.status = 'open')
+              AND (e.reference_id IS NULL OR EXISTS (
+                SELECT 1
+                  FROM budget_issued_reference bir2
+                 WHERE bir2.user_id = e.user_id
+                   AND bir2.reference_id = e.reference_id
+                   AND bir2.status = 'open'
+                   AND bir2.id = e.issued_ref_id
+              ))
           ), 0)::float8 AS total_expenses,
           COALESCE((
             SELECT SUM(ea.amount)
               FROM employee_abono ea
+              JOIN budget_reference br ON br.reference_id = ea.reference_id
              WHERE ea.user_id = $1 AND ea.status = 'open'
+               AND br.status = 'open'
+               AND EXISTS (
+                 SELECT 1
+                   FROM budget_issued_reference bir2
+                  WHERE bir2.user_id = ea.user_id
+                    AND bir2.reference_id = ea.reference_id
+                    AND bir2.status = 'open'
+                    AND bir2.id = ea.issued_ref_id
+               )
           ), 0)::float8 AS total_abono,
           COALESCE((
             SELECT SUM(bt.amount)
               FROM budget_transfer bt
+              JOIN budget_issued_reference birf ON birf.id = bt.issued_ref_id
+                AND birf.status = 'open'
+                AND birf.user_id = bt.user_id
              WHERE bt.user_id = $1 AND bt.status = 'success'
           ), 0)::float8 AS total_sent,
           COALESCE((
@@ -161,22 +204,65 @@ class BudgetTransfer {
             SELECT SUM(ib.amount)
               FROM budget_issued_reference bir
               JOIN issued_budget ib ON ib.issued_ref_id = bir.id
+              JOIN budget_reference br ON br.reference_id = bir.reference_id
              WHERE bir.user_id = $1 AND bir.status = 'open'
+               AND br.status = 'open'
                AND ib.status != 'cancel'
           ), 0)::float8 AS total_budget,
           COALESCE((
-            SELECT SUM(e.total_amount)
-              FROM expenses e
-             WHERE e.user_id = $1 AND e.status = 'paid'
+            SELECT COALESCE(SUM(e.total_amount), 0)
+              -- Settled abono is consumed spend (same rule as the displayed
+              -- heroes): without it the transfer form disagrees with the
+              -- Overview balance and lets settled money be moved twice.
+              + COALESCE((
+                SELECT SUM(ea.amount)
+                FROM employee_abono ea
+                JOIN budget_reference br2 ON br2.reference_id = ea.reference_id
+                WHERE ea.user_id = $1 AND ea.status = 'settled'
+                  AND br2.status = 'open'
+                  AND EXISTS (
+                    SELECT 1
+                      FROM budget_issued_reference bir3
+                     WHERE bir3.user_id = ea.user_id
+                       AND bir3.reference_id = ea.reference_id
+                       AND bir3.status = 'open'
+                       AND bir3.id = ea.issued_ref_id
+                  )
+              ), 0)
+            FROM expenses e
+            LEFT JOIN budget_reference br ON br.reference_id = e.reference_id
+            WHERE e.user_id = $1 AND e.status = 'paid'
+              AND (e.reference_id IS NULL OR br.status = 'open')
+              AND (e.reference_id IS NULL OR EXISTS (
+                SELECT 1
+                  FROM budget_issued_reference bir2
+                 WHERE bir2.user_id = e.user_id
+                   AND bir2.reference_id = e.reference_id
+                   AND bir2.status = 'open'
+                   AND bir2.id = e.issued_ref_id
+              ))
           ), 0)::float8 AS total_expenses,
           COALESCE((
             SELECT SUM(ea.amount)
               FROM employee_abono ea
+              JOIN budget_reference br ON br.reference_id = ea.reference_id
              WHERE ea.user_id = $1 AND ea.status = 'open'
+               AND br.status = 'open'
+               AND EXISTS (
+                 SELECT 1
+                   FROM budget_issued_reference bir2
+                  WHERE bir2.user_id = ea.user_id
+                    AND bir2.reference_id = ea.reference_id
+                    AND bir2.status = 'open'
+                    AND bir2.id = ea.issued_ref_id
+               )
           ), 0)::float8 AS total_abono,
           COALESCE((
             SELECT SUM(bt.amount)
               FROM budget_transfer bt
+              JOIN budget_issued_reference birf ON birf.id = bt.issued_ref_id
+                AND birf.status = 'open'
+                AND birf.user_id = bt.user_id
              WHERE bt.user_id = $1 AND bt.status = 'success'
           ), 0)::float8 AS total_sent,
           COALESCE((
@@ -655,22 +741,64 @@ class BudgetTransfer {
                 SELECT SUM(ib.amount)
                   FROM budget_issued_reference bir
                   JOIN issued_budget ib ON ib.issued_ref_id = bir.id
+                  JOIN budget_reference br ON br.reference_id = bir.reference_id
                  WHERE bir.user_id = $1 AND bir.status = 'open'
+                   AND br.status = 'open'
                    AND ib.status != 'cancel'
               ), 0)::float8 AS total_budget,
               COALESCE((
-                SELECT SUM(e.total_amount)
-                  FROM expenses e
-                 WHERE e.user_id = $1 AND e.status = 'paid'
+                SELECT COALESCE(SUM(e.total_amount), 0)
+                  -- Settled abono is consumed spend (same rule as the
+                  -- displayed heroes).
+                  + COALESCE((
+                    SELECT SUM(ea.amount)
+                    FROM employee_abono ea
+                    JOIN budget_reference br2 ON br2.reference_id = ea.reference_id
+                    WHERE ea.user_id = $1 AND ea.status = 'settled'
+                      AND br2.status = 'open'
+                      AND EXISTS (
+                        SELECT 1
+                          FROM budget_issued_reference bir3
+                         WHERE bir3.user_id = ea.user_id
+                           AND bir3.reference_id = ea.reference_id
+                           AND bir3.status = 'open'
+                           AND bir3.id = ea.issued_ref_id
+                      )
+                  ), 0)
+                FROM expenses e
+                LEFT JOIN budget_reference br ON br.reference_id = e.reference_id
+                WHERE e.user_id = $1 AND e.status = 'paid'
+                  AND (e.reference_id IS NULL OR br.status = 'open')
+                  AND (e.reference_id IS NULL OR EXISTS (
+                    SELECT 1
+                      FROM budget_issued_reference bir2
+                     WHERE bir2.user_id = e.user_id
+                       AND bir2.reference_id = e.reference_id
+                       AND bir2.status = 'open'
+                       AND bir2.id = e.issued_ref_id
+                  ))
               ), 0)::float8 AS total_expenses,
               COALESCE((
                 SELECT SUM(ea.amount)
                   FROM employee_abono ea
+                  JOIN budget_reference br ON br.reference_id = ea.reference_id
                  WHERE ea.user_id = $1 AND ea.status = 'open'
+                   AND br.status = 'open'
+                   AND EXISTS (
+                     SELECT 1
+                       FROM budget_issued_reference bir2
+                      WHERE bir2.user_id = ea.user_id
+                        AND bir2.reference_id = ea.reference_id
+                        AND bir2.status = 'open'
+                        AND bir2.id = ea.issued_ref_id
+                   )
               ), 0)::float8 AS total_abono,
               COALESCE((
                 SELECT SUM(bt.amount)
                   FROM budget_transfer bt
+                  JOIN budget_issued_reference birf ON birf.id = bt.issued_ref_id
+                    AND birf.status = 'open'
+                    AND birf.user_id = bt.user_id
                  WHERE bt.user_id = $1 AND bt.status = 'success'
               ), 0)::float8 AS total_sent,
               COALESCE((

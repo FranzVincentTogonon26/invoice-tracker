@@ -746,7 +746,25 @@ class Budget {
               AND ib.status != 'cancel'
           ), 0)::float8 AS total_budget,
           COALESCE((
-            SELECT SUM(e.total_amount)
+            SELECT COALESCE(SUM(e.total_amount), 0)
+              -- Settled abono is consumed spend (see employee.overview.model):
+              -- the settle flow books every settled peso as an issued child,
+              -- so omitting it overstates the pool by the settled amount.
+              + COALESCE((
+                SELECT SUM(ea.amount)
+                FROM employee_abono ea
+                JOIN budget_reference br2 ON br2.reference_id = ea.reference_id
+                WHERE ea.user_id = $1 AND ea.status = 'settled'
+                  AND br2.status = 'open'
+                  AND EXISTS (
+                    SELECT 1
+                      FROM budget_issued_reference bir3
+                     WHERE bir3.user_id = ea.user_id
+                       AND bir3.reference_id = ea.reference_id
+                       AND bir3.status = 'open'
+                       AND bir3.id = ea.issued_ref_id
+                  )
+              ), 0)
             FROM expenses e
             LEFT JOIN budget_reference br ON br.reference_id = e.reference_id
             WHERE e.user_id = $1 AND e.status = 'paid'
@@ -940,7 +958,17 @@ class Budget {
               AND ib.status != 'cancel'
           ), 0)::float8 AS total_budget,
           COALESCE((
-            SELECT SUM(e.total_amount)
+            SELECT COALESCE(SUM(e.total_amount), 0)
+              -- Settled abono of this record counts as its spent (see the
+              -- whole-account hero above for why).
+              + COALESCE((
+                SELECT SUM(ea.amount)
+                FROM employee_abono ea
+                JOIN budget_reference br2 ON br2.reference_id = ea.reference_id
+                WHERE ea.issued_ref_id = $2 AND ea.user_id = $1
+                  AND ea.status = 'settled'
+                  AND (ea.reference_id IS NULL OR br2.status = 'open')
+              ), 0)
             FROM expenses e
             LEFT JOIN budget_reference br ON br.reference_id = e.reference_id
             WHERE e.issued_ref_id = $2 AND e.user_id = $1 AND e.status = 'paid'
@@ -1070,11 +1098,13 @@ class Budget {
   // Each closed row also records its handover state in the same write:
   //   - `notes`: the submit dialog's optional note (keeps the row's existing
   //     notes when no note was given).
-  //   - `balance_forwarded`: that record's leftover at close time — live
-  //     issued children + OPEN abono − PAID expenses under open sources
-  //     (the per-record `balance` the reimbursement ledger displays; 0 stays
-  //     0). Computed BEFORE the status flips, in the same statement, so the
-  //     stored figure can never disagree with the pre-submit ledger.
+  //   - `balance_forwarded`: that record's leftover at close time — its own
+  //     live issued children + its own OPEN abono − its own PAID expenses −
+  //     its own SETTLED abono (consumed spend the settle flow re-booked as
+  //     issued), all keyed on `issued_ref_id = bir.id` so sibling records
+  //     sharing the source never leak into each other. Computed BEFORE the
+  //     status flips, in the same statement, so the stored figure can never
+  //     disagree with the pre-submit ledger (0 stays 0).
   // Resolves `{ closedCount }`.
   static async closeOpenIssuedReferences(userId, { note } = {}) {
     const result = await query(
@@ -1095,18 +1125,27 @@ class Budget {
                   SELECT SUM(ea.amount)
                     FROM employee_abono ea
                     JOIN budget_reference br2 ON br2.reference_id = ea.reference_id
-                   WHERE ea.user_id = bir.user_id
-                     AND ea.reference_id = bir.reference_id
+                   WHERE ea.issued_ref_id = bir.id
+                     AND ea.user_id = bir.user_id
                      AND ea.status = 'open'
                      AND br2.status = 'open'
                 ), 0)
                 - COALESCE((
                   SELECT SUM(e.total_amount)
                     FROM expenses e
-                    JOIN budget_reference br2 ON br2.reference_id = e.reference_id
-                   WHERE e.user_id = bir.user_id
-                     AND e.reference_id = bir.reference_id
+                    LEFT JOIN budget_reference br2 ON br2.reference_id = e.reference_id
+                   WHERE e.issued_ref_id = bir.id
+                     AND e.user_id = bir.user_id
                      AND e.status = 'paid'
+                     AND (e.reference_id IS NULL OR br2.status = 'open')
+                ), 0)
+                - COALESCE((
+                  SELECT SUM(ea.amount)
+                    FROM employee_abono ea
+                    JOIN budget_reference br2 ON br2.reference_id = ea.reference_id
+                   WHERE ea.issued_ref_id = bir.id
+                     AND ea.user_id = bir.user_id
+                     AND ea.status = 'settled'
                      AND br2.status = 'open'
                 ), 0)
               )
@@ -1499,13 +1538,30 @@ class Budget {
                      WHERE bir2.user_id = ea.user_id
                        AND bir2.reference_id = ea.reference_id
                        AND bir2.status = 'open'
-                       AND (ea.issued_ref_id IS NULL OR bir2.id = ea.issued_ref_id)
+                       AND bir2.id = ea.issued_ref_id
                    )
               ), 0)::float8 AS total_abono,
               COALESCE((
-                SELECT SUM(e.total_amount)
-                  FROM expenses e
-                  LEFT JOIN budget_reference br ON br.reference_id = e.reference_id
+                SELECT COALESCE(SUM(e.total_amount), 0)
+                  -- Settled abono is consumed spend (see the hero above):
+                  -- without this leg the guard approves take-backs against
+                  -- money that is already gone.
+                  + COALESCE((
+                    SELECT SUM(ea.amount)
+                    FROM employee_abono ea
+                    JOIN budget_reference br2 ON br2.reference_id = ea.reference_id
+                    WHERE ea.user_id = $1 AND ea.status = 'settled'
+                      AND br2.status = 'open'
+                      AND EXISTS (
+                        SELECT 1 FROM budget_issued_reference bir3
+                        WHERE bir3.user_id = ea.user_id
+                          AND bir3.reference_id = ea.reference_id
+                          AND bir3.status = 'open'
+                          AND bir3.id = ea.issued_ref_id
+                      )
+                  ), 0)
+                FROM expenses e
+                LEFT JOIN budget_reference br ON br.reference_id = e.reference_id
                  WHERE e.user_id = $1 AND e.status = 'paid'
                    AND (e.reference_id IS NULL OR br.status = 'open')
                    AND (e.reference_id IS NULL OR EXISTS (
@@ -1513,7 +1569,7 @@ class Budget {
                      WHERE bir2.user_id = e.user_id
                        AND bir2.reference_id = e.reference_id
                        AND bir2.status = 'open'
-                       AND (e.issued_ref_id IS NULL OR bir2.id = e.issued_ref_id)
+                       AND bir2.id = e.issued_ref_id
                    ))
               ), 0)::float8 AS total_expenses,
               COALESCE((
