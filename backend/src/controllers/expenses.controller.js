@@ -127,16 +127,18 @@ export const create = async (req, res, next) => {
     }
     // Tag the save with the picked source for both roles: admins tag the
     // budget reference they spent from, employees tag the reference their
-    // remaining balance was issued from. An employee may only tag a reference
-    // they hold an open issuance for — anything else is dropped to NULL.
-    // Either way the source must still be open: a closed source connects to
-    // no activity, so tagging it is refused instead of silently nulled.
+    // remaining balance was issued from. Either way the source must still
+    // be open: a closed source connects to no activity, so tagging it is
+    // refused instead of silently nulled.
     let referenceId = payload.reference_id ?? null;
     // Employee-only: the OPEN `budget_issued_reference.id` backing this
     // spend (same reference_id + same user_id, `status = 'open'`). Resolved
     // here from the verified token — never from the client — and stamped
     // onto every saved line. Admin saves keep NULL: their spend is drawn
-    // from the pool, not from a personal issuance.
+    // from the pool, not from a personal issuance. An employee may only
+    // spend from a source they hold an OPEN issuance for: a picked source
+    // with no open holding is refused (it would otherwise save untagged and
+    // connect to nothing while still counting in full).
     let issuedRefId = null;
     if (referenceId && !(await Budget.isReferenceOpen(referenceId))) {
       throw ApiError.conflict(
@@ -155,10 +157,12 @@ export const create = async (req, res, next) => {
       // `expenses.issued_ref_id` (see createExpenses below).
       const openHolding = held.find((row) => row.reference_id === referenceId);
       if (!openHolding) {
-        referenceId = null;
-      } else {
-        issuedRefId = openHolding.id;
+        throw ApiError.conflict(
+          "This budget source is no longer issued to you — pick the source currently issued to you and try again.",
+          "NO_OPEN_HOLDING",
+        );
       }
+      issuedRefId = openHolding.id;
     }
 
     // Employee-only backdated guard: a line dated before the FIRST budget

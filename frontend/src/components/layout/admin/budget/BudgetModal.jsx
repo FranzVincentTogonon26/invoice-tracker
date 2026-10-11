@@ -98,7 +98,13 @@ function ContextCard({ icon, title, subtitle, badge, badgeTone = "neutral" }) {
 }
 
 function BalanceCard({ summary, isLoading, referenceId, projection, exceeds }) {
-  const EMPTY = { allocated: 0, issued: 0, expenses: 0, balance: 0 };
+  const EMPTY = {
+    allocated: 0,
+    issued: 0,
+    expenses: 0,
+    employee_expenses: 0,
+    balance: 0,
+  };
 
   if (!referenceId) {
     return (
@@ -116,21 +122,36 @@ function BalanceCard({ summary, isLoading, referenceId, projection, exceeds }) {
     );
   }
 
+  // Loading mirror — same frame as the loaded card (header row with badge
+  // plus the 3-cell breakdown grid) so nothing shifts when the balance
+  // paints.
   if (isLoading) {
     return (
       <div className="rounded-2xl border border-[var(--border)] bg-[var(--surface-2)]/60 px-3.5 py-3 shadow-card">
         <div className="flex items-center gap-3">
           <div className="h-9 w-9 shrink-0 animate-pulse rounded-full bg-[var(--border)]" />
-          <div className="flex-1 space-y-1.5">
-            <div className="h-2.5 w-24 animate-pulse rounded bg-[var(--border)]" />
-            <div className="h-6 w-36 animate-pulse rounded bg-[var(--border)]" />
+          <div className="min-w-0 flex-1 space-y-1.5">
+            <div className="h-2.5 w-16 animate-pulse rounded bg-[var(--border)]" />
+            <div className="h-7 w-40 max-w-full animate-pulse rounded-lg bg-[var(--border)]" />
           </div>
+          <div className="h-6 w-20 shrink-0 animate-pulse rounded-full bg-[var(--border)]" />
+        </div>
+        <div className="mt-3 grid grid-cols-3 gap-2 border-t border-[var(--border)] pt-3">
+          {[0, 1, 2].map((i) => (
+            <div key={i} className="min-w-0 space-y-1.5">
+              <div className="h-2.5 w-14 animate-pulse rounded bg-[var(--border)]" />
+              <div className="h-4 w-20 max-w-full animate-pulse rounded bg-[var(--border)]" />
+            </div>
+          ))}
         </div>
       </div>
     );
   }
 
-  const { allocated, issued, expenses, balance } = summary ?? EMPTY;
+  // Employee spend for this source (display-only — it already left the
+  // source as `issued`, so it never enters `balance`).
+  const { allocated, issued, expenses, employee_expenses, balance } =
+    summary ?? EMPTY;
   const depleted = balance <= 0;
 
   return (
@@ -187,8 +208,11 @@ function BalanceCard({ summary, isLoading, referenceId, projection, exceeds }) {
         </div>
         <div className="min-w-0 text-right">
           <p className="type-eyebrow text-[var(--ink-muted)]">Expenses</p>
-          <p className="truncate text-sm font-medium tabular-nums">
-            {formatMoney(expenses)}
+          <p
+            className="truncate text-sm font-medium tabular-nums"
+            title="Combined admin + employee spend — the balance counts the admin leg only (employee spend already left as Issued)"
+          >
+            {formatMoney(Number(expenses) + Number(employee_expenses))}
           </p>
         </div>
       </div>

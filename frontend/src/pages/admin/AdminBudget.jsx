@@ -64,13 +64,40 @@ export default function AdminBudget() {
   const overviewBudget = overview.overviewBudget ?? [];
   const overviewIssuedBudget = overview.overviewIssuedBudget ?? [];
   const overviewExpenses = overview.overviewExpenses ?? [];
+  const overviewEmployeeExpenses = overview.overviewEmployeeExpenses ?? [];
+  const overviewForwarded = overview.overviewForwarded ?? [];
   const totalBudget = overview.totalBudget ?? 0;
   const totalIssued = overview.totalIssued ?? 0;
   const totalExpenses = overview.totalExpenses ?? 0;
+  const totalForwarded = overview.totalForwarded ?? 0;
 
-  // Balance = total budget − (total issued + total expenses)
+  // "My Expenses" breakdown shows both legs per open source: the admin spend
+  // (the headline total — employee spend already left as `issued`, so it is
+  // never added to the headline) plus a display-only employee row with that
+  // source's employee-spend total, so no spend stays invisible.
+  const expensesBreakdown = [
+    ...overviewExpenses.map((row, i) => ({
+      key: `admin-${row.reference_id ?? i}`,
+      label: row.label ?? "Untitled reference",
+      value: formatMoney(row.amount),
+      hint: formatDate(row.created_at),
+    })),
+    ...overviewEmployeeExpenses
+      .filter((row) => Number(row.amount || 0) !== 0)
+      .map((row) => ({
+        key: `employee-${row.reference_id ?? row.label ?? ""}`,
+        label: `${row.label ?? "Untitled reference"} · employee`,
+        value: formatMoney(row.amount),
+        hint: formatDate(row.created_at),
+      })),
+  ];
+
+  // Balance = total budget − total issued − total expenses + forwarded
+  // leftovers handed back by finalized (closed) holdings.
   const cashOnHand =
-    Number(totalBudget) - (Number(totalIssued) + Number(totalExpenses));
+    Number(totalBudget) -
+    (Number(totalIssued) + Number(totalExpenses)) +
+    Number(totalForwarded);
   const cashOnHandNum = Number(cashOnHand) || 0;
   const totalBudgetAmt = Number(totalBudget) || 0;
 
@@ -91,12 +118,17 @@ export default function AdminBudget() {
   const expensesByReference = new Map(
     overviewExpenses.map((row) => [row.reference_id, Number(row.amount || 0)]),
   );
-  // Per-reference remaining = allocated − issued − expenses (same formula as
-  // the headline balance, just scoped to each budget source).
+  const forwardedByReference = new Map(
+    overviewForwarded.map((row) => [row.reference_id, Number(row.amount || 0)]),
+  );
+  // Per-reference remaining = allocated − issued − expenses + forwarded
+  // (same formula as the headline balance, just scoped to each budget
+  // source — finalized holdings hand their leftover back).
   const cashOnHandBreakdown = overviewBudget.map((row, i) => {
     const issued = issuedByReference.get(row.reference_id) ?? 0;
     const spent = expensesByReference.get(row.reference_id) ?? 0;
-    const remaining = Number(row.amount || 0) - issued - spent;
+    const forwarded = forwardedByReference.get(row.reference_id) ?? 0;
+    const remaining = Number(row.amount || 0) - issued - spent + forwarded;
     return {
       key: i,
       label: row.label ?? "Untitled reference",
@@ -203,12 +235,7 @@ export default function AdminBudget() {
               icon={ReceiptText}
               loading={isLoading}
               breakdownCaption="Expenses"
-              breakdown={overviewExpenses.map((row, i) => ({
-                key: i,
-                label: row.label ?? "Untitled reference",
-                value: formatMoney(row.amount),
-                hint: formatDate(row.created_at),
-              }))}
+              breakdown={expensesBreakdown}
             />
           </motion.div>
 

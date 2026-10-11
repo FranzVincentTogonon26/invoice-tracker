@@ -44,17 +44,15 @@ class EmployeeOverview {
     if (issuedRefId) {
       return this.employeeOverviewByIssuedRef(userId, issuedRefId, { search });
     }
-    // Overview view (`…/employees/:userId/overview`, `view = 'overview'`):
-    // `openOnly` keys the whole page on the user's OPEN holdings
-    // (`budget_issued_reference.status = 'open'`) — closed holdings leave no
-    // footsteps in sums OR lists. Defaults off so the employee-facing pages
-    // (which keep closed-holding history visible) never change.
-    // Closed sources leave no footsteps, and closed holdings stop funding
-    // the hero: every money sum below only counts rows under an open source
-    // through an OPEN holding (untagged expenses excepted). The feed legs
-    // filter lighter on purpose — closed-holding spent/abono history stays
-    // listed (see each leg). Untagged expenses (reference_id IS NULL)
-    // connect to no source and stay visible everywhere.
+    // Whole-account view: every leg keys on the user's OPEN holdings
+    // (`budget_issued_reference.status = 'open'`) for the same
+    // (reference_id, user_id), then pins the child row through
+    // `issued_ref_id = budget_issued_reference.id`. Closed holdings leave no
+    // footsteps in sums OR lists. (`openOnly` is accepted for API
+    // compatibility — the base path is already strict so it adds nothing.)
+    // Closed sources leave no footsteps either. Untagged expenses
+    // (reference_id IS NULL) connect to no source and stay visible
+    // everywhere.
     const statsResult = await query(
       `SELECT
           COALESCE((
@@ -79,20 +77,20 @@ class EmployeeOverview {
             LEFT JOIN budget_reference br ON br.reference_id = e.reference_id
             WHERE e.user_id = $1 AND e.status = 'paid'
               AND (e.reference_id IS NULL OR br.status = 'open')
-              -- Holding-gated: a tagged expense only counts while the
-              -- employee still holds an OPEN issuance for its source. Once
+              -- Holding-gated through the expense's own issuance record: a
+              -- tagged expense only counts while it connects to an OPEN
+              -- budget_issued_reference row for the same
+              -- (reference_id, user_id) via issued_ref_id = bir.id. Once
               -- the holding closes, the line leaves the feed AND the hero
               -- together. Untagged lines connect to no holding and always
-              -- count. Pinned to the expense's own holding when stamped
-              -- (new saves carry issued_ref_id); legacy NULL rows fall back
-              -- to any open holding for the source.
+              -- count.
               AND (e.reference_id IS NULL OR EXISTS (
                 SELECT 1
                   FROM budget_issued_reference bir2
                  WHERE bir2.user_id = e.user_id
                    AND bir2.reference_id = e.reference_id
                    AND bir2.status = 'open'
-                   AND (e.issued_ref_id IS NULL OR bir2.id = e.issued_ref_id)
+                   AND bir2.id = e.issued_ref_id
               ))
           ), 0)::float8 AS total_expenses,
           COALESCE((
@@ -109,7 +107,7 @@ class EmployeeOverview {
                  WHERE bir2.user_id = e.user_id
                    AND bir2.reference_id = e.reference_id
                    AND bir2.status = 'open'
-                   AND (e.issued_ref_id IS NULL OR bir2.id = e.issued_ref_id)
+                   AND bir2.id = e.issued_ref_id
               ))
           ), 0)::int AS expense_count,
           COALESCE((
@@ -119,14 +117,16 @@ class EmployeeOverview {
             WHERE ea.user_id = $1 AND ea.status = 'open'
               AND br.status = 'open'
               -- Holding-gated like expenses above: open abono only funds
-              -- the hero while its source holding is still open. Closed
-              -- holdings keep their abono rows listed in the feed.
+              -- the hero while it connects to its own OPEN issuance record
+              -- (issued_ref_id = bir.id). Closed holdings fund neither the
+              -- hero nor the feed.
               AND EXISTS (
                 SELECT 1
                   FROM budget_issued_reference bir2
                  WHERE bir2.user_id = ea.user_id
                    AND bir2.reference_id = ea.reference_id
                    AND bir2.status = 'open'
+                   AND bir2.id = ea.issued_ref_id
               )
           ), 0)::float8 AS total_abono,
           COALESCE((
@@ -139,7 +139,9 @@ class EmployeeOverview {
           COALESCE((
             SELECT SUM(bt.amount)
             FROM budget_transfer bt
-            ${openOnly ? "JOIN budget_issued_reference birf ON birf.id = bt.issued_ref_id AND birf.status = 'open' AND birf.user_id = bt.user_id" : ""}
+            JOIN budget_issued_reference birf ON birf.id = bt.issued_ref_id
+              AND birf.status = 'open'
+              AND birf.user_id = bt.user_id
             WHERE bt.user_id = $1 AND bt.status = 'success'
           ), 0)::float8 AS total_sent,
           COALESCE((
@@ -179,18 +181,12 @@ class EmployeeOverview {
       )`;
     }
 
-    // Overview view (`openOnly`): closed holdings leave the feed too, so the
-    // list can never disagree with the open-only hero above. Default feeds
-    // keep closed-holding history visible (employee pages rely on it).
-    const openHoldingGate = openOnly ? "AND bir.status = 'open'" : "";
     const txQuery = `
       WITH all_tx AS (
-        -- 1. Budget Issued transactions (open sources only — holdings under
-        --    a cut-off source leave no footsteps here). Closed holdings list
-        --    by default (history stays visible); openOnly (overview view)
-        --    hides them so the list matches the open-only hero. The hero
-        --    total above is always open-holding-gated. issued_ref_id is the
-        --    issuance record id.
+        -- 1. Budget Issued transactions (open sources AND open holdings
+        --    only — holdings under a cut-off source, or closed holdings,
+        --    leave no footsteps here). issued_ref_id is the issuance
+        --    record id.
         SELECT
           ib.id,
           'issued' AS kind,
@@ -219,7 +215,7 @@ class EmployeeOverview {
         JOIN budget_reference br ON br.reference_id = bir.reference_id
           AND br.status = 'open'
         WHERE bir.user_id = $1
-          ${openHoldingGate}
+          AND bir.status = 'open'
 
         UNION ALL
 
@@ -254,24 +250,24 @@ class EmployeeOverview {
         LEFT JOIN budget_reference br ON br.reference_id = e.reference_id
         WHERE e.user_id = $1
           AND (e.reference_id IS NULL OR br.status = 'open')
-          -- Display gate: tagged lines list only while their holding is
-          -- still OPEN (pinned to the line's own issued_ref_id when stamped,
-          -- legacy NULL rows fall back to any open holding for the source).
+          -- Display gate: a tagged line lists only while it connects to its
+          -- own OPEN issuance record (issued_ref_id = bir.id for the same
+          -- reference_id + user_id). Untagged lines connect to no holding
+          -- and always list.
           AND (e.reference_id IS NULL OR EXISTS (
             SELECT 1
               FROM budget_issued_reference bir2
              WHERE bir2.user_id = e.user_id
                AND bir2.reference_id = e.reference_id
                AND bir2.status = 'open'
-               AND (e.issued_ref_id IS NULL OR bir2.id = e.issued_ref_id)
+               AND bir2.id = e.issued_ref_id
           ))
 
         UNION ALL
 
-        -- 3. Abono transactions (open sources only — including rows whose
-        --    holding has since closed; abono keeps full history while only
-        --    open-holding rows fund the hero total above). openOnly
-        --    (overview view) hides closed-holding rows too.
+        -- 3. Abono transactions (open sources only, through each row's own
+        --    OPEN issuance record — closed holdings fund neither the hero
+        --    nor this list).
         SELECT
           ea.id,
           'abono' AS kind,
@@ -295,13 +291,20 @@ class EmployeeOverview {
         JOIN budget_reference br ON br.reference_id = ea.reference_id
           AND br.status = 'open'
         WHERE ea.user_id = $1
-          ${openOnly ? "AND EXISTS (SELECT 1 FROM budget_issued_reference bir2 WHERE bir2.user_id = ea.user_id AND bir2.reference_id = ea.reference_id AND bir2.status = 'open' AND (ea.issued_ref_id IS NULL OR bir2.id = ea.issued_ref_id))" : ""}
+          AND EXISTS (
+            SELECT 1
+              FROM budget_issued_reference bir2
+             WHERE bir2.user_id = ea.user_id
+               AND bir2.reference_id = ea.reference_id
+               AND bir2.status = 'open'
+               AND bir2.id = ea.issued_ref_id
+          )
 
         UNION ALL
 
         -- 4. Budget transfers sent — money leaving this employee's pool
-        --    (open sources only). openOnly (overview view) counts only moves
-        --    funded by an OPEN holding (joined through issued_ref_id).
+        --    (open sources only, funded by an OPEN holding joined through
+        --    issued_ref_id).
         SELECT
           bt.id,
           'transfer' AS kind,
@@ -326,7 +329,9 @@ class EmployeeOverview {
           ru.name AS counterparty
         FROM budget_transfer bt
         LEFT JOIN users ru ON ru.user_id = bt.transfer_to
-        ${openOnly ? "JOIN budget_issued_reference birf ON birf.id = bt.issued_ref_id AND birf.status = 'open' AND birf.user_id = bt.user_id" : ""}
+        JOIN budget_issued_reference birf ON birf.id = bt.issued_ref_id
+          AND birf.status = 'open'
+          AND birf.user_id = bt.user_id
         WHERE bt.user_id = $1 AND bt.status = 'success'
 
         UNION ALL

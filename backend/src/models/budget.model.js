@@ -10,6 +10,12 @@ class Budget {
     // Closed sources leave no footsteps: every leg joins its
     // budget_reference with `br.status = 'open'`, so a cut-off source and
     // everything under it vanish from display AND from the totals.
+    // Every OPEN reference lists — even with zero (or only cancelled)
+    // allocations: the cancelled filter lives in the JOIN, not the WHERE,
+    // so the LEFT JOIN stays a real outer join and empty references read 0
+    // instead of vanishing. The page wires each reference to its related
+    // issuances/expenses (zero-filled when none) for the per-source
+    // remaining breakdown.
     const overviewBudget = await query(
       `SELECT
           br.reference_id,
@@ -18,13 +24,17 @@ class Budget {
           COALESCE(SUM(b.amount), 0) AS amount
        FROM budget_reference br
        LEFT JOIN budget b ON b.reference_id = br.reference_id
-       WHERE b.status != 'cancelled'
-         AND br.status = 'open'
+         AND b.status != 'cancelled'
+       WHERE br.status = 'open'
        GROUP BY br.reference_id, br.label, br.created_at
        ORDER BY br.created_at DESC`,
       [],
     );
 
+    // Issued transactions list whether their holding is open OR closed —
+    // only the source gates them (`budget_reference.status = 'open'`) plus
+    // live children (`issued_budget.status != 'cancel'`). A finalized
+    // (closed) holding's handed-out budget still counts as issued.
     const overviewIssuedBudget = await query(
       `SELECT
           br.reference_id,
@@ -34,9 +44,28 @@ class Budget {
        FROM budget_issued_reference bir
        JOIN issued_budget i ON i.issued_ref_id = bir.id
        JOIN budget_reference br ON br.reference_id = bir.reference_id
-       WHERE bir.status = 'open'
-         AND br.status = 'open'
+       WHERE br.status = 'open'
          AND i.status != 'cancel'
+       GROUP BY br.reference_id, br.label, br.created_at
+       ORDER BY br.created_at DESC`,
+      [],
+    );
+
+    // Forwarded leftovers handed back by finalized holdings (`status =
+    // 'close') under open sources — spendable again. Every OPEN reference
+    // lists (0 when nothing was forwarded). Added back into remaining
+    // wherever issued counts closed holdings too, so finalized money is
+    // never subtracted without its handover being added back.
+    const overviewForwarded = await query(
+      `SELECT
+          br.reference_id,
+          br.label,
+          br.created_at,
+          COALESCE(SUM(bir.balance_forwarded), 0) AS amount
+       FROM budget_reference br
+       LEFT JOIN budget_issued_reference bir ON bir.reference_id = br.reference_id
+         AND bir.status = 'close'
+       WHERE br.status = 'open'
        GROUP BY br.reference_id, br.label, br.created_at
        ORDER BY br.created_at DESC`,
       [],
@@ -44,6 +73,27 @@ class Budget {
 
     // Employee rows are excluded — their spend already left the reference as
     // `issued` (see referenceBalance below).
+    // Display-only mirror for the page: the same per-source sums for
+    // EMPLOYEE-authored rows. These never enter `totalExpenses` (that would
+    // double-subtract against `issued`) — they only render as extra
+    // breakdown rows so every source's employee spend stays visible.
+    const overviewEmployeeExpenses = await query(
+      `SELECT
+          br.reference_id,
+          br.label,
+          br.created_at,
+          COALESCE(SUM(e.total_amount), 0) AS amount
+       FROM budget_reference br
+       LEFT JOIN expenses e ON e.reference_id = br.reference_id
+         AND EXISTS (
+          SELECT 1 FROM users u
+           WHERE u.user_id = e.user_id AND u.role = 'employee'
+        )
+       WHERE br.status = 'open'
+       GROUP BY br.reference_id, br.label, br.created_at
+       ORDER BY br.created_at DESC`,
+      [],
+    );
     const overviewExpenses = await query(
       `SELECT
           br.reference_id,
@@ -75,6 +125,10 @@ class Budget {
       (sum, row) => sum + Number(row.amount || 0),
       0,
     );
+    const totalForwarded = overviewForwarded.rows.reduce(
+      (sum, row) => sum + Number(row.amount || 0),
+      0,
+    );
 
     // Return `.rows` (not the raw pg result) so the API payload is a plain
     // array — the frontend consumes these directly.
@@ -82,9 +136,12 @@ class Budget {
       overviewBudget: overviewBudget.rows,
       overviewIssuedBudget: overviewIssuedBudget.rows,
       overviewExpenses: overviewExpenses.rows,
+      overviewEmployeeExpenses: overviewEmployeeExpenses.rows,
+      overviewForwarded: overviewForwarded.rows,
       totalBudget,
       totalIssued,
       totalExpenses,
+      totalForwarded,
     };
   }
 
@@ -523,11 +580,21 @@ class Budget {
   // Balance summary for one budget_reference:
   // - `allocated`: SUM(budget.amount) — total funds added to this reference
   // - `issued`:    SUM(issued_budget.amount) — funds already handed out via
-  //                budget_issued_reference rows tied to this reference
+  //                budget_issued_reference rows tied to this reference, open
+  //                OR closed holdings alike (handed-out money left the source
+  //                either way — only the source itself gates this, plus live
+  //                children)
   // - `expenses`:  SUM(expenses.total_amount) — funds already spent against
   //                this reference by saved expenses
-  // - `balance`:   allocated - issued - expenses (what can still be issued),
-  //                the same formula the AdminBudget overview uses.
+  // - `employee_expenses`: display-only SUM of PAID expenses authored by
+  //                employees for this reference. Never enters `balance`
+  //                (that spend already left as `issued` — adding it would
+  //                double-subtract); rendered as its own line so employee
+  //                spend stays visible.
+  // - `forwarded`: SUM(budget_issued_reference.balance_forwarded) — leftovers
+  //                handed back by finalized (`close`) holdings, spendable again
+  // - `balance`:   allocated - issued - expenses + forwarded (what can still
+  //                be issued), the same formula the AdminBudget overview uses.
   // Scalar subqueries with COALESCE keep empty references at 0 instead of NULL
   // (SUM returns NULL over zero rows).
   //
@@ -538,7 +605,7 @@ class Budget {
   static async referenceBalance(referenceId) {
     // A closed source has no balance to show — nobody, no footsteps.
     if (!(await Budget.isReferenceOpen(referenceId))) {
-      return { allocated: 0, issued: 0, expenses: 0, balance: 0 };
+      return { allocated: 0, issued: 0, expenses: 0, employee_expenses: 0, forwarded: 0, balance: 0 };
     }
     const result = await query(
       `SELECT
@@ -551,7 +618,7 @@ class Budget {
             SELECT SUM(i.amount)
             FROM issued_budget i
             JOIN budget_issued_reference bir ON i.issued_ref_id = bir.id
-            WHERE bir.status = 'open' AND bir.reference_id = $1
+            WHERE bir.reference_id = $1
               AND i.status != 'cancel'
           ), 0) AS issued,
           COALESCE((
@@ -562,19 +629,38 @@ class Budget {
                 SELECT 1 FROM users u
                  WHERE u.user_id = e.user_id AND u.role = 'employee'
               )
-          ), 0) AS expenses`,
+          ), 0) AS expenses,
+          COALESCE((
+            SELECT SUM(e.total_amount)
+            FROM expenses e
+            WHERE e.reference_id = $1  AND e.status = 'paid'
+              AND EXISTS (
+                SELECT 1 FROM users u
+                 WHERE u.user_id = e.user_id AND u.role = 'employee'
+              )
+          ), 0) AS employee_expenses,
+          COALESCE((
+            SELECT SUM(bir.balance_forwarded)
+            FROM budget_issued_reference bir
+            WHERE bir.reference_id = $1
+              AND bir.status = 'close'
+          ), 0) AS forwarded`,
       [referenceId],
     );
 
-    const row = result.rows[0] ?? { allocated: 0, issued: 0, expenses: 0 };
+    const row = result.rows[0] ?? { allocated: 0, issued: 0, expenses: 0, employee_expenses: 0, forwarded: 0 };
     const allocated = Number(row.allocated);
     const issued = Number(row.issued);
     const expenses = Number(row.expenses);
+    const employeeExpenses = Number(row.employee_expenses);
+    const forwarded = Number(row.forwarded);
     return {
       allocated,
       issued,
       expenses,
-      balance: allocated - issued - expenses,
+      employee_expenses: employeeExpenses,
+      forwarded,
+      balance: allocated - issued - expenses + forwarded,
     };
   }
 
@@ -634,10 +720,12 @@ class Budget {
     if (issuedRefId) {
       return this.employeeBudgetByIssuedRef(userId, issuedRefId, { search });
     }
-    // Overview view (`openOnly`): every leg keys on the user's OPEN holdings
-    // (`budget_issued_reference.status = 'open'`) — closed holdings leave no
-    // footsteps in sums OR lists. Defaults off so employee-facing pages keep
-    // showing full history.
+    // Whole-account view: every leg keys on the user's OPEN holdings for
+    // the same (reference_id, user_id) — `budget_issued_reference.status =
+    // 'open'` — then pins the child row through `issued_ref_id =
+    // budget_issued_reference.id`. Closed holdings leave no footsteps in
+    // sums OR lists. (`openOnly` is accepted for API compatibility — the base
+    // path is already strict so it adds nothing.)
     // Overview mirrors employee.overview.model: the hero reads money the
     // employee still HOLDS (open issuances only) and the "Remaining" mini
     // stat reads the SAME balance the Overview page hero shows —
@@ -662,7 +750,14 @@ class Budget {
             LEFT JOIN budget_reference br ON br.reference_id = e.reference_id
             WHERE e.user_id = $1 AND e.status = 'paid'
               AND (e.reference_id IS NULL OR br.status = 'open')
-              ${openOnly ? "AND (e.reference_id IS NULL OR EXISTS (SELECT 1 FROM budget_issued_reference bir2 WHERE bir2.user_id = e.user_id AND bir2.reference_id = e.reference_id AND bir2.status = 'open' AND (e.issued_ref_id IS NULL OR bir2.id = e.issued_ref_id)))" : ""}
+              AND (e.reference_id IS NULL OR EXISTS (
+                SELECT 1
+                  FROM budget_issued_reference bir2
+                 WHERE bir2.user_id = e.user_id
+                   AND bir2.reference_id = e.reference_id
+                   AND bir2.status = 'open'
+                   AND bir2.id = e.issued_ref_id
+              ))
           ), 0)::float8 AS total_expenses,
           COALESCE((
             SELECT SUM(ea.amount)
@@ -670,12 +765,21 @@ class Budget {
             JOIN budget_reference br ON br.reference_id = ea.reference_id
             WHERE ea.user_id = $1 AND ea.status = 'open'
               AND br.status = 'open'
-              ${openOnly ? "AND EXISTS (SELECT 1 FROM budget_issued_reference bir2 WHERE bir2.user_id = ea.user_id AND bir2.reference_id = ea.reference_id AND bir2.status = 'open' AND (ea.issued_ref_id IS NULL OR bir2.id = ea.issued_ref_id))" : ""}
+              AND EXISTS (
+                SELECT 1
+                  FROM budget_issued_reference bir2
+                 WHERE bir2.user_id = ea.user_id
+                   AND bir2.reference_id = ea.reference_id
+                   AND bir2.status = 'open'
+                   AND bir2.id = ea.issued_ref_id
+              )
           ), 0)::float8 AS total_abono,
           COALESCE((
             SELECT SUM(bt.amount)
             FROM budget_transfer bt
-            ${openOnly ? "JOIN budget_issued_reference birf ON birf.id = bt.issued_ref_id AND birf.status = 'open' AND birf.user_id = bt.user_id" : ""}
+            JOIN budget_issued_reference birf ON birf.id = bt.issued_ref_id
+              AND birf.status = 'open'
+              AND birf.user_id = bt.user_id
             WHERE bt.user_id = $1 AND bt.status = 'success'
           ), 0)::float8 AS total_sent,
           COALESCE((
@@ -736,7 +840,7 @@ class Budget {
            JOIN budget_reference br ON br.reference_id = bir.reference_id
               AND br.status = 'open'
           WHERE bir.user_id = $1
-            ${openOnly ? "AND bir.status = 'open'" : ""}
+            AND bir.status = 'open'
         UNION ALL
          SELECT
             bt.id,
@@ -760,7 +864,9 @@ class Budget {
            FROM budget_transfer bt
            LEFT JOIN budget_reference br ON br.reference_id = bt.reference_id
            LEFT JOIN users ru ON ru.user_id = bt.transfer_to
-           ${openOnly ? "JOIN budget_issued_reference birf ON birf.id = bt.issued_ref_id AND birf.status = 'open' AND birf.user_id = bt.user_id" : ""}
+           JOIN budget_issued_reference birf ON birf.id = bt.issued_ref_id
+             AND birf.status = 'open'
+             AND birf.user_id = bt.user_id
           WHERE bt.user_id = $1 AND bt.status = 'success'
             AND br.status = 'open'
         UNION ALL
@@ -1192,18 +1298,24 @@ class Budget {
               SELECT SUM(i.amount)
                  FROM budget_issued_reference bir
                  JOIN issued_budget i ON i.issued_ref_id = bir.id
-                WHERE bir.reference_id = $1 AND bir.status = 'open'
+                WHERE bir.reference_id = $1
                   AND i.status != 'cancel'
              ), 0)::float8 AS issued,
               COALESCE((
-                SELECT SUM(e.total_amount)
-                  FROM expenses e
-                 WHERE e.reference_id = $1
-                   AND NOT EXISTS (
-                     SELECT 1 FROM users u
-                      WHERE u.user_id = e.user_id AND u.role = 'employee'
-                   )
-              ), 0)::float8 AS spent`,
+              SELECT SUM(e.total_amount)
+                 FROM expenses e
+                WHERE e.reference_id = $1
+                  AND NOT EXISTS (
+                    SELECT 1 FROM users u
+                     WHERE u.user_id = e.user_id AND u.role = 'employee'
+                  )
+             ), 0)::float8 AS spent,
+              COALESCE((
+                SELECT SUM(bir.balance_forwarded)
+                  FROM budget_issued_reference bir
+                 WHERE bir.reference_id = $1
+                   AND bir.status = 'close'
+             ), 0)::float8 AS forwarded`,
           [previous.reference_id],
         )
       ).rows[0] ?? {};
@@ -1211,7 +1323,8 @@ class Budget {
       const remaining = toMoney(
         Number(pool.allocated || 0) -
           Number(pool.issued || 0) -
-          Number(pool.spent || 0),
+          Number(pool.spent || 0) +
+          Number(pool.forwarded || 0),
       );
       const amount = toMoney(previous.amount);
 

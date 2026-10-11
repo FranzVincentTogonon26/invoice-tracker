@@ -321,10 +321,16 @@ class BudgetTransfer {
                 FROM budget_issued_reference bir
                 JOIN issued_budget ib ON ib.issued_ref_id = bir.id
                 JOIN budget_reference br ON br.reference_id = bir.reference_id
-               WHERE bir.status = 'open'
-                 AND br.status = 'open'
+               WHERE br.status = 'open'
                  AND ib.status != 'cancel'
             ), 0)::float8 AS issued,
+            COALESCE((
+              SELECT SUM(bir.balance_forwarded)
+                FROM budget_issued_reference bir
+                JOIN budget_reference br ON br.reference_id = bir.reference_id
+               WHERE bir.status = 'close'
+                 AND br.status = 'open'
+            ), 0)::float8 AS forwarded,
             COALESCE((
               SELECT SUM(e.total_amount)
                 FROM expenses e
@@ -349,7 +355,8 @@ class BudgetTransfer {
           Number(pool.allocated || 0) -
             Number(pool.issued || 0) -
             Number(pool.expenses || 0) -
-            Number(pool.admin_sent || 0),
+            Number(pool.admin_sent || 0) +
+            Number(pool.forwarded || 0),
         );
 
         if (requested > totalBalance) {
@@ -379,11 +386,16 @@ class BudgetTransfer {
                   ), 0)
                   - COALESCE((
                     SELECT SUM(ib.amount)
-                      FROM budget_issued_reference bir
-                      JOIN issued_budget ib ON ib.issued_ref_id = bir.id
-                     WHERE bir.status = 'open'
-                       AND bir.reference_id = br.reference_id
+                     FROM budget_issued_reference bir
+                     JOIN issued_budget ib ON ib.issued_ref_id = bir.id
+                     WHERE bir.reference_id = br.reference_id
                        AND ib.status != 'cancel'
+                  ), 0)
+                  + COALESCE((
+                    SELECT SUM(bir.balance_forwarded)
+                     FROM budget_issued_reference bir
+                     WHERE bir.reference_id = br.reference_id
+                       AND bir.status = 'close'
                   ), 0)
                   - COALESCE((
                     SELECT SUM(e.total_amount)

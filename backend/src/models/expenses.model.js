@@ -782,10 +782,13 @@ class Expenses {
 
     // Abono grouped by the budget reference it was booked against. Only OPEN
     // rows fund the employee (settled/draft rows are reimbursed or parked —
-    // same rule as the dashboard totals), and abono sitting on a reference
-    // without an open issuance still funds the employee, so it is credited to
-    // the oldest open source instead of silently disappearing. Abono booked
-    // to a cut-off source connects to nothing and never credits any source.
+    // same rule as the dashboard totals), and only through the row's own OPEN
+    // issuance record for the same (reference_id, user_id) via
+    // `issued_ref_id = budget_issued_reference.id` (`status = 'open'`).
+    // Abono under a closed holding — or on a reference with no open holding
+    // at all — funds nothing and is never credited to another source. Abono
+    // booked to a cut-off source connects to nothing and never credits any
+    // source.
     const abono = await query(
       `SELECT ea.reference_id,
               COALESCE(SUM(ea.amount), 0)::float8 AS abono
@@ -793,6 +796,13 @@ class Expenses {
          JOIN budget_reference br ON br.reference_id = ea.reference_id
         WHERE ea.user_id = $1 AND ea.status = 'open'
           AND br.status = 'open'
+          AND EXISTS (
+            SELECT 1 FROM budget_issued_reference bir2
+            WHERE bir2.user_id = ea.user_id
+              AND bir2.reference_id = ea.reference_id
+              AND bir2.status = 'open'
+              AND bir2.id = ea.issued_ref_id
+          )
         GROUP BY ea.reference_id`,
       [userId],
     );
@@ -809,17 +819,22 @@ class Expenses {
     }
 
     // Budget transfers (success only): money the employee sent out behaves
-    // like spent, money received behaves like additional funding. Neither is
-    // tagged with a reference, so sent joins the untagged spend pool below
-    // (spread oldest-first, capped at what each source received) and received
-    // is credited to the oldest open source — the same treatment untagged
-    // expenses and orphan abono already get. Without this the Add Expenses
-    // balance card would disagree with the Overview remaining balance.
+    // like spent, money received behaves like additional funding. Sent moves
+    // join the untagged spend pool below (spread oldest-first, capped at what
+    // each source received) — but only moves funded by an OPEN holding
+    // (`issued_ref_id` into a `status = 'open'` record for the sender).
+    // Received is credited to the oldest open source (inbound money carries
+    // the sender's record id, never a holding of this employee). Without
+    // this the Add Expenses balance card would disagree with the Overview
+    // remaining balance.
     const transfers = await query(
       `SELECT
           COALESCE((
             SELECT SUM(bt.amount)
               FROM budget_transfer bt
+              JOIN budget_issued_reference birf ON birf.id = bt.issued_ref_id
+                AND birf.status = 'open'
+                AND birf.user_id = bt.user_id
              WHERE bt.user_id = $1 AND bt.status = 'success'
           ), 0)::float8 AS sent,
           COALESCE((
@@ -835,17 +850,29 @@ class Expenses {
       sources[0].abono = toMoney(sources[0].abono + received);
     }
 
-    // The employee ledger grouped by reference: rows tagged with an open
-    // reference are charged to it directly, everything else (legacy saves that
-    // carry no tag, or a reference the employee no longer holds) is spread
-    // oldest-source-first, capped at what each source received so no source
-    // ever offers more cash than the pool holds. Grouping by reference_id also
-    // picks up the NULL bucket, i.e. the untagged ledger.
+    // The employee ledger grouped by reference: tagged rows charge to their
+    // source only while connected to their own OPEN issuance record for the
+    // same (reference_id, user_id) via `issued_ref_id`
+    // (`budget_issued_reference.status = 'open'`) — spend under closed
+    // holdings or cut-off sources never reaches any source. Untagged rows
+    // (reference_id IS NULL) connect to no holding and join the spread pool
+    // below (oldest-source-first, capped at what each source received so no
+    // source ever offers more cash than the pool holds). Grouping by
+    // reference_id also picks up the NULL bucket, i.e. the untagged ledger.
     const spend = await query(
       `SELECT e.reference_id,
               COALESCE(SUM(e.total_amount), 0)::float8 AS expenses
          FROM expenses e
+         LEFT JOIN budget_reference br ON br.reference_id = e.reference_id
         WHERE e.user_id = $1 AND e.status = 'paid'
+          AND (e.reference_id IS NULL OR br.status = 'open')
+          AND (e.reference_id IS NULL OR EXISTS (
+            SELECT 1 FROM budget_issued_reference bir2
+            WHERE bir2.user_id = e.user_id
+              AND bir2.reference_id = e.reference_id
+              AND bir2.status = 'open'
+              AND bir2.id = e.issued_ref_id
+          ))
         GROUP BY e.reference_id`,
       [userId],
     );
@@ -900,17 +927,19 @@ class Expenses {
       params.push(issuedRefId);
       where.push(`e.issued_ref_id = $${params.length}::uuid`);
     }
-    // Overview view (`openOnly`): tagged rows list only while their holding
-    // is still OPEN (`budget_issued_reference.status = 'open'`, pinned to the
-    // row's own `issued_ref_id` when stamped). Defaults off so employee pages
-    // keep showing full history.
-    if (openOnly && !issuedRefId) {
+    // Whole-account view: a tagged row lists only while it connects to its
+    // own OPEN issuance record for the same (reference_id, user_id) via
+    // issued_ref_id = budget_issued_reference.id (`status = 'open'`).
+    // Untagged rows connect to no holding and always list. (`openOnly` is
+    // accepted for API compatibility — the base path is already strict so it
+    // adds nothing.)
+    if (!issuedRefId) {
       where.push(`(e.reference_id IS NULL OR EXISTS (
         SELECT 1 FROM budget_issued_reference bir2
         WHERE bir2.user_id = e.user_id
           AND bir2.reference_id = e.reference_id
           AND bir2.status = 'open'
-          AND (e.issued_ref_id IS NULL OR bir2.id = e.issued_ref_id)
+          AND bir2.id = e.issued_ref_id
       ))`);
     }
     // Closed sources leave no footsteps: rows tagged to a cut-off source
@@ -974,8 +1003,12 @@ class Expenses {
     // Record-scoped view (`issuedRefId`): every sum is keyed on
     // `budget_issued_reference.id` via `issued_ref_id`; received transfers are
     // excluded (they carry the sender's issuance id).
-    // Overview view (`openOnly`): same whole-account sums but every leg keys
-    // on OPEN holdings only.
+    // Whole-account sums key every leg on the user's OPEN holdings for the
+    // same (reference_id, user_id), pinning tagged rows through
+    // `issued_ref_id = budget_issued_reference.id` (`status = 'open'`).
+    // Untagged expenses connect to no holding and always count. (`openOnly`
+    // is accepted for API compatibility — the base path is already strict
+    // so it adds nothing.)
     const stats = issuedRefId
       ? await query(
           `SELECT
@@ -1034,12 +1067,21 @@ class Expenses {
               JOIN budget_reference br ON br.reference_id = ea.reference_id
               WHERE ea.user_id = $1 AND ea.status = 'open'
                 AND br.status = 'open'
-                ${openOnly ? "AND EXISTS (SELECT 1 FROM budget_issued_reference bir2 WHERE bir2.user_id = ea.user_id AND bir2.reference_id = ea.reference_id AND bir2.status = 'open' AND (ea.issued_ref_id IS NULL OR bir2.id = ea.issued_ref_id))" : ""}
+                AND EXISTS (
+                  SELECT 1
+                    FROM budget_issued_reference bir2
+                   WHERE bir2.user_id = ea.user_id
+                     AND bir2.reference_id = ea.reference_id
+                     AND bir2.status = 'open'
+                     AND bir2.id = ea.issued_ref_id
+                )
             ), 0)::float8 AS total_abono,
             COALESCE((
               SELECT SUM(bt.amount)
               FROM budget_transfer bt
-              ${openOnly ? "JOIN budget_issued_reference birf ON birf.id = bt.issued_ref_id AND birf.status = 'open' AND birf.user_id = bt.user_id" : ""}
+              JOIN budget_issued_reference birf ON birf.id = bt.issued_ref_id
+                AND birf.status = 'open'
+                AND birf.user_id = bt.user_id
               WHERE bt.user_id = $1 AND bt.status = 'success'
             ), 0)::float8 AS total_sent,
             COALESCE((
@@ -1051,7 +1093,14 @@ class Expenses {
          LEFT JOIN budget_reference br ON br.reference_id = e.reference_id
         WHERE e.user_id = $1 AND e.status = 'paid'
           AND (e.reference_id IS NULL OR br.status = 'open')
-          ${openOnly ? "AND (e.reference_id IS NULL OR EXISTS (SELECT 1 FROM budget_issued_reference bir2 WHERE bir2.user_id = e.user_id AND bir2.reference_id = e.reference_id AND bir2.status = 'open' AND (e.issued_ref_id IS NULL OR bir2.id = e.issued_ref_id)))" : ""}`,
+          AND (e.reference_id IS NULL OR EXISTS (
+            SELECT 1
+              FROM budget_issued_reference bir2
+             WHERE bir2.user_id = e.user_id
+               AND bir2.reference_id = e.reference_id
+               AND bir2.status = 'open'
+               AND bir2.id = e.issued_ref_id
+          ))`,
       [userId],
     );
 

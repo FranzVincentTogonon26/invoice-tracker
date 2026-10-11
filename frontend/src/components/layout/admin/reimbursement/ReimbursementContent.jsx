@@ -172,10 +172,7 @@ export function AdminEmployeeReimbursementDetails() {
               <div className="h-5 w-24 animate-pulse rounded-full bg-[var(--border)]" />
             </div>
           </div>
-          <div
-            aria-hidden
-            className="min-w-0 p-4 sm:p-5 lg:col-span-3"
-          >
+          <div aria-hidden className="min-w-0 p-4 sm:p-5 lg:col-span-3">
             <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 sm:gap-2.5 xl:grid-cols-4">
               {[0, 1, 2, 3].map((i) => (
                 <div

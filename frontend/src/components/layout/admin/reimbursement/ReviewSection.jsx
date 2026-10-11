@@ -175,9 +175,8 @@ export function ReviewSection({
     [expenses],
   );
 
-  // Fully-closed account (a 'close' status with no 'open' issuance left):
-  // everything locks — checkboxes, bulk actions, row actions and summary
-  // actions all go read-only. Only Discard stays available.
+  // Fully-closed account (a 'close' status with no 'open' issuance left).
+  // Combined with the record status below into `locked`.
   const birStatuses = useMemo(
     () =>
       String(row?.birStatuses || "")
@@ -189,8 +188,20 @@ export function ReviewSection({
   const accountClosed =
     birStatuses.includes("close") && !birStatuses.includes("open");
 
+  // Record-closed lock: a finalized record locks its own checklist even when
+  // the holder's account aggregate still looks open elsewhere (`isClosed`
+  // carries the record status in record mode). Covers checkboxes, bulk
+  // actions and row actions — the summary Settle/Submit buttons below have
+  // their own gate.
+  const locked = accountClosed || isClosed;
+  const lockedTitle = accountClosed
+    ? "Account closed — read-only"
+    : isClosed
+      ? "Record closed — read-only"
+      : undefined;
+
   const toggle = async (expense) => {
-    if (accountClosed) return;
+    if (locked) return;
     const next = expense.review === "yes" ? "no" : "yes";
     setTogglingId(expense.id);
     try {
@@ -241,7 +252,7 @@ export function ReviewSection({
   // target state, then the shared invalidation refetches once per write
   // (last one wins, all cheap).
   const checkAll = async (review) => {
-    if (accountClosed) return;
+    if (locked) return;
     // Cancelled rows are pinned at reviewed — never bulk-flip them.
     const targets = expenses.filter(
       (e) =>
@@ -310,10 +321,8 @@ export function ReviewSection({
                   <button
                     type="button"
                     onClick={() => checkAll("yes")}
-                    disabled={bulkBusy || accountClosed}
-                    title={
-                      accountClosed ? "Account closed — read-only" : undefined
-                    }
+                    disabled={bulkBusy || locked}
+                    title={lockedTitle}
                     className="inline-flex h-7 items-center gap-1.5 rounded-full bg-[var(--accent-soft)] px-3 text-xs font-medium text-[var(--accent-strong)] transition-opacity hover:opacity-80 disabled:opacity-50"
                   >
                     {bulkBusy ? (
@@ -327,10 +336,8 @@ export function ReviewSection({
                   <button
                     type="button"
                     onClick={() => checkAll("no")}
-                    disabled={bulkBusy || accountClosed}
-                    title={
-                      accountClosed ? "Account closed — read-only" : undefined
-                    }
+                    disabled={bulkBusy || locked}
+                    title={lockedTitle}
                     className="inline-flex h-7 items-center gap-1.5 rounded-full border border-[var(--border)] px-3 text-xs font-medium text-[var(--ink-muted)] transition-colors hover:text-[var(--ink)] disabled:opacity-50"
                   >
                     {bulkBusy ? (
@@ -387,15 +394,15 @@ export function ReviewSection({
                     >
                       <label
                         title={
-                          accountClosed
-                            ? "Account closed — read-only"
+                          locked
+                            ? lockedTitle
                             : isCancelled
                               ? "Cancelled rows can't be reviewed"
                               : `Mark "${e.description || "expense"}" as reviewed`
                         }
                         className={cn(
                           "flex min-w-0 flex-1 items-center gap-3",
-                          isCancelled || busy || bulkBusy || accountClosed
+                          isCancelled || busy || bulkBusy || locked
                             ? "cursor-not-allowed"
                             : "cursor-pointer",
                         )}
@@ -405,7 +412,7 @@ export function ReviewSection({
                           className="sr-only"
                           checked={isChecked}
                           disabled={
-                            busy || bulkBusy || isCancelled || accountClosed
+                            busy || bulkBusy || isCancelled || locked
                           }
                           onChange={() => toggle(e)}
                           aria-label={`Mark "${e.description || "expense"}" as reviewed`}
@@ -423,14 +430,14 @@ export function ReviewSection({
                               busy ||
                               bulkBusy ||
                               isCancelled ||
-                              accountClosed
+                              locked
                             ) &&
                               !isChecked &&
                               "hover:border-[var(--success)]/60",
                             (busy ||
                               bulkBusy ||
                               isCancelled ||
-                              accountClosed) &&
+                              locked) &&
                               "opacity-60",
                           )}
                         >
@@ -509,7 +516,7 @@ export function ReviewSection({
                         <ExpenseRowMenu
                           status={e.status}
                           busy={acting}
-                          viewOnly={accountClosed}
+                          viewOnly={locked}
                           onView={() => setViewRow(toExpenseModalRow(e))}
                           onCancel={() => changeStatus(e, "cancel", "cancel")}
                           onRestore={() => changeStatus(e, "paid", "restore")}

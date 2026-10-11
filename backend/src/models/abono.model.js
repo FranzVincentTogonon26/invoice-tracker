@@ -30,23 +30,24 @@ class Abono {
   // list (`reference_id` is NOT NULL, so the inner condition is safe).
   // When `issuedRefId` is present (AdminEmployeesDetails bir-id link), only
   // rows stamped with that `budget_issued_reference.id` list.
-  // Overview view (`openOnly`): rows list only while their holding is still
-  // OPEN (`budget_issued_reference.status = 'open'`). Defaults off so
-  // employee pages keep showing full history.
+  // Whole-account view: a row lists only while it connects to its own OPEN
+  // issuance record for the same (reference_id, user_id) via
+  // issued_ref_id = budget_issued_reference.id (`status = 'open'`).
+  // (`openOnly` is accepted for API compatibility — the base path is already
+  // strict so it adds nothing.)
   static async listByUser(userId, { issuedRefId, openOnly } = {}) {
     const params = [userId];
     let extra = "";
     if (issuedRefId) {
       params.push(issuedRefId);
       extra = `AND ea.issued_ref_id = $2`;
-    }
-    if (openOnly && !issuedRefId) {
-      extra += ` AND EXISTS (
+    } else {
+      extra = `AND EXISTS (
         SELECT 1 FROM budget_issued_reference bir2
         WHERE bir2.user_id = ea.user_id
           AND bir2.reference_id = ea.reference_id
           AND bir2.status = 'open'
-          AND (ea.issued_ref_id IS NULL OR bir2.id = ea.issued_ref_id)
+          AND bir2.id = ea.issued_ref_id
       )`;
     }
     const result = await query(
@@ -99,8 +100,12 @@ class Abono {
   // When `issuedRefId` is present (AdminEmployeesDetails bir-id link), every
   // leg is scoped to that `budget_issued_reference.id` via `issued_ref_id`;
   // received transfers are excluded (they carry the sender's issuance id).
-  // Overview view (`openOnly`): every leg keys on the user's OPEN holdings
-  // only. Defaults off so employee-facing pages never change.
+  // Whole-account view: every leg keys on the user's OPEN holdings for the
+  // same (reference_id, user_id), pinning tagged rows through
+  // `issued_ref_id = budget_issued_reference.id` (`status = 'open'`).
+  // Untagged expenses connect to no holding and always count. (`openOnly`
+  // is accepted for API compatibility — the base path is already strict so
+  // it adds nothing.)
   static async employeeAbonoOverview(userId, { issuedRefId, openOnly } = {}) {
     const [abono, statsResult] = await Promise.all([
       this.listByUser(userId, { issuedRefId, openOnly }),
@@ -149,13 +154,29 @@ class Abono {
                     JOIN budget_reference br ON br.reference_id = ea.reference_id
                    WHERE ea.user_id = $1 AND ea.status = 'open'
                      AND br.status = 'open'
-                     ${openOnly ? "AND EXISTS (SELECT 1 FROM budget_issued_reference bir2 WHERE bir2.user_id = ea.user_id AND bir2.reference_id = ea.reference_id AND bir2.status = 'open' AND (ea.issued_ref_id IS NULL OR bir2.id = ea.issued_ref_id))" : ""}
+                     AND EXISTS (
+                       SELECT 1
+                         FROM budget_issued_reference bir2
+                        WHERE bir2.user_id = ea.user_id
+                          AND bir2.reference_id = ea.reference_id
+                          AND bir2.status = 'open'
+                          AND bir2.id = ea.issued_ref_id
+                     )
                 ), 0)::float8 AS total_abono,
                 COALESCE((
                   SELECT COUNT(*)
                     FROM employee_abono ea
+                    JOIN budget_reference br ON br.reference_id = ea.reference_id
                    WHERE ea.user_id = $1
-                   ${openOnly ? "AND EXISTS (SELECT 1 FROM budget_issued_reference bir2 WHERE bir2.user_id = ea.user_id AND bir2.reference_id = ea.reference_id AND bir2.status = 'open' AND (ea.issued_ref_id IS NULL OR bir2.id = ea.issued_ref_id))" : ""}
+                     AND br.status = 'open'
+                     AND EXISTS (
+                       SELECT 1
+                         FROM budget_issued_reference bir2
+                        WHERE bir2.user_id = ea.user_id
+                          AND bir2.reference_id = ea.reference_id
+                          AND bir2.status = 'open'
+                          AND bir2.id = ea.issued_ref_id
+                     )
                 ), 0)::int AS abono_count,
                 COALESCE((
                   SELECT SUM(ib.amount)
@@ -170,12 +191,21 @@ class Abono {
                      LEFT JOIN budget_reference br ON br.reference_id = e.reference_id
                     WHERE e.user_id = $1 AND e.status = 'paid'
                       AND (e.reference_id IS NULL OR br.status = 'open')
-                      ${openOnly ? "AND (e.reference_id IS NULL OR EXISTS (SELECT 1 FROM budget_issued_reference bir2 WHERE bir2.user_id = e.user_id AND bir2.reference_id = e.reference_id AND bir2.status = 'open' AND (e.issued_ref_id IS NULL OR bir2.id = e.issued_ref_id)))" : ""}
+                      AND (e.reference_id IS NULL OR EXISTS (
+                        SELECT 1
+                          FROM budget_issued_reference bir2
+                         WHERE bir2.user_id = e.user_id
+                           AND bir2.reference_id = e.reference_id
+                           AND bir2.status = 'open'
+                           AND bir2.id = e.issued_ref_id
+                      ))
                  ), 0)::float8 AS total_expenses,
                 COALESCE((
                   SELECT SUM(bt.amount)
                     FROM budget_transfer bt
-                    ${openOnly ? "JOIN budget_issued_reference birf ON birf.id = bt.issued_ref_id AND birf.status = 'open' AND birf.user_id = bt.user_id" : ""}
+                    JOIN budget_issued_reference birf ON birf.id = bt.issued_ref_id
+                      AND birf.status = 'open'
+                      AND birf.user_id = bt.user_id
                    WHERE bt.user_id = $1 AND bt.status = 'success'
                 ), 0)::float8 AS total_sent,
                 COALESCE((
