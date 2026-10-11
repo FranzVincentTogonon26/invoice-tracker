@@ -1,5 +1,10 @@
 import { useMemo } from "react";
-import { Link, useLocation, useNavigate, useSearchParams } from "react-router-dom";
+import {
+  Link,
+  useLocation,
+  useNavigate,
+  useSearchParams,
+} from "react-router-dom";
 import { ArrowLeft, HandCoins, Inbox, TrendingUp, Wallet } from "lucide-react";
 import { motion } from "framer-motion";
 import { PageHeader } from "../../../ui/PageHeader";
@@ -10,7 +15,7 @@ import { Card, CardDescription, CardTitle } from "../../../ui/Card";
 import { EmptyState } from "../../../ui/DataState";
 import { EmployeeAvatar } from "../../../ui/SelectEmployee";
 import { useSourceFunds } from "../../../../hooks/useSourceFunds";
-import { formatDate, formatMoney, formatTime, toMoney } from "@/lib/utils";
+import { formatDate, formatMoney, toMoney } from "@/lib/utils";
 import { StatusBadge } from "./SourceBadges";
 
 export function AdminSourceFundsOverview() {
@@ -99,16 +104,16 @@ export function AdminSourceFundsOverview() {
             <div className="h-5 w-36 animate-pulse rounded bg-[var(--border)]" />
             <div className="h-5 w-10 animate-pulse rounded-full bg-[var(--border)]" />
           </div>
-          <div aria-hidden className="mt-1 h-3.5 w-64 max-w-full animate-pulse rounded bg-[var(--border)]" />
+          <div
+            aria-hidden
+            className="mt-1 h-3.5 w-64 max-w-full animate-pulse rounded bg-[var(--border)]"
+          />
           <ul
             aria-hidden
             className="mt-3 divide-y divide-[var(--border)] overflow-hidden rounded-2xl border border-[var(--border)]"
           >
             {[0, 1, 2].map((i) => (
-              <li
-                key={i}
-                className="flex items-center gap-3 px-4 py-2.5"
-              >
+              <li key={i} className="flex items-center gap-3 px-4 py-2.5">
                 <div className="h-9 w-9 shrink-0 animate-pulse rounded-full bg-[var(--border)]" />
                 <div className="h-4 min-w-0 flex-1 animate-pulse rounded bg-[var(--border)]" />
                 <div className="h-3 w-12 shrink-0 animate-pulse rounded bg-[var(--border)]" />
@@ -284,7 +289,10 @@ export function AdminSourceFundsOverview() {
         ) : (
           <ul className="mt-3 divide-y divide-[var(--border)] overflow-hidden rounded-2xl border border-[var(--border)]">
             {involved.map((p) => (
-              <li key={p.user_id || p.name} className="flex items-center gap-3 px-4 py-2.5">
+              <li
+                key={p.user_id || p.name}
+                className="flex items-center gap-3 px-4 py-2.5"
+              >
                 <EmployeeAvatar
                   name={p.name}
                   avatarUrl={p.avatar_url}

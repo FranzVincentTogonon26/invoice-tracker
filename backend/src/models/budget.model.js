@@ -85,6 +85,7 @@ class Budget {
           COALESCE(SUM(e.total_amount), 0) AS amount
        FROM budget_reference br
        LEFT JOIN expenses e ON e.reference_id = br.reference_id
+         AND e.status = 'paid'
          AND EXISTS (
           SELECT 1 FROM users u
            WHERE u.user_id = e.user_id AND u.role = 'employee'

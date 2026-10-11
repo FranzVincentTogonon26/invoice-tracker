@@ -69,6 +69,16 @@ export default function AdminBudget() {
   const totalBudget = overview.totalBudget ?? 0;
   const totalIssued = overview.totalIssued ?? 0;
   const totalExpenses = overview.totalExpenses ?? 0;
+  // Headline "Total Expenses": admin + employee combined, summed from the
+  // same per-reference rows the drill-down lists below. All balance math
+  // keeps admin-only `totalExpenses` (employee spend already left as
+  // `issued` — adding it there would double-subtract).
+  const totalExpensesAll =
+    Number(totalExpenses) +
+    overviewEmployeeExpenses.reduce(
+      (sum, row) => sum + Number(row.amount || 0),
+      0,
+    );
   const totalForwarded = overview.totalForwarded ?? 0;
 
   // "My Expenses" breakdown shows both legs per open source: the admin spend
@@ -186,7 +196,7 @@ export default function AdminBudget() {
         >
           <motion.div variants={item} className="h-full min-w-0 [&>div]:h-full">
             <StatCard
-              label="Total Budget"
+              label="Total Budget Allocated"
               value={formatMoney(totalBudget)}
               icon={TrendingUp}
               accent
@@ -203,7 +213,7 @@ export default function AdminBudget() {
 
           <motion.div variants={item} className="h-full min-w-0 [&>div]:h-full">
             <StatCard
-              label="My Balance"
+              label="Remaining Balance"
               value={formatMoney(cashOnHand)}
               icon={PhilippinePesoIcon}
               loading={isLoading}
@@ -230,8 +240,8 @@ export default function AdminBudget() {
 
           <motion.div variants={item} className="h-full min-w-0 [&>div]:h-full">
             <StatCard
-              label="My Expenses"
-              value={formatMoney(totalExpenses)}
+              label="Total Expenses"
+              value={formatMoney(totalExpensesAll)}
               icon={ReceiptText}
               loading={isLoading}
               breakdownCaption="Expenses"
@@ -241,7 +251,7 @@ export default function AdminBudget() {
 
           <motion.div variants={item} className="h-full min-w-0 [&>div]:h-full">
             <StatCard
-              label="Total Issued"
+              label="Issued Budget"
               value={formatMoney(totalIssued)}
               icon={HandCoins}
               loading={isLoading}

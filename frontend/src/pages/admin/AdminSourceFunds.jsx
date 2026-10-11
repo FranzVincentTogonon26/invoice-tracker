@@ -11,11 +11,7 @@ import {
   CardHeader,
   CardTitle,
 } from "../../components/ui/Card";
-import {
-  EmptyState,
-  ErrorState,
-  LoadingSkeleton,
-} from "../../components/ui/DataState";
+import { EmptyState, ErrorState } from "../../components/ui/DataState";
 import ConfirmActionDialog from "../../components/layout/admin/expenses/ConfirmActionDialog";
 import { SourceCreateModal } from "../../components/layout/admin/source-of-funds/SourceCreateModal";
 import {
@@ -25,7 +21,10 @@ import {
 import { formatMoney, toMoney } from "../../lib/utils";
 import { SourceStats } from "../../components/layout/admin/source-of-funds/SourceStats";
 import { SourceFilters } from "../../components/layout/admin/source-of-funds/SourceFilters";
-import { SourceTable } from "../../components/layout/admin/source-of-funds/SourceTable";
+import {
+  SourceTable,
+  SourceTableSkeleton,
+} from "../../components/layout/admin/source-of-funds/SourceTable";
 import { SourceEditModal } from "../../components/layout/admin/source-of-funds/SourceEditModal";
 
 const PAGE_SIZE = 50;
@@ -53,7 +52,7 @@ export default function AdminSourceFunds() {
   );
   const { sources, isLoading, error, refetch } = useSourceFunds(params);
   const { createReference, updateReference, removeReference } =
-    useSourceFundsMutations(); 
+    useSourceFundsMutations();
 
   const rows = useMemo(() => {
     const list = sources ?? [];
@@ -219,7 +218,7 @@ export default function AdminSourceFunds() {
         />
 
         {isLoading ? (
-          <LoadingSkeleton rows={5} />
+          <SourceTableSkeleton />
         ) : error ? (
           <ErrorState
             title="Couldn't load sources"
