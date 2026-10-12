@@ -128,8 +128,17 @@ function RowActions({
   useEffect(() => {
     if (!open) return undefined;
 
-    const close = () => {
+    // Focus is returned to the trigger ONLY on keyboard dismissal (Escape).
+    // Outside-click / scroll / resize / item-select must NOT steal focus —
+    // the old `close()` focused on every path, yanking focus away from the
+    // element the user just clicked (including another row's trigger).
+    const dismiss = () => {
       setOpen(false);
+      setPosition(null);
+    };
+    const dismissWithFocus = () => {
+      setOpen(false);
+      setPosition(null);
       btnRef.current?.focus();
     };
 
@@ -138,31 +147,52 @@ function RowActions({
         !btnRef.current?.contains(e.target) &&
         !menuRef.current?.contains(e.target)
       )
-        close();
+        dismiss();
     };
 
     const handleKeyDown = (e) => {
       if (e.key === "Escape") {
         e.stopPropagation();
-        close();
+        dismissWithFocus();
+      } else if (e.key === "Tab") {
+        dismiss();
       }
     };
 
+    const handleScroll = () => dismiss();
+    const handleResize = () => dismiss();
+
     window.addEventListener("pointerdown", handlePointerDown);
     window.addEventListener("keydown", handleKeyDown);
-    window.addEventListener("scroll", close, {
+    window.addEventListener("scroll", handleScroll, {
       capture: true,
       passive: true,
     });
-    window.addEventListener("resize", close);
+    window.addEventListener("resize", handleResize);
 
     return () => {
       window.removeEventListener("pointerdown", handlePointerDown);
       window.removeEventListener("keydown", handleKeyDown);
-      window.removeEventListener("scroll", close, { capture: true });
-      window.removeEventListener("resize", close);
+      window.removeEventListener("scroll", handleScroll, { capture: true });
+      window.removeEventListener("resize", handleResize);
     };
   }, [open]);
+
+  // Closed-holding lock: an expense spent from a finalized (`close`)
+  // `budget_issued_reference` (via `expenses.issued_ref_id`,
+  // `issuedParentStatus`) is read-only — "View details" is the only action.
+  // Field-name variants are accepted so older cached payloads (snake_case)
+  // lock the same way.
+  const normStatus = (value) => String(value ?? "").trim().toLowerCase();
+  const isClosedStatus = (value) => {
+    const s = normStatus(value);
+    return s === "close" || s === "closed";
+  };
+  const isClosedHolding =
+    isClosedStatus(row?.issuedParentStatus) ||
+    isClosedStatus(row?.issued_parent_status) ||
+    isClosedStatus(row?.parentStatus) ||
+    isClosedStatus(row?.parent_status);
 
   // Cancelled employee rows keep the full lifecycle: View, Add to draft
   // (reactivate as a draft) and Delete. Paid employee rows offer View + Add
@@ -172,16 +202,21 @@ function RowActions({
   // `group` clusters the dropdown: viewing, status moves, then the
   // destructive action — rendered with a separator between clusters.
   const isEmployeeRow = row?.employeeRole === "employee";
-  const items = [
-    {
-      key: "view",
-      label: "View expense",
-      Icon: Eye,
-      danger: false,
-      group: "view",
-      onSelect: () => onView?.(row),
-    },
-    ...(isEmployeeRow && row?.status === "paid"
+  const viewItem = {
+    key: "view",
+    label: isClosedHolding ? "View details" : "View expense",
+    Icon: Eye,
+    danger: false,
+    group: "view",
+    onSelect: () => onView?.(row),
+  };
+  let items;
+  if (isClosedHolding) {
+    items = [viewItem];
+  } else {
+    items = [
+      viewItem,
+      ...(isEmployeeRow && row?.status === "paid"
       ? [
           {
             key: "draft",
@@ -241,7 +276,8 @@ function RowActions({
             onSelect: () => onDelete?.(row),
           },
         ]),
-  ];
+    ];
+  }
 
   // Preserve group order (view → lifecycle → danger), dropping empty clusters
   // so no stray separator renders.
@@ -251,12 +287,38 @@ function RowActions({
 
   const openMenu = () => {
     const rect = btnRef.current?.getBoundingClientRect();
-    if (rect)
-      setPosition({
-        top: rect.bottom + 6,
-        right: window.innerWidth - rect.right,
-      });
+    if (rect) {
+      // Flip upward when there isn't room below so the menu never runs
+      // off-screen; clamp to the viewport edges.
+      const margin = 6;
+      const estimatedHeight = 260;
+      const spaceBelow = window.innerHeight - rect.bottom;
+      const flip = spaceBelow < estimatedHeight && rect.top > spaceBelow;
+      const right = Math.max(8, window.innerWidth - rect.right);
+      if (flip) {
+        setPosition({
+          bottom: Math.max(
+            margin,
+            window.innerHeight - rect.top + margin,
+          ),
+          right,
+        });
+      } else {
+        setPosition({
+          top: Math.min(
+            rect.bottom + margin,
+            Math.max(margin, window.innerHeight - 120),
+          ),
+          right,
+        });
+      }
+    }
     setOpen(true);
+  };
+
+  const closeMenu = () => {
+    setOpen(false);
+    setPosition(null);
   };
 
   return (
@@ -264,7 +326,7 @@ function RowActions({
       <button
         ref={btnRef}
         type="button"
-        onClick={() => (open ? setOpen(false) : openMenu())}
+        onClick={() => (open ? closeMenu() : openMenu())}
         aria-haspopup="menu"
         aria-expanded={open}
         aria-label="Row actions"
@@ -280,8 +342,8 @@ function RowActions({
             ref={menuRef}
             role="menu"
             aria-label="Row actions"
-            style={{ top: position.top, right: position.right }}
-            className="fixed z-[70] min-w-[11rem] overflow-hidden rounded-2xl border border-[var(--border)] bg-[var(--surface)] py-1 shadow-hover"
+            style={position}
+            className="fixed z-[70] max-h-[70vh] min-w-[11rem] overflow-x-hidden overflow-y-auto rounded-2xl border border-[var(--border)] bg-[var(--surface)] py-1 shadow-hover"
           >
             {sections.map((section, sectionIndex) => (
               <div key={section[0].group}>
@@ -292,25 +354,32 @@ function RowActions({
                     className="mx-3 border-t border-[var(--border)]"
                   />
                 )}
-                {section.map(({ key, label, Icon, danger, onSelect }) => (
-                  <button
-                    key={key}
-                    type="button"
-                    role="menuitem"
-                    disabled={pending}
-                    onClick={() => {
-                      setOpen(false);
-                      onSelect();
-                    }}
-                    className={cn(
-                      "flex w-full items-center gap-2.5 px-3.5 py-2 text-sm font-medium transition-colors hover:bg-[var(--surface-2)] disabled:pointer-events-none disabled:opacity-40",
-                      danger ? "text-[var(--danger)]" : "text-[var(--ink)]",
-                    )}
-                  >
-                    <Icon size={15} aria-hidden />
-                    {label}
-                  </button>
-                ))}
+                {section.map(({ key, label, Icon, danger, onSelect }) => {
+                  // Read-only view stays available while a mutation is in
+                  // flight — only lifecycle / destructive actions lock.
+                  const disabled = pending && key !== "view";
+                  return (
+                    <button
+                      key={key}
+                      type="button"
+                      role="menuitem"
+                      disabled={disabled}
+                      onClick={() => {
+                        closeMenu();
+                        onSelect();
+                      }}
+                      className={cn(
+                        "flex w-full items-center gap-2.5 px-3.5 py-2 text-sm font-medium transition-colors hover:bg-[var(--surface-2)] disabled:pointer-events-none disabled:opacity-40",
+                        danger
+                          ? "text-[var(--danger)]"
+                          : "text-[var(--ink)]",
+                      )}
+                    >
+                      <Icon size={15} aria-hidden />
+                      {label}
+                    </button>
+                  );
+                })}
               </div>
             ))}
           </div>,

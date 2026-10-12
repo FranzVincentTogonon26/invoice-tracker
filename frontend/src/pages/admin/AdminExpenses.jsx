@@ -127,6 +127,11 @@ const AdminExpenses = () => {
           flagged: Number(e.flag) === 1,
           notes: e.notes,
           referenceId: e.reference_id,
+          // Closed-holding lock: an expense spent from a finalized (`close`)
+          // `budget_issued_reference` (via `expenses.issued_ref_id`) is
+          // read-only — ExpensesTable locks its actions to view-only.
+          issuedRefId: e.issued_ref_id ?? null,
+          issuedParentStatus: e.issued_parent_status ?? null,
           sourceOfFunds:
             e.reference_label ||
             (e.reference_id ? referenceLabels.get(e.reference_id) : "") ||
