@@ -1476,6 +1476,7 @@ class Budget {
                 ib.issued_ref_id,
                 ib.amount::float8 AS amount,
                 ib.status AS ib_status,
+                bir.status AS bir_status,
                 bir.user_id,
                 u.name AS employee_name
                FROM issued_budget ib
@@ -1488,6 +1489,10 @@ class Budget {
         ).rows[0] ?? null;
 
       if (!found) return null;
+
+      // Finalized holdings are read-only — a `close` parent locks its
+      // children to "View details" only (see TransactionsTable).
+      if (found.bir_status === "close") return { closedHolding: true };
 
       const previousStatus = found.ib_status;
 
@@ -1751,6 +1756,7 @@ class Budget {
             `SELECT ib.id,
                     ib.issued_ref_id,
                     ib.status AS ib_status,
+                    bir.status AS bir_status,
                     bir.user_id,
                     bir.reference_id
                FROM issued_budget ib
@@ -1762,6 +1768,10 @@ class Budget {
         ).rows[0] ?? null;
 
       if (!found) return { notFound: true };
+
+      // Finalized holdings are read-only — even cancelled children under a
+      // `close` parent stay locked to "View details" only.
+      if (found.bir_status === "close") return { closedHolding: true };
 
       if (found.ib_status !== "cancel")
         return { notFound: false, notCancelled: true, status: found.ib_status };

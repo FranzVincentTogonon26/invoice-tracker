@@ -15,6 +15,18 @@ import { deleteReceiptImage, saveReceiptImage } from "../utils/receiptImage.js";
 const UUID_RE =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
+// Finalized holdings are read-only: an expense spent from a `close`
+// `budget_issued_reference` (via `expenses.issued_ref_id`) locks to
+// "View details" only. Shared by every mutating expense endpoint so a
+// forged client can't bypass the hidden menu actions.
+const assertExpenseMutable = (expense) => {
+  if (expense?.issued_parent_status === "close")
+    throw ApiError.conflict(
+      "This expense is linked to a closed holding — only viewing is allowed.",
+      "EXPENSE_HOLDING_CLOSED",
+    );
+};
+
 // Row-level access for the single-expense endpoints (detail / delete):
 // admins may touch any row; everyone else must be an *active employee* and
 // the owner of that row. A rejected caller gets the plain "not found" instead
@@ -310,6 +322,7 @@ export const remove = async (req, res, next) => {
     const existing = await Expenses.findExpenseById(id);
     if (!existing || !canTouchRow(req, existing))
       throw ApiError.notFound("Expense not found", "EXPENSE_NOT_FOUND");
+    assertExpenseMutable(existing);
 
     const expense = await Expenses.removeExpense(id);
     if (!expense)
@@ -360,6 +373,7 @@ export const updateStatus = async (req, res, next) => {
     const existing = await Expenses.findExpenseById(id);
     if (!existing || !canTouchRow(req, existing))
       throw ApiError.notFound("Expense not found", "EXPENSE_NOT_FOUND");
+    assertExpenseMutable(existing);
 
     const expense = await Expenses.updateExpenseStatus(id, payload.status);
     if (!expense)
@@ -395,6 +409,12 @@ export const markEmployeeDraft = async (req, res, next) => {
     const { id } = req.params;
     if (!UUID_RE.test(id || ""))
       throw ApiError.badRequest("Invalid expense id", "VALIDATION_ERROR");
+
+    // Closed-holding lock first — a forged client must not bypass the
+    // view-only menu by calling the endpoint directly.
+    const pre = await Expenses.findExpenseById(id);
+    if (!pre) throw ApiError.notFound("Expense not found", "EXPENSE_NOT_FOUND");
+    assertExpenseMutable(pre);
 
     const expense = await Expenses.markEmployeeExpenseDraft(id);
     if (expense) {
@@ -441,6 +461,12 @@ export const markEmployeePaid = async (req, res, next) => {
     const { id } = req.params;
     if (!UUID_RE.test(id || ""))
       throw ApiError.badRequest("Invalid expense id", "VALIDATION_ERROR");
+
+    // Closed-holding lock first — a forged client must not bypass the
+    // view-only menu by calling the endpoint directly.
+    const pre = await Expenses.findExpenseById(id);
+    if (!pre) throw ApiError.notFound("Expense not found", "EXPENSE_NOT_FOUND");
+    assertExpenseMutable(pre);
 
     const expense = await Expenses.markEmployeeExpensePaid(id);
     if (expense) {

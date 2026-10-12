@@ -520,6 +520,11 @@ export const cancelIssuedTransaction = async (req, res, next) => {
         "Issued transaction not found",
         "ISSUED_TRANSACTION_NOT_FOUND",
       );
+    if (result.closedHolding)
+      throw ApiError.conflict(
+        "This issuance is linked to a closed holding — only viewing is allowed.",
+        "ISSUED_HOLDING_CLOSED",
+      );
     if (result.insufficientBalance)
       throw ApiError.badRequest(
         // A negative coverable reads as debt and confuses the message — what
@@ -567,6 +572,11 @@ export const removeIssuedTransaction = async (req, res, next) => {
       throw ApiError.notFound(
         "Issued transaction not found",
         "ISSUED_TRANSACTION_NOT_FOUND",
+      );
+    if (result.closedHolding)
+      throw ApiError.conflict(
+        "This issuance is linked to a closed holding — only viewing is allowed.",
+        "ISSUED_HOLDING_CLOSED",
       );
     if (result.notCancelled)
       throw ApiError.conflict(

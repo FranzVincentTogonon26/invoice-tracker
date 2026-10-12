@@ -152,12 +152,15 @@ class Employee {
   //                        different Remaining figure here than on their own
   //                        Overview.
   //   `issued_references` (the table's "Transactions" column) counts the
-  //   employee's `issued_budget` rows — the real issuance transactions,
-  //   wired through their parents via
+  //   employee's `issued_budget` rows under OPEN holdings only
+  //   (`budget_issued_reference.status = 'open'`) — the real live issuance
+  //   transactions, wired through their parents via
   //   `issued_budget.issued_ref_id = budget_issued_reference.id` — and NOT the
   //   parent `budget_issued_reference` rows themselves: repeated same-source
   //   top-ups reuse one OPEN parent (migration 003), so counting parents
   //   undercounted every multi-issuance employee (2 issuances read as 1).
+  //   Closed/cancelled holdings leave no footsteps here, matching the
+  //   `issued_budget` sum above.
   static async employeeList({ search, status } = {}) {
     const where = [];
     const params = [];
@@ -342,6 +345,7 @@ class Employee {
             JOIN budget_issued_reference bir2 ON ib2.issued_ref_id = bir2.id
             JOIN budget_reference br2 ON br2.reference_id = bir2.reference_id
             WHERE bir2.user_id = u.user_id
+              AND bir2.status = 'open'
               AND br2.status = 'open'
           )::int AS issued_references,
           -- Parent issuance rows for this user, any status — the delete guard:

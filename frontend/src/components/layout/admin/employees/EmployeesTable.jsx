@@ -175,15 +175,41 @@ export function SharePill({
 }
 
 /** Employee identity cell — stored photo when the account has one, initial
-    tile otherwise. */
+    tile otherwise. Rows holding OPEN issued budget (live `issued` amount —
+    closed holdings never count, see `budgetBreakdown`) get a glowing dot on
+    the avatar so funded rows read at a glance. */
 function EmployeeCell({ employee }) {
+  const { issued, remaining } = budgetBreakdown(employee);
+  const hasIssuedBudget = issued > 0;
+  const issuedHint = hasIssuedBudget
+    ? `Budget issued: ${formatMoney(issued)} open budget · ${formatMoney(remaining)} active balance`
+    : undefined;
   return (
     <div className="flex min-w-0 items-center gap-3">
-      <EmployeeAvatar
-        name={employee.name}
-        avatarUrl={employee.avatar_url}
-        className="h-9 w-9 rounded-full text-sm ring-1 ring-inset ring-[var(--accent)]/15"
-      />
+      <div className="relative shrink-0">
+        <EmployeeAvatar
+          name={employee.name}
+          avatarUrl={employee.avatar_url}
+          className="h-9 w-9 rounded-full text-sm ring-1 ring-inset ring-[var(--accent)]/15"
+        />
+        {hasIssuedBudget && (
+          <span
+            role="img"
+            aria-label={issuedHint}
+            title={issuedHint}
+            className="absolute -right-0.5 -top-0.5 flex h-3 w-3"
+          >
+            <span
+              aria-hidden
+              className="absolute inline-flex h-full w-full animate-ping rounded-full bg-[var(--danger)] opacity-60"
+            />
+            <span
+              aria-hidden
+              className="relative inline-flex h-3 w-3 rounded-full bg-[var(--danger)] ring-2 ring-[var(--surface)]"
+            />
+          </span>
+        )}
+      </div>
       <div className="min-w-0">
         <p className="truncate font-display text-sm font-medium leading-snug tracking-tight text-[var(--ink)] transition-colors duration-150 group-hover:text-[var(--accent-strong)]">
           {employee.name}
@@ -211,6 +237,9 @@ function EmployeeRow({ employee, pending, onAction }) {
   // Spending more than the issued budget flips the remaining amount red — the
   // same signal the Budget page uses for over-issued references.
   const overSpent = remaining < 0;
+  // The Transactions count only renders for employees holding live (open)
+  // issued budget — rows with nothing issued show a dash instead of a 0.
+  const hasIssuedBudget = issued > 0;
 
   return (
     <tr className="group border-b border-[var(--border)] transition-colors duration-150 last:border-b-0 odd:bg-[var(--surface)] even:bg-[var(--surface-2)]/40 hover:bg-[var(--accent)]/[0.04]">
@@ -313,9 +342,18 @@ function EmployeeRow({ employee, pending, onAction }) {
       </td>
 
       <td className="px-3 py-3.5 text-center align-middle">
-        <span className="inline-flex h-7 min-w-7 items-center justify-center rounded-full bg-[var(--surface-2)] px-2 text-xs font-normal tabular-nums text-[var(--ink)] ring-1 ring-inset ring-[var(--border)]">
-          {Number(employee.issued_references) || 0}
-        </span>
+        {hasIssuedBudget ? (
+          <span
+            title="Issuance transactions under open holdings"
+            className="inline-flex h-7 min-w-7 items-center justify-center rounded-full bg-[var(--surface-2)] px-2 text-xs font-normal tabular-nums text-[var(--ink)] ring-1 ring-inset ring-[var(--border)]"
+          >
+            {Number(employee.issued_references) || 0}
+          </span>
+        ) : (
+          <span className="text-sm leading-none text-[var(--ink-muted)]">
+            —
+          </span>
+        )}
       </td>
 
       {/* Date Added */}
@@ -371,6 +409,9 @@ function EmployeeCard({ employee, pending, onAction }) {
     budgetBreakdown(employee);
   const overSpent = remaining < 0;
   const references = Number(employee.issued_references) || 0;
+  // Mirrors the desktop Transactions column: the references badge only
+  // renders for employees holding live (open) issued budget.
+  const hasIssuedBudget = issued > 0;
 
   return (
     <div
@@ -483,8 +524,10 @@ function EmployeeCard({ employee, pending, onAction }) {
             ? `${formatDate(employee.created_at)} · ${formatTime(employee.created_at)}`
             : "—"}
         </span>
-        <Badge tone="neutral">
-          {references} {references === 1 ? "reference" : "references"}
+        <Badge tone="neutral" title="Issuance transactions under open holdings">
+          {hasIssuedBudget
+            ? `${references} ${references === 1 ? "reference" : "references"}`
+            : "No issuance"}
         </Badge>
       </div>
     </div>

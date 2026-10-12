@@ -160,7 +160,8 @@ export const updateDescription = async (req, res, next) => {
 // reimbursement lifecycle, not deletions). Guard: an OPEN abono funds the
 // spendable pool, so when its amount has already been spent (remaining
 // balance can't cover it) the delete is rejected — removing it would
-// overdraw the employee. Draft/settled rows never fund the pool and stay
+// overdraw the employee. Settled rows are consumed spend (re-booked as an
+// issued child) and stay read-only. Draft rows never fund the pool and stay
 // deletable.
 export const removeAbono = async (req, res, next) => {
   try {
@@ -171,6 +172,14 @@ export const removeAbono = async (req, res, next) => {
     const existing = await Abono.findById(id);
     if (!existing || !canTouchRow(req, existing))
       throw ApiError.notFound("Abono not found", "ABONO_NOT_FOUND");
+
+    // Settled abono is consumed spend — it locks to "View details" only in
+    // the ledger, so deletion is refused even from a direct API call.
+    if (existing.status === "settled")
+      throw ApiError.conflict(
+        "This abono has already been settled — only viewing is allowed.",
+        "ABONO_ALREADY_SETTLED",
+      );
 
     if (existing.status === "open") {
       const totalBalance = await Abono.spendableBalance(existing.user_id);

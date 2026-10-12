@@ -431,17 +431,19 @@ class Expenses {
            e.receipt_date,
            e.reference_id,
            e.issued_ref_id,
+           bir.status AS issued_parent_status,
            e.user_id,
            u.name AS created_by,
            u.role AS created_by_role,
            u.avatar_url AS created_by_avatar,
            br.label AS reference_label
-       FROM expenses e
-       LEFT JOIN category c ON c.category_id = e.category_id
-       LEFT JOIN users u ON u.user_id = e.user_id
-       LEFT JOIN budget_reference br ON br.reference_id = e.reference_id
-       WHERE e.id = $1::uuid
-       LIMIT 1`,
+        FROM expenses e
+        LEFT JOIN category c ON c.category_id = e.category_id
+        LEFT JOIN users u ON u.user_id = e.user_id
+        LEFT JOIN budget_reference br ON br.reference_id = e.reference_id
+        LEFT JOIN budget_issued_reference bir ON bir.id = e.issued_ref_id
+        WHERE e.id = $1::uuid
+        LIMIT 1`,
       [id],
     );
     return result.rows[0] ?? null;
@@ -588,6 +590,8 @@ class Expenses {
            e.image_url,
            e.receipt_date,
            e.reference_id,
+           e.issued_ref_id,
+           bir.status AS issued_parent_status,
            e.user_id,
            u.name AS created_by,
            u.role AS created_by_role,
@@ -597,6 +601,7 @@ class Expenses {
         LEFT JOIN category c ON c.category_id = e.category_id
         LEFT JOIN users u ON u.user_id = e.user_id
         LEFT JOIN budget_reference br ON br.reference_id = e.reference_id
+        LEFT JOIN budget_issued_reference bir ON bir.id = e.issued_ref_id
         ${where.length ? `WHERE ${where.join(" AND ")}` : ""}
         ORDER BY e.expense_date DESC, e.created_at DESC`,
       params,

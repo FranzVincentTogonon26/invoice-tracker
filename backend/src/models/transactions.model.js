@@ -141,6 +141,13 @@ class Transactions {
         moneyOut: direction === "out" ? amount : 0,
         direction,
         status: row.status,
+        // Closed-holding lock: `status` already reads 'close' when the parent
+        // `budget_issued_reference` is closed (see budgetIssuedTransaction's
+        // CASE), but `parent_status` / `issued_status` / `issued_ref_id` are
+        // kept so the UI can lock actions without reparsing vocabularies.
+        issuedRefId: row.issued_ref_id ?? null,
+        parentStatus: row.parent_status ?? null,
+        issuedStatus: row.issued_status ?? null,
         method: row.method ?? null,
         referenceId: row.reference_id ?? null,
         referenceLabel: row.source_of_funds || "No source of funds",
@@ -176,6 +183,11 @@ class Transactions {
         moneyOut: direction === "out" ? amount : 0,
         direction,
         status: row.status,
+        // Closed-holding lock: an expense spent from a finalized (`close`)
+        // `budget_issued_reference` (via `expenses.issued_ref_id`) is
+        // read-only — the UI locks its actions to "View details" only.
+        issuedRefId: row.issued_ref_id ?? null,
+        issuedParentStatus: row.issued_parent_status ?? null,
         method: row.payment_method ?? null,
         referenceId: row.reference_id ?? null,
         referenceLabel:
