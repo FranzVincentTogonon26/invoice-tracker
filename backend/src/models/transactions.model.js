@@ -53,7 +53,11 @@ class Transactions {
 //     direction, status, method, referenceId, referenceLabel, categoryId,
 //     categoryName, employeeId, employeeName, employeeRole, employeeAvatar,
 //     counterpartyName, counterpartyRole, approvedBy, flagged, expenseDate,
-//     dateSettled, receiptId, imageUrl }
+//     dateSettled, receiptId, imageUrl, issuedRefIdSent, sentParentStatus }
+// `issuedRefIdSent` / `sentParentStatus` ride the transfer legs: the
+// recipient-side issuance link (`budget_transfer.issued_ref_id_sent` →
+// `budget_issued_reference.id`) and its status, so the ledger can badge a
+// received row whose receiving holding has since closed.
 // `receiptId` / `imageUrl` mark rows carrying a scanned receipt attachment
 // (expenses via `expenses.receipt_id` / `expenses.image_url`, issuances via
 // `issued_budget.image_url`) so the ledger can badge them.
@@ -278,6 +282,8 @@ class Transactions {
         flagged: false,
         expenseDate: null,
         dateSettled: null,
+        issuedRefIdSent: row.issued_ref_id_sent ?? null,
+        sentParentStatus: row.sent_parent_status ?? null,
       });
 
       transactions.push({
@@ -307,6 +313,8 @@ class Transactions {
         flagged: false,
         expenseDate: null,
         dateSettled: null,
+        issuedRefIdSent: row.issued_ref_id_sent ?? null,
+        sentParentStatus: row.sent_parent_status ?? null,
       });
     }
 

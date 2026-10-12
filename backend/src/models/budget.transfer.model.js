@@ -702,6 +702,8 @@ class BudgetTransfer {
       `SELECT bt.id,
               bt.reference_id,
               bt.issued_ref_id,
+              bt.issued_ref_id_sent,
+              birs.status AS sent_parent_status,
               br.label AS reference_label,
               bt.user_id AS sender_id,
               su.name AS sender_name,
@@ -723,6 +725,7 @@ class BudgetTransfer {
          LEFT JOIN budget_reference br ON br.reference_id = bt.reference_id
          LEFT JOIN users su ON su.user_id = bt.user_id
          LEFT JOIN users ru ON ru.user_id = bt.transfer_to
+         LEFT JOIN budget_issued_reference birs ON birs.id = bt.issued_ref_id_sent
          WHERE ${where}
         ORDER BY bt.created_at DESC`,
       params,

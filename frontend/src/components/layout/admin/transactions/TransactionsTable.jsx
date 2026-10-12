@@ -161,8 +161,11 @@ function PersonCell({
 // its ledger rows read-only. Issued rows carry the parent status directly
 // (ledger `status` reads 'close' via the backend CASE, plus `parentStatus` /
 // `issuedStatus` / `issuedRefId`); expense rows carry it through their
-// `expenses.issued_ref_id` join (`issuedParentStatus`). Field-name variants
-// are accepted so older cached payloads (snake_case) lock the same way.
+// `expenses.issued_ref_id` join (`issuedParentStatus`); received transfer
+// rows carry it through their recipient-side link
+// (`budget_transfer.issued_ref_id_sent` → `sentParentStatus`). Field-name
+// variants are accepted so older cached payloads (snake_case) lock the
+// same way.
 const normStatus = (value) =>
   String(value ?? "")
     .trim()
@@ -192,12 +195,32 @@ function isClosedHolding(row) {
       isClosedStatus(row.parent_status)
     );
   }
+  if (row.kind === "transfer_received") {
+    return (
+      isClosedStatus(row.sentParentStatus) ||
+      isClosedStatus(row.sent_parent_status)
+    );
+  }
   return false;
 }
 
 function isSettledAbono(row) {
   if (!row || row.kind !== "abono") return false;
   return normStatus(row.status) === "settled";
+}
+
+// Recipient-side link lock: a transfer stamped to a finalized (`close`)
+// holding (`budget_transfer.issued_ref_id_sent`) can't be cancelled —
+// pulling it back would rewrite a closed holding's books. Both legs lock;
+// the PersonCell badge covers the received leg.
+function isClosedSentLink(row) {
+  if (!row) return false;
+  if (row.kind !== "transfer_sent" && row.kind !== "transfer_received")
+    return false;
+  return (
+    isClosedStatus(row.sentParentStatus) ||
+    isClosedStatus(row.sent_parent_status)
+  );
 }
 
 // Action menu per ledger kind
@@ -212,8 +235,11 @@ function actionsForRow(row) {
 
   // Finalized holdings (and expenses spent from them) are read-only —
   // "View details" is the only action. Settled abono is consumed spend
-  // (re-booked as an issued child), so it locks the same way.
-  if (isClosedHolding(row) || isSettledAbono(row)) return [viewItem];
+  // (re-booked as an issued child), so it locks the same way. Transfers
+  // stamped to a closed receiving holding lock both legs — cancelling
+  // would pull money back out of closed books.
+  if (isClosedHolding(row) || isSettledAbono(row) || isClosedSentLink(row))
+    return [viewItem];
 
   const items = [viewItem];
 
