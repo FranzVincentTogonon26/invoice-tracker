@@ -345,7 +345,7 @@ function EmployeeRow({ employee, pending, onAction }) {
         {hasIssuedBudget ? (
           <span
             title="Issuance transactions under open holdings"
-            className="inline-flex h-7 min-w-7 items-center justify-center rounded-full bg-[var(--surface-2)] px-2 text-xs font-normal tabular-nums text-[var(--ink)] ring-1 ring-inset ring-[var(--border)]"
+            className="inline-flex h-7 min-w-7 items-center justify-center rounded-full bg-[var(--warning)]/14 px-2 text-xs font-normal tabular-nums text-[var(--warning)] font-medium"
           >
             {Number(employee.issued_references) || 0}
           </span>
@@ -405,8 +405,16 @@ function CardMetric({ label, value, tone, className }) {
 
 /** Mobile employee card — every column stays readable in a stacked layout. */
 function EmployeeCard({ employee, pending, onAction }) {
-  const { issued, spent, remaining, received, abono, sent, funded, spentShare } =
-    budgetBreakdown(employee);
+  const {
+    issued,
+    spent,
+    remaining,
+    received,
+    abono,
+    sent,
+    funded,
+    spentShare,
+  } = budgetBreakdown(employee);
   const overSpent = remaining < 0;
   const references = Number(employee.issued_references) || 0;
   // Mirrors the desktop Transactions column: the references badge only

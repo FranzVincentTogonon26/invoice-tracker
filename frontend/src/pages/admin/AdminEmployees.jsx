@@ -185,7 +185,7 @@ export default function AdminEmployees() {
           className="h-full [&>div]:h-full"
         >
           <StatCard
-            label="Total Budget Issued"
+            label="Active Budget Issued"
             value={formatMoney(overview.totalEmployeeIssued)}
             icon={Wallet}
             accent
