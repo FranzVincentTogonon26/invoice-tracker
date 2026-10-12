@@ -72,26 +72,11 @@ class EmployeeOverview {
               AND br.status = 'open'
           ), 0)::int AS active_references,
           COALESCE((
+            -- Spent is PAID expenses only: a settled abono is handed back
+            -- (its pesos return as an issued_budget child), so counting it
+            -- as spent too would charge the same money twice. Pinned to its
+            -- own OPEN holding like every other leg.
             SELECT COALESCE(SUM(e.total_amount), 0)
-              -- Settled abono is consumed spend: the settle flow books every
-              -- settled peso back as an issued_budget child, so without
-              -- this leg the pool permanently overstates by the settled
-              -- amount. Pinned to its own OPEN holding like every other leg.
-              + COALESCE((
-                SELECT SUM(ea.amount)
-                FROM employee_abono ea
-                JOIN budget_reference br2 ON br2.reference_id = ea.reference_id
-                WHERE ea.user_id = $1 AND ea.status = 'settled'
-                  AND br2.status = 'open'
-                  AND EXISTS (
-                    SELECT 1
-                      FROM budget_issued_reference bir3
-                     WHERE bir3.user_id = ea.user_id
-                       AND bir3.reference_id = ea.reference_id
-                       AND bir3.status = 'open'
-                       AND bir3.id = ea.issued_ref_id
-                  )
-              ), 0)
             FROM expenses e
             LEFT JOIN budget_reference br ON br.reference_id = e.reference_id
             WHERE e.user_id = $1 AND e.status = 'paid'
@@ -164,9 +149,20 @@ class EmployeeOverview {
             WHERE bt.user_id = $1 AND bt.status = 'success'
           ), 0)::float8 AS total_sent,
           COALESCE((
+            -- Closed-holding gate (see the roster): a received transfer
+            -- whose stamped receiving holding has since closed leaves no
+            -- footsteps; unstamped legacy rows keep counting.
             SELECT SUM(btr.amount)
             FROM budget_transfer btr
             WHERE btr.transfer_to = $1 AND btr.status = 'success'
+              AND (
+                btr.issued_ref_id_sent IS NULL
+                OR EXISTS (
+                  SELECT 1 FROM budget_issued_reference birs
+                   WHERE birs.id = btr.issued_ref_id_sent
+                     AND birs.status = 'open'
+                )
+              )
           ), 0)::float8 AS total_received`,
       [userId],
     );
@@ -228,7 +224,8 @@ class EmployeeOverview {
           NULL AS receipt_id,
           NULL AS image_url,
           NULL AS direction,
-          NULL AS counterparty
+          NULL AS counterparty,
+          NULL AS category_name
         FROM issued_budget ib
         JOIN budget_issued_reference bir ON ib.issued_ref_id = bir.id
         JOIN budget_reference br ON br.reference_id = bir.reference_id
@@ -263,7 +260,8 @@ class EmployeeOverview {
           e.receipt_id,
           e.image_url,
           NULL AS direction,
-          NULL AS counterparty
+          NULL AS counterparty,
+          c.category_name AS category_name
         FROM expenses e
         LEFT JOIN category c ON c.category_id = e.category_id
         LEFT JOIN budget_reference br ON br.reference_id = e.reference_id
@@ -305,7 +303,8 @@ class EmployeeOverview {
           NULL AS receipt_id,
           NULL AS image_url,
           NULL AS direction,
-          NULL AS counterparty
+          NULL AS counterparty,
+          NULL AS category_name
         FROM employee_abono ea
         JOIN budget_reference br ON br.reference_id = ea.reference_id
           AND br.status = 'open'
@@ -345,7 +344,8 @@ class EmployeeOverview {
           NULL AS receipt_id,
           NULL AS image_url,
           'sent' AS direction,
-          ru.name AS counterparty
+          ru.name AS counterparty,
+          NULL AS category_name
         FROM budget_transfer bt
         LEFT JOIN users ru ON ru.user_id = bt.transfer_to
         JOIN budget_issued_reference birf ON birf.id = bt.issued_ref_id
@@ -378,10 +378,20 @@ class EmployeeOverview {
           NULL AS receipt_id,
           NULL AS image_url,
           'received' AS direction,
-          su.name AS counterparty
+          su.name AS counterparty,
+          NULL AS category_name
         FROM budget_transfer bt
         LEFT JOIN users su ON su.user_id = bt.user_id
         WHERE bt.transfer_to = $1 AND bt.status = 'success'
+          -- Same closed-holding gate as the totals above.
+          AND (
+            bt.issued_ref_id_sent IS NULL
+            OR EXISTS (
+              SELECT 1 FROM budget_issued_reference birs
+               WHERE birs.id = bt.issued_ref_id_sent
+                 AND birs.status = 'open'
+            )
+          )
       )
       SELECT * FROM all_tx t
       ${searchFilter}
@@ -417,8 +427,10 @@ class EmployeeOverview {
   // Source gating stays (a cut-off source connects to nothing), but the
   // holding gate is dropped: the record shows its own live money even after
   // it is closed, matching the reimbursement per-record view. Received
-  // transfers are excluded — they carry the SENDER's `issued_ref_id`, never
-  // this record's — so the balance is issued + abono − spent − sent.
+  // transfers ARE counted (same whole-account predicate): they carry the
+  // SENDER's `issued_ref_id`, never this record's, but they are the user's
+  // money — excluding them makes the record view disagree with the
+  // overview, so the balance is issued + abono − spent − sent + received.
   static async employeeOverviewByIssuedRef(userId, issuedRefId, { search } = {}) {
     const statsResult = await query(
       `SELECT
@@ -440,17 +452,9 @@ class EmployeeOverview {
               AND br.status = 'open'
           ), 0)::int AS active_references,
           COALESCE((
+            -- Same paid-expenses-only rule as the whole-account hero above:
+            -- this record's settled abono is handed back, not spent.
             SELECT COALESCE(SUM(e.total_amount), 0)
-              -- Settled abono of this record counts as its spent (see the
-              -- whole-account hero above for why).
-              + COALESCE((
-                SELECT SUM(ea.amount)
-                FROM employee_abono ea
-                JOIN budget_reference br2 ON br2.reference_id = ea.reference_id
-                WHERE ea.issued_ref_id = $2 AND ea.user_id = $1
-                  AND ea.status = 'settled'
-                  AND (ea.reference_id IS NULL OR br2.status = 'open')
-              ), 0)
             FROM expenses e
             LEFT JOIN budget_reference br ON br.reference_id = e.reference_id
             WHERE e.issued_ref_id = $2 AND e.user_id = $1 AND e.status = 'paid'
@@ -479,10 +483,19 @@ class EmployeeOverview {
           ), 0)::int AS abono_count,
           COALESCE((
             SELECT SUM(bt.amount)
-            FROM budget_transfer bt
-            WHERE bt.issued_ref_id = $2 AND bt.user_id = $1 AND bt.status = 'success'
+              FROM budget_transfer bt
+             WHERE bt.issued_ref_id = $2 AND bt.user_id = $1 AND bt.status = 'success'
           ), 0)::float8 AS total_sent,
-          0::float8 AS total_received`,
+          -- Record-stamped received: only transfers stamped to THIS record
+          -- count here — no status gate, so the legs always reconcile to
+          -- what close stored (close banks this same definition).
+          -- User-scope surfaces keep their own gated total; this one is
+          -- the record's own money.
+          COALESCE((
+            SELECT SUM(btr.amount)
+              FROM budget_transfer btr
+             WHERE btr.issued_ref_id_sent = $2 AND btr.status = 'success'
+          ), 0)::float8 AS total_received`,
       [userId, issuedRefId],
     );
 
@@ -529,7 +542,8 @@ class EmployeeOverview {
           NULL AS receipt_id,
           NULL AS image_url,
           NULL AS direction,
-          NULL AS counterparty
+          NULL AS counterparty,
+          NULL AS category_name
         FROM issued_budget ib
         JOIN budget_issued_reference bir ON ib.issued_ref_id = bir.id
         JOIN budget_reference br ON br.reference_id = bir.reference_id
@@ -556,7 +570,8 @@ class EmployeeOverview {
           e.receipt_id,
           e.image_url,
           NULL AS direction,
-          NULL AS counterparty
+          NULL AS counterparty,
+          c.category_name AS category_name
         FROM expenses e
         LEFT JOIN category c ON c.category_id = e.category_id
         LEFT JOIN budget_reference br ON br.reference_id = e.reference_id
@@ -583,7 +598,8 @@ class EmployeeOverview {
           NULL AS receipt_id,
           NULL AS image_url,
           NULL AS direction,
-          NULL AS counterparty
+          NULL AS counterparty,
+          NULL AS category_name
         FROM employee_abono ea
         JOIN budget_reference br ON br.reference_id = ea.reference_id
           AND br.status = 'open'
@@ -612,10 +628,43 @@ class EmployeeOverview {
           NULL AS receipt_id,
           NULL AS image_url,
           'sent' AS direction,
-          ru.name AS counterparty
+          ru.name AS counterparty,
+          NULL AS category_name
         FROM budget_transfer bt
         LEFT JOIN users ru ON ru.user_id = bt.transfer_to
         WHERE bt.issued_ref_id = $2 AND bt.user_id = $1 AND bt.status = 'success'
+
+        UNION ALL
+
+        -- Record-stamped inbound transfers only: this record's own money,
+        -- listed so the record view shows its books exactly as close
+        -- stored them.
+        SELECT
+          bt.id,
+          'transfer' AS kind,
+          bt.amount::float8 AS amount,
+          COALESCE(
+            NULLIF(TRIM(bt.notes), ''),
+            'Budget transfer from ' || COALESCE(su.name, 'employee')
+          ) AS description,
+          bt.notes,
+          bt.method,
+          bt.status,
+          NULL::timestamptz AS date_settled,
+          NULL AS reference_label,
+          bt.reference_id,
+          bt.issued_ref_id,
+          0 AS flag,
+          bt.created_at AS date,
+          bt.created_at AS created_at,
+          NULL AS receipt_id,
+          NULL AS image_url,
+          'received' AS direction,
+          su.name AS counterparty,
+          NULL AS category_name
+        FROM budget_transfer bt
+        LEFT JOIN users su ON su.user_id = bt.user_id
+        WHERE bt.issued_ref_id_sent = $2 AND bt.status = 'success'
       )
       SELECT * FROM all_tx t
       ${searchFilter}

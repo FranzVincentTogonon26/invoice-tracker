@@ -204,11 +204,10 @@ export default function AdminEmployeesDetails() {
     );
     const cumSum = (head, pred) =>
       round(head.filter(pred).reduce((s, t) => s + amountOf(t), 0));
-    // Settled abono rides the spent line (consumed spend); the abono line
+    // Spent is paid expenses (and sent transfers) only: settled abono is
+    // handed back, not spent, so it leaves the spent line. The abono line
     // keeps tracking all abono activity.
-    const isSpent = (t) =>
-      (!isIssued(t) && !isAbono(t)) ||
-      (t.kind === "abono" && t.status === "settled");
+    const isSpent = (t) => !isIssued(t) && !isAbono(t);
 
     return sorted.map((t, i) => {
       const head = sorted.slice(0, i + 1);
@@ -275,18 +274,22 @@ export default function AdminEmployeesDetails() {
           .filter(pred)
           .reduce((s, t) => s + num(t.amount), 0),
       );
+    // Unscoped sum: the feed's received leg is already scoped to this
+    // record's own stamp (`issued_ref_id_sent`), while every other row
+    // carries this record's id — so received must skip the record filter
+    // (whose sender-side id would drop every one of them).
+    const sumAll = (pred) =>
+      round(feed.filter(pred).reduce((s, t) => s + num(t.amount), 0));
 
     return {
       issued: sum((t) => t.kind === "issued" && t.status !== "cancel"),
-      // Settled abono is consumed spend (re-booked as issued on settle).
-      spent: sum(
-        (t) =>
-          (t.kind === "expense" && t.status === "paid") ||
-          (t.kind === "abono" && t.status === "settled"),
-      ),
+      // Paid expenses only: settled abono is handed back, not spent.
+      spent: sum((t) => t.kind === "expense" && t.status === "paid"),
       abono: sum((t) => t.kind === "abono" && t.status === "open"),
       sent: sum((t) => t.direction === "sent" && t.status === "success"),
-      received: 0,
+      received: sumAll(
+        (t) => t.direction === "received" && t.status === "success",
+      ),
     };
   }, [isBirLink, detailOverview, id]);
 

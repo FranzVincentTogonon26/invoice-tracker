@@ -134,14 +134,9 @@ class Abono {
                      AND ib.status != 'cancel'
                 ), 0)::float8 AS total_budget,
                 COALESCE((
+                  -- Paid-expenses-only spent: this record's settled abono
+                  -- is handed back, not spent.
                   SELECT COALESCE(SUM(e.total_amount), 0)
-                    -- Settled abono of this record counts as its spent.
-                    + COALESCE((
-                      SELECT SUM(ea.amount)
-                      FROM employee_abono ea
-                      WHERE ea.issued_ref_id = $2 AND ea.user_id = $1
-                        AND ea.status = 'settled'
-                    ), 0)
                    FROM expenses e
                    WHERE e.issued_ref_id = $2 AND e.user_id = $1 AND e.status = 'paid'
                 ), 0)::float8 AS total_expenses,
@@ -195,25 +190,9 @@ class Abono {
                      AND ib.status != 'cancel'
                 ), 0)::float8 AS total_budget,
                 COALESCE((
+                  -- Paid-expenses-only spent (see the employee overview
+                  -- hero): settled abono is handed back, not spent.
                   SELECT COALESCE(SUM(e.total_amount), 0)
-                    -- Settled abono is consumed spend (see the employee
-                    -- overview hero): without this leg the pool overstates
-                    -- by the settled amount.
-                    + COALESCE((
-                      SELECT SUM(ea.amount)
-                      FROM employee_abono ea
-                      JOIN budget_reference br2 ON br2.reference_id = ea.reference_id
-                      WHERE ea.user_id = $1 AND ea.status = 'settled'
-                        AND br2.status = 'open'
-                        AND EXISTS (
-                          SELECT 1
-                            FROM budget_issued_reference bir3
-                           WHERE bir3.user_id = ea.user_id
-                             AND bir3.reference_id = ea.reference_id
-                             AND bir3.status = 'open'
-                             AND bir3.id = ea.issued_ref_id
-                        )
-                    ), 0)
                    FROM expenses e
                    LEFT JOIN budget_reference br ON br.reference_id = e.reference_id
                     WHERE e.user_id = $1 AND e.status = 'paid'
@@ -236,9 +215,21 @@ class Abono {
                    WHERE bt.user_id = $1 AND bt.status = 'success'
                 ), 0)::float8 AS total_sent,
                 COALESCE((
+                  -- Closed-holding gate (see the roster): a received
+                  -- transfer whose stamped receiving holding has since
+                  -- closed leaves no footsteps; unstamped legacy rows keep
+                  -- counting.
                   SELECT SUM(btr.amount)
                     FROM budget_transfer btr
                    WHERE btr.transfer_to = $1 AND btr.status = 'success'
+                     AND (
+                       btr.issued_ref_id_sent IS NULL
+                       OR EXISTS (
+                         SELECT 1 FROM budget_issued_reference birs
+                          WHERE birs.id = btr.issued_ref_id_sent
+                            AND birs.status = 'open'
+                       )
+                     )
                 ), 0)::float8 AS total_received`,
             [userId],
           ),
@@ -357,24 +348,10 @@ class Abono {
                        AND bir2.id = e.issued_ref_id
                   ))
               ), 0)
-              -- Settled abono is consumed spend (same rule as the displayed
-              -- heroes): without it the guard disagrees with the dialog cover
-              -- balance and refuses coverable settles.
-              + COALESCE((
-                SELECT SUM(ea.amount)
-                FROM employee_abono ea
-                JOIN budget_reference br2 ON br2.reference_id = ea.reference_id
-                WHERE ea.user_id = $1 AND ea.status = 'settled'
-                  AND br2.status = 'open'
-                  AND EXISTS (
-                    SELECT 1
-                      FROM budget_issued_reference bir3
-                     WHERE bir3.user_id = ea.user_id
-                       AND bir3.reference_id = ea.reference_id
-                       AND bir3.status = 'open'
-                       AND bir3.id = ea.issued_ref_id
-                  )
-              ), 0))::float8
+              -- Paid-expenses-only spent (same rule as the displayed heroes):
+              -- settled abono is handed back, so the guard must not treat
+              -- it as gone.
+              )::float8
               - COALESCE((
                 SELECT SUM(bt.amount)
                 FROM budget_transfer bt
@@ -384,9 +361,20 @@ class Abono {
                 WHERE bt.user_id = $1 AND bt.status = 'success'
               ), 0)::float8
               + COALESCE((
+                -- Closed-holding gate (see the roster): a received transfer
+                -- whose stamped receiving holding has since closed leaves no
+                -- footsteps; unstamped legacy rows keep counting.
                 SELECT SUM(btr.amount)
                 FROM budget_transfer btr
                 WHERE btr.transfer_to = $1 AND btr.status = 'success'
+                  AND (
+                    btr.issued_ref_id_sent IS NULL
+                    OR EXISTS (
+                      SELECT 1 FROM budget_issued_reference birs
+                       WHERE birs.id = btr.issued_ref_id_sent
+                         AND birs.status = 'open'
+                    )
+                  )
               ), 0)::float8 AS total_balance`,
           [userId],
         )
@@ -512,24 +500,10 @@ class Abono {
                        AND bir2.id = e.issued_ref_id
                   ))
               ), 0)
-              -- Settled abono is consumed spend (same rule as the displayed
-              -- heroes): without it the guard disagrees with the dialog cover
-              -- balance and refuses coverable settles.
-              + COALESCE((
-                SELECT SUM(ea.amount)
-                FROM employee_abono ea
-                JOIN budget_reference br2 ON br2.reference_id = ea.reference_id
-                WHERE ea.user_id = $1 AND ea.status = 'settled'
-                  AND br2.status = 'open'
-                  AND EXISTS (
-                    SELECT 1
-                      FROM budget_issued_reference bir3
-                     WHERE bir3.user_id = ea.user_id
-                       AND bir3.reference_id = ea.reference_id
-                       AND bir3.status = 'open'
-                       AND bir3.id = ea.issued_ref_id
-                  )
-              ), 0))::float8
+              -- Paid-expenses-only spent (same rule as the displayed heroes):
+              -- settled abono is handed back, so the guard must not treat
+              -- it as gone.
+              )::float8
               - COALESCE((
                 SELECT SUM(bt.amount)
                 FROM budget_transfer bt
@@ -539,9 +513,20 @@ class Abono {
                 WHERE bt.user_id = $1 AND bt.status = 'success'
               ), 0)::float8
               + COALESCE((
+                -- Closed-holding gate (see the roster): a received transfer
+                -- whose stamped receiving holding has since closed leaves no
+                -- footsteps; unstamped legacy rows keep counting.
                 SELECT SUM(btr.amount)
                 FROM budget_transfer btr
                 WHERE btr.transfer_to = $1 AND btr.status = 'success'
+                  AND (
+                    btr.issued_ref_id_sent IS NULL
+                    OR EXISTS (
+                      SELECT 1 FROM budget_issued_reference birs
+                       WHERE birs.id = btr.issued_ref_id_sent
+                         AND birs.status = 'open'
+                    )
+                  )
               ), 0)::float8 AS total_balance`,
           [userId],
         )

@@ -132,9 +132,9 @@ export default function AdminSourceFunds() {
     }
   };
 
-  const handleCreate = async ({ label, notes }) => {
+  const handleCreate = async ({ label, notes, date_cut_off }) => {
     try {
-      await createReference.mutateAsync({ label, notes });
+      await createReference.mutateAsync({ label, notes, date_cut_off });
       setRefsOpen(false);
       // Actor-only toast: this admin's device confirms; other sessions
       // refresh silently over the socket.

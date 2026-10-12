@@ -20,10 +20,10 @@ const toMoney = (value) => Math.round((Number(value) || 0) * 100) / 100;
 //   - Expense: Money Out only while 'paid'. Drafts are parked and cancelled
 //     rows are void — neither counts as spent.
 //   - Abono (out-of-pocket top-up from an employee): Money In while 'open'.
-//     Settled (reimbursed) rows are consumed spend — the settle flow re-books
-//     every settled peso as an issued child, so they read as Money Out (this
-//     keeps ledger outflows in agreement with every hero that counts settled
-//     spend). Draft rows are parked and stay void.
+//     Settled (reimbursed) rows hand their pesos back — the settle flow
+//     re-books every settled peso as an issued child (already Money Out),
+//     so the settled row itself stays void: counting it as Out too would
+//     charge the same money twice. Draft rows are parked and stay void.
 //   - Budget Transfer: each `budget_transfer` row is split into its two legs
 //     — "Transfer Sent" (Money Out of the sender) and "Transfer Received"
 //     (Money In to the recipient). Employee-to-employee moves therefore net
@@ -37,11 +37,10 @@ const issuedFlow = (row) => (row.status === "cancel" ? "void" : "out");
 
 const expenseFlow = (row) => (row.status === "paid" ? "out" : "void");
 
-// Open abono funds the pool ('in'); settled abono is consumed spend ('out',
-// matching the heroes); drafts are parked ('void'). Every status stays in
-// the ledger with its badge.
-const abonoDirection = (row) =>
-  row.status === "open" ? "in" : row.status === "settled" ? "out" : "void";
+// Open abono funds the pool ('in'); settled abono is handed back ('void',
+// matching the heroes — the issued child carries the outflow); drafts are
+// parked ('void'). Every status stays in the ledger with its badge.
+const abonoDirection = (row) => (row.status === "open" ? "in" : "void");
 
 const transferLegFlow = (row) => (row.status === "success" ? null : "void");
 

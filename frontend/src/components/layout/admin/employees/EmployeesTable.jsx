@@ -345,7 +345,7 @@ function EmployeeRow({ employee, pending, onAction }) {
         {hasIssuedBudget ? (
           <span
             title="Issuance transactions under open holdings"
-            className="inline-flex h-7 min-w-7 items-center justify-center rounded-full bg-[var(--warning)]/14 px-2 text-xs font-normal tabular-nums text-[var(--warning)] font-medium"
+            className="inline-flex h-6 min-w-6 items-center justify-center rounded-full bg-[var(--danger)]/14 px-2 text-xs text-[var(--danger)] font-semibold"
           >
             {Number(employee.issued_references) || 0}
           </span>

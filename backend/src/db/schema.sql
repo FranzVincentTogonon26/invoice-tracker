@@ -181,26 +181,29 @@ CREATE TABLE IF NOT EXISTS employee_abono (
 -- ============================================================
 
 CREATE TABLE IF NOT EXISTS budget_transfer (
-    id            UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    reference_id  UUID NOT NULL
-                  REFERENCES budget_reference(reference_id)
-                  ON DELETE CASCADE,
-    issued_ref_id UUID
-                  REFERENCES budget_issued_reference(id)
-                  ON DELETE CASCADE,
-    user_id       UUID NOT NULL
-                  REFERENCES users(user_id)
-                  ON DELETE CASCADE,
-    amount        DECIMAL(12,2) NOT NULL,
-    notes         TEXT,
-    method        VARCHAR(255) NOT NULL,
-    status        VARCHAR(20) NOT NULL DEFAULT 'success'
-                  CHECK (status IN ('success', 'cancel')),
-    transfer_to   UUID NOT NULL
-                  REFERENCES users(user_id)
-                  ON DELETE CASCADE,
-    created_at    TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-    updated_at    TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    id                  UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    reference_id        UUID NOT NULL
+                        REFERENCES budget_reference(reference_id)
+                        ON DELETE CASCADE,
+    issued_ref_id       UUID
+                        REFERENCES budget_issued_reference(id)
+                        ON DELETE CASCADE,
+    issued_ref_id_sent  UUID
+                        REFERENCES budget_issued_reference(id)
+                        ON DELETE CASCADE,
+    user_id             UUID NOT NULL
+                        REFERENCES users(user_id)
+                        ON DELETE CASCADE,
+    amount              DECIMAL(12,2) NOT NULL,
+    notes               TEXT,
+    method              VARCHAR(255) NOT NULL,
+    status              VARCHAR(20) NOT NULL DEFAULT 'success'
+                        CHECK (status IN ('success', 'cancel')),
+    transfer_to         UUID NOT NULL
+                        REFERENCES users(user_id)
+                        ON DELETE CASCADE,
+    created_at          TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    updated_at          TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     CHECK (amount >= 0)
 );
 

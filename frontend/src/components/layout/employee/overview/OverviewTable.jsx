@@ -45,10 +45,7 @@ function StatusCell({ tx, meta }) {
     // Cancelled issuance (`issued_budget.status = 'cancel'`): danger
     // identifier — the amount below strikes through in danger tone too.
     return (
-      <Badge
-        tone="danger"
-        className="max-w-full gap-1.5 px-2 py-1 text-[11px]"
-      >
+      <Badge tone="danger" className="max-w-full gap-1.5 px-2 py-1 text-[11px]">
         <span className="h-2 w-2 rounded-full bg-current opacity-80" />
         <span className="truncate">Cancelled</span>
       </Badge>
@@ -94,7 +91,7 @@ function StatusCell({ tx, meta }) {
         </Badge>
         {tx?.date_settled && (
           <p
-            className="mt-1.5 truncate whitespace-nowrap text-[11px] leading-none tabular-nums text-[var(--ink-muted)]"
+            className="mt-1.5 truncate whitespace-nowrap text-[11px] leading-none text-[var(--ink-muted)]"
             title={`Settled on ${formatDate(tx.date_settled)} at ${formatTime(tx.date_settled)}`}
           >
             {formatDate(tx.date_settled)} · {formatTime(tx.date_settled)}
@@ -168,10 +165,10 @@ function OverviewTableRow({ tx, onView }) {
           aria-hidden
           className="absolute inset-y-2 left-0 w-[3px] rounded-full bg-transparent"
         />
-        <p className="whitespace-nowrap text-[13px] font-medium leading-none tabular-nums text-[var(--ink)]">
+        <p className="whitespace-nowrap text-[13px] font-medium leading-none text-[var(--ink)]">
           {formatDate(tx.date)}
         </p>
-        <p className="mt-1 whitespace-nowrap text-[11px] leading-none tabular-nums text-[var(--ink-muted)]">
+        <p className="mt-1 whitespace-nowrap text-[11px] leading-none  text-[var(--ink-muted)]">
           {formatTime(tx.date)}
         </p>
       </td>
@@ -199,13 +196,23 @@ function OverviewTableRow({ tx, onView }) {
           ) : null}
           <p
             className="truncate text-[13px] font-medium leading-snug text-[var(--ink)]"
-            title={transfer ? tx.reference_label || tx.description : tx.description}
+            title={
+              transfer ? tx.reference_label || tx.description : tx.description
+            }
           >
             {transfer
               ? tx.reference_label || tx.description || "—"
               : tx.description || "—"}
           </p>
         </div>
+        {tx.category_name ? (
+          <span
+            className="inline-flex items-center rounded-md bg-[var(--surface-2)] px-1.5 py-0.5 text-[11px] font-normal text-[var(--ink)]"
+            title={tx.category_name}
+          >
+            {tx.category_name}
+          </span>
+        ) : null}
         {transfer && tx.notes && transferCounterparty(tx) ? (
           <p
             className="mt-0.5 text-[11px] leading-snug text-[var(--ink-muted)]"
@@ -250,7 +257,7 @@ function OverviewTableRow({ tx, onView }) {
           <span aria-hidden className="mx-1.5 opacity-40">
             ·
           </span>
-          <span className="text-[11px] tabular-nums text-[var(--ink-muted)]">
+          <span className="text-[11px]  text-[var(--ink-muted)]">
             {formatTime(tx.date)}
           </span>
         </p>
@@ -258,12 +265,14 @@ function OverviewTableRow({ tx, onView }) {
       <td className="px-4 py-3 text-right align-middle">
         <span
           className={cn(
-            "whitespace-nowrap font-display text-[15px] font-medium tabular-nums",
+            "whitespace-nowrap font-display text-[15px] font-medium ",
             amountColor,
             (isCancelled(tx) || isCancelledIssued(tx)) && "line-through",
           )}
         >
-          {negative ? `-${formatMoney(tx.amount)}` : `+${formatMoney(tx.amount)}`}
+          {negative
+            ? `-${formatMoney(tx.amount)}`
+            : `+${formatMoney(tx.amount)}`}
         </span>
       </td>
       <td className="px-4 py-3 pr-5 text-right align-middle">

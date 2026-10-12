@@ -503,18 +503,20 @@ class Expenses {
                AND bu.status != 'cancelled'
           ), 0)::float8 AS allocated,
           COALESCE((
+            -- Same legs as AdminBudget's per-source breakdown
+            -- (budget.model overviewIssuedBudget): open AND closed
+            -- holdings count — only the source gates them — so the Add
+            -- Expenses picker reads the same remaining for each source.
             SELECT SUM(i.amount)
               FROM issued_budget i
               JOIN budget_issued_reference bir ON i.issued_ref_id = bir.id
-             WHERE bir.status = 'open'
-               AND bir.reference_id = b.reference_id
+             WHERE bir.reference_id = b.reference_id
                AND i.status != 'cancel'
           ), 0)::float8 AS issued,
           COALESCE((
             SELECT SUM(e.total_amount)
               FROM expenses e
              WHERE e.reference_id = b.reference_id
-               AND e.status = 'paid'
                -- Employee rows are tagged with their source too, but their
                -- spend already left the reference as "issued" — counting it
                -- again would double-subtract (see budget.model.js).
@@ -522,7 +524,15 @@ class Expenses {
                  SELECT 1 FROM users u
                   WHERE u.user_id = e.user_id AND u.role = 'employee'
                )
-          ), 0)::float8 AS expenses
+          ), 0)::float8 AS expenses,
+          COALESCE((
+            -- Finalized holdings hand their leftover back (same leg as
+            -- AdminBudget's overviewForwarded).
+            SELECT SUM(bir.balance_forwarded)
+              FROM budget_issued_reference bir
+             WHERE bir.reference_id = b.reference_id
+               AND bir.status = 'close'
+          ), 0)::float8 AS forwarded
          FROM budget_reference b
         WHERE b.status = 'open'
         ORDER BY b.created_at DESC`,
@@ -533,15 +543,18 @@ class Expenses {
       const allocated = Number(row.allocated) || 0;
       const issued = Number(row.issued) || 0;
       const expenses = Number(row.expenses) || 0;
-      // Spendable balance mirrors the AdminBudget overview:
-      // allocated − issued − expenses (expenses drawn against this source
-      // reduce what the Add Expenses form can still fund).
+      const forwarded = Number(row.forwarded) || 0;
+      // Spendable balance mirrors AdminBudget's per-source Remaining
+      // exactly: allocated − issued − expenses + forwarded (finalized
+      // holdings hand their leftover back, so the Add Expenses form can
+      // still fund against it).
       return {
         ...row,
         allocated,
         issued,
         expenses,
-        balance: allocated - issued - expenses,
+        forwarded,
+        balance: allocated - issued - expenses + forwarded,
       };
     });
   }
@@ -626,6 +639,65 @@ class Expenses {
        WHERE e.status = 'paid'
          AND u.role = 'admin'
          AND (e.reference_id IS NULL OR br.status = 'open')`,
+      [],
+    );
+
+    // Shared "Total Expenses" headline — the SAME two legs AdminBudget's
+    // `totalExpensesAll` sums, with identical predicates, so both pages
+    // render the same value: admin-authored spend on open sources plus
+    // paid employee-authored spend on open sources. Kept separate from
+    // `total_expenses` above (paid-only admin spend), which the My Balance
+    // card and ledger footer rely on.
+    const headlineAdmin = await query(
+      `SELECT COALESCE(SUM(e.total_amount), 0)::float8 AS amount
+       FROM expenses e
+       JOIN budget_reference br ON br.reference_id = e.reference_id
+       WHERE br.status = 'open'
+         AND NOT EXISTS (
+          SELECT 1 FROM users u
+           WHERE u.user_id = e.user_id AND u.role = 'employee'
+        )`,
+      [],
+    );
+    const headlineEmployee = await query(
+      `SELECT COALESCE(SUM(e.total_amount), 0)::float8 AS amount
+       FROM expenses e
+       JOIN budget_reference br ON br.reference_id = e.reference_id
+       WHERE br.status = 'open'
+         AND e.status = 'paid'
+         AND EXISTS (
+          SELECT 1 FROM users u
+           WHERE u.user_id = e.user_id AND u.role = 'employee'
+        )`,
+      [],
+    );
+    const headlineAdminRaw = Number(headlineAdmin.rows[0]?.amount ?? 0);
+    const headlineEmployeeRaw = Number(headlineEmployee.rows[0]?.amount ?? 0);
+    const totalExpensesAll = toMoney(headlineAdminRaw + headlineEmployeeRaw);
+
+    // Shared "Remaining Balance" — the SAME formula AdminBudget's
+    // `cashOnHand` uses, with identical leg definitions, so both pages
+    // render the same value:
+    //   budget − (issued + admin spend) + forwarded
+    // Note the issued leg here deliberately counts closed holdings too
+    // (only the source gates it), exactly like the Budget endpoint — the
+    // page's own `totalIssued` above is open-holdings-only and stays as-is
+    // for the breakdowns that consume it.
+    const sharedIssued = await query(
+      `SELECT COALESCE(SUM(i.amount), 0)::float8 AS amount
+       FROM budget_issued_reference bir
+       JOIN issued_budget i ON i.issued_ref_id = bir.id
+       JOIN budget_reference br ON br.reference_id = bir.reference_id
+       WHERE br.status = 'open'
+         AND i.status != 'cancel'`,
+      [],
+    );
+    const sharedForwarded = await query(
+      `SELECT COALESCE(SUM(bir.balance_forwarded), 0)::float8 AS amount
+       FROM budget_reference br
+       LEFT JOIN budget_issued_reference bir ON bir.reference_id = br.reference_id
+         AND bir.status = 'close'
+       WHERE br.status = 'open'`,
       [],
     );
 
@@ -714,6 +786,13 @@ class Expenses {
     // the My Balance card's Spent stat and broke allocated − issued − spent.
     const totalExpenses = toMoney(s.total_expenses);
 
+    // Raw (unrounded) legs — AdminBudget sums without cent-rounding, so this
+    // shared figure does the same; display rounding happens in formatMoney.
+    const sharedCashOnHand =
+      Number(totalBudget) -
+      (Number(sharedIssued.rows[0]?.amount ?? 0) + headlineAdminRaw) +
+      Number(sharedForwarded.rows[0]?.amount ?? 0);
+
     return {
       categories,
       references,
@@ -726,6 +805,16 @@ class Expenses {
         totalBudget,
         totalIssued,
         totalExpenses,
+        totalExpensesAll,
+        // Budget-definition legs behind the shared figures, so the
+        // Expenses page can mirror AdminBudget's breakdown labels
+        // ("Employee Expense" / "My Expenses") and its Issued total
+        // (closed holdings included) exactly.
+        totalEmployeeExpenses: headlineEmployeeRaw,
+        totalAdminExpenses: headlineAdminRaw,
+        totalIssuedAll: Number(sharedIssued.rows[0]?.amount ?? 0),
+        totalForwarded: Number(sharedForwarded.rows[0]?.amount ?? 0),
+        cashOnHand: sharedCashOnHand,
         totalCategories: categories.length,
         totalTransaction: totalTransaction.rows[0]?.total ?? 0,
       },
@@ -843,9 +932,20 @@ class Expenses {
              WHERE bt.user_id = $1 AND bt.status = 'success'
           ), 0)::float8 AS sent,
           COALESCE((
+            -- Closed-holding gate (see the roster): a received transfer
+            -- whose stamped receiving holding has since closed leaves no
+            -- footsteps; unstamped legacy rows keep counting.
             SELECT SUM(btr.amount)
               FROM budget_transfer btr
              WHERE btr.transfer_to = $1 AND btr.status = 'success'
+               AND (
+                 btr.issued_ref_id_sent IS NULL
+                 OR EXISTS (
+                   SELECT 1 FROM budget_issued_reference birs
+                    WHERE birs.id = btr.issued_ref_id_sent
+                      AND birs.status = 'open'
+                 )
+               )
           ), 0)::float8 AS received`,
       [userId],
     );
@@ -860,8 +960,9 @@ class Expenses {
     // same (reference_id, user_id) via `issued_ref_id`
     // (`budget_issued_reference.status = 'open'`) — spend under closed
     // holdings or cut-off sources never reaches any source. Settled abono
-    // counts as spend of its own record's source (same pinning — it is
-    // consumed money the settle flow re-booked as issued). Untagged rows
+    // is NOT spend here: settling hands the pesos back (re-booked as an
+    // issued child, already counted in the source's issued leg), so adding
+    // it to spend would charge the same money twice. Untagged rows
     // (reference_id IS NULL) connect to no holding and join the spread pool
     // below (oldest-source-first, capped at what each source received so no
     // source ever offers more cash than the pool holds). Grouping by
@@ -880,22 +981,7 @@ class Expenses {
               AND bir2.status = 'open'
               AND bir2.id = e.issued_ref_id
           ))
-        GROUP BY e.reference_id
-        UNION ALL
-       SELECT ea.reference_id,
-              COALESCE(SUM(ea.amount), 0)::float8 AS expenses
-         FROM employee_abono ea
-         JOIN budget_reference br ON br.reference_id = ea.reference_id
-        WHERE ea.user_id = $1 AND ea.status = 'settled'
-          AND br.status = 'open'
-          AND EXISTS (
-            SELECT 1 FROM budget_issued_reference bir2
-            WHERE bir2.user_id = ea.user_id
-              AND bir2.reference_id = ea.reference_id
-              AND bir2.status = 'open'
-              AND bir2.id = ea.issued_ref_id
-          )
-        GROUP BY ea.reference_id`,
+        GROUP BY e.reference_id`,
       [userId],
     );
 
@@ -1023,8 +1109,9 @@ class Expenses {
     // Successful budget transfers move money too (sent out shrinks the pool,
     // received widens it), so the balance matches the Overview hero exactly.
     // Record-scoped view (`issuedRefId`): every sum is keyed on
-    // `budget_issued_reference.id` via `issued_ref_id`; received transfers are
-    // excluded (they carry the sender's issuance id).
+    // `budget_issued_reference.id` via `issued_ref_id`; received transfers
+    // use the whole-account predicate (sender-stamped, never the record's)
+    // with the closed-holding gate, so record views agree everywhere.
     // Whole-account sums key every leg on the user's OPEN holdings for the
     // same (reference_id, user_id), pinning tagged rows through
     // `issued_ref_id = budget_issued_reference.id` (`status = 'open'`).
@@ -1060,7 +1147,23 @@ class Expenses {
                   FROM budget_transfer bt
                   WHERE bt.issued_ref_id = $2 AND bt.user_id = $1 AND bt.status = 'success'
                 ), 0)::float8 AS total_sent,
-                0::float8 AS total_received
+                -- Received is the user's money however it arrived
+                -- (sender-stamped, never this record's): same whole-account
+                -- predicate as every other surface, with the same
+                -- closed-holding gate, so record views agree everywhere.
+                COALESCE((
+                  SELECT SUM(btr.amount)
+                  FROM budget_transfer btr
+                  WHERE btr.transfer_to = $1 AND btr.status = 'success'
+                    AND (
+                      btr.issued_ref_id_sent IS NULL
+                      OR EXISTS (
+                        SELECT 1 FROM budget_issued_reference birs
+                         WHERE birs.id = btr.issued_ref_id_sent
+                           AND birs.status = 'open'
+                      )
+                    )
+                ), 0)::float8 AS total_received
              FROM expenses e
              LEFT JOIN budget_reference br ON br.reference_id = e.reference_id
             WHERE e.user_id = $1 AND e.issued_ref_id = $2 AND e.status = 'paid'
@@ -1070,26 +1173,11 @@ class Expenses {
       : await query(
           `SELECT
                 (COALESCE(SUM(e.total_amount), 0)
-                 -- Settled abono counts as spent: the settle flow books every
-                 -- settled peso back as an issued child, so omitting it
-                 -- overstates the pool. Pinned to its own OPEN holding like
-                 -- every other leg ($1 only — this branch has no record id).
-                 + COALESCE((
-                   SELECT SUM(ea.amount)
-                   FROM employee_abono ea
-                   JOIN budget_reference br2 ON br2.reference_id = ea.reference_id
-                   WHERE ea.user_id = $1
-                     AND ea.status = 'settled'
-                     AND br2.status = 'open'
-                     AND EXISTS (
-                       SELECT 1
-                         FROM budget_issued_reference bir3
-                        WHERE bir3.user_id = ea.user_id
-                          AND bir3.reference_id = ea.reference_id
-                          AND bir3.status = 'open'
-                          AND bir3.id = ea.issued_ref_id
-                     )
-                 ), 0))::float8 AS total_expenses,
+                 -- Paid-expenses-only spent: settled abono is handed back
+                 -- (re-booked as an issued child), not spent. Pinned to its
+                 -- own OPEN holding like every other leg ($1 only — this
+                 -- branch has no record id.
+                 )::float8 AS total_expenses,
                 COALESCE(SUM(e.total_amount) FILTER (
                   WHERE e.expense_date >= date_trunc('month', CURRENT_DATE)
                 ), 0)::float8 AS this_month,
@@ -1127,9 +1215,20 @@ class Expenses {
               WHERE bt.user_id = $1 AND bt.status = 'success'
             ), 0)::float8 AS total_sent,
             COALESCE((
+              -- Closed-holding gate (see the roster): a received transfer
+              -- whose stamped receiving holding has since closed leaves no
+              -- footsteps; unstamped legacy rows keep counting.
               SELECT SUM(btr.amount)
               FROM budget_transfer btr
               WHERE btr.transfer_to = $1 AND btr.status = 'success'
+                AND (
+                  btr.issued_ref_id_sent IS NULL
+                  OR EXISTS (
+                    SELECT 1 FROM budget_issued_reference birs
+                     WHERE birs.id = btr.issued_ref_id_sent
+                       AND birs.status = 'open'
+                  )
+                )
             ), 0)::float8 AS total_received
          FROM expenses e
          LEFT JOIN budget_reference br ON br.reference_id = e.reference_id

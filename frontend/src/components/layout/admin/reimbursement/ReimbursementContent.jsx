@@ -111,6 +111,8 @@ export function AdminEmployeeReimbursementDetails() {
       openAbonoCount: num(directOverview.abonoCount),
       spent: num(directOverview.totalExpenses),
       expenseCount: num(directOverview.expenseCount),
+      sent: num(directOverview.totalSent),
+      received: num(directOverview.totalReceived),
       balance: num(directOverview.totalBalance),
     };
   }, [directHolder, directOverview, directIssuedRef, id]);
@@ -385,6 +387,8 @@ export function AdminEmployeeReimbursementDetails() {
                 icon={HandCoins}
                 label="Issued Budget"
                 value={formatMoney(row.issued)}
+                received={Number(row?.received) || 0}
+                sent={Number(row?.sent) || 0}
                 hint={
                   record
                     ? `${record.issuedCount ?? 0} transactions · 1 source`

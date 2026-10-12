@@ -19,6 +19,7 @@ import {
   PAYMENT_METHODS,
 } from "../../constants";
 import { useExpenses, useExpensesMutations } from "../../hooks/useExpenses";
+import { useTransactions } from "../../hooks/useTransactions";
 import ConfirmActionDialog from "../../components/layout/admin/expenses/ConfirmActionDialog";
 import ExpenseDetailsModal from "../../components/layout/admin/expenses/ExpenseDetailsModal";
 import { ExpenseOverview } from "../../components/layout/admin/expenses/ExpenseOverview";
@@ -46,6 +47,10 @@ const AdminExpenses = () => {
 
   const { data, expenses, categories, references, isLoading, error, refetch } =
     useExpenses();
+  // Shared unified ledger (same react-query cache as AdminTransaction, so no
+  // extra fetch) — powers the Budget Allocated card's stats below with the
+  // Transaction page's exact figures.
+  const { transactions: allTxRows } = useTransactions();
 
   const {
     remove,
@@ -76,9 +81,11 @@ const AdminExpenses = () => {
 
   const overview = data?.overview ?? {};
   const totalBudget = Number(overview.totalBudget ?? 0);
-  const totalIssued = Number(overview.totalIssued ?? 0);
-  const totalExpenses = Number(overview.totalExpenses ?? 0);
-  const cashOnHand = totalBudget - (totalIssued + totalExpenses);
+  // Shared "Remaining Balance" — the same server figure AdminBudget's
+  // `cashOnHand` card renders (budget − issued − admin spend + forwarded).
+  // The overdrawn/depleted tone + status below derive from this value, so
+  // they stay consistent with the Budget page automatically.
+  const cashOnHand = Number(overview.cashOnHand ?? 0);
   const isBalanceOverdrawn = cashOnHand < -0.004;
   const isBalanceDepleted =
     !isBalanceOverdrawn && Math.abs(cashOnHand) < 0.005 && totalBudget > 0;
@@ -91,15 +98,13 @@ const AdminExpenses = () => {
     [expenses],
   );
 
-  const activeTotal = useMemo(
-    () =>
-      activeExpenses.reduce((sum, e) => sum + (Number(e.total_amount) || 0), 0),
-    [activeExpenses],
-  );
-
+  // Headline "Total Expenses" — the shared server figure matching
+  // AdminBudget's `totalExpensesAll` (admin spend on open sources + paid
+  // employee spend on open sources). Previously this added `totalIssued`
+  // (issued budgets aren't expenses), which is why the two pages disagreed.
   const totalSpend = useMemo(
-    () => totalIssued + activeTotal,
-    [totalIssued, activeTotal],
+    () => Number(overview.totalExpensesAll ?? 0),
+    [overview.totalExpensesAll],
   );
 
   const referenceLabels = useMemo(
@@ -230,46 +235,58 @@ const AdminExpenses = () => {
     [topCategory, dailyAverage, paceDays],
   );
 
+  // Remaining Balance breakdown — mirrors AdminBudget's legs exactly:
+  // "Employee Spent" = its Employee Expense, "Issued" = its Issued Budget
+  // (closed holdings included), "My Spent" = its My Expenses.
+  const employeeSpent = Number(overview.totalEmployeeExpenses ?? 0);
+  const mySpent = Number(overview.totalAdminExpenses ?? 0);
+  const issuedAll = Number(overview.totalIssuedAll ?? 0);
   const balanceStats = useMemo(
     () => [
       {
-        key: "allocated",
-        label: "Allocated",
-        value: formatMoney(totalBudget),
+        key: "employee-spent",
+        label: "Emp. Spent",
+        value:
+          employeeSpent > 0 ? `-${formatMoney(employeeSpent)}` : formatMoney(0),
       },
       {
         key: "issued",
         label: "Issued",
-        value:
-          totalIssued > 0 ? `-${formatMoney(totalIssued)}` : formatMoney(0),
+        value: issuedAll > 0 ? `-${formatMoney(issuedAll)}` : formatMoney(0),
         tone: "warning",
       },
       {
-        key: "expenses",
-        label: "Spent",
-        value:
-          totalExpenses > 0 ? `-${formatMoney(totalExpenses)}` : formatMoney(0),
+        key: "my-spent",
+        label: "My Spent",
+        value: mySpent > 0 ? `-${formatMoney(mySpent)}` : formatMoney(0),
         tone: "danger",
       },
     ],
-    [totalBudget, totalIssued, totalExpenses],
+    [employeeSpent, mySpent, issuedAll],
   );
 
-  const issuedSources = overview.overviewIssuedBudget;
-
+  // Budget Allocated card stats — the Transaction page's exact figures under
+  // its default (unfiltered) state: "Sources" = its Records > Budget Added
+  // count (`kindCounts.budget`), "Abono" = its Money In > Abono total
+  // (`totals.abonoIn`: open abono legs, cent-rounded like the source).
   const issuedStats = useMemo(() => {
-    const rows = issuedSources ?? [];
-
-    const largest = rows.reduce(
-      (max, row) => Math.max(max, Number(row.amount) || 0),
-      0,
-    );
+    let budgetAddedCount = 0;
+    let abonoIn = 0;
+    for (const row of allTxRows ?? []) {
+      if (row.kind === "budget") budgetAddedCount += 1;
+      if (row.kind === "abono" && row.status === "open")
+        abonoIn += Number(row.moneyIn) || 0;
+    }
 
     return [
-      { key: "sources", label: "Budget Sources", value: rows.length },
-      { key: "largest", label: "Largest", value: formatMoney(largest) },
+      { key: "sources", label: "Sources", value: budgetAddedCount },
+      {
+        key: "abono",
+        label: "Abono",
+        value: formatMoney(Math.round(abonoIn * 100) / 100),
+      },
     ];
-  }, [issuedSources]);
+  }, [allTxRows]);
 
   const statusStats = useMemo(() => {
     const counts = new Map();
@@ -623,7 +640,7 @@ const AdminExpenses = () => {
         isBalanceOverdrawn={isBalanceOverdrawn}
         isBalanceDepleted={isBalanceDepleted}
         balanceStats={balanceStats}
-        totalIssued={totalIssued}
+        totalIssued={totalBudget}
         issuedStats={issuedStats}
         recordCount={allLedgerRows.length}
         recordSeries={recordSeries}

@@ -22,38 +22,74 @@ import AILogo from "../../ui/AILogo";
 import ConfirmActionDialog from "./expenses/ConfirmActionDialog";
 import { EmployeeAvatar } from "../../ui/SelectEmployee";
 
-const NAV = [
+const NAV_GROUPS = [
   {
-    to: "/admin/dashboard",
-    icon: LayoutGrid,
-    label: "Dashboard",
-    primary: true,
+    label: "Overview",
+    items: [
+      {
+        to: "/admin/dashboard",
+        icon: LayoutGrid,
+        label: "Dashboard",
+        primary: true,
+      },
+    ],
   },
   {
-    to: "/admin/budget",
-    icon: FileText,
-    label: "Budget",
-    primary: true,
-    // Budget Transfer is a sub-page of Budget — keep this row highlighted
-    // while it is open.
-    match: ["/admin/budget-transfer"],
-  },
-  {
-    to: "/admin/transaction",
-    icon: ArrowLeftRight,
+    // Live money movement — these pages transact against open sources of
+    // funds and go quiet once a source is closed.
     label: "Transactions",
+    items: [
+      {
+        to: "/admin/employees",
+        icon: Users,
+        label: "Employees",
+        primary: true,
+      },  
+      {
+        to: "/admin/budget",
+        icon: FileText,
+        label: "Budget",
+        primary: true,
+        // Budget Transfer is a sub-page of Budget — keep this row highlighted
+        // while it is open.
+        match: ["/admin/budget-transfer"],
+      },
+      {
+        to: "/admin/transaction",
+        icon: ArrowLeftRight,
+        label: "Transactions",
+      },
+      {
+        to: "/admin/expenses",
+        icon: Receipt,
+        label: "Expenses",
+        primary: true,
+      },
+      {
+        to: "/admin/reimbursement",
+        icon: HandshakeIcon,
+        label: "Reimbursement",
+      },
+    ],
   },
-  { to: "/admin/employees", icon: Users, label: "Employees", primary: true },
-  { to: "/admin/expenses", icon: Receipt, label: "Expenses", primary: true },
   {
-    to: "/admin/reimbursement",
-    icon: HandshakeIcon,
-    label: "Reimbursement",
+    // Records stay retrievable here even after their source of funds closes.
+    label: "Records",
+    items: [
+      {
+        to: "/admin/source-funds",
+        icon: HandCoins,
+        label: "Source of Funds",
+      },
+      { to: "/admin/reports", icon: BarChart3, label: "Reports" },
+      { to: "/admin/audit-logs", icon: Logs, label: "Audit Logs" },
+    ],
   },
-  { to: "/admin/source-funds", icon: HandCoins, label: "Source of Funds" },
-  { to: "/admin/reports", icon: BarChart3, label: "Reports" },
-  { to: "/admin/audit-logs", icon: Logs, label: "Audit Logs" },
 ];
+
+// Flat list for consumers that don't care about grouping (dock lookup,
+// active-path checks).
+const NAV = NAV_GROUPS.flatMap((group) => group.items);
 
 // `md` is the hand-off point: from here up the hover-expanding rail is used,
 // below it every mobile surface takes over. Kept in sync with the `md:`
@@ -64,8 +100,17 @@ const DESKTOP_QUERY = "(min-width: 768px)";
 const SHEET_EASE = [0.16, 1, 0.3, 1];
 
 // Primary destinations are pinned to the mobile dock; every entry is listed
-// in the mobile menu sheet.
-const DOCK_ITEMS = NAV.filter((item) => item.primary);
+// in the mobile menu sheet. Order is pinned explicitly so regrouping the rail
+// never reshuffles the dock.
+const DOCK_ORDER = [
+  "/admin/dashboard",
+  "/admin/budget",
+  "/admin/employees",
+  "/admin/expenses",
+];
+const DOCK_ITEMS = DOCK_ORDER.map((to) =>
+  NAV.find((item) => item.to === to),
+).filter(Boolean);
 
 const ROW_BASE =
   "relative flex items-center h-11 w-11 rounded-2xl overflow-hidden " +
@@ -352,43 +397,50 @@ function MobileMenuSheet({ open, onClose, onLogout, user }) {
             </div>
 
             <div className={SHEET_LABEL}>Menu</div>
-            <div className="mt-2 grid grid-cols-2 gap-2">
-              {NAV.map((item) => {
-                const { to, icon: Icon, label } = item;
-                const isActive = isActivePath(location.pathname, item);
-                return (
-                  <NavLink
-                    key={to}
-                    to={to}
-                    onClick={onClose}
-                    className="block min-w-0 focus-visible:outline-none"
-                  >
-                    <span
-                      className={cn(
-                        SHEET_TILE,
-                        isActive
-                          ? "border-[var(--accent)]/35 bg-[var(--accent-soft)] text-[var(--accent-strong)] shadow-card"
-                          : "border-[var(--border)] bg-[var(--surface)] text-[var(--ink-muted)]",
-                      )}
-                    >
-                      <span
-                        className={cn(
-                          "flex h-9 w-9 shrink-0 items-center justify-center rounded-xl",
-                          isActive
-                            ? "bg-[var(--surface)] text-[var(--accent-strong)]"
-                            : "bg-[var(--surface-2)]",
-                        )}
+            {NAV_GROUPS.map((group) => (
+              <div key={group.label}>
+                <div className="mt-3 px-1 text-xs font-medium text-[var(--ink-muted)]">
+                  {group.label}
+                </div>
+                <div className="mt-2 grid grid-cols-2 gap-2">
+                  {group.items.map((item) => {
+                    const { to, icon: Icon, label } = item;
+                    const isActive = isActivePath(location.pathname, item);
+                    return (
+                      <NavLink
+                        key={to}
+                        to={to}
+                        onClick={onClose}
+                        className="block min-w-0 focus-visible:outline-none"
                       >
-                        <Icon size={16} />
-                      </span>
-                      <span className="truncate text-sm font-medium tracking-tight">
-                        {label}
-                      </span>
-                    </span>
-                  </NavLink>
-                );
-              })}
-            </div>
+                        <span
+                          className={cn(
+                            SHEET_TILE,
+                            isActive
+                              ? "border-[var(--accent)]/35 bg-[var(--accent-soft)] text-[var(--accent-strong)] shadow-card"
+                              : "border-[var(--border)] bg-[var(--surface)] text-[var(--ink-muted)]",
+                          )}
+                        >
+                          <span
+                            className={cn(
+                              "flex h-9 w-9 shrink-0 items-center justify-center rounded-xl",
+                              isActive
+                                ? "bg-[var(--surface)] text-[var(--accent-strong)]"
+                                : "bg-[var(--surface-2)]",
+                            )}
+                          >
+                            <Icon size={16} />
+                          </span>
+                          <span className="truncate text-sm font-medium tracking-tight">
+                            {label}
+                          </span>
+                        </span>
+                      </NavLink>
+                    );
+                  })}
+                </div>
+              </div>
+            ))}
 
             <div className={SHEET_LABEL}>Account</div>
             <div className="mt-2 flex flex-col gap-1">
@@ -523,9 +575,29 @@ export function Sidebar() {
             </span>
           </div>
 
-          <nav className="flex flex-col items-center gap-1.5">
-            {NAV.map((item) => (
-              <NavItem key={item.to} {...item} />
+          <nav
+            aria-label="Admin sections"
+            className="flex flex-col items-center gap-1.5"
+          >
+            {NAV_GROUPS.map((group, groupIndex) => (
+              <div
+                key={group.label}
+                role="group"
+                aria-label={group.label}
+                className="flex flex-col items-center gap-1.5"
+              >
+                {groupIndex > 0 && (
+                  <div
+                    aria-hidden="true"
+                    className="flex h-2 w-11 items-center justify-center transition-[width] duration-300 ease-[cubic-bezier(0.16,1,0.3,1)] group-hover/sidebar:w-[200px]"
+                  >
+                    <span className="h-px w-11 rounded-full bg-[var(--border)] transition-[width] duration-300 ease-[cubic-bezier(0.16,1,0.3,1)] group-hover/sidebar:w-[200px]" />
+                  </div>
+                )}
+                {group.items.map((item) => (
+                  <NavItem key={item.to} {...item} />
+                ))}
+              </div>
             ))}
           </nav>
         </div>
@@ -584,6 +656,11 @@ export function Sidebar() {
         description="You'll be signed out of your account and need to sign in again to continue."
         summary={
           <div className="mt-4 flex items-center gap-3 rounded-2xl border border-[var(--border)] bg-[var(--surface-2)]/60 px-4 py-3">
+            <EmployeeAvatar
+              name={user?.name}
+              avatarUrl={user?.avatar_url}
+              className="h-10 w-10 shrink-0 text-sm ring-2"
+            />
             <div className="min-w-0 flex-1">
               <p className="truncate text-base font-medium text-[var(--ink)]">
                 {displayName}

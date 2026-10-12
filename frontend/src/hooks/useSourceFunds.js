@@ -24,14 +24,15 @@ export function useSourceFundsMutations() {
     qc.invalidateQueries({ queryKey: ["budgets"] });
   };
   return {
-    // Creates one source (label + optional notes). New sources always open
-    // as 'open'.
+    // Creates one source (label + optional notes + optional cut-off date).
+    // New sources always open as 'open'.
     createReference: useMutation({
-      mutationFn: ({ label, notes }) =>
+      mutationFn: ({ label, notes, date_cut_off }) =>
         budgetsApi.create({
           type: "addBudgetReference",
           label,
           reference_notes: notes || undefined,
+          date_cut_off: date_cut_off || undefined,
         }),
       onSuccess: invalidate,
     }),

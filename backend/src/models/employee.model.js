@@ -136,7 +136,11 @@ class Employee {
   //                        OPEN budget_issued_reference rows ("Issued Budget")
   //     - `total_spent`:   SUM(expenses.total_amount) of PAID rows only, so a
   //                        soft-deleted row parked in 'draft' or a voided one
-  //                        in 'cancel' never reads as spent ("Total Spent")
+  //                        in 'cancel' never reads as spent ("Total Spent").
+  //                        Settled abono is NOT spent: settling hands the
+  //                        pesos back (re-booked as an issued_budget child),
+  //                        so adding it here would charge the same money
+  //                        twice — once as spent, once as issued.
   //     - `total_abono`:   SUM(employee_abono.amount) of OPEN rows only — a
   //                        settled (reimbursed) or draft abono no longer funds
   //                        spending
@@ -206,25 +210,12 @@ class Employee {
               AND ib.status != 'cancel'
           ), 0)::float8 AS issued_budget,
           COALESCE((
+            -- Spent is PAID expenses only: a settled abono is handed back
+            -- (its pesos return as an issued_budget child), so counting it
+            -- as spent too would charge the same money twice. Same rule as
+            -- the employee Overview hero, so the roster agrees with the
+            -- profile it links to.
             SELECT COALESCE(SUM(e.total_amount), 0)
-              -- Settled abono is consumed spend (same rule as the employee
-              -- Overview hero): without it the roster disagrees with the
-              -- profile it links to.
-              + COALESCE((
-                SELECT SUM(ea.amount)
-                FROM employee_abono ea
-                JOIN budget_reference br2 ON br2.reference_id = ea.reference_id
-                WHERE ea.user_id = u.user_id AND ea.status = 'settled'
-                  AND br2.status = 'open'
-                  AND EXISTS (
-                    SELECT 1
-                      FROM budget_issued_reference bir3
-                     WHERE bir3.user_id = ea.user_id
-                       AND bir3.reference_id = ea.reference_id
-                       AND bir3.status = 'open'
-                       AND bir3.id = ea.issued_ref_id
-                  )
-              ), 0)
             FROM expenses e
             LEFT JOIN budget_reference br ON br.reference_id = e.reference_id
             WHERE e.user_id = u.user_id AND e.status = 'paid'
@@ -262,14 +253,27 @@ class Employee {
             WHERE bt.user_id = u.user_id AND bt.status = 'success'
           ), 0)::float8 AS total_sent,
           COALESCE((
+            -- Received counts unless its stamped receiving holding has
+            -- since closed (a closed linked holding leaves no footsteps,
+            -- like every other leg). Unstamped legacy rows predate the
+            -- column and keep counting.
             SELECT SUM(btr.amount)
             FROM budget_transfer btr
             WHERE btr.transfer_to = u.user_id AND btr.status = 'success'
+              AND (
+                btr.issued_ref_id_sent IS NULL
+                OR EXISTS (
+                  SELECT 1 FROM budget_issued_reference birs
+                   WHERE birs.id = btr.issued_ref_id_sent
+                     AND birs.status = 'open'
+                )
+              )
           ), 0)::float8 AS total_received,
           -- Same formula as EmployeeOverview.totalBalance over the same five
           -- per-user aggregates above, so the admin "Remaining" column and the
           -- employee's own Overview balance can never disagree: open holdings
-          -- only, settled abono counts as spent.
+          -- only, paid-expenses-only spent (settled abono is handed back, not
+          -- spent).
           (
             COALESCE((
               SELECT SUM(ib.amount)
@@ -296,6 +300,9 @@ class Employee {
                 )
             ), 0)
             - (COALESCE((
+              -- Same paid-expenses-only spent as total_spent above: settled
+              -- abono returns to the pool as an issued child, so it must not
+              -- be subtracted here as well.
               SELECT SUM(e.total_amount)
               FROM expenses e
               LEFT JOIN budget_reference br ON br.reference_id = e.reference_id
@@ -309,21 +316,6 @@ class Employee {
                      AND bir2.status = 'open'
                      AND bir2.id = e.issued_ref_id
                 ))
-            ), 0)
-            + COALESCE((
-              SELECT SUM(ea.amount)
-              FROM employee_abono ea
-              JOIN budget_reference br2 ON br2.reference_id = ea.reference_id
-              WHERE ea.user_id = u.user_id AND ea.status = 'settled'
-                AND br2.status = 'open'
-                AND EXISTS (
-                  SELECT 1
-                    FROM budget_issued_reference bir3
-                   WHERE bir3.user_id = ea.user_id
-                     AND bir3.reference_id = ea.reference_id
-                     AND bir3.status = 'open'
-                     AND bir3.id = ea.issued_ref_id
-                )
             ), 0))
             - COALESCE((
               SELECT SUM(bt.amount)
@@ -334,9 +326,18 @@ class Employee {
               WHERE bt.user_id = u.user_id AND bt.status = 'success'
             ), 0)
             + COALESCE((
+              -- Same closed-holding gate as total_received above.
               SELECT SUM(btr.amount)
               FROM budget_transfer btr
               WHERE btr.transfer_to = u.user_id AND btr.status = 'success'
+                AND (
+                  btr.issued_ref_id_sent IS NULL
+                  OR EXISTS (
+                    SELECT 1 FROM budget_issued_reference birs
+                     WHERE birs.id = btr.issued_ref_id_sent
+                       AND birs.status = 'open'
+                  )
+                )
             ), 0)
           )::float8 AS remaining_balance,
           (

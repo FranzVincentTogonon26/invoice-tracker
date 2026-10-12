@@ -1,6 +1,5 @@
 import { Children, Fragment } from "react";
 import { HandCoins, ReceiptText, Wallet } from "lucide-react";
-import { Card } from "../../../ui/Card";
 import { cn, formatMoney } from "@/lib/utils";
 
 // Compact centered budget tile — label over a single centered value row;
@@ -53,41 +52,41 @@ export function EmployeeBudgetMetrics({
 }) {
   return (
     <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
-        <BudgetMetric
-          icon={Wallet}
-          label="Issued Budget"
-          value={formatMoney(issued)}
-        >
-          {received > 0 && (
-            <p
-              className="text-xs font-medium tabular-nums text-[var(--accent-strong)]"
-              title={`${formatMoney(received)} received from budget transfers`}
-            >
-              + {formatMoney(received)} received
-            </p>
-          )}
-        </BudgetMetric>
-        <BudgetMetric
-          icon={ReceiptText}
-          label="Total Spent"
-          value={formatMoney(spent)}
-        >
-          {sent > 0 && (
-            <p
-              className="text-xs font-medium tabular-nums text-[var(--danger)]"
-              title={`${formatMoney(sent)} sent via budget transfers`}
-            >
-              - {formatMoney(sent)} sent
-            </p>
-          )}
-        </BudgetMetric>
-        <BudgetMetric
-          icon={HandCoins}
-          label="Abono Held"
-          value={formatMoney(abono)}
-          tone={abono > 0 ? "warning" : undefined}
-        />
-      </div>
+      <BudgetMetric
+        icon={Wallet}
+        label="Issued Budget"
+        value={formatMoney(issued)}
+      >
+        {received > 0 && (
+          <p
+            className="text-xs font-medium tabular-nums text-[var(--accent-strong)]"
+            title={`${formatMoney(received)} received from budget transfers`}
+          >
+            + {formatMoney(received)} received
+          </p>
+        )}
+
+        {sent > 0 && (
+          <p
+            className="text-xs font-medium tabular-nums text-[var(--danger)]"
+            title={`${formatMoney(sent)} sent via budget transfers`}
+          >
+            - {formatMoney(sent)} sent
+          </p>
+        )}
+      </BudgetMetric>
+      <BudgetMetric
+        icon={ReceiptText}
+        label="Total Spent"
+        value={formatMoney(spent)}
+      />
+      <BudgetMetric
+        icon={HandCoins}
+        label="Abono Held"
+        value={formatMoney(abono)}
+        tone={abono > 0 ? "warning" : undefined}
+      />
+    </div>
   );
 }
 

@@ -55,6 +55,14 @@ export const createbudgetSchema = z
       .max(500, { message: "Notes are too long" })
       .optional(),
 
+    // Optional cut-off date for addBudgetReference (DB column:
+    // budget_reference.date_cut_off). Date-only `YYYY-MM-DD` from the date
+    // input; omitted when the admin leaves the field blank.
+    date_cut_off: z
+      .string({ error: "Invalid cut-off date" })
+      .regex(/^\d{4}-\d{2}-\d{2}$/, { message: "Invalid cut-off date" })
+      .optional(),
+
     // Optional field used only by issuedBudget (DB column: notes).
     note: z.string().optional(),
     // Optional scanned-receipt image for issuedBudget (DB column:
@@ -109,11 +117,19 @@ export const updateBudgetReferenceSchema = z
       .max(500, { message: "Notes are too long" })
       .optional(),
     status: z.enum(["open", "cut_off"], { error: "Invalid status" }).optional(),
+    // Optional cut-off date (DB column: budget_reference.date_cut_off).
+    // Date-only `YYYY-MM-DD`; explicit null clears a previously set date.
+    date_cut_off: z
+      .string({ error: "Invalid cut-off date" })
+      .regex(/^\d{4}-\d{2}-\d{2}$/, { message: "Invalid cut-off date" })
+      .optional()
+      .nullable(),
   })
   .refine(
     (data) =>
       data.label !== undefined ||
       data.notes !== undefined ||
-      data.status !== undefined,
+      data.status !== undefined ||
+      data.date_cut_off !== undefined,
     { message: "Nothing to update" },
   );

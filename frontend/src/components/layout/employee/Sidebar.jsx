@@ -569,6 +569,11 @@ export function Sidebar() {
         description="You'll be signed out of your account and need to sign in again to continue."
         summary={
           <div className="mt-4 flex items-center gap-3 rounded-2xl border border-[var(--border)] bg-[var(--surface-2)]/60 px-4 py-3">
+            <EmployeeAvatar
+              name={user?.name}
+              avatarUrl={user?.avatar_url}
+              className="h-10 w-10 shrink-0 text-sm ring-2"
+            />
             <div className="min-w-0 flex-1">
               <p className="truncate text-base font-medium text-[var(--ink)]">
                 {displayName}

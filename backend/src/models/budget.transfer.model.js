@@ -77,25 +77,10 @@ class BudgetTransfer {
                AND ib.status != 'cancel'
           ), 0)::float8 AS total_budget,
           COALESCE((
+            -- Paid-expenses-only spent (same rule as the displayed heroes):
+            -- settled abono is handed back, so the transfer form must not
+            -- treat it as gone.
             SELECT COALESCE(SUM(e.total_amount), 0)
-              -- Settled abono is consumed spend (same rule as the displayed
-              -- heroes): without it the transfer form disagrees with the
-              -- Overview balance and lets settled money be moved twice.
-              + COALESCE((
-                SELECT SUM(ea.amount)
-                FROM employee_abono ea
-                JOIN budget_reference br2 ON br2.reference_id = ea.reference_id
-                WHERE ea.user_id = $1 AND ea.status = 'settled'
-                  AND br2.status = 'open'
-                  AND EXISTS (
-                    SELECT 1
-                      FROM budget_issued_reference bir3
-                     WHERE bir3.user_id = ea.user_id
-                       AND bir3.reference_id = ea.reference_id
-                       AND bir3.status = 'open'
-                       AND bir3.id = ea.issued_ref_id
-                  )
-              ), 0)
             FROM expenses e
             LEFT JOIN budget_reference br ON br.reference_id = e.reference_id
             WHERE e.user_id = $1 AND e.status = 'paid'
@@ -133,9 +118,20 @@ class BudgetTransfer {
              WHERE bt.user_id = $1 AND bt.status = 'success'
           ), 0)::float8 AS total_sent,
           COALESCE((
+            -- Closed-holding gate (see the roster): a received transfer
+            -- whose stamped receiving holding has since closed leaves no
+            -- footsteps; unstamped legacy rows keep counting.
             SELECT SUM(btr.amount)
               FROM budget_transfer btr
              WHERE btr.transfer_to = $1 AND btr.status = 'success'
+               AND (
+                 btr.issued_ref_id_sent IS NULL
+                 OR EXISTS (
+                   SELECT 1 FROM budget_issued_reference birs
+                    WHERE birs.id = btr.issued_ref_id_sent
+                      AND birs.status = 'open'
+                 )
+               )
           ), 0)::float8 AS total_received`,
       [userId],
     );
@@ -210,25 +206,10 @@ class BudgetTransfer {
                AND ib.status != 'cancel'
           ), 0)::float8 AS total_budget,
           COALESCE((
+            -- Paid-expenses-only spent (same rule as the displayed heroes):
+            -- settled abono is handed back, so the transfer form must not
+            -- treat it as gone.
             SELECT COALESCE(SUM(e.total_amount), 0)
-              -- Settled abono is consumed spend (same rule as the displayed
-              -- heroes): without it the transfer form disagrees with the
-              -- Overview balance and lets settled money be moved twice.
-              + COALESCE((
-                SELECT SUM(ea.amount)
-                FROM employee_abono ea
-                JOIN budget_reference br2 ON br2.reference_id = ea.reference_id
-                WHERE ea.user_id = $1 AND ea.status = 'settled'
-                  AND br2.status = 'open'
-                  AND EXISTS (
-                    SELECT 1
-                      FROM budget_issued_reference bir3
-                     WHERE bir3.user_id = ea.user_id
-                       AND bir3.reference_id = ea.reference_id
-                       AND bir3.status = 'open'
-                       AND bir3.id = ea.issued_ref_id
-                  )
-              ), 0)
             FROM expenses e
             LEFT JOIN budget_reference br ON br.reference_id = e.reference_id
             WHERE e.user_id = $1 AND e.status = 'paid'
@@ -266,9 +247,20 @@ class BudgetTransfer {
              WHERE bt.user_id = $1 AND bt.status = 'success'
           ), 0)::float8 AS total_sent,
           COALESCE((
+            -- Closed-holding gate (see the roster): a received transfer
+            -- whose stamped receiving holding has since closed leaves no
+            -- footsteps; unstamped legacy rows keep counting.
             SELECT SUM(btr.amount)
               FROM budget_transfer btr
              WHERE btr.transfer_to = $1 AND btr.status = 'success'
+               AND (
+                 btr.issued_ref_id_sent IS NULL
+                 OR EXISTS (
+                   SELECT 1 FROM budget_issued_reference birs
+                    WHERE birs.id = btr.issued_ref_id_sent
+                      AND birs.status = 'open'
+                 )
+               )
           ), 0)::float8 AS total_received`,
       [userId],
     );
@@ -377,6 +369,22 @@ class BudgetTransfer {
           transfer: null,
         };
       }
+
+      // Recipient-side issuance link: the recipient's oldest OPEN holding
+      // (any source) is stamped as `issued_ref_id_sent`, connecting the
+      // transfer to the receiving record. NULL when the recipient holds no
+      // open issuance — the column stays informational and never blocks.
+      const sentHolding = (
+        await q(
+          `SELECT bir.id
+             FROM budget_issued_reference bir
+            WHERE bir.user_id = $1 AND bir.status = 'open'
+            ORDER BY bir.created_at ASC
+            LIMIT 1`,
+          [transferTo],
+        )
+      ).rows[0] ?? null;
+      const issuedRefIdSent = sentHolding?.id ?? null;
 
       let referenceId = null;
       let issuedRefId = null;
@@ -564,11 +572,24 @@ class BudgetTransfer {
                AND ib.status != 'cancel'
           ), 0)::float8 AS total_budget,
           COALESCE((
+            -- Identical predicates to spendableBalance above: the guard must
+            -- re-check the SAME balance the form previews, or covered
+            -- transfers get falsely refused. In particular sent transfers
+            -- only count while stamped to an OPEN holding, and spend/abono
+            -- honor the same holding gate as every displayed hero.
             SELECT SUM(e.total_amount)
               FROM expenses e
               LEFT JOIN budget_reference br ON br.reference_id = e.reference_id
              WHERE e.user_id = $1 AND e.status = 'paid'
                AND (e.reference_id IS NULL OR br.status = 'open')
+               AND (e.reference_id IS NULL OR EXISTS (
+                 SELECT 1
+                   FROM budget_issued_reference bir2
+                  WHERE bir2.user_id = e.user_id
+                    AND bir2.reference_id = e.reference_id
+                    AND bir2.status = 'open'
+                    AND bir2.id = e.issued_ref_id
+               ))
           ), 0)::float8 AS total_expenses,
           COALESCE((
             SELECT SUM(ea.amount)
@@ -576,16 +597,39 @@ class BudgetTransfer {
               JOIN budget_reference br ON br.reference_id = ea.reference_id
              WHERE ea.user_id = $1 AND ea.status = 'open'
                AND br.status = 'open'
+               AND EXISTS (
+                 SELECT 1
+                   FROM budget_issued_reference bir2
+                  WHERE bir2.user_id = ea.user_id
+                    AND bir2.reference_id = ea.reference_id
+                    AND bir2.status = 'open'
+                    AND bir2.id = ea.issued_ref_id
+               )
           ), 0)::float8 AS total_abono,
                 COALESCE((
                   SELECT SUM(bt.amount)
                     FROM budget_transfer bt
+                    JOIN budget_issued_reference birf ON birf.id = bt.issued_ref_id
+                      AND birf.status = 'open'
+                      AND birf.user_id = bt.user_id
                    WHERE bt.user_id = $1 AND bt.status = 'success'
                 ), 0)::float8 AS total_sent,
                 COALESCE((
+                  -- Closed-holding gate (see the roster): a received
+                  -- transfer whose stamped receiving holding has since
+                  -- closed leaves no footsteps; unstamped legacy rows keep
+                  -- counting.
                   SELECT SUM(btr.amount)
                     FROM budget_transfer btr
                    WHERE btr.transfer_to = $1 AND btr.status = 'success'
+                     AND (
+                       btr.issued_ref_id_sent IS NULL
+                       OR EXISTS (
+                         SELECT 1 FROM budget_issued_reference birs
+                          WHERE birs.id = btr.issued_ref_id_sent
+                            AND birs.status = 'open'
+                       )
+                     )
                 ), 0)::float8 AS total_received`,
             [senderId],
           )
@@ -613,12 +657,12 @@ class BudgetTransfer {
       const transfer = (
         await q(
           `INSERT INTO budget_transfer
-              (reference_id, issued_ref_id, user_id, amount, notes, method, status, transfer_to)
-           VALUES ($1, $2, $3, $4, $5, $6, 'success', $7)
-           RETURNING id, reference_id, issued_ref_id, user_id, amount::float8 AS amount,
+              (reference_id, issued_ref_id, issued_ref_id_sent, user_id, amount, notes, method, status, transfer_to)
+           VALUES ($1, $2, $3, $4, $5, $6, $7, 'success', $8)
+           RETURNING id, reference_id, issued_ref_id, issued_ref_id_sent, user_id, amount::float8 AS amount,
                      notes, method, status, transfer_to,
                      created_at, updated_at`,
-          [referenceId, issuedRefId, senderId, requested, notes ?? null, method, transferTo],
+          [referenceId, issuedRefId, issuedRefIdSent, senderId, requested, notes ?? null, method, transferTo],
         )
       ).rows[0];
 
@@ -747,24 +791,9 @@ class BudgetTransfer {
                    AND ib.status != 'cancel'
               ), 0)::float8 AS total_budget,
               COALESCE((
+                -- Paid-expenses-only spent (same rule as the displayed
+                -- heroes): settled abono is handed back, not gone.
                 SELECT COALESCE(SUM(e.total_amount), 0)
-                  -- Settled abono is consumed spend (same rule as the
-                  -- displayed heroes).
-                  + COALESCE((
-                    SELECT SUM(ea.amount)
-                    FROM employee_abono ea
-                    JOIN budget_reference br2 ON br2.reference_id = ea.reference_id
-                    WHERE ea.user_id = $1 AND ea.status = 'settled'
-                      AND br2.status = 'open'
-                      AND EXISTS (
-                        SELECT 1
-                          FROM budget_issued_reference bir3
-                         WHERE bir3.user_id = ea.user_id
-                           AND bir3.reference_id = ea.reference_id
-                           AND bir3.status = 'open'
-                           AND bir3.id = ea.issued_ref_id
-                      )
-                  ), 0)
                 FROM expenses e
                 LEFT JOIN budget_reference br ON br.reference_id = e.reference_id
                 WHERE e.user_id = $1 AND e.status = 'paid'
@@ -802,9 +831,20 @@ class BudgetTransfer {
                  WHERE bt.user_id = $1 AND bt.status = 'success'
               ), 0)::float8 AS total_sent,
               COALESCE((
+                -- Closed-holding gate (see the roster): a received transfer
+                -- whose stamped receiving holding has since closed leaves no
+                -- footsteps; unstamped legacy rows keep counting.
                 SELECT SUM(btr.amount)
                   FROM budget_transfer btr
                  WHERE btr.transfer_to = $1 AND btr.status = 'success'
+                   AND (
+                     btr.issued_ref_id_sent IS NULL
+                     OR EXISTS (
+                       SELECT 1 FROM budget_issued_reference birs
+                        WHERE birs.id = btr.issued_ref_id_sent
+                          AND birs.status = 'open'
+                     )
+                   )
               ), 0)::float8 AS total_received`,
           [locked.transfer_to],
         )

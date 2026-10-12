@@ -3,8 +3,8 @@ import {
   CircleAlert,
   CircleX,
   ClipboardList,
-  HandCoins,
   ReceiptText,
+  TrendingUp,
   Wallet,
 } from "lucide-react";
 import { StatCard } from "../../../ui/StatCard";
@@ -63,7 +63,7 @@ export function ExpenseOverview({
 
         <motion.div variants={item} className="h-full min-w-0 [&>div]:h-full">
           <StatCard
-            label="My Balance"
+            label="Remaining Balance"
             value={formatMoney(cashOnHand)}
             icon={Wallet}
             loading={isLoading}
@@ -95,9 +95,9 @@ export function ExpenseOverview({
 
         <motion.div variants={item} className="h-full min-w-0 [&>div]:h-full">
           <StatCard
-            label="Total Issued Budget"
+            label="Budget Allocated"
             value={formatMoney(totalIssued)}
-            icon={HandCoins}
+            icon={TrendingUp}
             loading={isLoading}
             stats={issuedStats}
           />

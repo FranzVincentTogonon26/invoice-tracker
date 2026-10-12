@@ -33,7 +33,7 @@ import EmployeeAbono from "../pages/employee/EmployeeAbono";
 import EmployeeSetting from "../pages/employee/EmployeeSetting";
 
 import AddExpenses from "../components/layout/expenses/AddExpenses";
-import BudgetTransfer from "../components/layout/budget_transfer/BudgetTransfer";
+import BudgetTransfer from "../components/layout/employee/budget/BudgetTransfer";
 
 export const router = createBrowserRouter([
   {

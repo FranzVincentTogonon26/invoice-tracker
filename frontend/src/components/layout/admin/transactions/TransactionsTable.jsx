@@ -101,8 +101,7 @@ function PersonCell({
   // automatically retries without needing a useEffect reset.
   const [failedUrl, setFailedUrl] = useState(null);
   // Normalize so empty strings / whitespace don't produce a broken <img>.
-  const cleanUrl =
-    typeof avatarUrl === "string" ? avatarUrl.trim() : avatarUrl;
+  const cleanUrl = typeof avatarUrl === "string" ? avatarUrl.trim() : avatarUrl;
   const showImage = !!cleanUrl && failedUrl !== cleanUrl;
 
   return (
@@ -164,7 +163,10 @@ function PersonCell({
 // `issuedStatus` / `issuedRefId`); expense rows carry it through their
 // `expenses.issued_ref_id` join (`issuedParentStatus`). Field-name variants
 // are accepted so older cached payloads (snake_case) lock the same way.
-const normStatus = (value) => String(value ?? "").trim().toLowerCase();
+const normStatus = (value) =>
+  String(value ?? "")
+    .trim()
+    .toLowerCase();
 
 const isClosedStatus = (value) => {
   const s = normStatus(value);
@@ -431,10 +433,7 @@ function RowActions({ row, pending, onAction }) {
       const right = Math.max(8, window.innerWidth - rect.right);
       if (flip) {
         setPosition({
-          bottom: Math.max(
-            margin,
-            window.innerHeight - rect.top + margin,
-          ),
+          bottom: Math.max(margin, window.innerHeight - rect.top + margin),
           right,
         });
       } else {
@@ -504,9 +503,7 @@ function RowActions({ row, pending, onAction }) {
                       }}
                       className={cn(
                         "flex w-full items-center gap-2.5 px-3.5 py-2 text-sm font-medium transition-colors hover:bg-[var(--surface-2)] disabled:pointer-events-none disabled:opacity-40",
-                        danger
-                          ? "text-[var(--danger)]"
-                          : "text-[var(--ink)]",
+                        danger ? "text-[var(--danger)]" : "text-[var(--ink)]",
                       )}
                     >
                       <Icon size={15} aria-hidden />

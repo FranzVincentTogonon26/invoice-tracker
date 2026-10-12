@@ -1,5 +1,5 @@
 import { motion } from "framer-motion";
-import { cn } from "@/lib/utils";
+import { cn, formatMoney } from "@/lib/utils";
 
 // ── Modern balance stat tile ─────────────────────────────────────────────────
 //
@@ -37,7 +37,15 @@ const toneMeta = {
   },
 };
 
-export function BalanceStat({ icon: Icon, label, value, hint, tone = "neutral" }) {
+export function BalanceStat({
+  icon: Icon,
+  label,
+  value,
+  hint,
+  received,
+  sent,
+  tone = "neutral",
+}) {
   const m = toneMeta[tone];
 
   return (
@@ -70,6 +78,22 @@ export function BalanceStat({ icon: Icon, label, value, hint, tone = "neutral" }
         >
           {value}
         </p>
+        {Number(received) > 0 && (
+          <p
+            className="mt-0.5 truncate text-[11px] font-medium tabular-nums text-[var(--accent-strong)]"
+            title={`${formatMoney(received)} received from budget transfers`}
+          >
+            + {formatMoney(received)} received
+          </p>
+        )}
+        {Number(sent) > 0 && (
+          <p
+            className="mt-0.5 truncate text-[11px] font-medium tabular-nums text-[var(--danger)]"
+            title={`${formatMoney(sent)} sent via budget transfers`}
+          >
+            - {formatMoney(sent)} sent
+          </p>
+        )}
         {hint && (
           <p className="mt-0.5 hidden truncate text-[11px] tabular-nums text-[var(--ink-muted)] sm:block">
             {hint}

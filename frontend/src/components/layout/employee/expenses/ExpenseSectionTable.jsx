@@ -77,6 +77,14 @@ function ExpenseSectionTableRow({
             {tx.description}
           </p>
         </div>
+        {tx.category_name ? (
+          <span
+            className="inline-flex items-center rounded-md bg-[var(--surface-2)] px-1.5 py-0.5 text-[11px] font-normal text-[var(--ink)]"
+            title={tx.category_name}
+          >
+            {tx.category_name}
+          </span>
+        ) : null}
       </td>
       <td className="px-4 py-3 align-middle">
         <div className="flex justify-center">

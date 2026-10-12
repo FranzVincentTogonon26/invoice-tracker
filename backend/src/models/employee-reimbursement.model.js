@@ -185,6 +185,8 @@ class EmployeeReimbursement {
                   COALESCE(ab.open_abono_count, 0)::int AS open_abono_count,
                   COALESCE(ex.spent, 0)::float8 AS spent,
                   COALESCE(ex.expense_count, 0)::int AS expense_count,
+                  COALESCE(st.sent, 0)::float8 AS sent,
+                  COALESCE(rc.received, 0)::float8 AS received,
                   -- First issuance date and latest close date across the
                   -- employee's references under open sources (NULL when the
                   -- side never happened — e.g. never closed yet).
@@ -235,6 +237,37 @@ class EmployeeReimbursement {
                   AND (e.reference_id IS NULL OR br3.status = 'open')
                 GROUP BY e.user_id
              ) ex ON ex.user_id = u.user_id
+             -- Sent counts while stamped to an OPEN holding (same gate as
+             -- the whole-account overview); received is the user's money
+             -- however it arrived (sender-stamped, ungated).
+             LEFT JOIN (
+               SELECT bt.user_id,
+                      SUM(bt.amount)::float8 AS sent
+                 FROM budget_transfer bt
+                 JOIN budget_issued_reference birf ON birf.id = bt.issued_ref_id
+                   AND birf.status = 'open'
+                   AND birf.user_id = bt.user_id
+                WHERE bt.status = 'success'
+                GROUP BY bt.user_id
+             ) st ON st.user_id = u.user_id
+             -- Received counts unless its stamped receiving holding has
+             -- since closed (closed holdings leave no footsteps); unstamped
+             -- legacy rows predate the column and keep counting.
+             LEFT JOIN (
+               SELECT btr.transfer_to AS user_id,
+                      SUM(btr.amount)::float8 AS received
+                 FROM budget_transfer btr
+                WHERE btr.status = 'success'
+                  AND (
+                    btr.issued_ref_id_sent IS NULL
+                    OR EXISTS (
+                      SELECT 1 FROM budget_issued_reference birs
+                       WHERE birs.id = btr.issued_ref_id_sent
+                         AND birs.status = 'open'
+                    )
+                  )
+                GROUP BY btr.transfer_to
+             ) rc ON rc.user_id = u.user_id
              WHERE EXISTS (
                SELECT 1
                  FROM budget_issued_reference b2
@@ -250,7 +283,8 @@ class EmployeeReimbursement {
                   AND ea2.status = 'open'
              )
              GROUP BY u.user_id, u.name, u.email, u.avatar_url, u.role,
-                     ab.open_abono, ab.open_abono_count, ex.spent, ex.expense_count
+                     ab.open_abono, ab.open_abono_count, ex.spent, ex.expense_count,
+                     st.sent, rc.received
              ORDER BY issued DESC`,
         ),
         // Per-reference allocation list for the Money In card — same shape
@@ -372,8 +406,10 @@ class EmployeeReimbursement {
                   COUNT(ib.id)::int AS issued_count,
                   COALESCE(ab.open_abono, 0)::float8 AS open_abono,
                   COALESCE(ab.open_abono_count, 0)::int AS open_abono_count,
-                  (COALESCE(sp.spent, 0) + COALESCE(st.settled, 0))::float8 AS spent,
-                  COALESCE(sp.expense_count, 0)::int AS expense_count
+                  COALESCE(sp.spent, 0)::float8 AS spent,
+                  COALESCE(sp.expense_count, 0)::int AS expense_count,
+                  COALESCE(st.sent, 0)::float8 AS sent,
+                  COALESCE(rc.received, 0)::float8 AS received
              FROM budget_issued_reference bir
              JOIN users u ON u.user_id = bir.user_id
              JOIN budget_reference br ON br.reference_id = bir.reference_id
@@ -402,27 +438,37 @@ class EmployeeReimbursement {
                   AND e.issued_ref_id IS NOT NULL
                 GROUP BY e.issued_ref_id
              ) sp ON sp.bir_id = bir.id
-             -- Settled abono of this record counts as its spent: settling
-             -- re-books every settled peso as an issued child, so without
-             -- this leg the record's spent undercounts and its balance
-             -- overstates. Independent join so records with settled abono
-             -- but no paid expenses still resolve.
+             -- Spent is PAID expenses only: this record's settled abono is
+             -- handed back (re-booked as an issued child, already in the
+             -- record's issued leg), so it must not inflate spent as well.
+             -- Sent keys on this record's own id; received is the user's
+             -- money however it arrived (sender-stamped, so keyed by user —
+             -- same unscoped figure the employees-details record view uses).
              LEFT JOIN (
-               SELECT ea.issued_ref_id AS bir_id,
-                      SUM(ea.amount)::float8 AS settled
-                 FROM employee_abono ea
-                 LEFT JOIN budget_reference br4 ON br4.reference_id = ea.reference_id
-                WHERE ea.status = 'settled'
-                  AND (ea.reference_id IS NULL OR br4.status = 'open')
-                  AND ea.issued_ref_id IS NOT NULL
-                GROUP BY ea.issued_ref_id
+               SELECT bt.issued_ref_id AS bir_id,
+                      SUM(bt.amount)::float8 AS sent
+                 FROM budget_transfer bt
+                WHERE bt.status = 'success'
+                  AND bt.issued_ref_id IS NOT NULL
+                GROUP BY bt.issued_ref_id
              ) st ON st.bir_id = bir.id
-              GROUP BY bir.id, bir.user_id, bir.reference_id, bir.status,
+             -- Record-stamped received: only transfers stamped to THIS record
+             -- count here — no status gate, so the legs always reconcile to
+             -- what close stored (close banks this same definition).
+             LEFT JOIN (
+               SELECT btr.issued_ref_id_sent AS bir_id,
+                      SUM(btr.amount)::float8 AS received
+                 FROM budget_transfer btr
+                WHERE btr.status = 'success'
+                  AND btr.issued_ref_id_sent IS NOT NULL
+                GROUP BY btr.issued_ref_id_sent
+             ) rc ON rc.bir_id = bir.id
+               GROUP BY bir.id, bir.user_id, bir.reference_id, bir.status,
                        bir.notes,
                        bir.created_at, bir.date_cut_off, bir.date_forwarded,
                       u.name, u.email, u.avatar_url, u.role, br.label,
                       ab.open_abono, ab.open_abono_count, sp.spent, sp.expense_count,
-                      st.settled
+                      st.sent, rc.received, rc.bir_id
              -- Open records first, then newest first inside each group.
              ORDER BY (bir.status = 'open') DESC, bir.created_at DESC`,
         ),
@@ -497,6 +543,8 @@ class EmployeeReimbursement {
         const rowIssued = toMoney(r.issued);
         const rowAbono = toMoney(r.open_abono);
         const rowSpent = toMoney(r.spent);
+        const rowSent = toMoney(r.sent);
+        const rowReceived = toMoney(r.received);
         return {
           userId: r.user_id,
           name: r.name,
@@ -511,16 +559,20 @@ class EmployeeReimbursement {
           openAbonoCount: Number(r.open_abono_count) || 0,
           spent: rowSpent,
           expenseCount: Number(r.expense_count) || 0,
+          sent: rowSent,
+          received: rowReceived,
           birStatuses: r.bir_statuses || "",
           dateCreated: r.first_issued_at ?? null,
           dateClosed: r.last_forwarded_at ?? null,
-          balance: toMoney(rowIssued + rowAbono - rowSpent),
+          balance: toMoney(rowIssued + rowAbono - rowSpent - rowSent + rowReceived),
         };
       }),
       records: (issuanceRecordsResult.rows ?? []).map((r) => {
         const rowIssued = toMoney(r.issued);
         const rowAbono = toMoney(r.open_abono);
         const rowSpent = toMoney(r.spent);
+        const rowSent = toMoney(r.sent);
+        const rowReceived = toMoney(r.received);
         return {
           id: r.id,
           userId: r.user_id,
@@ -541,7 +593,9 @@ class EmployeeReimbursement {
           openAbonoCount: Number(r.open_abono_count) || 0,
           spent: rowSpent,
           expenseCount: Number(r.expense_count) || 0,
-          balance: toMoney(rowIssued + rowAbono - rowSpent),
+          sent: rowSent,
+          received: rowReceived,
+          balance: toMoney(rowIssued + rowAbono - rowSpent - rowSent + rowReceived),
         };
       }),
     };

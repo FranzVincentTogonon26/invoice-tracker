@@ -14,15 +14,15 @@ import toast from "react-hot-toast";
 import {
   useBudgetTransfer,
   useBudgetTransferMutations,
-} from "../../../hooks/useBudgetTransfer";
-import { SelectEmployee, EmployeeAvatar } from "../../ui/SelectEmployee";
-import { Select } from "../../ui/Select";
-import { Button } from "../../ui/Button";
-import { Input, TextArea } from "../../ui/Input";
-import { Card } from "../../ui/Card";
-import ConfirmActionDialog from "../admin/expenses/ConfirmActionDialog";
-import { PAYMENT_METHODS } from "../../../constants";
-import { cn, formatMoney, methodLabel } from "../../../lib/utils";
+} from "../../../../hooks/useBudgetTransfer";
+import { SelectEmployee, EmployeeAvatar } from "../../../ui/SelectEmployee";
+import { Select } from "../../../ui/Select";
+import { Button } from "../../../ui/Button";
+import { Input, TextArea } from "../../../ui/Input";
+import { Card } from "../../../ui/Card";
+import ConfirmActionDialog from "../../admin/expenses/ConfirmActionDialog";
+import { PAYMENT_METHODS } from "../../../../constants";
+import { cn, formatMoney, methodLabel } from "../../../../lib/utils";
 
 const NOTES_MAX = 500;
 
@@ -197,7 +197,7 @@ const BudgetTransfer = () => {
         </p>
       </div>
       <div className="flex items-center justify-between gap-3 border-t border-[var(--border)] pt-2">
-        <p className="text-sm text-[var(--ink-muted)]">Remaining after</p>
+        <p className="text-sm text-[var(--ink-muted)]">Remaining afters</p>
         <p
           className={cn(
             "font-display text-sm font-medium tabular-nums",
@@ -239,7 +239,7 @@ const BudgetTransfer = () => {
 
       {/* ── Available balance hero: plain oversized type, deliberately not a
           card, so the eye lands on the spendable figure first. ── */}
-      <section aria-label="Available balance" className="pt-2 text-center">
+      <section aria-label="Available balance" className="p-4 text-center">
         <p className="type-eyebrow text-[var(--ink-muted)]">
           Available balance
         </p>

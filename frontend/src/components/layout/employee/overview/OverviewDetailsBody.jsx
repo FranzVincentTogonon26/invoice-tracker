@@ -1,7 +1,13 @@
 import { ArrowLeftRight, Flag, ShieldAlert, XCircle } from "lucide-react";
 import { Badge } from "../../../ui/Badge";
 import { ExpenseStatusBadge } from "../../admin/expenses/ExpensesTable";
-import { cn, formatDate, formatMoney, formatTime, methodLabel } from "@/lib/utils";
+import {
+  cn,
+  formatDate,
+  formatMoney,
+  formatTime,
+  methodLabel,
+} from "@/lib/utils";
 import {
   isCancelled,
   isCancelledIssued,
@@ -148,7 +154,7 @@ export function OverviewDetailsBody({ row, meta }) {
           <p className="type-eyebrow text-[var(--ink-muted)]">Amount</p>
           <p
             className={cn(
-              "mt-1 font-display text-2xl font-medium leading-none tracking-tight tabular-nums text-[var(--ink)]",
+              "mt-1 font-display text-2xl font-medium leading-none tracking-tight  text-[var(--ink)]",
               (isCancelled(row) || isCancelledIssued(row)) && "line-through",
               isCancelledIssued(row) && "text-[var(--danger)]",
             )}
@@ -174,13 +180,13 @@ export function OverviewDetailsBody({ row, meta }) {
         <div className="grid grid-cols-3 gap-3 py-1">
           <div className="min-w-0">
             <p className="type-eyebrow text-[var(--ink-muted)]">Date</p>
-            <p className="mt-1 truncate text-sm font-medium tabular-nums text-[var(--ink)]">
+            <p className="mt-1 truncate text-sm font-medium  text-[var(--ink)]">
               {formatDate(row?.date)}
             </p>
           </div>
           <div className="min-w-0">
             <p className="type-eyebrow text-[var(--ink-muted)]">Time</p>
-            <p className="mt-1 truncate text-sm font-medium tabular-nums text-[var(--ink)]">
+            <p className="mt-1 truncate text-sm font-medium  text-[var(--ink)]">
               {formatTime(row?.date)}
             </p>
           </div>
@@ -191,6 +197,17 @@ export function OverviewDetailsBody({ row, meta }) {
             </p>
           </div>
         </div>
+
+
+        {row?.category_name ? (
+          <div className="min-w-0 border-t border-[var(--border)] pt-3">
+            <p className="type-eyebrow text-[var(--ink-muted)]">Category</p>
+            <p className="mt-1 truncate text-sm font-medium text-[var(--ink)]">
+              {row.category_name}
+            </p>
+          </div>
+        ) : null}
+
         {/* Transfer rows read who the money moved to / came from, plus the
             sender's notes when the description shows them. */}
         {transfer && (counterparty || row?.notes) ? (
@@ -213,13 +230,13 @@ export function OverviewDetailsBody({ row, meta }) {
               <p className="type-eyebrow text-[var(--ink-muted)]">
                 Date Settled
               </p>
-              <p className="mt-1 truncate text-sm font-medium tabular-nums text-[var(--ink)]">
+              <p className="mt-1 truncate text-sm font-medium text-[var(--ink)]">
                 {formatDate(row?.date_settled)}
               </p>
             </div>
             <div className="min-w-0">
               <p className="type-eyebrow text-[var(--ink-muted)]">Time</p>
-              <p className="mt-1 truncate text-sm font-medium tabular-nums text-[var(--ink)]">
+              <p className="mt-1 truncate text-sm font-medium  text-[var(--ink)]">
                 {formatTime(row?.date_settled)}
               </p>
             </div>
@@ -231,7 +248,7 @@ export function OverviewDetailsBody({ row, meta }) {
           <div className="grid border-t border-[var(--border)] pt-3 py-1">
             <div className="min-w-0">
               <p className="type-eyebrow text-[var(--ink-muted)]">Notes</p>
-              <p className="mt-1  text-sm font-medium tabular-nums text-[var(--ink)]">
+              <p className="mt-1  text-sm font-medium  text-[var(--ink)]">
                 {row?.notes || "—"}
               </p>
             </div>

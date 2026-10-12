@@ -63,6 +63,9 @@ export function DatePicker({
   onChange,
   placeholder = "Select date",
   align = "start",
+  // Earliest selectable day (same value contract as `value`) — earlier
+  // days render muted and cannot be picked. Omitted → no lower bound.
+  minDate,
   className,
   disabled = false,
   // Hover tooltip for the trigger — the Add Expenses form uses it to explain a
@@ -79,6 +82,7 @@ export function DatePicker({
   const triggerRef = useRef(null);
   const today = useMemo(() => startOfDay(), []);
   const selected = useMemo(() => normalizeDay(value), [value]);
+  const minDay = useMemo(() => normalizeDay(minDate), [minDate]);
   const cells = useMemo(() => getMonthGrid(viewMonth), [viewMonth]);
   const label = selected ? formatDate(selected) : placeholder;
   const close = useCallback((refocus = true) => {
@@ -159,7 +163,7 @@ export function DatePicker({
             exit={{ opacity: 0, y: -4, scale: 0.98 }}
             transition={{ duration: 0.18, ease: DIALOG_EASE }}
             className={cn(
-              "absolute top-[calc(100%+8px)] z-40 w-[min(92vw,320px)] overflow-hidden rounded-3xl border border-[var(--border)] bg-[var(--surface)] shadow-hover",
+              "absolute top-[calc(100%+8px)] z-[9999999] w-[min(92vw,320px)] overflow-hidden rounded-3xl border border-[var(--border)] bg-[var(--surface)] shadow-hover",
               align === "end"
                 ? "left-0 right-auto sm:left-auto sm:right-0"
                 : "left-0",
@@ -217,20 +221,27 @@ export function DatePicker({
                         return <span key={`pad-${index}`} className="h-9" />;
                       const isSelected = isSameDay(day, selected);
                       const isToday = isSameDay(day, today);
+                      const isTooEarly =
+                        minDay != null && startOfDay(day) < minDay;
                       return (
                         <button
                           key={day.toDateString()}
                           type="button"
                           onClick={() => pickDay(day)}
+                          disabled={isTooEarly}
                           aria-label={formatDate(day)}
                           aria-pressed={isSelected}
                           aria-current={isToday ? "date" : undefined}
+                          aria-disabled={isTooEarly || undefined}
                           className={cn(
                             "flex h-9 items-center justify-center rounded-full text-sm font-medium tabular-nums transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)]/40",
-                            isSelected
-                              ? "bg-[var(--accent)] font-medium text-white hover:bg-[var(--accent-strong)]"
-                              : "text-[var(--ink)] hover:bg-[var(--surface-2)]",
-                            !isSelected &&
+                            isTooEarly
+                              ? "cursor-not-allowed text-[var(--ink-muted)] opacity-30"
+                              : isSelected
+                                ? "bg-[var(--accent)] font-medium text-white hover:bg-[var(--accent-strong)]"
+                                : "text-[var(--ink)] hover:bg-[var(--surface-2)]",
+                            !isTooEarly &&
+                              !isSelected &&
                               isToday &&
                               "ring-1 ring-inset ring-[var(--accent)]/40",
                           )}
