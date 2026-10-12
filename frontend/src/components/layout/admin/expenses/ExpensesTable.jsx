@@ -88,6 +88,31 @@ export function FlaggedBadge({ className }) {
   );
 }
 
+// Closed-holding check (shared by RowActions + EmployeeCell): an expense
+// spent from a finalized (`close`) `budget_issued_reference` (via
+// `expenses.issued_ref_id`, `issuedParentStatus`) is read-only.
+// Field-name variants are accepted so older cached payloads (snake_case)
+// resolve the same way.
+const normHoldingStatus = (value) =>
+  String(value ?? "")
+    .trim()
+    .toLowerCase();
+
+const isClosedHoldingStatus = (value) => {
+  const s = normHoldingStatus(value);
+  return s === "close" || s === "closed";
+};
+
+function isExpenseClosedHolding(row) {
+  if (!row) return false;
+  return (
+    isClosedHoldingStatus(row.issuedParentStatus) ||
+    isClosedHoldingStatus(row.issued_parent_status) ||
+    isClosedHoldingStatus(row.parentStatus) ||
+    isClosedHoldingStatus(row.parent_status)
+  );
+}
+
 function SourceFundsBadge({ source, tone }) {
   if (!source) {
     return (
@@ -179,20 +204,9 @@ function RowActions({
   }, [open]);
 
   // Closed-holding lock: an expense spent from a finalized (`close`)
-  // `budget_issued_reference` (via `expenses.issued_ref_id`,
-  // `issuedParentStatus`) is read-only — "View details" is the only action.
-  // Field-name variants are accepted so older cached payloads (snake_case)
-  // lock the same way.
-  const normStatus = (value) => String(value ?? "").trim().toLowerCase();
-  const isClosedStatus = (value) => {
-    const s = normStatus(value);
-    return s === "close" || s === "closed";
-  };
-  const isClosedHolding =
-    isClosedStatus(row?.issuedParentStatus) ||
-    isClosedStatus(row?.issued_parent_status) ||
-    isClosedStatus(row?.parentStatus) ||
-    isClosedStatus(row?.parent_status);
+  // `budget_issued_reference` is read-only — "View details" is the only
+  // action (see `isExpenseClosedHolding` above).
+  const isClosedHolding = isExpenseClosedHolding(row);
 
   // Cancelled employee rows keep the full lifecycle: View, Add to draft
   // (reactivate as a draft) and Delete. Paid employee rows offer View + Add
@@ -217,65 +231,65 @@ function RowActions({
     items = [
       viewItem,
       ...(isEmployeeRow && row?.status === "paid"
-      ? [
-          {
-            key: "draft",
-            label: "Add to draft",
-            Icon: RotateCcw,
-            danger: false,
-            group: "lifecycle",
-            onSelect: () => onAddToDraft?.(row),
-          },
-        ]
-      : []),
-    // Cancelled rows get their own revoke action — same draft endpoint as
-    // "Add to draft" (the server accepts 'paid' and 'cancel'), but labelled
-    // for what it undoes. Clicking moves the row back to 'draft' through the
-    // existing confirm flow.
-    ...(isEmployeeRow && row?.status === "cancel"
-      ? [
-          {
-            key: "restore-draft",
-            label: "Restore to draft",
-            Icon: RotateCcw,
-            danger: false,
-            group: "lifecycle",
-            onSelect: () => onAddToDraft?.(row),
-          },
-        ]
-      : []),
-    ...(isEmployeeRow && row?.status === "draft"
-      ? [
-          {
-            key: "restore",
-            label: "Remove from draft",
-            Icon: CircleCheck,
-            danger: false,
-            group: "lifecycle",
-            onSelect: () => onRemoveFromDraft?.(row),
-          },
-          {
-            key: "cancel",
-            label: "Cancel expense",
-            Icon: XCircle,
-            danger: false,
-            group: "lifecycle",
-            onSelect: () => onCancelExpense?.(row),
-          },
-        ]
-      : []),
-    ...(isEmployeeRow && row?.status === "paid"
-      ? []
-      : [
-          {
-            key: "delete",
-            label: "Delete expense",
-            Icon: Trash2,
-            danger: true,
-            group: "danger",
-            onSelect: () => onDelete?.(row),
-          },
-        ]),
+        ? [
+            {
+              key: "draft",
+              label: "Add to draft",
+              Icon: RotateCcw,
+              danger: false,
+              group: "lifecycle",
+              onSelect: () => onAddToDraft?.(row),
+            },
+          ]
+        : []),
+      // Cancelled rows get their own revoke action — same draft endpoint as
+      // "Add to draft" (the server accepts 'paid' and 'cancel'), but labelled
+      // for what it undoes. Clicking moves the row back to 'draft' through the
+      // existing confirm flow.
+      ...(isEmployeeRow && row?.status === "cancel"
+        ? [
+            {
+              key: "restore-draft",
+              label: "Restore to draft",
+              Icon: RotateCcw,
+              danger: false,
+              group: "lifecycle",
+              onSelect: () => onAddToDraft?.(row),
+            },
+          ]
+        : []),
+      ...(isEmployeeRow && row?.status === "draft"
+        ? [
+            {
+              key: "restore",
+              label: "Remove from draft",
+              Icon: CircleCheck,
+              danger: false,
+              group: "lifecycle",
+              onSelect: () => onRemoveFromDraft?.(row),
+            },
+            {
+              key: "cancel",
+              label: "Cancel expense",
+              Icon: XCircle,
+              danger: false,
+              group: "lifecycle",
+              onSelect: () => onCancelExpense?.(row),
+            },
+          ]
+        : []),
+      ...(isEmployeeRow && row?.status === "paid"
+        ? []
+        : [
+            {
+              key: "delete",
+              label: "Delete expense",
+              Icon: Trash2,
+              danger: true,
+              group: "danger",
+              onSelect: () => onDelete?.(row),
+            },
+          ]),
     ];
   }
 
@@ -297,10 +311,7 @@ function RowActions({
       const right = Math.max(8, window.innerWidth - rect.right);
       if (flip) {
         setPosition({
-          bottom: Math.max(
-            margin,
-            window.innerHeight - rect.top + margin,
-          ),
+          bottom: Math.max(margin, window.innerHeight - rect.top + margin),
           right,
         });
       } else {
@@ -370,9 +381,7 @@ function RowActions({
                       }}
                       className={cn(
                         "flex w-full items-center gap-2.5 px-3.5 py-2 text-sm font-medium transition-colors hover:bg-[var(--surface-2)] disabled:pointer-events-none disabled:opacity-40",
-                        danger
-                          ? "text-[var(--danger)]"
-                          : "text-[var(--ink)]",
+                        danger ? "text-[var(--danger)]" : "text-[var(--ink)]",
                       )}
                     >
                       <Icon size={15} aria-hidden />
@@ -398,7 +407,7 @@ function initialsOf(name) {
     .join("");
 }
 
-function EmployeeCell({ name, role, avatarUrl, size = "md" }) {
+function EmployeeCell({ name, role, avatarUrl, size = "md", closed = false }) {
   const compact = size === "sm";
   // Tracks WHICH url failed (not just a boolean) so a new avatarUrl
   // automatically retries without needing a useEffect reset.
@@ -439,14 +448,32 @@ function EmployeeCell({ name, role, avatarUrl, size = "md" }) {
         >
           {name || "Unknown"}
         </p>
-        <p
-          className={cn(
-            "mt-0.5 truncate capitalize text-[var(--ink-muted)]",
-            compact ? "text-xs" : "text-sm",
+        <div className="mt-0.5 flex min-w-0 items-center gap-1.5">
+          <p
+            className={cn(
+              "min-w-0 flex-1 truncate capitalize leading-tight text-[var(--ink-muted)]",
+              compact ? "text-xs" : "text-sm",
+            )}
+          >
+            {role || "—"}
+          </p>
+          {closed && (
+            <>
+              <span
+                aria-hidden
+                className="shrink-0 text-[11px] text-[var(--border)]"
+              >
+                |
+              </span>
+              <span
+                title="Linked issuance is closed — this record is read-only"
+                className="inline-flex shrink-0 items-center rounded-md bg-[var(--surface-2)] px-1.5 py-0.5 text-[11px] font-normal leading-tight text-[var(--ink)]"
+              >
+                Closed
+              </span>
+            </>
           )}
-        >
-          {role || "—"}
-        </p>
+        </div>
       </div>
     </div>
   );
@@ -548,6 +575,7 @@ function LedgerRow({
           role={row.employeeRole}
           avatarUrl={row.employeeAvatar}
           size="sm"
+          closed={isExpenseClosedHolding(row)}
         />
       </td>
 

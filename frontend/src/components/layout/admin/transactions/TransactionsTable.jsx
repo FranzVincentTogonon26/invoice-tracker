@@ -90,7 +90,13 @@ function initialsOf(name) {
     .join("");
 }
 
-function PersonCell({ name, role, avatarUrl, fallback = "System" }) {
+function PersonCell({
+  name,
+  role,
+  avatarUrl,
+  fallback = "System",
+  closed = false,
+}) {
   // Tracks WHICH url failed (not just a boolean) so a new avatarUrl
   // automatically retries without needing a useEffect reset.
   const [failedUrl, setFailedUrl] = useState(null);
@@ -120,10 +126,32 @@ function PersonCell({ name, role, avatarUrl, fallback = "System" }) {
         <p className="truncate text-[13px] font-medium leading-tight text-[var(--ink)]">
           {name || fallback}
         </p>
-        {role && (
-          <p className="mt-0.5 truncate text-xs capitalize text-[var(--ink-muted)]">
-            {role}
-          </p>
+        {(role || closed) && (
+          <div className="mt-0.5 flex min-w-0 items-center gap-1.5">
+            {role && (
+              <p className="min-w-0 flex-1 truncate text-xs capitalize leading-tight text-[var(--ink-muted)]">
+                {role}
+              </p>
+            )}
+            {closed && (
+              <>
+                {role && (
+                  <span
+                    aria-hidden
+                    className="shrink-0 text-[11px] text-[var(--border)]"
+                  >
+                    |
+                  </span>
+                )}
+                <span
+                  title="Linked issuance is closed — this record is read-only"
+                  className="inline-flex shrink-0 items-center rounded-md bg-[var(--surface-2)] px-1.5 py-0.5 text-[11px] font-normal leading-tight text-[var(--ink)]"
+                >
+                  Closed
+                </span>
+              </>
+            )}
+          </div>
         )}
       </div>
     </div>
@@ -600,6 +628,7 @@ function LedgerRow({ row, pending, onAction }) {
               name={row.employeeName}
               role={row.employeeRole}
               avatarUrl={row.employeeAvatar}
+              closed={isClosedHolding(row) || isSettledAbono(row)}
             />
             {row.counterpartyName && (
               <p className="mt-1 flex min-w-0 items-center gap-1 pl-10 text-xs text-[var(--ink-muted)]">
