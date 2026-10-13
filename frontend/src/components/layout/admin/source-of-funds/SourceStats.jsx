@@ -6,7 +6,7 @@ import {
   Wallet,
 } from "lucide-react";
 import { StatCard } from "../../../ui/StatCard";
-import { formatMoney, toMoney } from "@/lib/utils";
+import { formatMoney } from "@/lib/utils";
 
 export function SourceStats({ totals, sparks, isLoading }) {
   return (
@@ -38,15 +38,15 @@ export function SourceStats({ totals, sparks, isLoading }) {
           chart: "bars",
         },
         {
-          label: "Total Used",
-          value: formatMoney(toMoney(totals.issued + totals.expenses)),
+          label: "Total Expenses",
+          value: formatMoney(totals.expenses),
           icon: HandCoins,
           data: sparks.used,
           chart: "bars",
         },
         {
-          label: "Transactions",
-          value: totals.transactions.toLocaleString(),
+          label: "Total Issued",
+          value: formatMoney(totals.issued),
           icon: Wallet,
           tone: "success",
           data: sparks.transactions,

@@ -265,28 +265,28 @@ const AdminExpenses = () => {
     [employeeSpent, mySpent, issuedAll],
   );
 
-  // Budget Allocated card stats — the Transaction page's exact figures under
-  // its default (unfiltered) state: "Sources" = its Records > Budget Added
-  // count (`kindCounts.budget`), "Abono" = its Money In > Abono total
-  // (`totals.abonoIn`: open abono legs, cent-rounded like the source).
+  // Budget Allocated card stats — "Sources" mirrors AdminBudget's per-source
+  // breakdown count (open budget *references*), not the budget-transaction
+  // row count: one source with several top-ups still reads as one source on
+  // both pages. "Abono" stays the Transaction page's open-abono Money In.
   const issuedStats = useMemo(() => {
-    let budgetAddedCount = 0;
     let abonoIn = 0;
     for (const row of allTxRows ?? []) {
-      if (row.kind === "budget") budgetAddedCount += 1;
       if (row.kind === "abono" && row.status === "open")
         abonoIn += Number(row.moneyIn) || 0;
     }
 
+    const sources = (overview.overviewBudget ?? []).length;
+
     return [
-      { key: "sources", label: "Sources", value: budgetAddedCount },
+      { key: "sources", label: "Sources", value: sources },
       {
         key: "abono",
         label: "Abono",
         value: formatMoney(Math.round(abonoIn * 100) / 100),
       },
     ];
-  }, [allTxRows]);
+  }, [allTxRows, overview]);
 
   const statusStats = useMemo(() => {
     const counts = new Map();

@@ -17,11 +17,13 @@ export function StatusBadge({ status }) {
 
 // Everyone connected to a source — issuance receivers, expense/abono authors
 // and transfer parties (employees AND admins) — as an overlapping avatar
-// stack with a "+N" overflow and a names tooltip.
-export function InvolvedStack({ people, total }) {
+// stack with a "+N" overflow and a names tooltip. `size="lg"` renders bigger
+// avatars for prominent placements like the overview header.
+export function InvolvedStack({ people, total, size = "sm" }) {
   const list = Array.isArray(people) ? people : [];
   const shown = list.slice(0, 4);
   const extra = Math.max(0, (Number(total) || 0) - shown.length);
+  const large = size === "lg";
   if (shown.length === 0)
     return <span className="text-xs text-[var(--ink-muted)]">—</span>;
   const names = list
@@ -35,12 +37,22 @@ export function InvolvedStack({ people, total }) {
             key={p.user_id || p.name}
             name={p.name}
             avatarUrl={p.avatar_url}
-            className="h-6 w-6 text-[11px] ring-2 ring-[var(--surface)]"
+            className={
+              large
+                ? "h-9 w-9 text-xs ring-2 ring-[var(--surface)]"
+                : "h-6 w-6 text-[11px] ring-2 ring-[var(--surface)]"
+            }
           />
         ))}
       </span>
       {extra > 0 && (
-        <span className="ml-1.5 inline-flex h-6 min-w-6 items-center justify-center rounded-full bg-[var(--surface-2)] px-1.5 text-[11px] font-medium tabular-nums text-[var(--ink-muted)] ring-1 ring-inset ring-[var(--border)]">
+        <span
+          className={
+            large
+              ? "ml-1.5 inline-flex h-9 min-w-9 items-center justify-center rounded-full bg-[var(--surface-2)] px-2 text-xs font-medium tabular-nums text-[var(--ink-muted)] ring-1 ring-inset ring-[var(--border)]"
+              : "ml-1.5 inline-flex h-6 min-w-6 items-center justify-center rounded-full bg-[var(--surface-2)] px-1.5 text-[11px] font-medium tabular-nums text-[var(--ink-muted)] ring-1 ring-inset ring-[var(--border)]"
+          }
+        >
           +{extra}
         </span>
       )}

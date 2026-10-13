@@ -771,16 +771,16 @@ class Expenses {
 
     const overviewBudget = await query(
       `SELECT
-          br.reference_id,
-          br.label,
-          br.created_at,
-          COALESCE(SUM(b.amount), 0) AS amount
-       FROM budget_reference br
-       LEFT JOIN budget b ON b.reference_id = br.reference_id
-       WHERE b.status != 'cancelled'
-         AND br.status = 'open'
-       GROUP BY br.reference_id, br.label, br.created_at
-       ORDER BY br.created_at DESC`,
+           br.reference_id,
+           br.label,
+           br.created_at,
+           COALESCE(SUM(b.amount), 0) AS amount
+        FROM budget_reference br
+        LEFT JOIN budget b ON b.reference_id = br.reference_id
+          AND b.status != 'cancelled'
+        WHERE br.status = 'open'
+        GROUP BY br.reference_id, br.label, br.created_at
+        ORDER BY br.created_at DESC`,
       [],
     );
 

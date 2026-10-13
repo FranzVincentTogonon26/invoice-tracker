@@ -320,7 +320,6 @@ export function SourceTable({
                 const remaining = toMoney(source.remaining ?? 0);
                 const overSpent = remaining < 0;
                 const txns = Number(source.transactions) || 0;
-                const involvedCount = Number(source.involved_count) || 0;
                 // Total spent for display: admin + employee + settled legs.
                 // (Remaining still subtracts the admin leg only — the other
                 // two already left as issued, so they must not reduce it.)

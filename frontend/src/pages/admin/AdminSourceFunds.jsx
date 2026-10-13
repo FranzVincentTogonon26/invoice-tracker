@@ -61,34 +61,48 @@ export default function AdminSourceFunds() {
       : list.filter((s) => (s.status ?? "open") === status);
   }, [sources, status]);
 
+  // Headline stats always cover OPEN sources only — closing disconnects a
+  // source from every flow, so cut-off rows must not move the totals (the
+  // table below keeps its own status filter; the cards do not follow it).
+  // Every figure reuses the SourceTable row definitions: allocated /
+  // remaining / issued straight off the row, spent = admin + employee +
+  // settled legs (the table's Spent column).
+  const openRows = useMemo(
+    () => (sources ?? []).filter((s) => (s.status ?? "open") === "open"),
+    [sources],
+  );
+
+  const spentTotalOf = (r) =>
+    Number(r.expenses) + Number(r.employeeExpenses) + Number(r.settledAbono);
+
   const totals = useMemo(() => {
     const sum = (pick) =>
-      toMoney(rows.reduce((acc, r) => acc + Number(pick(r) || 0), 0));
+      toMoney(openRows.reduce((acc, r) => acc + Number(pick(r) || 0), 0));
     return {
       allocated: sum((r) => r.allocated),
       remaining: sum((r) => r.remaining),
       issued: sum((r) => r.issued),
-      expenses: sum((r) => r.expenses),
-      transactions: rows.reduce(
+      expenses: sum(spentTotalOf),
+      transactions: openRows.reduce(
         (acc, r) => acc + (Number(r.transactions) || 0),
         0,
       ),
     };
-  }, [rows]);
+  }, [openRows]);
 
-  // Per-card sparklines — top sources by allocated, so a handful of bars
+  // Per-card sparklines — top OPEN sources by allocated, so a handful of bars
   // never stretches across the lane.
   const sparks = useMemo(() => {
-    const top = [...rows]
+    const top = [...openRows]
       .sort((a, b) => Number(b.allocated || 0) - Number(a.allocated || 0))
       .slice(0, 8);
     return {
       allocated: top.map((r) => ({ v: toMoney(r.allocated) })),
       remaining: top.map((r) => ({ v: toMoney(r.remaining) })),
-      used: top.map((r) => ({ v: toMoney(r.issued + r.expenses) })),
+      used: top.map((r) => ({ v: toMoney(spentTotalOf(r)) })),
       transactions: top.map((r) => ({ v: Number(r.transactions) || 0 })),
     };
-  }, [rows]);
+  }, [openRows]);
 
   const pageCount = Math.max(1, Math.ceil(rows.length / PAGE_SIZE));
   const currentPage = Math.min(page, pageCount - 1);

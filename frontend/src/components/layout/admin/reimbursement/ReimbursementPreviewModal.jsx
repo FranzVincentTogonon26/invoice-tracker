@@ -188,7 +188,6 @@ export function ReimbursementPreviewModal({
                   {
                     label: "Issued",
                     value: formatMoney(row?.issued ?? 0),
-                    hint: `${row?.issuedCount ?? 0} txns`,
                     tone: "accent",
                     lines: [
                       Number(row?.received) > 0 && {
