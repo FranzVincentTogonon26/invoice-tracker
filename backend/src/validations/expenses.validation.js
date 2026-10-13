@@ -245,3 +245,13 @@ export const updateExpenseNotesSchema = z.object({
       .optional(),
   ),
 });
+
+// Category reassignment from the ExpenseDetailsModal (draft rows only) —
+// `category_id` picks a row from `category`, NULL clears it back to
+// uncategorized. Empty string from the UI normalizes to NULL.
+export const updateExpenseCategorySchema = z.object({
+  category_id: z.preprocess(
+    (v) => (v == null || (typeof v === "string" && v.trim() === "") ? null : v),
+    z.uuid({ message: "Invalid category id" }).nullable(),
+  ),
+});

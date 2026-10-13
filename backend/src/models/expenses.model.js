@@ -388,9 +388,60 @@ class Expenses {
         WHERE id = $1
         RETURNING id, notes, total_amount::float8 AS total_amount,
                   status, image_url`,
-      [id, notes],
+      [id, notes ?? null],
     );
     return result.rows[0] ?? null;
+  }
+
+  // Category reassignment from the ExpenseDetailsModal (draft rows only) —
+  // points the row at another `category` row, or NULL to clear it back to
+  // uncategorized (`category_id` is nullable with ON DELETE SET NULL).
+  // Resolves `{ notFound }` when the expense is missing, `{ badCategory }`
+  // when the picked category does not exist, `{ notDraft }` when the row is
+  // no longer a draft — the UI only offers the editor on drafts.
+  static async updateExpenseCategory(id, categoryId) {
+    const existing = await query(
+      `SELECT id, status FROM expenses WHERE id = $1::uuid`,
+      [id],
+    );
+    const found = existing.rows[0] ?? null;
+    if (!found) return { notFound: true };
+    if (found.status !== "draft") return { notDraft: true, status: found.status };
+
+    if (categoryId != null) {
+      const cat = await query(
+        `SELECT category_id FROM category WHERE category_id = $1`,
+        [categoryId],
+      );
+      if (!cat.rows[0]) return { badCategory: true };
+    }
+
+    const result = await query(
+      `UPDATE expenses e
+          SET category_id = $2, updated_at = NOW()
+         FROM category c
+        WHERE e.id = $1::uuid AND c.category_id = $2
+        RETURNING e.id, e.category_id, c.category_name,
+                  e.total_amount::float8 AS total_amount,
+                  e.status, e.image_url`,
+      [id, categoryId ?? null],
+    );
+    // Clearing to NULL skips the `FROM category` join (no row to join), so
+    // fall back to a join-less update that still returns the row.
+    if (!result.rows[0] && categoryId == null) {
+      const cleared = await query(
+        `UPDATE expenses
+            SET category_id = NULL, updated_at = NOW()
+          WHERE id = $1::uuid
+          RETURNING id, category_id, total_amount::float8 AS total_amount,
+                    status, image_url`,
+        [id],
+      );
+      const row = cleared.rows[0] ?? null;
+      return row ? { expense: { ...row, category_name: null } } : { notFound: true };
+    }
+    const row = result.rows[0] ?? null;
+    return row ? { expense: row } : { notFound: true };
   }
 
   // How many expense rows still point at the same stored image. One scan can

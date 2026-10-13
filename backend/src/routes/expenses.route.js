@@ -117,6 +117,16 @@ router.patch(
   expensesController.updateNotes,
 );
 
+// Category reassignment (ExpenseDetailsModal pencil editor, draft rows) —
+// points the row at another category, or NULL for uncategorized. Admin-only;
+// the controller enforces the draft-only and closed-holding guards.
+router.patch(
+  "/:id/category",
+  authMiddleware,
+  requireAdminAccess,
+  expensesController.updateCategory,
+);
+
 router.delete("/:id", authMiddleware, expensesController.remove);
 
 export default router;

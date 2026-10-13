@@ -122,6 +122,13 @@ export function useExpensesMutations() {
       mutationFn: ({ id, notes }) => expensesApi.updateNotes(id, notes),
       onSuccess: invalidate,
     }),
+    // Category reassignment (ExpenseDetailsModal pencil editor, draft rows);
+    // `updateCategory({ id, categoryId })` — NULL clears to uncategorized.
+    updateCategory: useMutation({
+      mutationFn: ({ id, categoryId }) =>
+        expensesApi.updateCategory(id, categoryId),
+      onSuccess: invalidate,
+    }),
     // Deletes a category (UNIQUE-style feedback comes back as a 409).
     removeCategory: useMutation({
       mutationFn: expensesApi.removeCategory,

@@ -75,6 +75,14 @@ export const expensesApi = {
   updateNotes: (id, notes) =>
     apiClient.patch(`/expenses/${id}/notes`, { notes }).then((r) => r.data),
 
+  // Category reassignment (ExpenseDetailsModal pencil editor, draft rows) —
+  // `categoryId` picks a category, NULL clears back to uncategorized.
+  // Admin-only on the server; draft-only + closed-holding guarded there too.
+  updateCategory: (id, categoryId) =>
+    apiClient
+      .patch(`/expenses/${id}/category`, { category_id: categoryId ?? null })
+      .then((r) => r.data),
+
   // Admin approval for a flagged expense: clears `expenses.flag` back to 0.
   // Called by the "Approve flag" action inside the flaggedNotice of the View
   // expense modal. Admin-only on the server.

@@ -5,6 +5,7 @@ import { validate } from "../utils/validate.js";
 import { emitTransaction } from "../realtime/index.js";
 import {
   createExpensesSchema,
+  updateExpenseCategorySchema,
   updateExpenseStatusSchema,
   updateExpenseDescriptionSchema,
   updateExpenseNotesSchema,
@@ -637,6 +638,54 @@ export const updateNotes = async (req, res, next) => {
     return res.status(200).json({
       expense,
       message: "Review notes saved.",
+    });
+  } catch (err) {
+    next(err);
+  }
+};
+
+// Update expense category — the pencil editor in ExpenseDetailsModal (draft
+// rows only in the UI). Admin-only via the route middleware. Draft-only and
+// closed-holding guards are enforced here too so a direct API call can't
+// retag a paid row or a finalized holding.
+export const updateCategory = async (req, res, next) => {
+  try {
+    const { id } = req.params;
+    if (!UUID_RE.test(id || ""))
+      throw ApiError.badRequest("Invalid expense id", "VALIDATION_ERROR");
+
+    const payload = validate(updateExpenseCategorySchema, req.body);
+
+    const existing = await Expenses.findExpenseById(id);
+    if (!existing)
+      throw ApiError.notFound("Expense not found", "EXPENSE_NOT_FOUND");
+    assertExpenseMutable(existing);
+
+    const result = await Expenses.updateExpenseCategory(
+      id,
+      payload.category_id ?? null,
+    );
+    if (result?.notFound)
+      throw ApiError.notFound("Expense not found", "EXPENSE_NOT_FOUND");
+    if (result?.badCategory)
+      throw ApiError.notFound("Category not found", "CATEGORY_NOT_FOUND");
+    if (result?.notDraft)
+      throw ApiError.conflict(
+        `Only a draft expense can change category (current status: ${result.status}).`,
+        "EXPENSE_NOT_DRAFT",
+      );
+
+    emitTransaction({
+      action: "update",
+      entity: "expense",
+      actor: req.user,
+      message: `Updated expense category (${result.expense?.category_name ?? "Uncategorized"}).`,
+      metadata: { id, userId: existing?.user_id ?? null },
+    });
+
+    return res.status(200).json({
+      expense: result.expense,
+      message: "Category updated.",
     });
   } catch (err) {
     next(err);

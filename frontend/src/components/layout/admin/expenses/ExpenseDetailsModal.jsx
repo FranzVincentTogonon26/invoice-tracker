@@ -5,6 +5,7 @@ import { AnimatePresence, motion } from "framer-motion";
 import {
   AlertCircle,
   Banknote,
+  Check,
   ChevronDown,
   CreditCard,
   Eye,
@@ -13,6 +14,7 @@ import {
   Landmark,
   Loader2,
   Maximize2,
+  Pencil,
   ReceiptText,
   RotateCcw,
   ShieldCheck,
@@ -28,6 +30,7 @@ import { TextArea } from "../../../ui/Input";
 import { EmployeeAvatar } from "../../../ui/SelectEmployee";
 import {
   useExpenseDetail,
+  useExpenses,
   useExpensesMutations,
 } from "../../../../hooks/useExpenses";
 import { expensesApi } from "../../../../api/expenses";
@@ -167,6 +170,171 @@ const ReviewNotesCard = ({ row }) => {
           {saving ? "Saving…" : "Save notes"}
         </Button>
       </div>
+    </div>
+  );
+};
+
+// Draft-only category editor (pencil → picker → save). Shows the stored
+// category, or "Uncategorized" when the row has none. Picking a category
+// (or Uncategorized to clear) then Save persists through
+// `updateCategory`; the committed value renders immediately since the
+// modal's `row` snapshot only refreshes on the next ledger fetch.
+const CategoryEditor = ({ row }) => {
+  const { categories } = useExpenses();
+  const { updateCategory } = useExpensesMutations();
+  const saving = updateCategory.isPending;
+  const [editing, setEditing] = useState(false);
+  const [selected, setSelected] = useState(row?.categoryId ?? null);
+  const [committed, setCommitted] = useState(undefined);
+  const [error, setError] = useState(null);
+
+  const [editFor, setEditFor] = useState(row?.id);
+  if (editFor !== row?.id) {
+    setEditFor(row?.id);
+    setSelected(row?.categoryId ?? null);
+    setCommitted(undefined);
+    setEditing(false);
+    setError(null);
+  }
+
+  const currentId =
+    committed !== undefined ? committed.id : (row?.categoryId ?? null);
+  const currentName =
+    committed !== undefined ? committed.name : (row?.category ?? null);
+  const displayName = currentName || "Uncategorized";
+  const dirty = (selected ?? null) !== (currentId ?? null);
+
+  const handleSave = async () => {
+    if (!row?.id || saving || !dirty) return;
+    setError(null);
+    try {
+      const data = await updateCategory.mutateAsync({
+        id: row.id,
+        categoryId: selected ?? null,
+      });
+      const saved = data?.expense ?? null;
+      setCommitted({
+        id: saved?.category_id ?? selected ?? null,
+        name: saved?.category_name ?? null,
+      });
+      setEditing(false);
+      toast.success("Category updated");
+    } catch (err) {
+      setError(err?.message || "Couldn't update category. Try again.");
+    }
+  };
+
+  const optionClass = (isSelected) =>
+    cn(
+      "flex w-full items-center justify-between gap-2 rounded-lg px-2.5 py-1.5 text-left text-xs transition-colors",
+      isSelected
+        ? "bg-[var(--accent-soft)] font-medium text-[var(--accent-strong)]"
+        : "text-[var(--ink)] hover:bg-[var(--surface-2)]",
+    );
+
+  return (
+    <div className="min-w-0">
+      <p className="type-eyebrow text-[var(--ink-muted)]">Category</p>
+      {!editing ? (
+        <div className="mt-1 flex min-w-0 items-center gap-1.5">
+          <button
+            type="button"
+            onClick={() => {
+              setSelected(currentId);
+              setError(null);
+              setEditing(true);
+            }}
+            disabled={saving}
+            aria-label="Edit category"
+            title="Edit category"
+            className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-[var(--ink-muted)] transition-colors hover:bg-[var(--surface-2)] hover:text-[var(--ink)] disabled:opacity-40"
+          >
+            <Pencil size={12} aria-hidden />
+          </button>
+          <p
+            title={displayName}
+            className="min-w-0 flex-1 truncate text-sm font-medium text-[var(--ink)]"
+          >
+            {displayName}
+          </p>
+        </div>
+      ) : (
+        <div className="mt-1.5 overflow-hidden rounded-xl border border-[var(--border)] bg-[var(--surface)]">
+          <div
+            role="listbox"
+            aria-label="Expense category"
+            className="scrollbar-slim max-h-[180px] overflow-y-auto p-1"
+          >
+            <button
+              type="button"
+              role="option"
+              aria-selected={selected == null}
+              onClick={() => setSelected(null)}
+              className={optionClass(selected == null)}
+            >
+              <span className="truncate">Uncategorized</span>
+              {selected == null && (
+                <Check size={13} aria-hidden className="shrink-0" />
+              )}
+            </button>
+            {(categories ?? []).map((cat) => {
+              const isSelected = selected === cat.category_id;
+              return (
+                <button
+                  key={cat.category_id}
+                  type="button"
+                  role="option"
+                  aria-selected={isSelected}
+                  onClick={() => setSelected(cat.category_id)}
+                  className={optionClass(isSelected)}
+                >
+                  <span className="truncate">{cat.category_name}</span>
+                  {isSelected && (
+                    <Check size={13} aria-hidden className="shrink-0" />
+                  )}
+                </button>
+              );
+            })}
+          </div>
+          {error ? (
+            <p
+              role="alert"
+              className="border-t border-[var(--border)] px-2.5 pt-1.5 text-[11px] font-medium text-[var(--danger)]"
+            >
+              {error}
+            </p>
+          ) : null}
+          <div className="flex items-center justify-end gap-1.5 border-t border-[var(--border)] px-2 py-1.5">
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              onClick={() => {
+                setSelected(currentId);
+                setError(null);
+                setEditing(false);
+              }}
+              disabled={saving}
+              className="h-7 text-xs"
+            >
+              Cancel
+            </Button>
+            <Button
+              type="button"
+              variant="soft"
+              size="sm"
+              onClick={handleSave}
+              disabled={saving || !dirty}
+              className="h-7 text-xs"
+            >
+              {saving && (
+                <Loader2 size={12} className="animate-spin" aria-hidden />
+              )}
+              {saving ? "Saving…" : "Save"}
+            </Button>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
@@ -467,6 +635,14 @@ const ExpenseDetailsModal = ({
   const vendorName = String(detailVendor ?? "").trim();
   const title = vendorName || row?.description || "Expense details";
 
+  // Category pencil editor: draft rows only (closed-holding drafts stay
+  // read-only, matching the ledger's view-only lock).
+  const isClosedHoldingRow =
+    String(
+      row?.issuedParentStatus ?? row?.issued_parent_status ?? "",
+    ).trim().toLowerCase() === "close";
+  const canEditCategory = row?.status === "draft" && !isClosedHoldingRow;
+
   const handleClose = () => {
     setFailedUrl(null);
     setZoomLevel(1);
@@ -762,16 +938,22 @@ const ExpenseDetailsModal = ({
                   </div>
 
                   {/* Category & Source of Funds */}
-                  {(row?.category || referenceLabel) && (
+                  {(row?.category || canEditCategory || referenceLabel) && (
                     <div className="grid grid-cols-2 gap-3 border-b border-[var(--border)] py-2.5">
-                      {row?.category ? (
+                      {row?.category || canEditCategory ? (
                         <div className="min-w-0">
-                          <p className="type-eyebrow text-[var(--ink-muted)]">
-                            Category
-                          </p>
-                          <p className="mt-1 truncate text-sm font-medium text-[var(--ink)]">
-                            {row.category}
-                          </p>
+                          {canEditCategory ? (
+                            <CategoryEditor row={row} />
+                          ) : (
+                            <>
+                              <p className="type-eyebrow text-[var(--ink-muted)]">
+                                Category
+                              </p>
+                              <p className="mt-1 truncate text-sm font-medium text-[var(--ink)]">
+                                {row.category}
+                              </p>
+                            </>
+                          )}
                         </div>
                       ) : null}
                       {referenceLabel ? (
