@@ -662,3 +662,59 @@ export const restoreIssuedTransaction = async (req, res, next) => {
     next(err);
   }
 };
+
+// Reopen a finalized issuance record (`budget_issued_reference.status`
+// 'close' -> 'open') — the undo of a reimbursement submit for one record.
+// Refuses non-closed rows, cut-off sources and pairs that already hold a
+// live sibling (the partial unique index covers open rows only).
+export const reopenIssuedReference = async (req, res, next) => {
+  try {
+    const { id } = req.params;
+
+    if (!UUID_RE.test(id || ""))
+      throw ApiError.badRequest(
+        "Invalid issuance reference id",
+        "VALIDATION_ERROR",
+      );
+
+    const result = await Budget.reopenIssuedReference(id);
+    if (!result || result.notFound)
+      throw ApiError.notFound(
+        "Issuance record not found",
+        "ISSUED_REFERENCE_NOT_FOUND",
+      );
+    if (result.notClosed)
+      throw ApiError.conflict(
+        "Only a finalized (closed) record can be reopened.",
+        "REFERENCE_NOT_CLOSED",
+      );
+    if (result.sourceClosed)
+      throw ApiError.conflict(
+        "This budget source is cut off — reopening would reconnect dead money.",
+        "REFERENCE_NOT_OPEN",
+      );
+    if (result.conflict)
+      throw ApiError.conflict(
+        "The employee already holds an open issuance for this source — reimburse it first.",
+        "EMPLOYEE_ISSUED_CONFLICT",
+      );
+
+    emitTransaction({
+      action: "update",
+      entity: "issued-budget",
+      actor: req.user,
+      message: `Reopened issuance record (${result.issuedReference?.id ?? id}).`,
+      metadata: {
+        id,
+        userId: result.issuedReference?.user_id ?? null,
+      },
+      notifyUserIds: result.issuedReference?.user_id
+        ? [result.issuedReference.user_id]
+        : [],
+    });
+
+    return res.status(200).json({ issuedReference: result.issuedReference });
+  } catch (err) {
+    next(err);
+  }
+};

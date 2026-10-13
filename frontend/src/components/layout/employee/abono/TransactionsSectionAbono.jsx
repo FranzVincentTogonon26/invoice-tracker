@@ -34,6 +34,7 @@ import {
   startOfDay,
   toDate,
 } from "../../../../lib/utils";
+import { tableRowVariants } from "@/lib/tableAnimation";
 import DateRangePicker from "../../../ui/DateRangePicker";
 import ConfirmActionDialog from "../../admin/expenses/ConfirmActionDialog";
 import { AbonoStatusBadge } from "./AbonoStatusBadge";
@@ -895,14 +896,20 @@ export const TransactionsSectionAbono = ({
                 </tr>
               </thead>
               <tbody className="divide-y divide-[var(--border)]">
+                <AnimatePresence initial={false}>
                 {pageRows.map((tx) => {
                   const meta = TYPE_CONFIG[tx.kind] ?? TYPE_CONFIG.expense;
                   const Icon = meta.icon;
                   const flagged = isFlagged(tx);
 
                   return (
-                    <tr
+                    <motion.tr
                       key={`${tx.kind}-${tx.id}`}
+                      layout
+                      initial="hidden"
+                      animate="visible"
+                      exit={{ opacity: 0 }}
+                      variants={tableRowVariants}
                       className={cn(
                         "relative  transition-colors duration-150 hover:bg-[var(--accent)]/[0.05]",
                         flagged &&
@@ -914,7 +921,7 @@ export const TransactionsSectionAbono = ({
                           : undefined
                       }
                     >
-                      <td className="relative px-4 py-3 first:pl-5 align-middle">
+                      <td className="relative px-4 py-3.5 first:pl-5 align-middle">
                         <span
                           aria-hidden
                           className={cn(
@@ -929,7 +936,7 @@ export const TransactionsSectionAbono = ({
                           {formatTime(tx.date)}
                         </p>
                       </td>
-                      <td className="px-4 py-3 align-middle">
+                      <td className="px-4 py-3.5 align-middle">
                         <p
                           className=" text-[13px] font-medium leading-snug text-[var(--ink)]"
                           title={tx.reference_label || tx.description}
@@ -953,7 +960,7 @@ export const TransactionsSectionAbono = ({
                           </span>
                         )}
                       </td>
-                      <td className="px-4 py-3 align-middle">
+                      <td className="px-4 py-3.5 align-middle">
                         <div className="flex w-full flex-row flex-nowrap items-center gap-2.5">
                           {tx.status ? (
                             <AbonoStatusBadge
@@ -994,7 +1001,7 @@ export const TransactionsSectionAbono = ({
                         </div>
                       </td>
 
-                      <td className="px-4 py-3 text-right last:pr-5 align-middle">
+                      <td className="px-4 py-3.5 text-right last:pr-5 align-middle">
                         <span
                           className={cn(
                             "whitespace-nowrap font-display text-[15px] font-medium tabular-nums",
@@ -1004,7 +1011,7 @@ export const TransactionsSectionAbono = ({
                         </span>
                       </td>
                       {showActions && (
-                        <td className="px-4 py-4 text-right align-middle">
+                        <td className="px-4 py-3.5 text-right align-middle">
                           <div className="flex justify-end">
                             {tx?.status === "open" &&
                               !isAbonoSpent(tx, totalBalance) && (
@@ -1017,9 +1024,10 @@ export const TransactionsSectionAbono = ({
                           </div>
                         </td>
                       )}
-                    </tr>
+                    </motion.tr>
                   );
                 })}
+                </AnimatePresence>
               </tbody>
             </table>
           </div>

@@ -49,6 +49,7 @@ export function EmployeeBudgetMetrics({
   spent,
   sent,
   abono,
+  settledAbono,
 }) {
   return (
     <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
@@ -57,23 +58,31 @@ export function EmployeeBudgetMetrics({
         label="Issued Budget"
         value={formatMoney(issued)}
       >
-        {received > 0 && (
-          <p
-            className="text-xs font-medium tabular-nums text-[var(--accent-strong)]"
-            title={`${formatMoney(received)} received from budget transfers`}
-          >
-            + {formatMoney(received)} received
-          </p>
-        )}
+          {received > 0 && (
+            <p
+              className="text-xs font-medium tabular-nums text-[var(--accent-strong)]"
+              title={`${formatMoney(received)} received from budget transfers`}
+            >
+              + {formatMoney(received)} received
+            </p>
+          )}
 
-        {sent > 0 && (
-          <p
-            className="text-xs font-medium tabular-nums text-[var(--danger)]"
-            title={`${formatMoney(sent)} sent via budget transfers`}
-          >
-            - {formatMoney(sent)} sent
-          </p>
-        )}
+          {sent > 0 && (
+            <p
+              className="text-xs font-medium tabular-nums text-[var(--danger)]"
+              title={`${formatMoney(sent)} sent via budget transfers`}
+            >
+              - {formatMoney(sent)} sent
+            </p>
+          )}
+          {settledAbono > 0 && (
+            <p
+              className="text-xs font-medium tabular-nums text-[var(--warning)]"
+              title={`${formatMoney(settledAbono)} settled abono deducted from issued budget`}
+            >
+              - {formatMoney(settledAbono)} abono settled
+            </p>
+          )}
       </BudgetMetric>
       <BudgetMetric
         icon={ReceiptText}

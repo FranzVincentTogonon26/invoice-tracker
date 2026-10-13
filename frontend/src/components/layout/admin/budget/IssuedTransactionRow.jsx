@@ -1,10 +1,12 @@
 import { useState } from "react";
+import { motion } from "framer-motion";
 import { HandCoins } from "lucide-react";
 import { Badge, StatusBadge } from "../../../ui/Badge";
 import { MethodIcon } from "../../../ui/Select";
 import { cn, formatDate, formatMoney, formatTime } from "../../../../lib/utils";
 import { methodLabel } from "./PaymentMethod";
 import { IssuedTransactionActions } from "./IssuedTransactionActions";
+import { tableRowVariants } from "@/lib/tableAnimation";
 
 /* ── Cell building blocks ────────────────────────────────────────────────── */
 
@@ -110,7 +112,14 @@ function DateIssuedCell({ date }) {
  */
 export function IssuedTransactionRow({ transaction: t, onAction }) {
   return (
-    <tr className="group border-b border-[var(--border)] transition-colors duration-150 last:border-b-0 hover:bg-[var(--accent)]/[0.04]">
+    <motion.tr
+      layout
+      initial="hidden"
+      animate="visible"
+      exit={{ opacity: 0 }}
+      variants={tableRowVariants}
+      className="group border-b border-[var(--border)] transition-colors duration-150 last:border-b-0 hover:bg-[var(--accent)]/[0.04]"
+    >
       <td className="relative px-4 py-3.5 pl-5 align-middle">
         <span
           aria-hidden
@@ -168,7 +177,7 @@ export function IssuedTransactionRow({ transaction: t, onAction }) {
           />
         </div>
       </td>
-    </tr>
+    </motion.tr>
   );
 }
 

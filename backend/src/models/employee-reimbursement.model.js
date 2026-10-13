@@ -187,6 +187,7 @@ class EmployeeReimbursement {
                   COALESCE(ex.expense_count, 0)::int AS expense_count,
                   COALESCE(st.sent, 0)::float8 AS sent,
                   COALESCE(rc.received, 0)::float8 AS received,
+                  COALESCE(sb.settled_abono, 0)::float8 AS settled_abono,
                   -- First issuance date and latest close date across the
                   -- employee's references under open sources (NULL when the
                   -- side never happened — e.g. never closed yet).
@@ -237,6 +238,24 @@ class EmployeeReimbursement {
                   AND (e.reference_id IS NULL OR br3.status = 'open')
                 GROUP BY e.user_id
              ) ex ON ex.user_id = u.user_id
+             -- Settled abono under open holdings (same pinning as the
+             -- roster): backed out of issued/funded/remaining everywhere.
+             LEFT JOIN (
+               SELECT ea.user_id,
+                      SUM(ea.amount)::float8 AS settled_abono
+                 FROM employee_abono ea
+                 JOIN budget_reference br2 ON br2.reference_id = ea.reference_id
+                WHERE ea.status = 'settled'
+                  AND br2.status = 'open'
+                  AND EXISTS (
+                    SELECT 1 FROM budget_issued_reference bir2
+                     WHERE bir2.user_id = ea.user_id
+                       AND bir2.reference_id = ea.reference_id
+                       AND bir2.status = 'open'
+                       AND bir2.id = ea.issued_ref_id
+                  )
+                GROUP BY ea.user_id
+             ) sb ON sb.user_id = u.user_id
              -- Sent counts while stamped to an OPEN holding (same gate as
              -- the whole-account overview); received is the user's money
              -- however it arrived (sender-stamped, ungated).
@@ -284,7 +303,7 @@ class EmployeeReimbursement {
              )
              GROUP BY u.user_id, u.name, u.email, u.avatar_url, u.role,
                      ab.open_abono, ab.open_abono_count, ex.spent, ex.expense_count,
-                     st.sent, rc.received
+                     st.sent, rc.received, sb.settled_abono
              ORDER BY issued DESC`,
         ),
         // Per-reference allocation list for the Money In card — same shape
@@ -409,7 +428,8 @@ class EmployeeReimbursement {
                   COALESCE(sp.spent, 0)::float8 AS spent,
                   COALESCE(sp.expense_count, 0)::int AS expense_count,
                   COALESCE(st.sent, 0)::float8 AS sent,
-                  COALESCE(rc.received, 0)::float8 AS received
+                  COALESCE(rc.received, 0)::float8 AS received,
+                  COALESCE(sb.settled_abono, 0)::float8 AS settled_abono
              FROM budget_issued_reference bir
              JOIN users u ON u.user_id = bir.user_id
              JOIN budget_reference br ON br.reference_id = bir.reference_id
@@ -463,12 +483,24 @@ class EmployeeReimbursement {
                   AND btr.issued_ref_id_sent IS NOT NULL
                 GROUP BY btr.issued_ref_id_sent
              ) rc ON rc.bir_id = bir.id
+             -- Record-scoped settled abono: backed out of the balance like
+             -- every other surface.
+             LEFT JOIN (
+               SELECT ea.issued_ref_id AS bir_id,
+                      SUM(ea.amount)::float8 AS settled_abono
+                 FROM employee_abono ea
+                 LEFT JOIN budget_reference br5 ON br5.reference_id = ea.reference_id
+                WHERE ea.status = 'settled'
+                  AND (ea.reference_id IS NULL OR br5.status = 'open')
+                  AND ea.issued_ref_id IS NOT NULL
+                GROUP BY ea.issued_ref_id
+             ) sb ON sb.bir_id = bir.id
                GROUP BY bir.id, bir.user_id, bir.reference_id, bir.status,
                        bir.notes,
                        bir.created_at, bir.date_cut_off, bir.date_forwarded,
                       u.name, u.email, u.avatar_url, u.role, br.label,
                       ab.open_abono, ab.open_abono_count, sp.spent, sp.expense_count,
-                      st.sent, rc.received, rc.bir_id
+                      st.sent, rc.received, rc.bir_id, sb.settled_abono
              -- Open records first, then newest first inside each group.
              ORDER BY (bir.status = 'open') DESC, bir.created_at DESC`,
         ),
@@ -545,6 +577,7 @@ class EmployeeReimbursement {
         const rowSpent = toMoney(r.spent);
         const rowSent = toMoney(r.sent);
         const rowReceived = toMoney(r.received);
+        const rowSettledAbono = toMoney(r.settled_abono);
         return {
           userId: r.user_id,
           name: r.name,
@@ -561,10 +594,11 @@ class EmployeeReimbursement {
           expenseCount: Number(r.expense_count) || 0,
           sent: rowSent,
           received: rowReceived,
+          settledAbono: rowSettledAbono,
           birStatuses: r.bir_statuses || "",
           dateCreated: r.first_issued_at ?? null,
           dateClosed: r.last_forwarded_at ?? null,
-          balance: toMoney(rowIssued + rowAbono - rowSpent - rowSent + rowReceived),
+          balance: toMoney(rowIssued + rowAbono - rowSpent - rowSent + rowReceived - rowSettledAbono),
         };
       }),
       records: (issuanceRecordsResult.rows ?? []).map((r) => {
@@ -573,6 +607,7 @@ class EmployeeReimbursement {
         const rowSpent = toMoney(r.spent);
         const rowSent = toMoney(r.sent);
         const rowReceived = toMoney(r.received);
+        const rowSettledAbono = toMoney(r.settled_abono);
         return {
           id: r.id,
           userId: r.user_id,
@@ -595,7 +630,8 @@ class EmployeeReimbursement {
           expenseCount: Number(r.expense_count) || 0,
           sent: rowSent,
           received: rowReceived,
-          balance: toMoney(rowIssued + rowAbono - rowSpent - rowSent + rowReceived),
+          settledAbono: rowSettledAbono,
+          balance: toMoney(rowIssued + rowAbono - rowSpent - rowSent + rowReceived - rowSettledAbono),
         };
       }),
     };

@@ -53,6 +53,14 @@ router.patch(
   requireAdminAccess,
   budgetController.restoreIssuedTransaction,
 );
+// Reopen a finalized issuance record (`budget_issued_reference.status`
+// 'close' -> 'open') — the undo of a reimbursement submit for one record.
+router.patch(
+  "/issued_reference/:id/reopen",
+  authMiddleware,
+  requireAdminAccess,
+  budgetController.reopenIssuedReference,
+);
 // Permanently deletes a cancelled issued budget transaction (hard delete of
 // the row, parent pruned when childless). Admin-only at the route layer via
 // `requireAdminAccess` (auth + role re-checked from the token, so a forged

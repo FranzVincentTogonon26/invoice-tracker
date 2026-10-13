@@ -1,5 +1,7 @@
+import { AnimatePresence, motion } from "framer-motion";
 import { Flag } from "lucide-react";
 import { OVERVIEW_COLUMN_WIDTHS } from "@/constants";
+import { tableRowVariants } from "@/lib/tableAnimation";
 import { cn, formatDate, formatMoney, formatTime } from "@/lib/utils";
 import {
   getDateGroupLabel,
@@ -142,7 +144,12 @@ function OverviewTableRow({ tx, onView }) {
   const hasReceipt = hasOverviewReceipt(tx);
 
   return (
-    <tr
+    <motion.tr
+      layout
+      initial="hidden"
+      animate="visible"
+      exit={{ opacity: 0 }}
+      variants={tableRowVariants}
       key={`${tx.kind}-${tx.id}`}
       className={cn(
         "relative transition-colors duration-150 hover:bg-[var(--accent)]/[0.05]",
@@ -160,7 +167,7 @@ function OverviewTableRow({ tx, onView }) {
           : undefined
       }
     >
-      <td className="relative px-4 py-3 first:pl-5 align-middle">
+      <td className="relative px-4 py-3.5 first:pl-5 align-middle">
         <span
           aria-hidden
           className="absolute inset-y-2 left-0 w-[3px] rounded-full bg-transparent"
@@ -173,7 +180,7 @@ function OverviewTableRow({ tx, onView }) {
         </p>
       </td>
 
-      <td className="px-4 py-3 align-middle">
+      <td className="px-4 py-3.5 align-middle">
         <div className="flex min-w-0 items-center gap-1.5">
           {flagged ? (
             <span
@@ -222,12 +229,12 @@ function OverviewTableRow({ tx, onView }) {
           </p>
         ) : null}
       </td>
-      <td className="px-4 py-3 align-middle">
+      <td className="px-4 py-3.5 align-middle">
         <div className="flex justify-center">
           {hasReceipt ? <OverviewReceiptBadge /> : null}
         </div>
       </td>
-      <td className="px-4 py-3 align-middle">
+      <td className="px-4 py-3.5 align-middle">
         <Badge
           tone={typeBadge.tone}
           className="max-w-full gap-1.5 px-2 py-1 text-[11px]"
@@ -242,13 +249,13 @@ function OverviewTableRow({ tx, onView }) {
           <span className="truncate">{typeBadge.label}</span>
         </Badge>
       </td>
-      <td className="px-4 py-3 align-middle">
+      <td className="px-4 py-3.5 align-middle">
         <OverviewMethodBadge method={tx.method} className="max-w-full" />
       </td>
-      <td className="px-4 py-3 align-middle">
+      <td className="px-4 py-3.5 align-middle">
         <StatusCell tx={tx} meta={meta} />
       </td>
-      <td className="px-4 py-3 align-middle">
+      <td className="px-4 py-3.5 align-middle">
         <p
           className="whitespace-nowrap text-left text-[13px] font-normal leading-none text-[var(--ink)]"
           title={`${formatDate(tx.date)} at ${formatTime(tx.date)}`}
@@ -262,7 +269,7 @@ function OverviewTableRow({ tx, onView }) {
           </span>
         </p>
       </td>
-      <td className="px-4 py-3 text-right align-middle">
+      <td className="px-4 py-3.5 text-right align-middle">
         <span
           className={cn(
             "whitespace-nowrap font-display text-[15px] font-medium ",
@@ -275,12 +282,12 @@ function OverviewTableRow({ tx, onView }) {
             : `+${formatMoney(tx.amount)}`}
         </span>
       </td>
-      <td className="px-4 py-3 pr-5 text-right align-middle">
+      <td className="px-4 py-3.5 pr-5 text-right align-middle">
         <div className="flex justify-end">
           <OverviewRowActions onView={() => onView(tx)} />
         </div>
       </td>
-    </tr>
+    </motion.tr>
   );
 }
 
@@ -327,13 +334,15 @@ export function OverviewTable({ rows, onView }) {
           </tr>
         </thead>
         <tbody className="divide-y divide-[var(--border)]">
-          {rows.map((tx) => (
-            <OverviewTableRow
-              key={`${tx.kind}-${tx.id}`}
-              tx={tx}
-              onView={onView}
-            />
-          ))}
+          <AnimatePresence initial={false}>
+            {rows.map((tx) => (
+              <OverviewTableRow
+                key={`${tx.kind}-${tx.id}`}
+                tx={tx}
+                onView={onView}
+              />
+            ))}
+          </AnimatePresence>
         </tbody>
       </table>
     </div>

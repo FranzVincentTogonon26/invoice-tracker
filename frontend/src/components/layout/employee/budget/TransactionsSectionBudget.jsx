@@ -38,6 +38,7 @@ import {
 } from "../../../../lib/utils";
 import DateRangePicker from "../../../ui/DateRangePicker";
 import ConfirmActionDialog from "../../admin/expenses/ConfirmActionDialog";
+import { tableRowVariants } from "@/lib/tableAnimation";
 import { useBudgetTransferMutations } from "../../../../hooks/useBudgetTransfer";
 
 const formatShortDate = (value) => {
@@ -708,6 +709,7 @@ export const TransactionsSectionBudget = ({
                 </tr>
               </thead>
               <tbody className="divide-y divide-[var(--border)]">
+                <AnimatePresence initial={false}>
                 {pageRows.map((tx) => {
                   const transfer = isTransfer(tx);
                   const sent = isSentTransfer(tx);
@@ -716,11 +718,16 @@ export const TransactionsSectionBudget = ({
                     ? [counterparty].filter(Boolean).join(" · ")
                     : tx.notes;
                   return (
-                    <tr
+                    <motion.tr
                       key={`${tx.kind}-${tx.id}`}
+                      layout
+                      initial="hidden"
+                      animate="visible"
+                      exit={{ opacity: 0 }}
+                      variants={tableRowVariants}
                       className="transition-colors duration-150 hover:bg-[var(--accent)]/[0.05]"
                     >
-                      <td className="px-4 py-3 align-middle first:pl-5">
+                      <td className="px-4 py-3.5 align-middle first:pl-5">
                         <p className="whitespace-nowrap text-[13px] font-medium leading-none tabular-nums text-[var(--ink)]">
                           {formatDate(tx.date)}
                         </p>
@@ -728,7 +735,7 @@ export const TransactionsSectionBudget = ({
                           {formatTime(tx.date)}
                         </p>
                       </td>
-                      <td className="px-4 py-3 align-middle">
+                      <td className="px-4 py-3.5 align-middle">
                         <p
                           className=" text-[13px] font-medium leading-snug text-[var(--ink)]"
                           title={rowTitle(tx)}
@@ -744,10 +751,10 @@ export const TransactionsSectionBudget = ({
                           </p>
                         )}
                       </td>
-                      <td className="px-4 py-3 align-middle">
+                      <td className="px-4 py-3.5 align-middle">
                         <MethodBadge method={tx.method} />
                       </td>
-                      <td className="px-4 py-3 align-middle">
+                      <td className="px-4 py-3.5 align-middle">
                         {transfer ? (
                           <Badge tone={sent ? "neutral" : "success"}>
                             <ArrowLeftRight
@@ -769,7 +776,7 @@ export const TransactionsSectionBudget = ({
                           </Badge>
                         )}
                       </td>
-                      <td className="px-4 py-3 align-middle">
+                      <td className="px-4 py-3.5 align-middle">
                         <p
                           className="whitespace-nowrap text-left text-[13px] font-normal leading-none text-[var(--ink)]"
                           title={`${formatDate(tx.date)} at ${formatTime(tx.date)}`}
@@ -783,7 +790,7 @@ export const TransactionsSectionBudget = ({
                           </span>
                         </p>
                       </td>
-                      <td className="px-4 py-3 text-right align-middle">
+                      <td className="px-4 py-3.5 text-right align-middle">
                         <span
                           className={cn(
                             "text-[13px] font-medium tabular-nums",
@@ -796,9 +803,10 @@ export const TransactionsSectionBudget = ({
                             : formatMoney(tx.amount)}
                         </span>
                       </td>
-                    </tr>
+                    </motion.tr>
                   );
                 })}
+                </AnimatePresence>
               </tbody>
             </table>
           </div>

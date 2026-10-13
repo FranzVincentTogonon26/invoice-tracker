@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from "react";
+import { AnimatePresence, motion } from "framer-motion";
 import { createPortal } from "react-dom";
 import {
   CircleCheck,
@@ -23,6 +24,7 @@ import {
   isSameDay,
   addDays,
 } from "../../../../lib/utils";
+import { tableRowVariants } from "@/lib/tableAnimation";
 
 // Column widths MUST sum to exactly 100% — `table-fixed` distributes any
 // leftover/overflow proportionally, so 101% forced a permanent ~11px overflow
@@ -506,13 +508,18 @@ function LedgerRow({
 }) {
   const hasReceipt = Boolean(row.receiptId || row.imageUrl);
   return (
-    <tr
+    <motion.tr
+      layout
+      initial="hidden"
+      animate="visible"
+      exit={{ opacity: 0 }}
+      variants={tableRowVariants}
       className={cn(
         "group border-b border-[var(--border)] transition-colors duration-150 last:border-b-0 hover:bg-[var(--accent)]/[0.04]",
         row.flagged && "bg-[var(--danger)]/[0.03]",
       )}
     >
-      <td className="relative px-4 py-4 pl-5 align-middle">
+      <td className="relative px-4 py-3.5 pl-5 align-middle">
         <span
           aria-hidden
           className={cn(
@@ -530,7 +537,7 @@ function LedgerRow({
         </p>
       </td>
 
-      <td className="min-w-0 max-w-0 px-4 py-4 align-middle">
+      <td className="min-w-0 max-w-0 px-4 py-3.5 align-middle">
         <div className="flex min-w-0 items-center gap-1.5">
           {row.flagged && (
             <span
@@ -569,7 +576,7 @@ function LedgerRow({
         </div>
       </td>
 
-      <td className="min-w-0 max-w-0 px-4 py-4 align-middle">
+      <td className="min-w-0 max-w-0 px-4 py-3.5 align-middle">
         <EmployeeCell
           name={row.employee}
           role={row.employeeRole}
@@ -579,7 +586,7 @@ function LedgerRow({
         />
       </td>
 
-      <td className="min-w-0 max-w-0 px-4 py-4 align-middle">
+      <td className="min-w-0 max-w-0 px-4 py-3.5 align-middle">
         <SourceFundsBadge
           source={
             row.employeeRole === "employee"
@@ -590,11 +597,11 @@ function LedgerRow({
         />
       </td>
 
-      <td className="px-4 py-4 align-middle">
+      <td className="px-4 py-3.5 align-middle">
         <ExpenseStatusBadge status={row.status} />
       </td>
 
-      <td className="px-4 py-4 align-middle">
+      <td className="px-4 py-3.5 align-middle">
         <div className="flex justify-left">
           <p
             className="whitespace-nowrap text-left text-[13px] font-normal leading-none  text-[var(--ink-muted)]"
@@ -611,7 +618,7 @@ function LedgerRow({
         </div>
       </td>
 
-      <td className="min-w-0 max-w-0 px-4 py-4 text-right align-middle">
+      <td className="min-w-0 max-w-0 px-4 py-3.5 text-right align-middle">
         <p className="truncate text-sm font-medium tabular-nums text-[var(--ink)]">
           {formatMoney(row.amount)}
         </p>
@@ -624,7 +631,7 @@ function LedgerRow({
         </p>
       </td>
 
-      <td className="px-4 py-4 pr-5 text-right align-middle">
+      <td className="px-4 py-3.5 pr-5 text-right align-middle">
         <div className="flex justify-end">
           <RowActions
             row={row}
@@ -637,7 +644,7 @@ function LedgerRow({
           />
         </div>
       </td>
-    </tr>
+    </motion.tr>
   );
 }
 
@@ -762,7 +769,7 @@ const ExpensesTable = ({
                   key={h.label}
                   scope="col"
                   className={cn(
-                    "border-b border-[var(--accent)]/30 px-4 pb-4 pt-6 type-eyebrow tracking-[0.15em] text-[var(--ink-muted)] align-bottom first:pl-5 last:pr-5",
+                    "border-b border-[var(--accent)]/30 px-4 py-3 type-eyebrow tracking-[0.15em] text-[var(--ink-muted)] align-bottom first:pl-5 last:pr-5",
                     {
                       "text-left": h.align === "left",
                       "text-center": h.align === "center",
@@ -779,18 +786,20 @@ const ExpensesTable = ({
           </thead>
 
           <tbody>
-            {rows.map((row) => (
-              <LedgerRow
-                key={row.id}
-                row={row}
-                pending={pending}
-                onView={onView}
-                onDelete={onDelete}
-                onAddToDraft={onAddToDraft}
-                onRemoveFromDraft={onRemoveFromDraft}
-                onCancelExpense={onCancelExpense}
-              />
-            ))}
+            <AnimatePresence initial={false}>
+              {rows.map((row) => (
+                <LedgerRow
+                  key={row.id}
+                  row={row}
+                  pending={pending}
+                  onView={onView}
+                  onDelete={onDelete}
+                  onAddToDraft={onAddToDraft}
+                  onRemoveFromDraft={onRemoveFromDraft}
+                  onCancelExpense={onCancelExpense}
+                />
+              ))}
+            </AnimatePresence>
           </tbody>
         </table>
       </div>

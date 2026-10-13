@@ -156,19 +156,26 @@ export function budgetBreakdown(employee) {
   const received = Math.max(0, toMoney(employee?.total_received));
   const abono = Math.max(0, toMoney(employee?.total_abono));
   const sent = Math.max(0, toMoney(employee?.total_sent));
-  const funded = toMoney(issued + abono + received);
-  const remaining = toMoney(received + abono + issued - spent - sent);
+  // Settled abono connected to the transactions ledger — backed out of
+  // issued everywhere (its re-booked children read as funding), so funded
+  // and remaining are net figures. Never below zero.
+  const settledAbono = Math.max(0, toMoney(employee?.total_settled_abono));
+  const netIssued = Math.max(0, toMoney(issued - settledAbono));
+  const funded = toMoney(netIssued + abono + received);
+  const remaining = toMoney(received + abono + netIssued - spent - sent);
   const share =
     funded > 0 ? Number(((remaining / funded) * 100).toFixed(2)) : 0;
   const spentShare =
     funded > 0 ? Number(Math.min(100, Math.max(0, 100 - share)).toFixed(2)) : 0;
   return {
     issued,
+    netIssued,
     spent,
     remaining,
     received,
     abono,
     sent,
+    settledAbono,
     funded,
     share,
     spentShare,

@@ -97,6 +97,24 @@ class EmployeeOverview {
                    AND bir2.id = e.issued_ref_id
               ))
           ), 0)::float8 AS total_expenses,
+          -- Settled abono under open holdings (same pinning as every other
+          -- leg): backed out of issued/funded/remaining everywhere, since
+          -- its re-booked children read as funding.
+          COALESCE((
+            SELECT SUM(ea.amount)
+            FROM employee_abono ea
+            JOIN budget_reference br2 ON br2.reference_id = ea.reference_id
+            WHERE ea.user_id = $1 AND ea.status = 'settled'
+              AND br2.status = 'open'
+              AND EXISTS (
+                SELECT 1
+                  FROM budget_issued_reference bir3
+                 WHERE bir3.user_id = ea.user_id
+                   AND bir3.reference_id = ea.reference_id
+                   AND bir3.status = 'open'
+                   AND bir3.id = ea.issued_ref_id
+              )
+          ), 0)::float8 AS total_settled_abono,
           COALESCE((
             SELECT COUNT(*)
             FROM expenses e
@@ -173,6 +191,7 @@ class EmployeeOverview {
     const totalAbono = toMoney(row.total_abono);
     const totalSent = toMoney(row.total_sent);
     const totalReceived = toMoney(row.total_received);
+    const totalSettledAbono = toMoney(row.total_settled_abono);
 
     // Fetch individual transactions for this employee across issued budget,
     // expenses, abono, and budget transfers (success only — transfers complete
@@ -411,8 +430,9 @@ class EmployeeOverview {
       totalAbono,
       totalSent,
       totalReceived,
+      totalSettledAbono,
       totalBalance: toMoney(
-        totalBudget + totalAbono - totalExpenses - totalSent + totalReceived,
+        totalBudget + totalAbono - totalExpenses - totalSent + totalReceived - totalSettledAbono,
       ),
       activeReferences: Number(row.active_references) || 0,
       expenseCount: Number(row.expense_count) || 0,
@@ -460,6 +480,17 @@ class EmployeeOverview {
             WHERE e.issued_ref_id = $2 AND e.user_id = $1 AND e.status = 'paid'
               AND (e.reference_id IS NULL OR br.status = 'open')
           ), 0)::float8 AS total_expenses,
+          -- Record-scoped settled abono: backed out of issued/funded/
+          -- remaining everywhere, since its re-booked children read as
+          -- funding.
+          COALESCE((
+            SELECT SUM(ea.amount)
+            FROM employee_abono ea
+            JOIN budget_reference br ON br.reference_id = ea.reference_id
+            WHERE ea.issued_ref_id = $2 AND ea.user_id = $1
+              AND ea.status = 'settled'
+              AND br.status = 'open'
+          ), 0)::float8 AS total_settled_abono,
           COALESCE((
             SELECT COUNT(*)
             FROM expenses e
@@ -504,7 +535,8 @@ class EmployeeOverview {
     const totalExpenses = toMoney(row.total_expenses);
     const totalAbono = toMoney(row.total_abono);
     const totalSent = toMoney(row.total_sent);
-    const totalReceived = 0;
+    const totalReceived = toMoney(row.total_received);
+    const totalSettledAbono = toMoney(row.total_settled_abono);
 
     const txParams = [userId, issuedRefId];
     let searchFilter = "";
@@ -679,8 +711,9 @@ class EmployeeOverview {
       totalAbono,
       totalSent,
       totalReceived,
+      totalSettledAbono,
       totalBalance: toMoney(
-        totalBudget + totalAbono - totalExpenses - totalSent + totalReceived,
+        totalBudget + totalAbono - totalExpenses - totalSent + totalReceived - totalSettledAbono,
       ),
       activeReferences: Number(row.active_references) || 0,
       expenseCount: Number(row.expense_count) || 0,

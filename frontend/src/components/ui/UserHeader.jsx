@@ -31,10 +31,10 @@ export function UserHeader({ user }) {
         />
 
         <div className="min-w-0 flex-1">
-          <p className="type-eyebrow text-[11px]  leading-tight text-[var(--ink-muted)]">
+          <p className="type-eyebrow truncate text-[11px]  leading-tight text-[var(--ink-muted)]">
             {greeting}
           </p>
-          <p className="type-eyebrow text-sm font-bold leading-tight text-[var(--ink)]">
+          <p className="type-eyebrow  truncate text-sm font-bold leading-tight text-[var(--ink)]">
             {displayName}
           </p>
         </div>

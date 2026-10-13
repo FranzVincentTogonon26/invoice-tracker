@@ -1,10 +1,12 @@
 import { useMemo, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
+import toast from "react-hot-toast";
 import {
-  Eye,
   HandCoins,
   Inbox,
   Lock,
+  LockOpen,
   MessageCircleQuestionMark,
   PhilippinePesoIcon,
   ReceiptText,
@@ -20,11 +22,19 @@ import { SettleAbonoModal } from "./SettleAbonoModal";
 import { BalanceStat } from "./BalanceStat";
 import { ReviewSection, ReviewSectionSkeleton } from "./ReviewSection";
 import { formatDate, formatMoney } from "@/lib/utils";
-import { useReimbursementOverview } from "../../../../hooks/useEmployeeReimbursement";
 import {
+  reimbursementOverviewKey,
+  useReimbursementOverview,
+} from "../../../../hooks/useEmployeeReimbursement";
+import { budgetsApi } from "../../../../api/budget";
+import ConfirmActionDialog from "../expenses/ConfirmActionDialog";
+import {
+  useEmployeeDetailsExpenses,
   useEmployeeDetailsOverview,
   useIssuanceHolder,
 } from "../../../../hooks/useEmployeeDetails";
+import { RecordActionsMenu } from "./RecordActionsMenu";
+import { ReimbursementPreviewModal } from "./ReimbursementPreviewModal";
 
 // Admin → Reimbursement → personnel row → per-RECORD detail (route
 // `reimbursement/:id`, where `:id` is the `budget_issued_reference` row id
@@ -113,6 +123,7 @@ export function AdminEmployeeReimbursementDetails() {
       expenseCount: num(directOverview.expenseCount),
       sent: num(directOverview.totalSent),
       received: num(directOverview.totalReceived),
+      settledAbono: num(directOverview.totalSettledAbono),
       balance: num(directOverview.totalBalance),
     };
   }, [directHolder, directOverview, directIssuedRef, id]);
@@ -120,6 +131,14 @@ export function AdminEmployeeReimbursementDetails() {
   // otherwise the legacy per-user aggregates.
   const record = recordMatch ?? directRecord;
   const row = record ?? personnelRow;
+  // Preview expense list — hooked unconditionally at top level (never inside
+  // the preview conditional below): a hook mounted only while the modal is
+  // open changes the hook count between renders ("Rendered more hooks").
+  // Null id keeps the query idle until a record resolves.
+  const previewExpId = record?.id ?? row?.userId ?? null;
+  const previewExpView = record?.id ? "reimbursement" : undefined;
+  const { expenses: previewTxns, isLoading: previewTxLoading } =
+    useEmployeeDetailsExpenses(previewExpId, previewExpView);
   // Review context: the checklist reads the account-level lock
   // (`birStatuses`) from the personnel row but the record's own money/name
   // when a single record is open — the tips then describe this record, not
@@ -135,6 +154,26 @@ export function AdminEmployeeReimbursementDetails() {
         }
       : row;
   const [settleOpen, setSettleOpen] = useState(false);
+  const [reopenConfirmOpen, setReopenConfirmOpen] = useState(false);
+  const [previewOpen, setPreviewOpen] = useState(false);
+
+  // Reopen: flips this finalized record back to 'open' (undo of the
+  // submit). Refreshes every surface that reads issuance status.
+  const qc = useQueryClient();
+  const reopen = useMutation({
+    mutationFn: (recordId) => budgetsApi.reopenIssuedReference(recordId),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: reimbursementOverviewKey });
+      qc.invalidateQueries({ queryKey: ["employeeDetails"] });
+      qc.invalidateQueries({ queryKey: ["budgets"] });
+      setReopenConfirmOpen(false);
+      toast.success("Reimbursement reopened — the record is open again.");
+    },
+    onError: (err) => {
+      toast.error(err?.message || "Couldn't reopen this reimbursement.");
+      setReopenConfirmOpen(false);
+    },
+  });
 
   const backToList = () => nav("/admin/reimbursement");
   const hasOpenAbono = Number(row?.openAbonoCount) > 0;
@@ -267,9 +306,9 @@ export function AdminEmployeeReimbursementDetails() {
       {isClosed && (
         <section
           aria-label="Finalized issuance record"
-          className="overflow-hidden rounded-3xl border border-[var(--border)] bg-[var(--surface)] shadow-card"
+          className="overflow-visible rounded-3xl border border-[var(--border)] bg-[var(--surface)] shadow-card"
         >
-          <div className="flex items-center gap-3 border-b border-[var(--border)] bg-[var(--surface-2)]/60 px-4 py-3 sm:px-5">
+          <div className="flex items-center gap-3 rounded-t-3xl border-b border-[var(--border)] bg-[var(--surface-2)]/60 px-4 py-3 sm:px-5">
             <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-[var(--ink)] text-[var(--bg)]">
               <Lock size={17} aria-hidden />
             </span>
@@ -291,12 +330,17 @@ export function AdminEmployeeReimbursementDetails() {
                 {" · "}only done transactions below
               </p>
             </div>
-            <span className="hidden shrink-0 items-center gap-1.5 rounded-full bg-[var(--surface)] px-2.5 py-1 text-xs font-medium text-[var(--ink-muted)] ring-1 ring-inset ring-[var(--border)] sm:inline-flex">
-              <Eye size={12} aria-hidden />
-              View only
-            </span>
+            <RecordActionsMenu
+              canReopen={Boolean(record?.id)}
+              onReopen={() => setReopenConfirmOpen(true)}
+              onPreview={() => setPreviewOpen(true)}
+            />
           </div>
-          <dl className="grid grid-cols-1 gap-px bg-[var(--border)]/60 sm:grid-cols-3">
+          <dl
+            className={`grid grid-cols-1 gap-px bg-[var(--border)]/60 sm:grid-cols-3 ${
+              showRecordNote ? "" : "overflow-hidden rounded-b-3xl"
+            }`}
+          >
             <div className="min-w-0 bg-[var(--surface)] px-4 py-3 sm:px-5">
               <dt className="type-eyebrow text-[var(--ink-muted)]">
                 Source of funds
@@ -323,7 +367,7 @@ export function AdminEmployeeReimbursementDetails() {
             </div>
           </dl>
           {showRecordNote ? (
-            <div className="border-t border-[var(--border)] px-4 py-3 sm:px-5">
+            <div className="rounded-b-3xl border-t border-[var(--border)] px-4 py-3 sm:px-5">
               <div className="flex items-start gap-2.5 rounded-2xl border border-[var(--accent)]/25 bg-[var(--accent-soft)]/40 px-3.5 py-3">
                 <MessageCircleQuestionMark
                   size={16}
@@ -389,6 +433,7 @@ export function AdminEmployeeReimbursementDetails() {
                 value={formatMoney(row.issued)}
                 received={Number(row?.received) || 0}
                 sent={Number(row?.sent) || 0}
+                settled={Number(row?.settledAbono) || 0}
                 hint={
                   record
                     ? `${record.issuedCount ?? 0} transactions · 1 source`
@@ -414,7 +459,7 @@ export function AdminEmployeeReimbursementDetails() {
                 icon={PhilippinePesoIcon}
                 label="Remaining Balance"
                 value={formatMoney(row.balance)}
-                hint="Issued + abono − spent"
+                hint="Issued + abono − spent − sent + received − settled"
                 tone={Number(row.balance) < 0 ? "danger" : "neutral"}
               />
             </div>
@@ -434,6 +479,52 @@ export function AdminEmployeeReimbursementDetails() {
         open={settleOpen}
         employee={row}
         onClose={() => setSettleOpen(false)}
+      />
+      <ConfirmActionDialog
+        open={reopenConfirmOpen}
+        icon={<LockOpen size={20} aria-hidden />}
+        iconClassName="bg-[var(--accent-soft)] text-[var(--accent-strong)]"
+        title="Reopen reimbursement?"
+        description="Do you want to open this reimbursement transactions? Its status returns to open, its money counts again, and the checklist unlocks."
+        summary={
+          <div className="mt-4 flex items-center gap-3 rounded-2xl border border-[var(--border)] bg-[var(--surface-2)]/60 px-4 py-3">
+            <EmployeeAvatar
+              name={row?.name}
+              avatarUrl={row?.avatarUrl}
+              className="h-10 w-10 shrink-0 text-sm"
+            />
+            <div className="min-w-0 flex-1">
+              <p className="truncate text-base font-medium text-[var(--ink)]">
+                {row?.name || "This record"}
+              </p>
+              <p className="mt-0.5 truncate text-xs text-[var(--ink-muted)]">
+                {record?.referenceLabel || labels[0] || "Issuance record"} ·{" "}
+                {formatMoney(row?.balance ?? 0)} balance  
+              </p>
+            </div>
+          </div>
+        }
+        cancelLabel="Keep closed"
+        confirmLabel="Yes, reopen it"
+        confirmVariant="accent"
+        pendingLabel="Reopening…"
+        pending={reopen.isPending}
+        onCancel={() => {
+          if (!reopen.isPending) setReopenConfirmOpen(false);
+        }}
+        onConfirm={() => {
+          if (record?.id && !reopen.isPending) reopen.mutate(record.id);
+        }}
+      />
+      <ReimbursementPreviewModal
+        open={previewOpen}
+        onClose={() => setPreviewOpen(false)}
+        row={row}
+        labels={labels}
+        finalizedDate={finalizedDate}
+        recordNote={recordNote}
+        txns={previewTxns}
+        txLoading={previewTxLoading}
       />
     </div>
   );

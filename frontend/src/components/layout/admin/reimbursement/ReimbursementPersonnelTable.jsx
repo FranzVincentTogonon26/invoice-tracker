@@ -1,4 +1,5 @@
 import { useMemo, useState } from "react";
+import { AnimatePresence, motion } from "framer-motion";
 import { Inbox, Search, Users, X } from "lucide-react";
 import { Badge, StatusBadge } from "../../../ui/Badge";
 import { Card, CardDescription, CardHeader, CardTitle } from "../../../ui/Card";
@@ -7,15 +8,15 @@ import { EmptyState, LoadingSkeleton } from "../../../ui/DataState";
 import { EmployeeAvatar } from "../../../ui/SelectEmployee";
 import { cn, formatDate, formatMoney, formatTime } from "@/lib/utils";
 import { PersonnelActions } from "./PersonnelActions";
+import { tableRowVariants } from "@/lib/tableAnimation";
 
 // Date + AM/PM time stacked cell (used by the Date Created / Date Closed
 // columns). Renders "—" when there is no date — e.g. never closed yet.
 function DateTimeCell({ value }) {
-  if (!value)
-    return <span className="text-[13px] text-[var(--ink-muted)]">—</span>;
+  if (!value) return <span className="text-xs text-[var(--ink-muted)]">—</span>;
   return (
     <>
-      <p className="whitespace-nowrap text-[13px] text-[var(--ink)]">
+      <p className="whitespace-nowrap text-xs text-[var(--ink)]">
         {formatDate(value)}
       </p>
       <p className="mt-0.5 whitespace-nowrap text-[11px] tabular-nums text-[var(--ink-muted)]">
@@ -58,7 +59,7 @@ export function ReimbursementPersonnelTable({
 
   return (
     <Card className="overflow-hidden px-2.5">
-      <CardHeader className="mb-3 flex-col gap-4 border-b border-[var(--border)] pb-4 md:flex-row md:items-center md:justify-between">
+      <CardHeader className="mb-2 flex-col gap-3 border-b border-[var(--border)] pb-3 md:flex-row md:items-center md:justify-between">
         <div className="flex items-center gap-3">
           <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-[var(--surface-2)] text-[var(--ink)]">
             <Users size={18} />
@@ -66,8 +67,8 @@ export function ReimbursementPersonnelTable({
           <div>
             <CardTitle className="text-base">Personnel</CardTitle>
             <CardDescription className="mt-0.5">
-              Issuance references holding live budget — holdings, abono and
-              spending per record
+              Issuance references holding live budget — holdings, abono,
+              transfers and spending per record
             </CardDescription>
           </div>
         </div>
@@ -117,22 +118,23 @@ export function ReimbursementPersonnelTable({
         />
       ) : (
         <div className="overflow-x-auto rounded-2xl border border-[var(--border)] bg-[var(--surface)] shadow-card">
-          <table className="w-full min-w-[1360px] table-fixed border-collapse text-left">
+          <table className="w-full min-w-[1480px] table-fixed border-collapse text-left">
             <caption className="sr-only">
               Personnel reimbursement ledger
             </caption>
             <colgroup>
-              <col style={{ width: "16%" }} />
-              <col style={{ width: "12%" }} />
+              <col style={{ width: "14%" }} />
+              <col style={{ width: "10%" }} />
               <col style={{ width: "8%" }} />
+              <col style={{ width: "7%" }} />
+              <col style={{ width: "7%" }} />
               <col style={{ width: "9%" }} />
-              <col style={{ width: "8%" }} />
               <col style={{ width: "9%" }} />
               <col style={{ width: "6%" }} />
-              <col style={{ width: "9%" }} />
-              <col style={{ width: "9%" }} />
-              <col style={{ width: "7%" }} />
-              <col style={{ width: "7%" }} />
+              <col style={{ width: "8%" }} />
+              <col style={{ width: "8%" }} />
+              <col style={{ width: "6%" }} />
+              <col style={{ width: "8%" }} />
             </colgroup>
             <thead className="sticky top-0 z-[1] bg-[var(--surface-2)]">
               <tr>
@@ -149,10 +151,14 @@ export function ReimbursementPersonnelTable({
                   Abono
                 </th>
                 <th className="truncate whitespace-nowrap border-b border-[var(--border)] px-4 py-3 text-right type-eyebrow text-[var(--ink-muted)]">
-                  Spent
+                  Transfer
                 </th>
                 <th className="truncate whitespace-nowrap border-b border-[var(--border)] px-4 py-3 text-right type-eyebrow text-[var(--ink-muted)]">
-                  Remaining Balance
+                  Spent
+                </th>
+
+                <th className="truncate whitespace-nowrap border-b border-[var(--border)] px-4 py-3 text-right type-eyebrow text-[var(--ink-muted)]">
+                  Remaining
                 </th>
                 <th className="truncate whitespace-nowrap border-b border-[var(--border)] px-4 py-3 text-center type-eyebrow text-[var(--ink-muted)]">
                   Transaction
@@ -172,9 +178,15 @@ export function ReimbursementPersonnelTable({
               </tr>
             </thead>
             <tbody className="divide-y divide-[var(--border)]">
-              {filtered.map((r) => (
-                <tr
+              <AnimatePresence initial={false}>
+                {filtered.map((r) => (
+                <motion.tr
                   key={r.id ?? r.userId}
+                  layout
+                  initial="hidden"
+                  animate="visible"
+                  exit={{ opacity: 0 }}
+                  variants={tableRowVariants}
                   className="transition-colors duration-150 hover:bg-[var(--accent)]/[0.05]"
                 >
                   <td className="px-4 py-3.5 first:pl-5 align-middle">
@@ -182,7 +194,7 @@ export function ReimbursementPersonnelTable({
                       <EmployeeAvatar
                         name={r.name}
                         avatarUrl={r.avatarUrl}
-                        className="h-8 w-8 text-xs"
+                        className="h-7 w-7 text-[11px]"
                       />
                       <div className="min-w-0">
                         <p className="truncate text-[13px] font-medium text-[var(--ink)]">
@@ -219,24 +231,79 @@ export function ReimbursementPersonnelTable({
                     )}
                   </td>
                   <td className="px-4 py-3.5 text-right align-middle">
-                    <span className="whitespace-nowrap font-display text-[15px] font-medium tabular-nums text-[var(--ink)]">
+                    <span className="whitespace-nowrap font-display text-sm font-medium tabular-nums text-[var(--ink)]">
                       {formatMoney(r.issued)}
                     </span>
                   </td>
                   <td className="px-4 py-3.5 text-right align-middle">
-                    <span className="whitespace-nowrap font-display text-[15px] font-medium tabular-nums text-[var(--warning)]">
-                      {formatMoney(r.openAbono)}
-                    </span>
+                    {!(
+                      Number(r.openAbono) > 0 || Number(r.settledAbono) > 0
+                    ) ? (
+                      <span className="text-sm leading-none text-[var(--ink-muted)]">
+                        —
+                      </span>
+                    ) : (
+                      <div className="space-y-0.5">
+                        {Number(r.settledAbono) > 0 && (
+                          <p
+                            className="flex items-center justify-end gap-1.5 text-xs tabular-nums"
+                            title={`${formatMoney(r.settledAbono)} settled abono`}
+                          >
+                            <span className="text-sm font-medium tabular-nums  text-[var(--warning)]">
+                              - {formatMoney(r.settledAbono)}
+                            </span>
+                          </p>
+                        )}
+                        {Number(r.openAbono) > 0 && (
+                          <p
+                            className="whitespace-nowrap font-display text-sm font-medium tabular-nums  text-[var(--warning)]"
+                            title={`${formatMoney(r.openAbono)} open abono held`}
+                          >
+                            + {formatMoney(r.openAbono)}
+                          </p>
+                        )}
+                      </div>
+                    )}
                   </td>
                   <td className="px-4 py-3.5 text-right align-middle">
-                    <span className="whitespace-nowrap font-display text-[15px] font-medium tabular-nums text-[var(--danger)]">
+                    <div className="space-y-0.5">
+                      {Number(r.received) > 0 && (
+                        <p
+                          className="flex items-center justify-end gap-1.5 text-xs tabular-nums"
+                          title={`${formatMoney(r.received)} received from budget transfers`}
+                        >
+                          <span className="text-sm font-medium tabular-nums  text-[var(--success)]">
+                            + {formatMoney(r.received)}
+                          </span>
+                        </p>
+                      )}
+                      {Number(r.sent) > 0 && (
+                        <p
+                          className="flex items-center justify-end gap-1.5 text-xs tabular-nums"
+                          title={`${formatMoney(r.sent)} sent via budget transfers`}
+                        >
+                          <span className="text-sm font-medium tabular-nums  text-[var(--danger)]">
+                            - {formatMoney(r.sent)}
+                          </span>
+                        </p>
+                      )}
+                      {!(Number(r.received) > 0 || Number(r.sent) > 0) && (
+                        <span className="text-sm font-medium tabular-nums  leading-none text-[var(--ink-muted)]">
+                          —
+                        </span>
+                      )}
+                    </div>
+                  </td>
+                  <td className="px-4 py-3.5 text-right align-middle">
+                    <span className="whitespace-nowrap font-display text-sm font-medium tabular-nums text-[var(--danger)]">
                       {formatMoney(r.spent)}
                     </span>
                   </td>
+
                   <td className="px-4 py-3.5 text-right align-middle">
                     <span
                       className={cn(
-                        "whitespace-nowrap font-display text-[15px] font-medium tabular-nums",
+                        "whitespace-nowrap font-display text-sm font-medium tabular-nums",
                         r.balance < 0
                           ? "text-[var(--danger)]"
                           : "text-[var(--accent-strong)]",
@@ -281,8 +348,9 @@ export function ReimbursementPersonnelTable({
                       onViewReimbursement={() => onViewReimbursement?.(r)}
                     />
                   </td>
-                </tr>
-              ))}
+                </motion.tr>
+                ))}
+              </AnimatePresence>
             </tbody>
           </table>
         </div>

@@ -110,7 +110,7 @@ const ConfirmActionDialog = ({
             </h2>
             <p
               id={descriptionId}
-              className="mt-1.5 text-sm leading-relaxed text-[var(--ink-muted)]"
+              className="mt-1.5 text-xs leading-relaxed text-[var(--ink-muted)]"
             >
               {description}
             </p>

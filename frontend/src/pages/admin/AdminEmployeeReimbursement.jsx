@@ -124,7 +124,12 @@ const AdminEmployeeReimbursement = () => {
       };
     });
     return rows;
-  }, [givenBreakdown, issuedByReference, spentByReference, forwardedByReference]);
+  }, [
+    givenBreakdown,
+    issuedByReference,
+    spentByReference,
+    forwardedByReference,
+  ]);
 
   const expensesSummary = useMemo(
     () => [

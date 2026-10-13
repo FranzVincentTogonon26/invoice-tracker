@@ -1,3 +1,4 @@
+import { AnimatePresence } from "framer-motion";
 import { cn } from "../../../../lib/utils";
 import { TransactionCard, TransactionRow } from "./TransactionRow";
 
@@ -58,7 +59,7 @@ const TransactionTable = ({ rows, role, onAction, remainingForRow }) => (
                   key={h.label}
                   scope="col"
                   className={cn(
-                    "border-b border-[var(--border)] px-4 py-3.5 type-eyebrow text-[var(--ink-muted)] first:pl-5 last:pr-5",
+                      "border-b border-[var(--border)] px-4 py-3 type-eyebrow text-[var(--ink-muted)] first:pl-5 last:pr-5",
                     {
                       "text-left": h.align === "left",
                       "text-center": h.align === "center",
@@ -76,6 +77,7 @@ const TransactionTable = ({ rows, role, onAction, remainingForRow }) => (
             </tr>
           </thead>
           <tbody>
+            <AnimatePresence initial={false}>
             {rows.map((t) => {
               const remaining = remainingForRow?.(t) ?? {};
               return (
@@ -89,6 +91,7 @@ const TransactionTable = ({ rows, role, onAction, remainingForRow }) => (
                 />
               );
             })}
+            </AnimatePresence>
           </tbody>
         </table>
       </div>

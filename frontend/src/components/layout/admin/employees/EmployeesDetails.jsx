@@ -286,6 +286,7 @@ export default function AdminEmployeesDetails() {
       // Paid expenses only: settled abono is handed back, not spent.
       spent: sum((t) => t.kind === "expense" && t.status === "paid"),
       abono: sum((t) => t.kind === "abono" && t.status === "open"),
+      settled: sum((t) => t.kind === "abono" && t.status === "settled"),
       sent: sum((t) => t.direction === "sent" && t.status === "success"),
       received: sumAll(
         (t) => t.direction === "received" && t.status === "success",
@@ -423,6 +424,7 @@ export default function AdminEmployeesDetails() {
             received: detailOverview.totalReceived,
             abono: detailOverview.totalAbono,
             sent: detailOverview.totalSent,
+            settled: detailOverview.totalSettledAbono,
           }
         : null;
   const {
@@ -432,6 +434,7 @@ export default function AdminEmployeesDetails() {
     received,
     abono,
     sent,
+    settledAbono,
     funded,
     spentShare,
   } = budgetBreakdown(
@@ -442,6 +445,7 @@ export default function AdminEmployeesDetails() {
           total_received: strictSource.received,
           total_abono: strictSource.abono,
           total_sent: strictSource.sent,
+          total_settled_abono: strictSource.settled,
         }
       : employee,
   );
@@ -667,6 +671,7 @@ export default function AdminEmployeesDetails() {
         spent={spent}
         sent={sent}
         abono={abono}
+        settledAbono={settledAbono}
         traceData={traceData}
         traceLoading={traceLoading}
       />

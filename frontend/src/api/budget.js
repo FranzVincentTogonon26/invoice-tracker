@@ -69,6 +69,12 @@ export const budgetsApi = {
   // `{ previousStatus, budget }` so the UI can offer an undo window.
   cancelTransaction: (id) =>
     apiClient.patch(`/budgets/${id}/cancel`).then((r) => r.data),
+  // Reopens a finalized issuance record (budget_issued_reference.status
+  // 'close' -> 'open') — the undo of a reimbursement submit for one record.
+  reopenIssuedReference: (id) =>
+    apiClient
+      .patch(`/budgets/issued_reference/${id}/reopen`)
+      .then((r) => r.data.issuedReference ?? r.data),
   // Permanently deletes a cancelled budget transaction (hard delete).
   // Admin-only server-side; live rows are refused with 409.
   // Returns `{ budget }`.

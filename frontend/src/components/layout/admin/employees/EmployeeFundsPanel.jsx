@@ -10,6 +10,7 @@ export function EmployeeFundsPanel({
   spent,
   sent,
   abono,
+  settledAbono,
   traceData,
   traceLoading,
 }) {
@@ -108,6 +109,7 @@ export function EmployeeFundsPanel({
           spent={spent}
           sent={sent}
           abono={abono}
+          settledAbono={settledAbono}
         />
         <div className="mt-2.5 flex flex-wrap items-center gap-x-3 gap-y-1 rounded-2xl border border-[var(--border)] bg-[var(--surface)]/70 px-3.5 py-2 text-xs tabular-nums text-[var(--ink-muted)] shadow-card backdrop-blur">
           <span>

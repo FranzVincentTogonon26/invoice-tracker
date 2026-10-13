@@ -44,6 +44,7 @@ export function BalanceStat({
   hint,
   received,
   sent,
+  settled,
   tone = "neutral",
 }) {
   const m = toneMeta[tone];
@@ -80,7 +81,7 @@ export function BalanceStat({
         </p>
         {Number(received) > 0 && (
           <p
-            className="mt-0.5 truncate text-[11px] font-medium tabular-nums text-[var(--accent-strong)]"
+            className="mt-0.5 truncate text-xs font-medium tabular-nums text-[var(--accent-strong)]"
             title={`${formatMoney(received)} received from budget transfers`}
           >
             + {formatMoney(received)} received
@@ -88,10 +89,18 @@ export function BalanceStat({
         )}
         {Number(sent) > 0 && (
           <p
-            className="mt-0.5 truncate text-[11px] font-medium tabular-nums text-[var(--danger)]"
+            className="mt-0.5 truncate text-xs font-medium tabular-nums text-[var(--danger)]"
             title={`${formatMoney(sent)} sent via budget transfers`}
           >
             - {formatMoney(sent)} sent
+          </p>
+        )}
+        {Number(settled) > 0 && (
+          <p
+            className="mt-0.5 truncate text-xs font-medium tabular-nums text-[var(--warning)]"
+            title={`${formatMoney(settled)} settled abono deducted from issued budget`}
+          >
+            - {formatMoney(settled)} settled
           </p>
         )}
         {hint && (

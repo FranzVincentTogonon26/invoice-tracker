@@ -1,10 +1,11 @@
-import { motion } from "framer-motion";
+import { AnimatePresence, motion } from "framer-motion";
 import { AlertCircle, Check } from "lucide-react";
 import { Badge } from "../../../ui/Badge";
 import { EmployeeAvatar } from "../../../ui/SelectEmployee";
 import { cn, formatDate, formatMoney, formatTime } from "../../../../lib/utils";
 import EmployeeActions from "./EmployeeActions";
 import { budgetBreakdown } from "../../../../constants/index";
+import { tableRowVariants } from "@/lib/tableAnimation";
 
 const COLUMN_WIDTHS = [
   "24%", // Employee
@@ -179,10 +180,10 @@ export function SharePill({
     closed holdings never count, see `budgetBreakdown`) get a glowing dot on
     the avatar so funded rows read at a glance. */
 function EmployeeCell({ employee }) {
-  const { issued, remaining } = budgetBreakdown(employee);
-  const hasIssuedBudget = issued > 0;
+  const { netIssued, remaining } = budgetBreakdown(employee);
+  const hasIssuedBudget = netIssued > 0;
   const issuedHint = hasIssuedBudget
-    ? `Budget issued: ${formatMoney(issued)} open budget · ${formatMoney(remaining)} active balance`
+    ? `Budget issued: ${formatMoney(netIssued)} open budget · ${formatMoney(remaining)} active balance`
     : undefined;
   return (
     <div className="flex min-w-0 items-center gap-3">
@@ -225,12 +226,13 @@ function EmployeeCell({ employee }) {
 /** Desktop table row. */
 function EmployeeRow({ employee, pending, onAction }) {
   const {
-    issued,
+    netIssued,
     spent,
     remaining,
     received,
     abono,
     sent,
+    settledAbono,
     funded,
     spentShare,
   } = budgetBreakdown(employee);
@@ -239,18 +241,25 @@ function EmployeeRow({ employee, pending, onAction }) {
   const overSpent = remaining < 0;
   // The Transactions count only renders for employees holding live (open)
   // issued budget — rows with nothing issued show a dash instead of a 0.
-  const hasIssuedBudget = issued > 0;
+  const hasIssuedBudget = netIssued > 0;
 
   return (
-    <tr className="group border-b border-[var(--border)] transition-colors duration-150 last:border-b-0 odd:bg-[var(--surface)] even:bg-[var(--surface-2)]/40 hover:bg-[var(--accent)]/[0.04]">
+    <motion.tr
+      layout
+      initial="hidden"
+      animate="visible"
+      exit={{ opacity: 0 }}
+      variants={tableRowVariants}
+      className="group border-b border-[var(--border)] transition-colors duration-150 last:border-b-0 odd:bg-[var(--surface)] even:bg-[var(--surface-2)]/40 hover:bg-[var(--accent)]/[0.04]"
+    >
       <td className="px-4 py-3 pl-5 align-middle">
         <EmployeeCell employee={employee} />
       </td>
       {/* Status */}
-      <td className="px-3 py-3.5 text-center align-middle">
+      <td className="px-4 py-3.5 text-center align-middle">
         <EmployeeStatusBadge status={employee.status} />
       </td>
-      <td className="px-3 py-3.5 text-right align-middle">
+      <td className="px-4 py-3.5 text-right align-middle">
         <div className="space-y-1">
           {received > 0 && (
             <p
@@ -278,16 +287,29 @@ function EmployeeRow({ employee, pending, onAction }) {
               </span>
             </p>
           )}
+          {settledAbono > 0 && (
+            <p
+              className="flex items-center justify-end gap-1.5 text-xs tabular-nums"
+              title={`${formatMoney(settledAbono)} settled abono deducted from issued budget`}
+            >
+              <span className="font-medium uppercase tracking-wide text-[var(--warning)]/80">
+                Settled
+              </span>
+              <span className="font-medium text-[var(--warning)]">
+                - {formatMoney(settledAbono)}
+              </span>
+            </p>
+          )}
           <p
             className="font-display text-sm font-medium tabular-nums text-[var(--ink)]"
-            title={`${formatMoney(issued)} issued budget`}
+            title={`${formatMoney(netIssued)} issued budget net of settled abono`}
           >
-            {formatMoney(issued)}
+            {formatMoney(netIssued)}
           </p>
         </div>
       </td>
 
-      <td className="px-3 py-3.5 text-right align-middle">
+      <td className="px-4 py-3.5 text-right align-middle">
         <div className="space-y-1">
           {sent > 0 && (
             <p
@@ -311,7 +333,7 @@ function EmployeeRow({ employee, pending, onAction }) {
         </div>
       </td>
 
-      <td className="px-3 py-3.5 align-middle">
+      <td className="px-4 py-3.5 align-middle">
         <div className="px-3 py-2 ">
           <div className="flex items-center justify-between gap-2">
             <p
@@ -341,7 +363,7 @@ function EmployeeRow({ employee, pending, onAction }) {
         </div>
       </td>
 
-      <td className="px-3 py-3.5 text-center align-middle">
+      <td className="px-4 py-3.5 text-center align-middle">
         {hasIssuedBudget ? (
           <span
             title="Issuance transactions under open holdings"
@@ -357,7 +379,7 @@ function EmployeeRow({ employee, pending, onAction }) {
       </td>
 
       {/* Date Added */}
-      <td className="px-3 py-3.5 align-middle">
+      <td className="px-4 py-3.5 align-middle">
         {employee.created_at ? (
           <div>
             <p className="whitespace-nowrap text-[13px] font-medium leading-none text-[var(--ink)]">
@@ -373,7 +395,7 @@ function EmployeeRow({ employee, pending, onAction }) {
       </td>
 
       {/* Actions */}
-      <td className="px-3 py-3.5 pr-4 text-center align-middle">
+      <td className="px-4 py-3.5 pr-4 text-center align-middle">
         <div className="flex justify-center">
           <EmployeeActions
             employee={employee}
@@ -382,7 +404,7 @@ function EmployeeRow({ employee, pending, onAction }) {
           />
         </div>
       </td>
-    </tr>
+    </motion.tr>
   );
 }
 
@@ -406,12 +428,13 @@ function CardMetric({ label, value, tone, className }) {
 /** Mobile employee card — every column stays readable in a stacked layout. */
 function EmployeeCard({ employee, pending, onAction }) {
   const {
-    issued,
+    netIssued,
     spent,
     remaining,
     received,
     abono,
     sent,
+    settledAbono,
     funded,
     spentShare,
   } = budgetBreakdown(employee);
@@ -419,7 +442,7 @@ function EmployeeCard({ employee, pending, onAction }) {
   const references = Number(employee.issued_references) || 0;
   // Mirrors the desktop Transactions column: the references badge only
   // renders for employees holding live (open) issued budget.
-  const hasIssuedBudget = issued > 0;
+  const hasIssuedBudget = netIssued > 0;
 
   return (
     <div
@@ -447,7 +470,7 @@ function EmployeeCard({ employee, pending, onAction }) {
 
       {/* Budget strip — issued / spent / remaining, mirroring the table */}
       <div className="mt-3.5 grid grid-cols-3 gap-3 rounded-xl bg-[var(--surface-2)]/60 p-3 ring-1 ring-inset ring-[var(--border)]">
-        <CardMetric label="Issued" value={formatMoney(issued)} />
+        <CardMetric label="Issued" value={formatMoney(netIssued)} />
         <CardMetric
           label="Spent"
           value={formatMoney(spent)}
@@ -462,7 +485,10 @@ function EmployeeCard({ employee, pending, onAction }) {
         {/* Same "+ received" figure as the table row's Issued Budget cell —
             only rendered when the employee actually received a transfer. */}
         {received > 0 && (
-          <p className="col-span-3 flex items-center gap-1.5 text-xs tabular-nums">
+          <p
+            className="col-span-3 flex items-center gap-1.5 text-xs tabular-nums"
+            title={`${formatMoney(received)} received from budget transfers`}
+          >
             <span className="font-medium uppercase tracking-wide text-[var(--success)]/80">
               Received
             </span>
@@ -490,7 +516,10 @@ function EmployeeCard({ employee, pending, onAction }) {
           </p>
         )}
         {sent > 0 && (
-          <p className="col-span-3 flex items-center gap-1.5 text-xs tabular-nums">
+          <p
+            className="col-span-3 flex items-center gap-1.5 text-xs tabular-nums"
+            title={`${formatMoney(sent)} sent via budget transfers`}
+          >
             <span className="font-medium uppercase tracking-wide text-[var(--danger)]/80">
               Sent
             </span>
@@ -499,6 +528,22 @@ function EmployeeCard({ employee, pending, onAction }) {
             </span>
             <span className="truncate font-normal text-[var(--ink-muted)]">
               transfers
+            </span>
+          </p>
+        )}
+        {settledAbono > 0 && (
+          <p
+            className="col-span-3 flex items-center gap-1.5 text-xs tabular-nums"
+            title={`${formatMoney(settledAbono)} settled abono deducted from issued budget`}
+          >
+            <span className="font-medium uppercase tracking-wide text-[var(--warning)]/80">
+              Settled
+            </span>
+            <span className="font-medium text-[var(--warning)]">
+              - {formatMoney(settledAbono)}
+            </span>
+            <span className="truncate font-normal text-[var(--ink-muted)]">
+              abono
             </span>
           </p>
         )}
@@ -583,7 +628,7 @@ export function EmployeesTable({ rows, pending = false, onAction }) {
                     key={h.label}
                     scope="col"
                     className={cn(
-                      "border-b border-[var(--border)] px-3 py-3 type-eyebrow text-[var(--ink-muted)] first:pl-5 last:pr-4",
+                      "border-b border-[var(--border)] px-4 py-3 type-eyebrow text-[var(--ink-muted)] first:pl-5 last:pr-4",
                       {
                         "text-left": h.align === "left",
                         "text-center": h.align === "center",
@@ -603,14 +648,16 @@ export function EmployeesTable({ rows, pending = false, onAction }) {
               </tr>
             </thead>
             <tbody>
-              {rows.map((e) => (
-                <EmployeeRow
-                  key={e.user_id}
-                  employee={e}
-                  pending={pending}
-                  onAction={onAction}
-                />
-              ))}
+              <AnimatePresence initial={false}>
+                {rows.map((e) => (
+                  <EmployeeRow
+                    key={e.user_id}
+                    employee={e}
+                    pending={pending}
+                    onAction={onAction}
+                  />
+                ))}
+              </AnimatePresence>
             </tbody>
           </table>
         </div>

@@ -25,6 +25,8 @@ import {
   ZoomOut,
 } from "lucide-react";
 import toast from "react-hot-toast";
+import { useAuth } from "../../../../context/AuthContext";
+import { USER_ROLES } from "../../../../constants";
 import { Button } from "../../../ui/Button";
 import { TextArea } from "../../../ui/Input";
 import { EmployeeAvatar } from "../../../ui/SelectEmployee";
@@ -174,11 +176,12 @@ const ReviewNotesCard = ({ row }) => {
   );
 };
 
-// Draft-only category editor (pencil → picker → save). Shows the stored
-// category, or "Uncategorized" when the row has none. Picking a category
-// (or Uncategorized to clear) then Save persists through
-// `updateCategory`; the committed value renders immediately since the
-// modal's `row` snapshot only refreshes on the next ledger fetch.
+// Admin-only category editor (pencil → picker → save), hidden on
+// closed-holding rows. Shows the stored category, or "Uncategorized" when
+// the row has none. Picking a category (or Uncategorized to clear) then
+// Save persists through `updateCategory`; the committed value renders
+// immediately since the modal's `row` snapshot only refreshes on the next
+// ledger fetch.
 const CategoryEditor = ({ row }) => {
   const { categories } = useExpenses();
   const { updateCategory } = useExpensesMutations();
@@ -635,13 +638,15 @@ const ExpenseDetailsModal = ({
   const vendorName = String(detailVendor ?? "").trim();
   const title = vendorName || row?.description || "Expense details";
 
-  // Category pencil editor: draft rows only (closed-holding drafts stay
-  // read-only, matching the ledger's view-only lock).
+  // Category pencil editor: admins only, and never on closed-holding rows
+  // (matching the ledger's view-only lock).
+  const { user } = useAuth();
   const isClosedHoldingRow =
-    String(
-      row?.issuedParentStatus ?? row?.issued_parent_status ?? "",
-    ).trim().toLowerCase() === "close";
-  const canEditCategory = row?.status === "draft" && !isClosedHoldingRow;
+    String(row?.issuedParentStatus ?? row?.issued_parent_status ?? "")
+      .trim()
+      .toLowerCase() === "close";
+  const canEditCategory =
+    user?.role === USER_ROLES.ADMIN && !isClosedHoldingRow;
 
   const handleClose = () => {
     setFailedUrl(null);
@@ -678,14 +683,14 @@ const ExpenseDetailsModal = ({
   const confirmSummary = row ? (
     <div className="mt-4 flex items-center gap-3 rounded-2xl border border-[var(--border)] bg-[var(--surface-2)]/60 px-4 py-3">
       <div className="min-w-0 flex-1">
-        <p className="truncate text-base font-medium text-[var(--ink)]">
+        <p className="truncate text-sm font-medium text-[var(--ink)]">
           {row.description || "Untitled expense"}
         </p>
         <p className="mt-0.5 truncate text-xs text-[var(--ink-muted)]">
           {`${row.category || "Uncategorized"} · ${formatDate(row.date)}`}
         </p>
       </div>
-      <span className="shrink-0 text-sm font-medium tabular-nums text-[var(--ink)]">
+      <span className="shrink-0 text-lg  font-medium  text-[var(--ink)]">
         {formatMoney(row.amount)}
       </span>
     </div>

@@ -244,6 +244,24 @@ class Employee {
                    AND bir2.id = ea.issued_ref_id
               )
           ), 0)::float8 AS total_abono,
+          -- Settled abono under open holdings (same pinning as the open
+          -- leg): the transactions-connected settled amounts, shown as a
+          -- deduction against issued in the roster row.
+          COALESCE((
+            SELECT SUM(ea.amount)
+            FROM employee_abono ea
+            JOIN budget_reference br ON br.reference_id = ea.reference_id
+            WHERE ea.user_id = u.user_id AND ea.status = 'settled'
+              AND br.status = 'open'
+              AND EXISTS (
+                SELECT 1
+                  FROM budget_issued_reference bir2
+                 WHERE bir2.user_id = ea.user_id
+                   AND bir2.reference_id = ea.reference_id
+                   AND bir2.status = 'open'
+                   AND bir2.id = ea.issued_ref_id
+              )
+          ), 0)::float8 AS total_settled_abono,
           COALESCE((
             SELECT SUM(bt.amount)
             FROM budget_transfer bt

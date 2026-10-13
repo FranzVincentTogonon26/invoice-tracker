@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from "react";
+import { AnimatePresence, motion } from "framer-motion";
 import { createPortal } from "react-dom";
 import {
   ArrowLeftRight,
@@ -23,6 +24,7 @@ import {
   methodLabel,
 } from "../../../../lib/utils";
 import { TRANSACTION_KIND_META } from "@/constants";
+import { tableRowVariants } from "@/lib/tableAnimation";
 
 export { TRANSACTION_KIND_META };
 
@@ -561,7 +563,14 @@ function LedgerRow({ row, pending, onAction }) {
     row.kind !== "transfer_received";
 
   return (
-    <tr className="group border-b border-[var(--border)] transition-colors duration-150 last:border-b-0 hover:bg-[var(--accent)]/[0.04]">
+    <motion.tr
+      layout
+      initial="hidden"
+      animate="visible"
+      exit={{ opacity: 0 }}
+      variants={tableRowVariants}
+      className="group border-b border-[var(--border)] transition-colors duration-150 last:border-b-0 hover:bg-[var(--accent)]/[0.04]"
+    >
       {/* 1. Date */}
       <td className="relative px-4 py-3.5 pl-5 align-middle">
         <span
@@ -685,7 +694,7 @@ function LedgerRow({ row, pending, onAction }) {
       </td>
 
       {/* 7. Status */}
-      <td className="px-3 py-3.5 align-middle">
+      <td className="px-4 py-3.5 align-middle">
         <StatusBadge status={row.status} />
       </td>
 
@@ -721,7 +730,7 @@ function LedgerRow({ row, pending, onAction }) {
           <RowActions row={row} pending={pending} onAction={onAction} />
         </div>
       </td>
-    </tr>
+    </motion.tr>
   );
 }
 
@@ -909,7 +918,7 @@ const TransactionsTable = ({ rows, pending = false, onAction }) => (
                   key={h.label}
                   scope="col"
                   className={cn(
-                    "border-b border-[var(--accent)]/30 px-4 pb-4 pt-6 type-eyebrow tracking-[0.15em] text-[var(--ink-muted)] align-bottom first:pl-5 last:pr-5",
+                    "border-b border-[var(--accent)]/30 px-4 py-3 type-eyebrow tracking-[0.15em] text-[var(--ink-muted)] align-bottom first:pl-5 last:pr-5",
                     {
                       "text-left": h.align === "left" || !h.align,
                       "text-center": h.align === "center",
@@ -926,14 +935,16 @@ const TransactionsTable = ({ rows, pending = false, onAction }) => (
           </thead>
 
           <tbody>
-            {rows.map((row) => (
-              <LedgerRow
-                key={row.key}
-                row={row}
-                pending={pending}
-                onAction={onAction}
-              />
-            ))}
+            <AnimatePresence initial={false}>
+              {rows.map((row) => (
+                <LedgerRow
+                  key={row.key}
+                  row={row}
+                  pending={pending}
+                  onAction={onAction}
+                />
+              ))}
+            </AnimatePresence>
           </tbody>
         </table>
       </div>

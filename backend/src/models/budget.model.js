@@ -385,7 +385,9 @@ class Budget {
   // delete them — the `status` column drives those decisions.
   // Per source: allocated (non-cancelled budget rows), issued (open
   // issuances), expenses (paid, non-employee — employee spend already left
-  // as `issued`), remaining = allocated − issued − expenses, transactions
+  // as `issued`), remaining = allocated − issued − expenses + forwarded
+  // (finalized holdings hand their leftover back — the same formula as
+  // AdminBudget's per-source Remaining breakdown), transactions
   // (budget_issued_reference rows), budgets (budget rows).
   static async sourceFunds({ search } = {}) {
     const params = [];
@@ -409,23 +411,56 @@ class Budget {
                AND b.status != 'cancelled'
           ), 0)::float8 AS allocated,
           COALESCE((
+            -- Same legs as AdminBudget's per-source Remaining breakdown
+            -- (overviewIssuedBudget / overviewExpenses): open AND closed
+            -- holdings count and expenses of any status count — only live
+            -- children and non-employee rows qualify — so this table reads
+            -- the same remaining for each source.
               SELECT SUM(ib.amount)
                  FROM budget_issued_reference bir
                  JOIN issued_budget ib ON ib.issued_ref_id = bir.id
                 WHERE bir.reference_id = br.reference_id
-                  AND bir.status = 'open'
                   AND ib.status != 'cancel'
              ), 0)::float8 AS issued,
           COALESCE((
             SELECT SUM(e.total_amount)
               FROM expenses e
              WHERE e.reference_id = br.reference_id
-               AND e.status = 'paid'
                AND NOT EXISTS (
                  SELECT 1 FROM users u
                   WHERE u.user_id = e.user_id AND u.role = 'employee'
                )
           ), 0)::float8 AS expenses,
+          COALESCE((
+            -- Employee spend tagged to this source (display-only: it
+            -- already left the reference as issued, so it must NOT enter
+            -- the remaining math — shown so each source accounts ALL of
+            -- its expenses).
+            SELECT SUM(e.total_amount)
+              FROM expenses e
+             WHERE e.reference_id = br.reference_id
+               AND e.status = 'paid'
+               AND EXISTS (
+                 SELECT 1 FROM users u
+                  WHERE u.user_id = e.user_id AND u.role = 'employee'
+               )
+          ), 0)::float8 AS employee_expenses,
+          COALESCE((
+            -- Settled abono tagged to this source (display-only, same
+            -- reason as above — shown so the spent cell totals everything).
+            SELECT SUM(ea.amount)
+              FROM employee_abono ea
+             WHERE ea.reference_id = br.reference_id
+               AND ea.status = 'settled'
+          ), 0)::float8 AS settled_abono,
+          COALESCE((
+            -- Finalized holdings hand their leftover back (same leg as
+            -- AdminBudget's overviewForwarded).
+            SELECT SUM(bir.balance_forwarded)
+              FROM budget_issued_reference bir
+             WHERE bir.reference_id = br.reference_id
+               AND bir.status = 'close'
+          ), 0)::float8 AS forwarded,
           (
             SELECT COUNT(*)::int
               FROM budget_issued_reference bir
@@ -520,12 +555,16 @@ class Budget {
       const allocated = Number(row.allocated) || 0;
       const issued = Number(row.issued) || 0;
       const expenses = Number(row.expenses) || 0;
+      const forwarded = Number(row.forwarded) || 0;
       return {
         ...row,
         allocated,
         issued,
         expenses,
-        remaining: allocated - issued - expenses,
+        employeeExpenses: Number(row.employee_expenses) || 0,
+        settledAbono: Number(row.settled_abono) || 0,
+        forwarded,
+        remaining: allocated - issued - expenses + forwarded,
       };
     });
   }
@@ -1157,17 +1196,15 @@ class Budget {
   //     notes when no note was given).
   //   - `balance_forwarded`: that record's leftover at close time — its own
   //     live issued children + its own OPEN abono − its own PAID expenses −
-  //     its own sent transfers + its own stamped received transfers, i.e.
-  //     EXACTLY the balance the review page shows (`records` endpoint
-  //     formula), so the stored figure never disagrees with the submitted
-  //     display. Issued, abono, expenses, sent and received all key on this
+  //     its own sent transfers + its own stamped received transfers −
+  //     its own settled abono, i.e. EXACTLY the balance the review page
+  //     shows (`records` endpoint formula), so the stored figure never
+  //     disagrees with the submitted display. All legs key on this
   //     record's own id (`issued_ref_id` / `issued_ref_id_sent = bir.id`)
   //     so sibling records sharing the source never leak into each other.
-  //     Settled abono is NOT
-  //     subtracted: settling hands the pesos back (re-booked as issued
-  //     children, already counted in the issued leg), so subtracting it too
-  //     would charge the same money twice. Computed BEFORE the status flips,
-  //     in the same statement (0 stays 0).
+  //     Settled abono is NOT spent, but it IS backed out of funding (its
+  //     re-booked children read as issued), matching every display.
+  //     Computed BEFORE the status flips, in the same statement (0 stays 0).
   // Resolves `{ closedCount }`.
   static async closeOpenIssuedReferences(userId, { note } = {}) {
     const result = await query(
@@ -1218,6 +1255,17 @@ class Budget {
                    WHERE btr.issued_ref_id_sent = bir.id
                      AND btr.status = 'success'
                 ), 0)
+                - COALESCE((
+                  -- Record-scoped settled: backed out of funding like every
+                  -- display, so stored equals submitted.
+                  SELECT SUM(ea.amount)
+                    FROM employee_abono ea
+                    JOIN budget_reference br2 ON br2.reference_id = ea.reference_id
+                   WHERE ea.issued_ref_id = bir.id
+                     AND ea.user_id = bir.user_id
+                     AND ea.status = 'settled'
+                     AND br2.status = 'open'
+                ), 0)
               )
          FROM budget_reference br
         WHERE bir.user_id = $1
@@ -1228,6 +1276,64 @@ class Budget {
       [userId, note ?? null],
     );
     return { closedCount: result.rows.length };
+  }
+
+  // Reopen one finalized issuance reference (status 'close' -> 'open'):
+  // the undo of the reimbursement submit for a single record. The row is
+  // locked, must currently be closed, its source must still be open
+  // (reopening under a cut-off source would reconnect dead money), and no
+  // sibling OPEN row may hold the same (user_id, reference_id) pair (the
+  // partial unique index covers open rows only — two live parents for one
+  // pair would violate it). `date_forwarded` clears (no longer finalized);
+  // `notes` / `balance_forwarded` stay as the close-time audit trail and
+  // are recomputed on the next submit. Resolves `{ notFound, notClosed,
+  // sourceClosed, conflict, issuedReference }`.
+  static async reopenIssuedReference(id) {
+    return withTransaction(async (client) => {
+      const q = (text, params) => client.query(text, params);
+
+      const found = (
+        await q(
+          `SELECT bir.id, bir.user_id, bir.reference_id, bir.status,
+                  br.status AS source_status
+             FROM budget_issued_reference bir
+             JOIN budget_reference br ON br.reference_id = bir.reference_id
+            WHERE bir.id = $1
+            FOR UPDATE OF bir`,
+          [id],
+        )
+      ).rows[0] ?? null;
+
+      if (!found) return { notFound: true };
+      if (found.status !== "close") return { notClosed: true };
+      if ((found.source_status ?? null) !== "open")
+        return { sourceClosed: true };
+
+      const [sibling] = (
+        await q(
+          `SELECT id
+             FROM budget_issued_reference
+            WHERE user_id = $1 AND reference_id = $2
+              AND status = 'open' AND id <> $3
+            LIMIT 1`,
+          [found.user_id, found.reference_id, found.id],
+        )
+      ).rows;
+
+      if (sibling) return { conflict: true, siblingId: sibling.id };
+
+      const reopened = (
+        await q(
+          `UPDATE budget_issued_reference
+              SET status = 'open', date_forwarded = NULL
+            WHERE id = $1
+            RETURNING *`,
+          [id],
+        )
+      ).rows[0];
+
+      return { issuedReference: reopened };
+    });
   }
 
   // Soft-delete a Budget Reference (status 'open' -> 'cut_off'). A hard
