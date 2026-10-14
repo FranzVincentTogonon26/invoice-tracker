@@ -545,6 +545,7 @@ class Expenses {
           b.label,
           b.created_at,
           b.status,
+          b.date_cut_off,
           ( SELECT COUNT(id) FROM budget bi
              WHERE bi.reference_id = b.reference_id ) AS active,
           COALESCE((

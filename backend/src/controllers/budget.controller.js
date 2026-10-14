@@ -165,6 +165,18 @@ export const create = async (req, res, next) => {
         issuedBudget,
       });
     }
+    // Cut-off date gate (addBudget only): a past cut-off date freezes the
+    // source against new funds even while its status is still 'open'.
+    if (
+      type === "addBudget" &&
+      (await Budget.isReferenceCutOffDue(reference_id))
+    ) {
+      throw ApiError.conflict(
+        "Cut-off date already due — no new budget can be added to this source.",
+        "CUT_OFF_DUE",
+      );
+    }
+
     if (type === "addBudget") {
       const newBudget = await Budget.createBudget({
         reference_id: reference_id,

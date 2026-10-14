@@ -176,7 +176,6 @@ export function SourceCreateModal({ open, saving, onClose, onSave }) {
                       value={cutOff}
                       onChange={(next) => setCutOff(next || "")}
                       placeholder="Cut-off date"
-                      minDate={new Date()}
                       className="text-xs"
                       disabled={saving}
                     />

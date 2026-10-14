@@ -89,7 +89,9 @@ export function SourceEditModal({ source, saving, onClose, onSave }) {
   useEffect(() => {
     if (!source) return undefined;
     const onKeyDown = (e) => {
-      if (e.key !== "Escape" && !saving) {
+      if (e.key === "Escape" && !saving) {
+        // eslint-disable-next-line no-console
+        console.log("[edit-modal] Escape key close");
         setErr("");
         onClose?.();
       }
@@ -97,6 +99,17 @@ export function SourceEditModal({ source, saving, onClose, onSave }) {
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
   }, [source, saving, onClose]);
+
+  // TEMP-DEBUG: log mount/unmount (remove after diagnosis).
+  useEffect(() => {
+    // eslint-disable-next-line no-console
+    console.log("[edit-modal] mounted, source:", source?.reference_id);
+    return () => {
+      // eslint-disable-next-line no-console
+      console.log("[edit-modal] UNMOUNTED");
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   if (!source) return null;
 
@@ -116,8 +129,15 @@ export function SourceEditModal({ source, saving, onClose, onSave }) {
     });
   };
 
-  const handleClose = () => {
+  const handleClose = (reason) => {
     if (saving) return;
+    // TEMP-DEBUG: trace what closes the modal (remove after diagnosis).
+    // eslint-disable-next-line no-console
+    console.log(
+      "[edit-modal] handleClose via",
+      reason,
+      new Error("trace").stack,
+    );
     setErr("");
     onClose?.();
   };
@@ -132,7 +152,7 @@ export function SourceEditModal({ source, saving, onClose, onSave }) {
       >
         <div
           className="absolute inset-0 bg-[var(--ink)]/40 backdrop-blur-sm flex items-center justify-center px-2"
-          onClick={handleClose}
+          onClick={() => handleClose("backdrop-click")}
         >
           <motion.form
             onSubmit={handleSave}
@@ -158,7 +178,7 @@ export function SourceEditModal({ source, saving, onClose, onSave }) {
               </div>
               <button
                 type="button"
-                onClick={handleClose}
+                onClick={() => handleClose("x-button")}
                 disabled={saving}
                 aria-label="Close editor"
                 className="h-8 w-8 rounded-full flex items-center justify-center text-[var(--ink-muted)] hover:bg-[var(--surface-2)] disabled:opacity-50"
@@ -197,16 +217,15 @@ export function SourceEditModal({ source, saving, onClose, onSave }) {
                     maxLength={LABEL_MAX}
                   />
                 </Field>
-                <Field label="Date cut off" optional>
-                  <DatePicker
-                    value={cutOff}
-                    onChange={(next) => setCutOff(next || "")}
-                    placeholder="Cut-off date"
-                    minDate={new Date()}
-                    className="text-xs"
-                    disabled={saving}
-                  />
-                </Field>
+                  <Field label="Date cut off" optional>
+                    <DatePicker
+                      value={cutOff}
+                      onChange={(next) => setCutOff(next || "")}
+                      placeholder="Cut-off date"
+                      className="text-xs"
+                      disabled={saving}
+                    />
+                  </Field>
                 <Field
                   label="Notes"
                   optional
@@ -255,7 +274,7 @@ export function SourceEditModal({ source, saving, onClose, onSave }) {
               <Button
                 type="button"
                 variant="outline"
-                onClick={handleClose}
+                onClick={() => handleClose("cancel-button")}
                 disabled={saving}
               >
                 Cancel

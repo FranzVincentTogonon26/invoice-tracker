@@ -15,6 +15,10 @@ import { formatDate } from "../../lib/utils";
  * activity. Rows without a status field (older payloads, already filtered
  * server-side) still show.
  *
+ * With `disablePastCutOff`, sources whose `date_cut_off` already passed
+ * stay visible but cannot be picked (muted + tooltip) — used where a past
+ * cut-off must hard-block the flow (e.g. adding new budget).
+ *
  * Row layout: leading accent-soft calendar chip, the human `label` as the
  * primary line, and the date + mono `reference_id` as muted metadata.
  */
@@ -25,16 +29,33 @@ export const SelectReference = ({
   placeholder,
   disabled,
   searchable = true,
+  disablePastCutOff = false,
 }) => {
+  const isCutOffDue = (dateCutOff) => {
+    if (!disablePastCutOff || !dateCutOff) return false;
+    const day = new Date(dateCutOff);
+    if (Number.isNaN(day.getTime())) return false;
+    day.setHours(0, 0, 0, 0);
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    return day < today;
+  };
   const options = references
     .filter((reference) => !reference.status || reference.status === "open")
-    .map((reference) => ({
-    value: reference.reference_id,
-    // Searchable text: the human label, falling back to the reference id
-    label: reference.label || reference.reference_id,
-    referenceId: reference.reference_id,
-    createdAt: reference.created_at ?? reference.date_created,
-  }));
+    .map((reference) => {
+      const pastDue = isCutOffDue(reference.date_cut_off);
+      return {
+        value: reference.reference_id,
+        // Searchable text: the human label, falling back to the reference id
+        label: reference.label || reference.reference_id,
+        referenceId: reference.reference_id,
+        createdAt: reference.created_at ?? reference.date_created,
+        disabled: pastDue || undefined,
+        disabledReason: pastDue
+          ? "Cut-off date already due — this source accepts no new activity"
+          : undefined,
+      };
+    });
 
   const renderOption = (option, { selected: isSelected }) => (
     <>
@@ -51,6 +72,11 @@ export const SelectReference = ({
           </span>
           <span className="h-0.5 w-0.5 shrink-0 rounded-full bg-current opacity-60" />
           <span className="truncate font-sans text-xs tabular-nums tracking-tight">{`${(option.referenceId ?? "").slice(0, 8)}-xxxxx`}</span>
+          {option.disabled && (
+            <span className="shrink-0 rounded-full bg-[var(--danger)]/10 px-1.5 py-px text-[10px] font-semibold uppercase tracking-wide text-[var(--danger)]">
+              Cut off due
+            </span>
+          )}
         </span>
       </span>
       {isSelected && (

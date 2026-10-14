@@ -4,15 +4,16 @@ import {
   Activity,
   ArrowLeft,
   ArrowLeftRight,
+  CalendarDays,
   CalendarOff,
   CalendarRange,
+  CalendarX2,
   ClipboardList,
   Copy,
   EllipsisVertical,
   ExternalLink,
   HandCoins,
   Inbox,
-  Info,
   Plus,
   Printer,
   ReceiptText,
@@ -154,6 +155,28 @@ export function AdminSourceFundsOverview() {
 
   const hasDateRange = Boolean(dateRange?.start && dateRange?.end);
   const rangeLabel = shortRangeLabel(dateRange);
+
+  // Cut-off notice: shown whenever a valid cut-off date is set — compared
+  // against TODAY only, never against creation (a backdated cut-off before
+  // its own creation is still real and already due). Three states — past
+  // dates read as already due (danger), today reads as due today (warning),
+  // future dates read as scheduled (warning, never "already due" and never
+  // the informational accent tone — a deadline is a caution, not info).
+  // Plain derivation (no hook): it must run before the early returns below.
+  const { hasCutOff, cutOffDue, cutOffToday } = (() => {
+    const none = { hasCutOff: false, cutOffDue: false, cutOffToday: false };
+    if (!source?.date_cut_off) return none;
+    const day = new Date(source.date_cut_off);
+    if (Number.isNaN(day.getTime())) return none;
+    day.setHours(0, 0, 0, 0);
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    if (day < today)
+      return { hasCutOff: true, cutOffDue: true, cutOffToday: false };
+    if (day.getTime() === today.getTime())
+      return { hasCutOff: true, cutOffDue: false, cutOffToday: true };
+    return { hasCutOff: true, cutOffDue: false, cutOffToday: false };
+  })();
 
   // Transactions belonging to this source
   const sourceRows = useMemo(() => {
@@ -538,6 +561,9 @@ export function AdminSourceFundsOverview() {
       {/* ── Page Header ── */}
       <SourceOverviewHeader
         source={source}
+        hasCutOff={hasCutOff}
+        cutOffDue={cutOffDue}
+        cutOffToday={cutOffToday}
         isRefreshing={isRefreshing}
         onBack={backToList}
         onRefresh={handleRefresh}
@@ -545,8 +571,65 @@ export function AdminSourceFundsOverview() {
         onCopyLink={copyPageUrl}
       />
 
-      {/* ── Optional Notes Banner ── */}
-      {source.notes && <SourceNotesBanner notes={source.notes} />}
+      {/* ── Cut-off notice banner — unmissable, directly under the header.
+          The whole banner turns accent only for the scheduled message
+          ("...on the date above"); due-today stays warning, past-due stays
+          danger. */}
+      {hasCutOff &&
+        (() => {
+          const scheduled = !cutOffDue && !cutOffToday;
+          const tone = cutOffDue
+            ? {
+                frame: "border-[var(--danger)]/40 bg-[var(--danger)]/10",
+                icon: "text-[var(--danger)]",
+                title: "text-[var(--danger)]",
+                body: "text-[var(--danger)]/90",
+              }
+            : scheduled
+              ? {
+                  frame: "border-[var(--accent)]/25 bg-[var(--accent-soft)]/40",
+                  icon: "text-[var(--accent-strong)]",
+                  title: "text-[var(--accent-strong)]",
+                  body: "text-[var(--accent-strong)]",
+                }
+              : {
+                  frame: "border-[var(--warning)]/40 bg-[var(--warning)]/10",
+                  icon: "text-[var(--warning)]",
+                  title: "text-[var(--warning)]",
+                  body: "text-[var(--warning)]/90",
+                };
+          return (
+            <motion.div
+              initial={{ opacity: 0, y: -6 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.3 }}
+              role="alert"
+              className={`flex items-start gap-3 rounded-2xl border px-4 py-3 shadow-card ${tone.frame}`}
+            >
+              <CalendarX2
+                size={18}
+                aria-hidden
+                className={`mt-0.5 shrink-0 ${tone.icon}`}
+              />
+              <div className="min-w-0 flex-1">
+                <p className={`text-sm font-semibold ${tone.title}`}>
+                  {cutOffDue
+                    ? `Cut-off date already due — ${formatDate(source.date_cut_off)}`
+                    : cutOffToday
+                      ? `Today is the due date — ${formatDate(source.date_cut_off)}`
+                      : `Cut-off date notice — ${formatDate(source.date_cut_off)}`}
+                </p>
+                <p className={`mt-0.5 text-xs leading-relaxed ${tone.body}`}>
+                  {cutOffDue
+                    ? "This source no longer accepts new budgets, issuances, or expenses. Existing records stay viewable."
+                    : cutOffToday
+                      ? "Today is the last day this source accepts new budgets, issuances, or expenses."
+                      : "This source stops accepting new budgets, issuances, or expenses on the date above."}
+                </p>
+              </div>
+            </motion.div>
+          );
+        })()}
 
       {/* ── Executive Financial Stat Cards ── */}
       <SourceStatCards
@@ -665,6 +748,9 @@ export function AdminSourceFundsOverview() {
 /** Header block with Title, metadata tags, Involved Avatars, and Actions */
 function SourceOverviewHeader({
   source,
+  hasCutOff = false,
+  cutOffDue = false,
+  cutOffToday = false,
   isRefreshing,
   onBack,
   onRefresh,
@@ -674,28 +760,61 @@ function SourceOverviewHeader({
   return (
     <PageHeader
       title={
-        <div className="flex items-center gap-3">
+        <div className="flex min-w-0 flex-1 items-center gap-2.5">
           <BackButton onClick={onBack} />
-          <span className="truncate">{source.label || "Untitled source"}</span>
+          <div className="min-w-0 flex-1">
+            <span className="block truncate font-display text-2xl font-medium tracking-tight text-[var(--ink)]">
+              {source.label || "Untitled source"}
+            </span>
+            <span
+              className="mt-0.5 block truncate text-sm text-[var(--ink-muted)]"
+              title={source.notes || undefined}
+            >
+              {source.notes || "Source of funds overview"}
+            </span>
+          </div>
         </div>
       }
       description={
-        <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-[var(--ink-muted)]">
-          <span>Created {formatDate(source.created_at)}</span>
-          {source.date_cut_off && (
-            <>
-              <span aria-hidden>·</span>
-              <span>Cut off {formatDate(source.date_cut_off)}</span>
-            </>
-          )}
-          <span aria-hidden>·</span>
-          <span className="inline-flex items-center gap-1 font-mono text-[11px]">
-            ID: {source.reference_id?.slice(0, 12)}…
+        <span className="flex flex-wrap items-center gap-x-2 gap-y-1 text-xs pt-4">
+          <span
+            title={`Created on ${formatDate(source.created_at)}`}
+            className="inline-flex items-center gap-1.5 rounded-full bg-[var(--surface-2)] px-2.5 py-2.5 font-semibold tabular-nums text-[var(--ink)] ring-1 ring-inset ring-[var(--border)]"
+          >
+            <CalendarDays
+              size={13}
+              aria-hidden
+              className="shrink-0 text-[var(--ink-muted)]"
+            />
+            Created {formatDate(source.created_at)}
           </span>
-        </div>
+          {hasCutOff && source.date_cut_off && (
+            <span
+              title={
+                cutOffDue
+                  ? `Cut-off date already due — this source accepts no new activity since ${formatDate(source.date_cut_off)}`
+                  : cutOffToday
+                    ? `Today is the due date — this source stops accepting activity after today`
+                    : `This source stops accepting activity on ${formatDate(source.date_cut_off)}`
+              }
+              className={
+                cutOffDue
+                  ? "inline-flex items-center gap-1.5 rounded-full bg-[var(--danger)]/12 px-2.5 py-2 font-semibold tabular-nums text-[var(--danger)] ring-1 ring-inset ring-[var(--danger)]/30"
+                  : "inline-flex items-center gap-1.5 rounded-full bg-[var(--warning)]/12 px-2.5 py-2 font-semibold tabular-nums text-[var(--warning)] ring-1 ring-inset ring-[var(--warning)]/30"
+              }
+            >
+              <CalendarX2 size={13} aria-hidden className="shrink-0" />
+              {cutOffDue
+                ? `Cut off due ${formatDate(source.date_cut_off)}`
+                : cutOffToday
+                  ? `Due today · ${formatDate(source.date_cut_off)}`
+                  : `Cut off ${formatDate(source.date_cut_off)}`}
+            </span>
+          )}
+        </span>
       }
       actions={
-        <div className="flex w-full flex-wrap items-center justify-end gap-2.5 sm:w-auto">
+        <div className="flex w-full flex-wrap items-center justify-end gap-2 sm:w-auto ">
           <InvolvedStack
             people={source.involved}
             total={source.involved_count}
@@ -718,28 +837,6 @@ function SourceOverviewHeader({
         </div>
       }
     />
-  );
-}
-
-/** Animated optional source notes banner */
-function SourceNotesBanner({ notes }) {
-  return (
-    <motion.div
-      initial={{ opacity: 0, y: -6 }}
-      animate={{ opacity: 1, y: 0 }}
-      transition={{ duration: 0.3 }}
-      className="flex items-start gap-3 rounded-2xl border border-[var(--border)] bg-[var(--surface)] p-4 shadow-card"
-    >
-      <Info size={18} className="mt-0.5 shrink-0 text-[var(--accent)]" />
-      <div className="min-w-0 flex-1">
-        <p className="text-xs font-semibold uppercase tracking-wider text-[var(--ink-muted)]">
-          Source Purpose & Notes
-        </p>
-        <p className="mt-1 break-words text-sm leading-relaxed text-[var(--ink)]">
-          {notes}
-        </p>
-      </div>
-    </motion.div>
   );
 }
 
@@ -1160,34 +1257,34 @@ function SourceLedgerSection({
       className="relative overflow-visible shadow-card"
     >
       <CardHeader className="mb-4">
-        <div className="min-w-0">
-          <div className="flex items-center gap-2">
+        <div className="flex items-start justify-between gap-3 w-full">
+          <div className="min-w-0">
             <CardTitle className="text-lg">Related Transactions</CardTitle>
-            <Badge tone="neutral" className="tabular-nums">
-              {filteredRows.length}{" "}
-              {filteredRows.length === 1 ? "record" : "records"}
-            </Badge>
-          </div>
-          <CardDescription className="mt-1">
-            <span className="inline-flex flex-wrap items-center gap-1.5 text-xs">
-              {hasDateRange ? (
-                <Badge tone="accent">
-                  <CalendarRange size={12} aria-hidden />
-                  {rangeLabel}
-                </Badge>
-              ) : (
-                <Badge tone="neutral">
-                  <CalendarOff size={12} aria-hidden />
-                  All dates
-                </Badge>
-              )}
-              <span>
-                {hasDateRange
-                  ? "· activity in this selected range"
-                  : "· complete ledger activity for this source of funds"}
+            <CardDescription className="mt-1">
+              <span className="inline-flex flex-wrap items-center gap-1.5 text-xs">
+                {hasDateRange ? (
+                  <Badge tone="accent">
+                    <CalendarRange size={12} aria-hidden />
+                    {rangeLabel}
+                  </Badge>
+                ) : (
+                  <Badge tone="neutral">
+                    <CalendarOff size={12} aria-hidden />
+                    All dates
+                  </Badge>
+                )}
+                <span>
+                  {hasDateRange
+                    ? "· activity in this selected range"
+                    : "· complete ledger activity for this source of funds"}
+                </span>
               </span>
-            </span>
-          </CardDescription>
+            </CardDescription>
+          </div>
+          <Badge tone="neutral" className="shrink-0 tabular-nums">
+            {filteredRows.length}{" "}
+            {filteredRows.length === 1 ? "record" : "records"}
+          </Badge>
         </div>
       </CardHeader>
 

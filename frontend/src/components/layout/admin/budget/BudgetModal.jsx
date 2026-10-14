@@ -656,11 +656,32 @@ const BudgetModal = ({
 
   const amountLocked = !form.reference_id;
 
+  // Cut-off date gate (addBudget only): a past cut-off freezes the source
+  // against new funds even while its status is still 'open'. Day granularity.
+  const selectedReference = references.find(
+    (r) => String(r?.reference_id) === String(form.reference_id || ""),
+  );
+  const cutOffDue = (() => {
+    if (!isAddBudget) return false;
+    const raw = selectedReference?.date_cut_off;
+    if (!raw) return false;
+    const day = new Date(raw);
+    if (Number.isNaN(day.getTime())) return false;
+    day.setHours(0, 0, 0, 0);
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    return day < today;
+  })();
+
   const validate = () => {
     // Both flows need a source of funds — the issuedBudget branch previously
     // only required it for addBudget, so an issue with no reference slipped
     // past the form and died on the DB NOT NULL column as a raw 500.
     if (!form.reference_id) return "Please select a budget reference first.";
+    // Past cut-off: no new budget may be added to this source (the server
+    // enforces the same rule).
+    if (isAddBudget && cutOffDue)
+      return "Cut-off date already due — no new budget can be added to this source.";
     if (!form.employee && !isAddBudget)
       return "Please select an employee first.";
     // Restriction guard — the selected employee still has an open issuance
@@ -851,10 +872,32 @@ const BudgetModal = ({
                             onChange={set("reference_id")}
                             placeholder="Select budget source"
                             disabled={saving}
+                            disablePastCutOff
                           />
                         </div>
                       </div>
                     </Field>
+                    {/* Past cut-off: the source accepts no new funds — the
+                        submit stays disabled and the server refuses anyway. */}
+                    <AnimatePresence initial={false}>
+                      {cutOffDue && (
+                        <motion.div
+                          initial={{ opacity: 0, y: -4, height: 0 }}
+                          animate={{ opacity: 1, y: 0, height: "auto" }}
+                          exit={{ opacity: 0, y: -4, height: 0 }}
+                          transition={{ duration: 0.25, ease: "easeOut" }}
+                          role="alert"
+                          className="flex items-start gap-2 overflow-hidden text-sm leading-snug text-[var(--danger)] bg-[var(--danger)]/10 border border-[var(--danger)]/20 rounded-xl px-3.5 py-2.5"
+                        >
+                          <AlertCircle size={18} className="mt-px shrink-0" />
+                          <span>
+                            Cut-off date already due — no new budget can be
+                            added to this source. Pick another source or clear
+                            its cut-off date first.
+                          </span>
+                        </motion.div>
+                      )}
+                    </AnimatePresence>
                     <AmountField
                       value={form?.amount}
                       onChange={set("amount")}
@@ -1070,7 +1113,12 @@ const BudgetModal = ({
                 <Button
                   type="submit"
                   variant="accent"
-                  disabled={saving || Boolean(issuedConflict)}
+                  disabled={saving || Boolean(issuedConflict) || cutOffDue}
+                  title={
+                    cutOffDue
+                      ? "Cut-off date already due — no new budget can be added to this source"
+                      : undefined
+                  }
                 >
                   {saving && <Loader2 size={14} className="animate-spin" />}
                   {transaction === "addBudget" ? "Add Budget" : "Issue Budget"}

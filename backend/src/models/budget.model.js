@@ -379,6 +379,25 @@ class Budget {
     return (result.rows[0]?.status ?? null) === "open";
   }
 
+  // Cut-off date check for the addBudget gate: true when the reference
+  // carries a cut-off date earlier than today (day granularity). A past
+  // cut-off freezes new funds even while the status is still 'open'.
+  static async isReferenceCutOffDue(reference_id) {
+    if (!reference_id) return false;
+    const result = await query(
+      `SELECT date_cut_off FROM budget_reference WHERE reference_id = $1`,
+      [reference_id],
+    );
+    const raw = result.rows[0]?.date_cut_off ?? null;
+    if (!raw) return false;
+    const day = new Date(raw);
+    if (Number.isNaN(day.getTime())) return false;
+    day.setHours(0, 0, 0, 0);
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    return day < today;
+  }
+
   // Source of Funds management list — EVERY reference (open AND cut-off),
   // each with its live aggregates, newest first. Unlike the picker lists,
   // management must also see disconnected sources to edit, reopen or
@@ -611,10 +630,10 @@ class Budget {
   // Budget Reference
   static async budgetReference() {
     const result = await query(
-      `SELECT 
-        reference_id, 
-        label, created_at, status,
-        ( SELECT COUNT(id) FROM budget bi WHERE bi.reference_id = b.reference_id ) AS active 
+      `SELECT
+        reference_id,
+        label, created_at, status, date_cut_off,
+        ( SELECT COUNT(id) FROM budget bi WHERE bi.reference_id = b.reference_id ) AS active
        FROM budget_reference b
        WHERE b.status = 'open'
        ORDER BY b.created_at DESC`,

@@ -120,7 +120,32 @@ export default function Listbox({
     );
   }, [options, search]);
 
+  // Per-option disabled support (e.g. past-cut-off sources): disabled rows
+  // never commit via click or keyboard, and arrow navigation skips them.
+  const isDisabled = (option) => Boolean(option?.disabled);
+
+  const stepEnabled = (from, dir) => {
+    let i = from;
+    for (let n = 0; n < filteredOptions.length; n += 1) {
+      i += dir;
+      if (i < 0 || i >= filteredOptions.length) return from;
+      if (!isDisabled(filteredOptions[i])) return i;
+    }
+    return from;
+  };
+
+  const firstEnabled = () =>
+    filteredOptions.findIndex((option) => !isDisabled(option));
+
+  const lastEnabled = () => {
+    for (let i = filteredOptions.length - 1; i >= 0; i -= 1) {
+      if (!isDisabled(filteredOptions[i])) return i;
+    }
+    return -1;
+  };
+
   const commit = (option) => {
+    if (isDisabled(option)) return;
     setOpen(false);
     setActiveIndex(-1);
     onChange(option.value);
@@ -217,21 +242,21 @@ export default function Listbox({
     switch (e.key) {
       case "ArrowDown":
         e.preventDefault();
-        setActiveIndex((i) =>
-          Math.min(i < 0 ? 0 : i + 1, filteredOptions.length - 1),
-        );
+        setActiveIndex((i) => stepEnabled(i < 0 ? -1 : i, 1));
         break;
       case "ArrowUp":
         e.preventDefault();
-        setActiveIndex((i) => Math.max(i < 0 ? 0 : i - 1, 0));
+        setActiveIndex((i) =>
+          stepEnabled(i < 0 ? filteredOptions.length : i, -1),
+        );
         break;
       case "Home":
         e.preventDefault();
-        setActiveIndex(0);
+        setActiveIndex(firstEnabled());
         break;
       case "End":
         e.preventDefault();
-        setActiveIndex(filteredOptions.length - 1);
+        setActiveIndex(lastEnabled());
         break;
       case "Enter":
       case " ":
@@ -260,13 +285,13 @@ export default function Listbox({
     switch (e.key) {
       case "ArrowDown":
         e.preventDefault();
-        setActiveIndex((i) =>
-          Math.min(i < 0 ? 0 : i + 1, filteredOptions.length - 1),
-        );
+        setActiveIndex((i) => stepEnabled(i < 0 ? -1 : i, 1));
         break;
       case "ArrowUp":
         e.preventDefault();
-        setActiveIndex((i) => Math.max(i < 0 ? 0 : i - 1, 0));
+        setActiveIndex((i) =>
+          stepEnabled(i < 0 ? filteredOptions.length : i, -1),
+        );
         break;
       case "Enter":
         e.preventDefault();
@@ -340,23 +365,31 @@ export default function Listbox({
               {filteredOptions.map((option, index) => {
                 const selected = option.value === value;
                 const active = index === activeIndex;
+                const optionDisabled = isDisabled(option);
 
                 return (
                   <li
                     key={option.value ?? index}
                     role="option"
                     aria-selected={selected}
-                    onMouseEnter={() => setActiveIndex(index)}
+                    aria-disabled={optionDisabled || undefined}
+                    title={option.disabledReason}
+                    onMouseEnter={() =>
+                      !optionDisabled && setActiveIndex(index)
+                    }
                     onClick={(e) => {
                       e.preventDefault();
                       commit(option);
                     }}
                     className={cn(
-                      "flex cursor-pointer items-center gap-2 px-4 py-2.5 text-sm transition-colors",
+                      "flex items-center gap-2 px-4 py-2.5 text-sm transition-colors",
+                      optionDisabled
+                        ? "cursor-not-allowed opacity-50"
+                        : "cursor-pointer",
                       selected
                         ? "text-[var(--accent-strong)] font-medium"
                         : "text-[var(--ink)]",
-                      active && "bg-[var(--surface-2)]",
+                      active && !optionDisabled && "bg-[var(--surface-2)]",
                     )}
                   >
                     {renderOption ? (
