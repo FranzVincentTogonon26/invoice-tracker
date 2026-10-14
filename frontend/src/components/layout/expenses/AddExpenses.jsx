@@ -49,6 +49,7 @@ import {
   removeReceiptFile,
 } from "../../../lib/receiptFiles";
 import ConfirmRemoveItemDialog from "./ConfirmRemoveItemDialog";
+import ConfirmSaveExpensesDialog from "./ConfirmSaveExpensesDialog";
 import ExpensesModal from "./ExpensesModal";
 import ReceiptDraftModal from "./ReceiptDraftModal";
 import SelectSourceFund from "./SelectSourceFund";
@@ -215,6 +216,9 @@ const AddExpenses = () => {
   const [showZeroAmountErrors, setShowZeroAmountErrors] = useState(false);
   const [removeIndex, setRemoveIndex] = useState(null);
   const [viewReceipt, setViewReceipt] = useState(null);
+  // Pre-save review: "Save expenses" opens the confirm dialog first — the
+  // request only fires after confirmation.
+  const [confirmSaveOpen, setConfirmSaveOpen] = useState(false);
   const pendingRemoveRef = useRef(null);
   const removeTriggerRef = useRef(null);
   const addLineRef = useRef(null);
@@ -407,6 +411,42 @@ const AddExpenses = () => {
   const insufficientFunds = funding.status === FUNDING_STATUS.insufficient;
   const sourceUnselected = funding.sources.length > 1 && !funding.source;
   const noSources = funding.sources.length === 0;
+
+  // Pre-save review summary: only lines the save will actually persist
+  // (touched lines — untouched blanks are skipped by handleSave).
+  const confirmLines = useMemo(
+    () =>
+      items
+        .filter((item) => isTouchedLine(item))
+        .map((item, index) => ({
+          key: `${item.receiptId || "line"}-${index}`,
+          description: item.description.trim(),
+          category: item.categoryId
+            ? (categoryNames.get(item.categoryId) ?? "")
+            : "",
+          date: item.date,
+          amount: Number(item.totalAmount) || 0,
+        })),
+    [items, categoryNames],
+  );
+  const confirmBackdatedCount = useMemo(
+    () =>
+      firstIssuedDate
+        ? items.filter(
+            (item) =>
+              isTouchedLine(item) &&
+              isBeforeFirstIssued(item.date, firstIssuedDate),
+          ).length
+        : 0,
+    [items, firstIssuedDate],
+  );
+
+  // The confirm dialog only asks — the request fires here, running the full
+  // validation inside handleSave (single source of truth).
+  const confirmSaveExpenses = () => {
+    setConfirmSaveOpen(false);
+    handleSave();
+  };
 
   const handleCategoryAdded = (category) => {
     if (!category?.category_id) return;
@@ -1149,7 +1189,7 @@ const AddExpenses = () => {
                 variant="accent"
                 className="w-full"
                 type="button"
-                onClick={handleSave}
+                onClick={() => setConfirmSaveOpen(true)}
                 disabled={
                   saving ||
                   !isActiveSession ||
@@ -1230,6 +1270,20 @@ const AddExpenses = () => {
         }
         onCancel={cancelRemoveItem}
         onConfirm={confirmRemoveItem}
+      />
+
+      <ConfirmSaveExpensesDialog
+        open={confirmSaveOpen}
+        lines={confirmLines}
+        total={total}
+        sourceLabel={funding.source?.label ?? ""}
+        backdatedCount={confirmBackdatedCount}
+        firstIssuedLabel={firstIssuedLabel}
+        saving={saving}
+        onCancel={() => {
+          if (!saving) setConfirmSaveOpen(false);
+        }}
+        onConfirm={confirmSaveExpenses}
       />
     </div>
   );

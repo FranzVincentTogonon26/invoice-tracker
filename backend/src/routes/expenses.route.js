@@ -127,6 +127,26 @@ router.patch(
   expensesController.updateCategory,
 );
 
+// Expense-date reassignment (ExpenseDetailsModal date pencil editor) —
+// overwrites `expenses.expense_date`. Admin-only; the controller enforces
+// the closed-holding guard.
+router.patch(
+  "/:id/date",
+  authMiddleware,
+  requireAdminAccess,
+  expensesController.updateDate,
+);
+
+// Receipt-date reassignment (ExpenseDetailsModal receipt-date pencil editor)
+// — overwrites `expenses.receipt_date`. Admin-only; the controller enforces
+// the closed-holding guard.
+router.patch(
+  "/:id/receipt-date",
+  authMiddleware,
+  requireAdminAccess,
+  expensesController.updateReceiptDate,
+);
+
 router.delete("/:id", authMiddleware, expensesController.remove);
 
 export default router;

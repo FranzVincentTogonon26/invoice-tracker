@@ -67,7 +67,7 @@ class Transactions {
   // Budget Given rows, which carry `approvedBy` text instead).
   // Also returns `summary` (all-time gross Money In / Out / net / counts)
   // and the `categories` + `references` lists the filters are built from.
-  static async ledger() {
+  static async ledger({ referenceId } = {}) {
     const [
       budgetRows,
       issuedRows,
@@ -318,11 +318,20 @@ class Transactions {
       });
     }
 
-    transactions.sort((a, b) => {
+    let resultTransactions = transactions;
+    if (referenceId) {
+      const targetRef = String(referenceId).toLowerCase().trim();
+      resultTransactions = transactions.filter(
+        (t) => String(t.referenceId || "").toLowerCase().trim() === targetRef,
+      );
+    }
+
+    resultTransactions.sort((a, b) => {
       const ta = new Date(a.date ?? 0).getTime() || 0;
       const tb = new Date(b.date ?? 0).getTime() || 0;
       return tb - ta;
     });
+
 
     // All-time gross figures — the stat cards' starting point. Filtered views
     // re-sum the visible rows client-side so every number on screen always
@@ -331,11 +340,11 @@ class Transactions {
       moneyIn: 0,
       moneyOut: 0,
       net: 0,
-      count: transactions.length,
+      count: resultTransactions.length,
       byKind: {},
       forwarded: toMoney(forwardedResult.rows[0]?.forwarded),
     };
-    for (const tx of transactions) {
+    for (const tx of resultTransactions) {
       summary.moneyIn = toMoney(summary.moneyIn + tx.moneyIn);
       summary.moneyOut = toMoney(summary.moneyOut + tx.moneyOut);
       summary.byKind[tx.kind] = (summary.byKind[tx.kind] ?? 0) + 1;
@@ -343,7 +352,7 @@ class Transactions {
     summary.net = toMoney(summary.moneyIn - summary.moneyOut);
 
     return {
-      transactions,
+      transactions: resultTransactions,
       summary,
       categories: expensesData?.categories ?? [],
       references: expensesData?.references ?? [],

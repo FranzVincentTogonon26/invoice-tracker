@@ -255,3 +255,21 @@ export const updateExpenseCategorySchema = z.object({
     z.uuid({ message: "Invalid category id" }).nullable(),
   ),
 });
+
+// Expense-date reassignment from the ExpenseDetailsModal date pencil editor —
+// date-only `YYYY-MM-DD` matching the DatePicker output and the
+// `expenses.expense_date` DATE column.
+export const updateExpenseDateSchema = z.object({
+  expense_date: z
+    .string({ error: "Invalid expense date" })
+    .regex(/^\d{4}-\d{2}-\d{2}$/, { message: "Invalid expense date" }),
+});
+
+// Receipt-date reassignment from the ExpenseDetailsModal receipt-date pencil
+// editor — date-only `YYYY-MM-DD` matching the DatePicker output, stored on
+// the `expenses.receipt_date` TIMESTAMPTZ column.
+export const updateExpenseReceiptDateSchema = z.object({
+  receipt_date: z
+    .string({ error: "Invalid receipt date" })
+    .regex(/^\d{4}-\d{2}-\d{2}$/, { message: "Invalid receipt date" }),
+});

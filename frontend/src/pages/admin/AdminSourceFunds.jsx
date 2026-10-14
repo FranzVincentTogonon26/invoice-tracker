@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { Inbox, Plus, Trash2 } from "lucide-react";
+import { Ban, Inbox, LockOpen, Plus, Trash2 } from "lucide-react";
 import toast from "react-hot-toast";
 import { PageHeader } from "../../components/ui/PageHeader";
 import { Button } from "../../components/ui/Button";
@@ -37,6 +37,7 @@ export default function AdminSourceFunds() {
   const [page, setPage] = useState(0);
   const [editSource, setEditSource] = useState(null);
   const [deleteSource, setDeleteSource] = useState(null);
+  const [toggleSource, setToggleSource] = useState(null);
   const [refsOpen, setRefsOpen] = useState(false);
 
   useEffect(() => {
@@ -169,6 +170,42 @@ export default function AdminSourceFunds() {
     }
   };
 
+  // Open <-> cut_off flip behind a confirmation. Closing sets
+  // budget_reference.status = 'cut_off' and stamps date_cut_off (NOW())
+  // server-side; reopening sets status = 'open' and clears the stamp.
+  const toggleIsOpen = (toggleSource?.status ?? "open") === "open";
+  const handleToggleStatus = async () => {
+    if (!toggleSource) return;
+    try {
+      await updateReference.mutateAsync({
+        referenceId: toggleSource.reference_id,
+        payload: { status: toggleIsOpen ? "cut_off" : "open" },
+      });
+      setToggleSource(null);
+      toast.success(
+        toggleIsOpen
+          ? `Source "${toggleSource.label || "Untitled source"}" closed.`
+          : `Source "${toggleSource.label || "Untitled source"}" reopened.`,
+      );
+    } catch (err) {
+      toast.error(err?.message || "Couldn't update the source status.");
+    }
+  };
+
+  const toggleSummary = toggleSource ? (
+    <div className="mt-4 flex items-center gap-3 rounded-2xl border border-[var(--border)] bg-[var(--surface-2)]/60 px-4 py-3">
+      <div className="min-w-0 flex-1">
+        <p className="truncate text-base font-medium text-[var(--ink)]">
+          {toggleSource.label || "Untitled source"}
+        </p>
+        <p className="mt-0.5 truncate text-xs tabular-nums text-[var(--ink-muted)]">
+          {formatMoney(toggleSource.allocated)} allocated ·{" "}
+          {Number(toggleSource.transactions) || 0} transactions
+        </p>
+      </div>
+    </div>
+  ) : null;
+
   const deleteSummary = deleteSource ? (
     <div className="mt-4 flex items-center gap-3 rounded-2xl border border-[var(--border)] bg-[var(--surface-2)]/60 px-4 py-3">
       <div className="min-w-0 flex-1">
@@ -267,6 +304,12 @@ export default function AdminSourceFunds() {
             onView={handleView}
             onEdit={setEditSource}
             onDelete={setDeleteSource}
+            onToggleStatus={(s) => {
+              // Zero / empty allocated sources never enter the close/reopen
+              // flow — the menu already hides the item; this guards direct
+              // calls.
+              if (Number(s?.allocated) > 0) setToggleSource(s);
+            }}
           />
         )}
       </Card>
@@ -303,6 +346,37 @@ export default function AdminSourceFunds() {
           if (!removeReference.isPending) setDeleteSource(null);
         }}
         onConfirm={handleDelete}
+      />
+      <ConfirmActionDialog
+        open={Boolean(toggleSource)}
+        icon={
+          toggleIsOpen ? (
+            <Ban size={20} aria-hidden />
+          ) : (
+            <LockOpen size={20} aria-hidden />
+          )
+        }
+        iconClassName={
+          toggleIsOpen
+            ? "bg-[var(--danger)]/12 text-[var(--danger)]"
+            : "bg-[var(--accent-soft)] text-[var(--accent-strong)]"
+        }
+        title={toggleIsOpen ? "Close this source?" : "Reopen this source?"}
+        description={
+          toggleIsOpen
+            ? "Sets status to cut_off and stamps the cut-off date — the source disconnects from every flow until reopened."
+            : "Sets status back to open and clears the cut-off date — the source reconnects to every flow."
+        }
+        summary={toggleSummary}
+        cancelLabel="Cancel"
+        confirmLabel={toggleIsOpen ? "Yes, close it" : "Yes, reopen it"}
+        confirmVariant={toggleIsOpen ? "danger" : "accent"}
+        pendingLabel={toggleIsOpen ? "Closing…" : "Reopening…"}
+        pending={updateReference.isPending}
+        onCancel={() => {
+          if (!updateReference.isPending) setToggleSource(null);
+        }}
+        onConfirm={handleToggleStatus}
       />
     </div>
   );

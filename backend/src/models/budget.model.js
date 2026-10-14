@@ -408,12 +408,16 @@ class Budget {
   // (finalized holdings hand their leftover back — the same formula as
   // AdminBudget's per-source Remaining breakdown), transactions
   // (budget_issued_reference rows), budgets (budget rows).
-  static async sourceFunds({ search } = {}) {
+  static async sourceFunds({ search, referenceId } = {}) {
     const params = [];
     let searchClause = "";
+    if (referenceId) {
+      params.push(referenceId);
+      searchClause += ` AND br.reference_id = $${params.length}`;
+    }
     if (search && search.trim()) {
       params.push(`%${search.trim()}%`);
-      searchClause = `AND (br.label ILIKE $1 OR br.notes ILIKE $1)`;
+      searchClause += ` AND (br.label ILIKE $${params.length} OR br.notes ILIKE $${params.length})`;
     }
     const result = await query(
       `SELECT
@@ -423,6 +427,7 @@ class Budget {
           br.status,
           br.date_cut_off,
           br.created_at,
+
           COALESCE((
             SELECT SUM(b.amount)
               FROM budget b
@@ -611,9 +616,17 @@ class Budget {
       sets.push(`date_cut_off = $${params.length}::timestamptz`);
     }
     if (status !== undefined) {
+      // NOTE: status is bound as TWO separate params (not one reused `$n`
+      // twice). Reusing a single placeholder in both `status = $n`
+      // (varchar) and `CASE WHEN $n = 'cut_off'` (text) makes Postgres
+      // raise 42P08 "text versus character varying", which surfaced as a
+      // 500 Internal Server Error on every close/reopen.
       params.push(status);
+      const statusParam = params.length;
+      params.push(status);
+      const statusCheck = params.length;
       sets.push(
-        `status = $${params.length}, date_cut_off = CASE WHEN $${params.length} = 'cut_off' THEN COALESCE(date_cut_off, NOW()) ELSE NULL END`,
+        `status = $${statusParam}, date_cut_off = CASE WHEN $${statusCheck} = 'cut_off' THEN COALESCE(date_cut_off, NOW()) ELSE NULL END`,
       );
     }
     if (sets.length === 0) return null;

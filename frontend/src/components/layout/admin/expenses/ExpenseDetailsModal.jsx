@@ -4,7 +4,9 @@ import { useQueryClient } from "@tanstack/react-query";
 import { AnimatePresence, motion } from "framer-motion";
 import {
   AlertCircle,
+  ArrowLeft,
   Banknote,
+  CalendarDays,
   Check,
   ChevronDown,
   CreditCard,
@@ -28,6 +30,7 @@ import toast from "react-hot-toast";
 import { useAuth } from "../../../../context/AuthContext";
 import { USER_ROLES } from "../../../../constants";
 import { Button } from "../../../ui/Button";
+import { DatePicker } from "../../../ui/DatePicker";
 import { TextArea } from "../../../ui/Input";
 import { EmployeeAvatar } from "../../../ui/SelectEmployee";
 import {
@@ -131,7 +134,7 @@ const ReviewNotesCard = ({ row }) => {
   };
 
   return (
-    <div className="min-w-0 space-y-2 pt-1">
+    <div className="min-w-0 space-y-2 border-t border-[var(--border)] pt-4 ">
       <div className="flex items-center justify-between">
         <p className="type-eyebrow text-[var(--ink-muted)]">Review Notes</p>
         <span className="text-[10px] text-[var(--ink-muted)]">
@@ -238,106 +241,619 @@ const CategoryEditor = ({ row }) => {
   return (
     <div className="min-w-0">
       <p className="type-eyebrow text-[var(--ink-muted)]">Category</p>
-      {!editing ? (
-        <div className="mt-1 flex min-w-0 items-center gap-1.5">
-          <button
-            type="button"
-            onClick={() => {
-              setSelected(currentId);
-              setError(null);
-              setEditing(true);
-            }}
-            disabled={saving}
-            aria-label="Edit category"
-            title="Edit category"
-            className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-[var(--ink-muted)] transition-colors hover:bg-[var(--surface-2)] hover:text-[var(--ink)] disabled:opacity-40"
-          >
-            <Pencil size={12} aria-hidden />
-          </button>
-          <p
-            title={displayName}
-            className="min-w-0 flex-1 truncate text-sm font-medium text-[var(--ink)]"
-          >
-            {displayName}
-          </p>
-        </div>
-      ) : (
-        <div className="mt-1.5 overflow-hidden rounded-xl border border-[var(--border)] bg-[var(--surface)]">
-          <div
-            role="listbox"
-            aria-label="Expense category"
-            className="scrollbar-slim max-h-[180px] overflow-y-auto p-1"
+      <AnimatePresence initial={false} mode="wait">
+        {!editing ? (
+          <motion.div
+            key="category-view"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: 0.15, ease: DIALOG_EASE }}
+            className="mt-1 flex min-w-0 items-center gap-1.5"
           >
             <button
               type="button"
-              role="option"
-              aria-selected={selected == null}
-              onClick={() => setSelected(null)}
-              className={optionClass(selected == null)}
-            >
-              <span className="truncate">Uncategorized</span>
-              {selected == null && (
-                <Check size={13} aria-hidden className="shrink-0" />
-              )}
-            </button>
-            {(categories ?? []).map((cat) => {
-              const isSelected = selected === cat.category_id;
-              return (
-                <button
-                  key={cat.category_id}
-                  type="button"
-                  role="option"
-                  aria-selected={isSelected}
-                  onClick={() => setSelected(cat.category_id)}
-                  className={optionClass(isSelected)}
-                >
-                  <span className="truncate">{cat.category_name}</span>
-                  {isSelected && (
-                    <Check size={13} aria-hidden className="shrink-0" />
-                  )}
-                </button>
-              );
-            })}
-          </div>
-          {error ? (
-            <p
-              role="alert"
-              className="border-t border-[var(--border)] px-2.5 pt-1.5 text-[11px] font-medium text-[var(--danger)]"
-            >
-              {error}
-            </p>
-          ) : null}
-          <div className="flex items-center justify-end gap-1.5 border-t border-[var(--border)] px-2 py-1.5">
-            <Button
-              type="button"
-              variant="ghost"
-              size="sm"
               onClick={() => {
                 setSelected(currentId);
                 setError(null);
-                setEditing(false);
+                setEditing(true);
               }}
               disabled={saving}
-              className="h-7 text-xs"
+              aria-label="Edit category"
+              title="Edit category"
+              className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-[var(--ink-muted)] transition-colors hover:bg-[var(--accent-soft)] hover:text-[var(--accent-strong)] disabled:opacity-40"
             >
-              Cancel
-            </Button>
-            <Button
+              <Pencil size={12} aria-hidden />
+            </button>
+            <p
+              title={displayName}
+              className="min-w-0 flex-1 truncate text-sm font-medium text-[var(--ink)]"
+            >
+              {displayName}
+            </p>
+          </motion.div>
+        ) : (
+          <motion.div
+            key="category-edit"
+            initial={{ opacity: 0, height: 0 }}
+            animate={{ opacity: 1, height: "auto" }}
+            exit={{ opacity: 0, height: 0 }}
+            transition={{ duration: 0.22, ease: DIALOG_EASE }}
+            className="mt-1.5 overflow-hidden rounded-xl border border-[var(--border)] bg-[var(--surface)]"
+          >
+            <div
+              role="listbox"
+              aria-label="Expense category"
+              className="scrollbar-slim max-h-[180px] overflow-y-auto p-1"
+            >
+              <button
+                type="button"
+                role="option"
+                aria-selected={selected == null}
+                onClick={() => setSelected(null)}
+                className={optionClass(selected == null)}
+              >
+                <span className="truncate">Uncategorized</span>
+                {selected == null && (
+                  <Check size={13} aria-hidden className="shrink-0" />
+                )}
+              </button>
+              {(categories ?? []).map((cat) => {
+                const isSelected = selected === cat.category_id;
+                return (
+                  <button
+                    key={cat.category_id}
+                    type="button"
+                    role="option"
+                    aria-selected={isSelected}
+                    onClick={() => setSelected(cat.category_id)}
+                    className={optionClass(isSelected)}
+                  >
+                    <span className="truncate">{cat.category_name}</span>
+                    {isSelected && (
+                      <Check size={13} aria-hidden className="shrink-0" />
+                    )}
+                  </button>
+                );
+              })}
+            </div>
+            {error ? (
+              <p
+                role="alert"
+                className="border-t border-[var(--border)] px-2.5 pt-1.5 text-[11px] font-medium text-[var(--danger)]"
+              >
+                {error}
+              </p>
+            ) : null}
+            <div className="flex items-center justify-end gap-1.5 border-t border-[var(--border)] px-2 py-1.5">
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                onClick={() => {
+                  setSelected(currentId);
+                  setError(null);
+                  setEditing(false);
+                }}
+                disabled={saving}
+                className="h-7 text-xs"
+              >
+                Cancel
+              </Button>
+              <Button
+                type="button"
+                variant="soft"
+                size="sm"
+                onClick={handleSave}
+                disabled={saving || !dirty}
+                className="h-7 text-xs"
+              >
+                {saving && (
+                  <Loader2 size={12} className="animate-spin" aria-hidden />
+                )}
+                {saving ? "Saving…" : "Save"}
+              </Button>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </div>
+  );
+};
+
+// DB DATE columns serialize as `YYYY-MM-DD` (or full ISO) — the picker
+// speaks date-only `YYYY-MM-DD`, so normalize on the way in. Slicing keeps
+// the stored calendar day instead of re-interpreting it across timezones.
+const toDateOnly = (value) => {
+  const text = String(value ?? "");
+  return /^\d{4}-\d{2}-\d{2}/.test(text) ? text.slice(0, 10) : "";
+};
+
+// Admin date editor (pencil → date picker → save), mirroring CategoryEditor.
+// Picking a date then Save persists through `updateDate`; the committed
+// value renders immediately since the modal's `row` snapshot only refreshes
+// on the next ledger fetch.
+const DateEditor = ({ row, onEditingChange }) => {
+  const { updateDate } = useExpensesMutations();
+  const saving = updateDate.isPending;
+  const [editing, setEditing] = useState(false);
+  const [selected, setSelected] = useState(toDateOnly(row?.date));
+  const [committed, setCommitted] = useState(undefined);
+  const [error, setError] = useState(null);
+
+  const [editFor, setEditFor] = useState(row?.id);
+  if (editFor !== row?.id) {
+    setEditFor(row?.id);
+    setSelected(toDateOnly(row?.date));
+    setCommitted(undefined);
+    setEditing(false);
+    setError(null);
+  }
+
+  // Lets the parent grid give the Date cell the full row while editing —
+  // the picker + actions need more than a third of the row.
+  useEffect(() => {
+    onEditingChange?.(editing);
+  }, [editing, onEditingChange]);
+
+  const current = committed !== undefined ? committed : toDateOnly(row?.date);
+  const dirty = Boolean(selected) && selected !== current;
+
+  const handleSave = async () => {
+    if (!row?.id || saving || !dirty) return;
+    setError(null);
+    try {
+      const data = await updateDate.mutateAsync({
+        id: row.id,
+        expenseDate: selected,
+      });
+      setCommitted(data?.expense?.expense_date ?? selected);
+      setEditing(false);
+      toast.success("Expense date updated");
+    } catch (err) {
+      setError(err?.message || "Couldn't update expense date. Try again.");
+    }
+  };
+
+  return (
+    <div className="min-w-0">
+      <p className="type-eyebrow text-[var(--ink-muted)]">Date</p>
+      <AnimatePresence initial={false} mode="wait">
+        {!editing ? (
+          <motion.div
+            key="date-view"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: 0.15, ease: DIALOG_EASE }}
+            className="mt-1 flex min-w-0 items-center gap-1.5"
+          >
+            <button
               type="button"
-              variant="soft"
-              size="sm"
-              onClick={handleSave}
-              disabled={saving || !dirty}
-              className="h-7 text-xs"
+              onClick={() => {
+                setSelected(current);
+                setError(null);
+                setEditing(true);
+              }}
+              disabled={saving}
+              aria-label="Edit expense date"
+              title="Edit expense date"
+              className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-[var(--ink-muted)] transition-colors hover:bg-[var(--accent-soft)] hover:text-[var(--accent-strong)] disabled:opacity-40"
             >
-              {saving && (
-                <Loader2 size={12} className="animate-spin" aria-hidden />
-              )}
-              {saving ? "Saving…" : "Save"}
-            </Button>
-          </div>
-        </div>
+              <Pencil size={12} aria-hidden />
+            </button>
+            <p
+              title={current ? formatDate(current) : undefined}
+              className="min-w-0 flex-1 truncate text-sm font-medium text-[var(--ink)]"
+            >
+              {formatDate(current || row?.date)}
+            </p>
+          </motion.div>
+        ) : (
+          <motion.div
+            key="date-edit"
+            initial={{ opacity: 0, height: 0 }}
+            animate={{ opacity: 1, height: "auto" }}
+            exit={{ opacity: 0, height: 0 }}
+            transition={{ duration: 0.22, ease: DIALOG_EASE }}
+            className="mt-1.5 overflow-hidden"
+          >
+            <div className="space-y-2 rounded-2xl border border-[var(--accent)]/60 bg-[var(--surface)] p-2.5 shadow-xs ring-2 ring-[var(--accent)]/15">
+              <DatePicker
+                value={selected}
+                onChange={(next) => setSelected(next || "")}
+                placeholder="Pick a date"
+                className="h-9 text-xs"
+                disabled={saving}
+              />
+              {error ? (
+                <p
+                  role="alert"
+                  className="text-[11px] font-medium text-[var(--danger)]"
+                >
+                  {error}
+                </p>
+              ) : null}
+              <div className="flex items-center justify-end gap-1.5 border-t border-[var(--border)] pt-2">
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => {
+                    setSelected(current);
+                    setError(null);
+                    setEditing(false);
+                  }}
+                  disabled={saving}
+                  className="h-7 text-xs"
+                >
+                  Cancel
+                </Button>
+                <Button
+                  type="button"
+                  variant="soft"
+                  size="sm"
+                  onClick={handleSave}
+                  disabled={saving || !dirty}
+                  className="h-7 text-xs"
+                >
+                  {saving && (
+                    <Loader2 size={12} className="animate-spin" aria-hidden />
+                  )}
+                  {saving ? "Saving…" : "Save"}
+                </Button>
+              </div>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </div>
+  );
+};
+
+// High-visibility receipt-date pill: accent-tinted row with a calendar glyph
+// and semibold date so the scan date reads at a glance. Optional `children`
+// render trailing (the edit pencil). When `danger` (flagged expense) the
+// whole pill flips to the danger tone with a warning glyph.
+const ReceiptDatePill = ({ formatted, danger, children }) => (
+  <div
+    className={cn(
+      "flex min-w-0 items-center gap-2 rounded-xl px-2.5 py-1.5 ring-1 ring-inset",
+      danger
+        ? "bg-[var(--danger)]/10 ring-[var(--danger)]/30"
+        : "bg-[var(--accent-soft)]/50 ring-[var(--accent)]/25",
+    )}
+  >
+    <span
+      className={cn(
+        "shrink-0",
+        danger ? "text-[var(--danger)]" : "text-[var(--accent-strong)]",
       )}
+    >
+      {danger ? (
+        <TriangleAlert size={14} aria-hidden />
+      ) : (
+        <CalendarDays size={14} aria-hidden />
+      )}
+    </span>
+    <p className="min-w-0 flex-1 truncate text-xs tabular-nums">
+      <span
+        className={cn(
+          "font-medium",
+          danger ? "text-[var(--danger)]" : "text-[var(--ink-muted)]",
+        )}
+      >
+        Receipt date ·{" "}
+      </span>
+      <span
+        className={cn(
+          "font-semibold",
+          danger ? "text-[var(--danger)]" : "text-[var(--ink)]",
+        )}
+      >
+        {formatted}
+      </span>
+    </p>
+    {children}
+  </div>
+);
+
+// Receipt-date editor (pencil → date picker → save) for the receipt card,
+// mirroring DateEditor. The pencil always shows (when the caller renders
+// this) so a missing receipt date can be set, not just changed. Picking a
+// date then Save persists through `updateReceiptDate`; the committed value
+// renders immediately since the modal's `row` snapshot only refreshes on the
+// next ledger fetch.
+const ReceiptDateEditor = ({ row, danger }) => {
+  const { updateReceiptDate } = useExpensesMutations();
+  const saving = updateReceiptDate.isPending;
+  const [editing, setEditing] = useState(false);
+  const [selected, setSelected] = useState(toDateOnly(row?.receiptDate));
+  const [committed, setCommitted] = useState(undefined);
+  const [error, setError] = useState(null);
+
+  const [editFor, setEditFor] = useState(row?.id);
+  if (editFor !== row?.id) {
+    setEditFor(row?.id);
+    setSelected(toDateOnly(row?.receiptDate));
+    setCommitted(undefined);
+    setEditing(false);
+    setError(null);
+  }
+
+  const currentFull =
+    committed !== undefined ? committed : (row?.receiptDate ?? "");
+  const currentDay = toDateOnly(currentFull);
+  const dirty = Boolean(selected) && selected !== currentDay;
+
+  const handleSave = async () => {
+    if (!row?.id || saving || !dirty) return;
+    setError(null);
+    try {
+      const data = await updateReceiptDate.mutateAsync({
+        id: row.id,
+        receiptDate: selected,
+      });
+      setCommitted(data?.expense?.receipt_date ?? selected);
+      setEditing(false);
+      toast.success("Receipt date updated");
+    } catch (err) {
+      setError(err?.message || "Couldn't update receipt date. Try again.");
+    }
+  };
+
+  return (
+    <div className="min-w-0">
+      <AnimatePresence initial={false} mode="wait">
+        {!editing ? (
+          <motion.div
+            key="receipt-date-view"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: 0.15, ease: DIALOG_EASE }}
+            className="min-w-0"
+          >
+            <ReceiptDatePill
+              formatted={
+                currentFull
+                  ? `${formatDate(currentFull)} · ${formatTime(currentFull)}`
+                  : "Not set"
+              }
+              danger={danger}
+            >
+              <button
+                type="button"
+                onClick={() => {
+                  setSelected(currentDay);
+                  setError(null);
+                  setEditing(true);
+                }}
+                disabled={saving}
+                aria-label="Edit receipt date"
+                title="Edit receipt date"
+                className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-[var(--ink-muted)] transition-colors hover:bg-[var(--accent-soft)] hover:text-[var(--accent-strong)] disabled:opacity-40"
+              >
+                <Pencil size={12} aria-hidden />
+              </button>
+            </ReceiptDatePill>
+          </motion.div>
+        ) : (
+          <motion.div
+            key="receipt-date-edit"
+            initial={{ opacity: 0, height: 0 }}
+            animate={{ opacity: 1, height: "auto" }}
+            exit={{ opacity: 0, height: 0 }}
+            transition={{ duration: 0.22, ease: DIALOG_EASE }}
+            className="mt-1.5 overflow-hidden"
+          >
+            <div className="space-y-2 rounded-2xl border border-[var(--accent)]/60 bg-[var(--surface)] p-2.5 shadow-xs ring-2 ring-[var(--accent)]/15">
+              <DatePicker
+                value={selected}
+                onChange={(next) => setSelected(next || "")}
+                placeholder="Pick a date"
+                className="h-9 text-xs"
+                disabled={saving}
+              />
+              {error ? (
+                <p
+                  role="alert"
+                  className="text-[11px] font-medium text-[var(--danger)]"
+                >
+                  {error}
+                </p>
+              ) : null}
+              <div className="flex items-center justify-end gap-1.5 border-t border-[var(--border)] pt-2">
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => {
+                    setSelected(currentDay);
+                    setError(null);
+                    setEditing(false);
+                  }}
+                  disabled={saving}
+                  className="h-7 text-xs"
+                >
+                  Cancel
+                </Button>
+                <Button
+                  type="button"
+                  variant="soft"
+                  size="sm"
+                  onClick={handleSave}
+                  disabled={saving || !dirty}
+                  className="h-7 text-xs"
+                >
+                  {saving && (
+                    <Loader2 size={12} className="animate-spin" aria-hidden />
+                  )}
+                  {saving ? "Saving…" : "Save"}
+                </Button>
+              </div>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </div>
+  );
+};
+
+// Description editor (pencil → textarea → save) for the Vendor /
+// Description row, mirroring the other inline editors. The scanned vendor
+// (when it differs) stays read-only on top; the stored expense description
+// is what the pencil edits. Committed value renders immediately since the
+// modal's `row` snapshot only refreshes on the next ledger fetch.
+const DESCRIPTION_MIN = 2;
+const DESCRIPTION_MAX = 200;
+
+const DescriptionEditor = ({ row, vendorName }) => {
+  const { updateDescription } = useExpensesMutations();
+  const saving = updateDescription.isPending;
+  const [editing, setEditing] = useState(false);
+  const [draft, setDraft] = useState(row?.description ?? "");
+  const [committed, setCommitted] = useState(undefined);
+  const [error, setError] = useState(null);
+
+  const [editFor, setEditFor] = useState(row?.id);
+  if (editFor !== row?.id) {
+    setEditFor(row?.id);
+    setDraft(row?.description ?? "");
+    setCommitted(undefined);
+    setEditing(false);
+    setError(null);
+  }
+
+  const current =
+    committed !== undefined ? committed : (row?.description ?? "");
+  const showVendor = Boolean(vendorName) && vendorName !== current;
+  const dirty = draft.trim() !== current.trim();
+
+  const handleSave = async () => {
+    if (!row?.id || saving || !dirty) return;
+    const trimmed = draft.trim();
+    if (trimmed.length < DESCRIPTION_MIN) {
+      setError("Description must be at least 2 characters.");
+      return;
+    }
+    setError(null);
+    try {
+      const data = await updateDescription.mutateAsync({
+        id: row.id,
+        description: trimmed,
+      });
+      setCommitted(data?.expense?.description ?? trimmed);
+      setEditing(false);
+      toast.success("Description updated");
+    } catch (err) {
+      setError(err?.message || "Couldn't update description. Try again.");
+    }
+  };
+
+  return (
+    <div className="min-w-0">
+      <AnimatePresence initial={false} mode="wait">
+        {!editing ? (
+          <motion.div
+            key="description-view"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: 0.15, ease: DIALOG_EASE }}
+            className="mt-1 flex min-w-0 items-start gap-1.5"
+          >
+            <button
+              type="button"
+              onClick={() => {
+                setDraft(current);
+                setError(null);
+                setEditing(true);
+              }}
+              disabled={saving}
+              aria-label="Edit description"
+              title="Edit description"
+              className="mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-[var(--ink-muted)] transition-colors hover:bg-[var(--accent-soft)] hover:text-[var(--accent-strong)] disabled:opacity-40"
+            >
+              <Pencil size={12} aria-hidden />
+            </button>
+            <div className="min-w-0 flex-1">
+              <p className="break-words text-sm font-medium leading-snug text-[var(--ink)]">
+                {current || "—"}
+              </p>
+              {showVendor && (
+                <p className="mt-0.5 break-words text-xs leading-relaxed text-[var(--ink-muted)]">
+                  Scanned vendor · {vendorName}
+                </p>
+              )}
+            </div>
+          </motion.div>
+        ) : (
+          <motion.div
+            key="description-edit"
+            initial={{ opacity: 0, height: 0 }}
+            animate={{ opacity: 1, height: "auto" }}
+            exit={{ opacity: 0, height: 0 }}
+            transition={{ duration: 0.22, ease: DIALOG_EASE }}
+            className="mt-1.5 overflow-hidden"
+          >
+            <div className="space-y-2 rounded-2xl border border-[var(--accent)]/60 bg-[var(--surface)] p-2.5 shadow-xs ring-2 ring-[var(--accent)]/15">
+              <TextArea
+                value={draft}
+                onChange={(e) => setDraft(e.target.value)}
+                rows={2}
+                maxLength={DESCRIPTION_MAX}
+                disabled={saving}
+                placeholder="What is this expense for…"
+                aria-label="Expense description"
+                className="w-full text-xs"
+              />
+              {error ? (
+                <p
+                  role="alert"
+                  className="text-[11px] font-medium text-[var(--danger)]"
+                >
+                  {error}
+                </p>
+              ) : null}
+              <div className="flex items-center justify-between gap-2 border-t border-[var(--border)] pt-2">
+                <span className="text-[10px] tabular-nums text-[var(--ink-muted)]">
+                  {draft.trim().length}/{DESCRIPTION_MAX}
+                </span>
+                <span className="flex items-center gap-1.5">
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => {
+                      setDraft(current);
+                      setError(null);
+                      setEditing(false);
+                    }}
+                    disabled={saving}
+                    className="h-7 text-xs"
+                  >
+                    Cancel
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="soft"
+                    size="sm"
+                    onClick={handleSave}
+                    disabled={saving || !dirty}
+                    className="h-7 text-xs"
+                  >
+                    {saving && (
+                      <Loader2 size={12} className="animate-spin" aria-hidden />
+                    )}
+                    {saving ? "Saving…" : "Save"}
+                  </Button>
+                </span>
+              </div>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   );
 };
@@ -573,6 +1089,10 @@ const ExpenseDetailsModal = ({
   const row = expense;
 
   // Reset state on open or row change
+  // Tracks whether the Date cell editor is open so the Date/Time/Method
+  // grid can hand the Date cell the full row while editing.
+  const [dateEditing, setDateEditing] = useState(false);
+
   const [prevOpen, setPrevOpen] = useState(open);
   if (prevOpen !== open) {
     setPrevOpen(open);
@@ -583,6 +1103,7 @@ const ExpenseDetailsModal = ({
       setClearedFlagId(null);
       setFlagConfirmOpen(false);
     }
+    setDateEditing(false);
   }
 
   const [prevRowId, setPrevRowId] = useState(row?.id);
@@ -591,6 +1112,7 @@ const ExpenseDetailsModal = ({
     setActiveTab("details");
     setClearedFlagId(null);
     setFlagConfirmOpen(false);
+    setDateEditing(false);
   }
 
   useEffect(() => {
@@ -647,7 +1169,16 @@ const ExpenseDetailsModal = ({
       .toLowerCase() === "close";
   const canEditCategory =
     user?.role === USER_ROLES.ADMIN && !isClosedHoldingRow;
-
+  // Date pencil editor: same gate — admins only, never on closed-holding
+  // rows. Allowed on any status.
+  const canEditDate = user?.role === USER_ROLES.ADMIN && !isClosedHoldingRow;
+  // Description pencil editor: same gate — admins only, never on
+  // closed-holding rows. Allowed on any status.
+  const canEditDescription =
+    user?.role === USER_ROLES.ADMIN && !isClosedHoldingRow;
+  // Flag tone for the receipt-date pill — mirrors the flagged banner above
+  // (an approved flag reads back as the normal accent tone).
+  const isFlagged = row?.flagged && clearedFlagId !== row?.id;
   const handleClose = () => {
     setFailedUrl(null);
     setZoomLevel(1);
@@ -890,6 +1421,56 @@ const ExpenseDetailsModal = ({
                   />
                 </div>
 
+                {/* Receipt Quick Preview Link Card */}
+                {hasReceipt && (
+                  <div className="w-full rounded-2xl border border-[var(--border)] bg-[var(--surface-2)]/60 p-3.5 text-left transition-colors ">
+                    <div className="flex w-full items-center justify-between gap-3">
+                      <div className="flex min-w-0 items-center gap-3">
+                        <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-[var(--accent-soft)] text-[var(--accent-strong)]">
+                          {receiptIsPdf ? (
+                            <FileText size={16} />
+                          ) : (
+                            <ImageIcon size={16} />
+                          )}
+                        </span>
+                        <div className="min-w-0">
+                          <p className="truncate text-xs font-medium text-[var(--ink)]">
+                            {receiptIsPdf
+                              ? "PDF receipt document attached"
+                              : "Receipt image attached"}
+                          </p>
+                          <p className="truncate text-[11px] text-[var(--ink-muted)]">
+                            {receiptLines.length > 0
+                              ? `${receiptLines.length} itemized lines scanned · View receipt`
+                              : "Click to inspect receipt document"}
+                          </p>
+                        </div>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => setActiveTab("receipt")}
+                        className="shrink-0 rounded-full border border-[var(--border)] bg-[var(--surface)] hover:bg-[var(--surface-2)]/90 px-2.5 py-1 text-xs font-normal text-[var(--ink)] shadow-2xs"
+                      >
+                        View receipt →
+                      </button>
+                    </div>
+                    {/* Receipt date gets its own full-width row so the value
+                        reads at a glance and the editor has room to breathe. */}
+                    {(canEditDate || row?.receiptDate) && (
+                      <div className="mt-2.5 border-t border-[var(--border)] pt-2.5">
+                        {canEditDate ? (
+                          <ReceiptDateEditor row={row} danger={isFlagged} />
+                        ) : (
+                          <ReceiptDatePill
+                            formatted={`${formatDate(row.receiptDate)} · ${formatTime(row.receiptDate)}`}
+                            danger={isFlagged}
+                          />
+                        )}
+                      </div>
+                    )}
+                  </div>
+                )}
+
                 {/* Details Section */}
                 <div className="space-y-2 rounded-2xl border border-[var(--border)] bg-[var(--surface-2)]/60 px-4 py-3.5">
                   {/* Vendor / Description */}
@@ -897,27 +1478,42 @@ const ExpenseDetailsModal = ({
                     <p className="type-eyebrow text-[var(--ink-muted)]">
                       Vendor / Description
                     </p>
-                    <p className="mt-1 break-words text-sm font-medium leading-snug text-[var(--ink)] normal-case">
-                      {vendorName || row?.description || "—"}
-                    </p>
-                    {vendorName &&
-                    row?.description &&
-                    vendorName !== row.description ? (
-                      <p className="mt-0.5 break-words text-xs text-[var(--ink-muted)]">
-                        {row.description}
-                      </p>
-                    ) : null}
+                    {canEditDescription ? (
+                      <DescriptionEditor row={row} vendorName={vendorName} />
+                    ) : (
+                      <>
+                        <p className="mt-1 break-words text-sm font-medium leading-snug text-[var(--ink)] normal-case">
+                          {vendorName || row?.description || "—"}
+                        </p>
+                        {vendorName &&
+                        row?.description &&
+                        vendorName !== row.description ? (
+                          <p className="mt-0.5 break-words text-xs text-[var(--ink-muted)]">
+                            {row.description}
+                          </p>
+                        ) : null}
+                      </>
+                    )}
                   </div>
 
                   {/* Date, Time, Method */}
                   <div className="grid grid-cols-3 gap-3 border-b border-[var(--border)] py-2.5">
-                    <div className="min-w-0">
-                      <p className="type-eyebrow text-[var(--ink-muted)]">
-                        Date
-                      </p>
-                      <p className="mt-1 truncate text-sm font-medium tabular-nums text-[var(--ink)]">
-                        {formatDate(row?.date)}
-                      </p>
+                    <div className={cn("min-w-0", dateEditing && "col-span-3")}>
+                      {canEditDate ? (
+                        <DateEditor
+                          row={row}
+                          onEditingChange={setDateEditing}
+                        />
+                      ) : (
+                        <>
+                          <p className="type-eyebrow text-[var(--ink-muted)]">
+                            Date
+                          </p>
+                          <p className="mt-1 truncate text-sm font-medium tabular-nums text-[var(--ink)]">
+                            {formatDate(row?.date)}
+                          </p>
+                        </>
+                      )}
                     </div>
                     <div className="min-w-0">
                       <p className="type-eyebrow text-[var(--ink-muted)]">
@@ -975,7 +1571,7 @@ const ExpenseDetailsModal = ({
                   )}
 
                   {/* Submitted By */}
-                  <div className="border-b border-[var(--border)] py-2.5">
+                  <div className="py-2.5">
                     <p className="mb-2 type-eyebrow text-[var(--ink-muted)]">
                       Submitted By
                     </p>
@@ -998,40 +1594,6 @@ const ExpenseDetailsModal = ({
                     </div>
                   ) : null}
                 </div>
-
-                {/* Receipt Quick Preview Link Card */}
-                {hasReceipt && (
-                  <button
-                    type="button"
-                    onClick={() => setActiveTab("receipt")}
-                    className="flex w-full items-center justify-between gap-3 rounded-2xl border border-[var(--border)] bg-[var(--surface-2)]/60 p-3.5 text-left transition-colors hover:bg-[var(--surface-2)]/90"
-                  >
-                    <div className="flex items-center gap-3">
-                      <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-[var(--accent-soft)] text-[var(--accent-strong)]">
-                        {receiptIsPdf ? (
-                          <FileText size={16} />
-                        ) : (
-                          <ImageIcon size={16} />
-                        )}
-                      </span>
-                      <div>
-                        <p className="text-xs font-medium text-[var(--ink)]">
-                          {receiptIsPdf
-                            ? "PDF receipt document attached"
-                            : "Receipt image attached"}
-                        </p>
-                        <p className="text-[11px] text-[var(--ink-muted)]">
-                          {receiptLines.length > 0
-                            ? `${receiptLines.length} itemized lines scanned · View receipt`
-                            : "Click to inspect receipt document"}
-                        </p>
-                      </div>
-                    </div>
-                    <span className="rounded-full border border-[var(--border)] bg-[var(--surface)] px-2.5 py-1 text-xs font-normal text-[var(--ink)] shadow-2xs">
-                      View receipt →
-                    </span>
-                  </button>
-                )}
               </div>
             ) : (
               /* ── Receipt & Scanned Items View ── */
@@ -1170,9 +1732,10 @@ const ExpenseDetailsModal = ({
                 <button
                   type="button"
                   onClick={() => setActiveTab("details")}
-                  className="text-xs font-medium text-[var(--accent-strong)] hover:underline"
+                  className="inline-flex shrink-0 items-center gap-1.5 rounded-full border border-[var(--border)] bg-[var(--surface)] px-3 py-2.5 text-xs font-medium text-[var(--ink)]  transition-colors hover:bg-[var(--surface-2)]"
                 >
-                  ← Back to overview
+                  <ArrowLeft size={13} aria-hidden />
+                  Back to overview
                 </button>
               ) : (
                 <span />

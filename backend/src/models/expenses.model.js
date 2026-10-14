@@ -444,6 +444,44 @@ class Expenses {
     return row ? { expense: row } : { notFound: true };
   }
 
+  // Expense-date reassignment from the ExpenseDetailsModal date pencil editor —
+  // overwrites `expenses.expense_date` on any status (the UI gates the pencil
+  // on admin + non-closed-holding only). Resolves null when the expense is
+  // missing. The review `flag` is intentionally left untouched:
+  // clearing/approving it stays an explicit admin action via the Approve-flag
+  // flow.
+  static async updateExpenseDate(id, expenseDate) {
+    const result = await query(
+      `UPDATE expenses
+          SET expense_date = $2::date, updated_at = NOW()
+        WHERE id = $1::uuid
+        RETURNING id, expense_date::text AS expense_date,
+                  total_amount::float8 AS total_amount,
+                  status, image_url`,
+      [id, expenseDate],
+    );
+    return result.rows[0] ?? null;
+  }
+
+  // Receipt-date reassignment from the ExpenseDetailsModal receipt-date pencil
+  // editor — overwrites `expenses.receipt_date` on any status (same UI gate
+  // as the expense date). Date-only input lands as midnight on the
+  // TIMESTAMPTZ column. Resolves null when the expense is missing. The review
+  // `flag` is intentionally left untouched: clearing it stays an explicit
+  // admin action via the Approve-flag flow.
+  static async updateExpenseReceiptDate(id, receiptDate) {
+    const result = await query(
+      `UPDATE expenses
+          SET receipt_date = $2::timestamptz, updated_at = NOW()
+        WHERE id = $1::uuid
+        RETURNING id, receipt_date,
+                  total_amount::float8 AS total_amount,
+                  status, image_url`,
+      [id, receiptDate],
+    );
+    return result.rows[0] ?? null;
+  }
+
   // How many expense rows still point at the same stored image. One scan can
   // back several lines (each line of a confirmed receipt carries the same
   // `image_url`), so the file may only be deleted once the last reference is

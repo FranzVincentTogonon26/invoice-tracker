@@ -6,6 +6,8 @@ import { emitTransaction } from "../realtime/index.js";
 import {
   createExpensesSchema,
   updateExpenseCategorySchema,
+  updateExpenseDateSchema,
+  updateExpenseReceiptDateSchema,
   updateExpenseStatusSchema,
   updateExpenseDescriptionSchema,
   updateExpenseNotesSchema,
@@ -686,6 +688,85 @@ export const updateCategory = async (req, res, next) => {
     return res.status(200).json({
       expense: result.expense,
       message: "Category updated.",
+    });
+  } catch (err) {
+    next(err);
+  }
+};
+
+// Update expense date — the pencil editor on the Date cell in
+// ExpenseDetailsModal. Admin-only via the route middleware; the
+// closed-holding guard is enforced here so a direct API call can't redate a
+// finalized holding. Allowed on any status (unlike category).
+export const updateDate = async (req, res, next) => {
+  try {
+    const { id } = req.params;
+    if (!UUID_RE.test(id || ""))
+      throw ApiError.badRequest("Invalid expense id", "VALIDATION_ERROR");
+
+    const payload = validate(updateExpenseDateSchema, req.body);
+
+    const existing = await Expenses.findExpenseById(id);
+    if (!existing)
+      throw ApiError.notFound("Expense not found", "EXPENSE_NOT_FOUND");
+    assertExpenseMutable(existing);
+
+    const expense = await Expenses.updateExpenseDate(id, payload.expense_date);
+    if (!expense)
+      throw ApiError.notFound("Expense not found", "EXPENSE_NOT_FOUND");
+
+    emitTransaction({
+      action: "update",
+      entity: "expense",
+      actor: req.user,
+      message: `Updated expense date (${expense?.expense_date ?? payload.expense_date}).`,
+      metadata: { id, userId: existing?.user_id ?? null },
+    });
+
+    return res.status(200).json({
+      expense,
+      message: "Expense date updated.",
+    });
+  } catch (err) {
+    next(err);
+  }
+};
+
+// Update receipt date — the pencil editor on the receipt-date line in
+// ExpenseDetailsModal. Admin-only via the route middleware; the
+// closed-holding guard is enforced here so a direct API call can't redate a
+// finalized holding. Allowed on any status (unlike category).
+export const updateReceiptDate = async (req, res, next) => {
+  try {
+    const { id } = req.params;
+    if (!UUID_RE.test(id || ""))
+      throw ApiError.badRequest("Invalid expense id", "VALIDATION_ERROR");
+
+    const payload = validate(updateExpenseReceiptDateSchema, req.body);
+
+    const existing = await Expenses.findExpenseById(id);
+    if (!existing)
+      throw ApiError.notFound("Expense not found", "EXPENSE_NOT_FOUND");
+    assertExpenseMutable(existing);
+
+    const expense = await Expenses.updateExpenseReceiptDate(
+      id,
+      payload.receipt_date,
+    );
+    if (!expense)
+      throw ApiError.notFound("Expense not found", "EXPENSE_NOT_FOUND");
+
+    emitTransaction({
+      action: "update",
+      entity: "expense",
+      actor: req.user,
+      message: `Updated receipt date (${payload.receipt_date}).`,
+      metadata: { id, userId: existing?.user_id ?? null },
+    });
+
+    return res.status(200).json({
+      expense,
+      message: "Receipt date updated.",
     });
   } catch (err) {
     next(err);

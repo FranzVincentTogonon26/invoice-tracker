@@ -1,11 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import { AnimatePresence, motion } from "framer-motion";
-import {
-  CalendarDays,
-  ChevronLeft,
-  ChevronRight,
-  RotateCcw,
-} from "lucide-react";
+import { CalendarDays, ChevronLeft, ChevronRight } from "lucide-react";
 import {
   addMonths,
   cn,
@@ -74,12 +70,17 @@ export function DatePicker({
   title,
 }) {
   const [open, setOpen] = useState(false);
+  // Fixed viewport position for the portaled calendar (set on open from the
+  // trigger rect) — the panel lives on document.body so no overflow ancestor
+  // (e.g. a modal scrollport) can clip it, no matter the z-index.
+  const [position, setPosition] = useState(null);
   const [viewMonth, setViewMonth] = useState(() =>
     startOfMonth(normalizeDay(value) ?? new Date()),
   );
   const [slide, setSlide] = useState(1);
   const rootRef = useRef(null);
   const triggerRef = useRef(null);
+  const panelRef = useRef(null);
   const today = useMemo(() => startOfDay(), []);
   const selected = useMemo(() => normalizeDay(value), [value]);
   const minDay = useMemo(() => normalizeDay(minDate), [minDate]);
@@ -87,9 +88,30 @@ export function DatePicker({
   const label = selected ? formatDate(selected) : placeholder;
   const close = useCallback((refocus = true) => {
     setOpen(false);
+    setPosition(null);
     if (refocus) triggerRef.current?.focus();
   }, []);
   const openPanel = () => {
+    const rect = triggerRef.current?.getBoundingClientRect();
+    if (rect) {
+      // Panel width mirrors the w-[min(92vw,320px)] class below; flip above
+      // the trigger when there is no room below.
+      const panelWidth = Math.min(window.innerWidth * 0.92, 320);
+      const panelHeight = 460;
+      const gap = 8;
+      const fitsBelow =
+        rect.bottom + gap + panelHeight <= window.innerHeight;
+      const top = fitsBelow
+        ? rect.bottom + gap
+        : Math.max(8, rect.top - gap - panelHeight);
+      const rawLeft =
+        align === "end" ? rect.right - panelWidth : rect.left;
+      const left = Math.max(
+        8,
+        Math.min(rawLeft, window.innerWidth - panelWidth - 8),
+      );
+      setPosition({ top, left, width: panelWidth });
+    }
     setViewMonth(startOfMonth(normalizeDay(value) ?? new Date()));
     setSlide(1);
     setOpen(true);
@@ -98,18 +120,34 @@ export function DatePicker({
   useEffect(() => {
     if (!open) return;
     const onPointerDown = (e) => {
-      if (!rootRef.current?.contains(e.target)) close(false);
+      if (
+        !rootRef.current?.contains(e.target) &&
+        !panelRef.current?.contains(e.target)
+      )
+        close(false);
     };
     const onKeyDown = (e) => {
       if (e.key !== "Escape") return;
       e.stopPropagation();
       close();
     };
+    // Same contract as RowMenu: scrolling or resizing dismisses the floating
+    // panel instead of leaving it stranded mid-viewport.
+    const onViewportChange = () => close(false);
     window.addEventListener("mousedown", onPointerDown);
     window.addEventListener("keydown", onKeyDown);
+    window.addEventListener("scroll", onViewportChange, {
+      capture: true,
+      passive: true,
+    });
+    window.addEventListener("resize", onViewportChange);
     return () => {
       window.removeEventListener("mousedown", onPointerDown);
       window.removeEventListener("keydown", onKeyDown);
+      window.removeEventListener("scroll", onViewportChange, {
+        capture: true,
+      });
+      window.removeEventListener("resize", onViewportChange);
     };
   }, [open, close]);
   const shiftMonth = (amount) => {
@@ -119,10 +157,6 @@ export function DatePicker({
   const pickDay = (day) => {
     onChange?.(toISODate(startOfDay(day)));
     close();
-  };
-  const goToday = () => {
-    setSlide(1);
-    setViewMonth(startOfMonth(today));
   };
   const clear = () => {
     onChange?.("");
@@ -153,22 +187,26 @@ export function DatePicker({
         </span>
         <span className="min-w-0 flex-1 truncate text-left">{label}</span>
       </button>
-      <AnimatePresence>
-        {open && (
-          <motion.div
-            role="dialog"
-            aria-label="Select date"
-            initial={{ opacity: 0, y: -6, scale: 0.98 }}
-            animate={{ opacity: 1, y: 0, scale: 1 }}
-            exit={{ opacity: 0, y: -4, scale: 0.98 }}
-            transition={{ duration: 0.18, ease: DIALOG_EASE }}
-            className={cn(
-              "absolute top-[calc(100%+8px)] z-[9999999] w-[min(92vw,320px)] overflow-hidden rounded-3xl border border-[var(--border)] bg-[var(--surface)] shadow-hover",
-              align === "end"
-                ? "left-0 right-auto sm:left-auto sm:right-0"
-                : "left-0",
-            )}
-          >
+      {createPortal(
+        <AnimatePresence>
+          {open && position && (
+            <motion.div
+              key="date-panel"
+              ref={panelRef}
+              role="dialog"
+              aria-label="Select date"
+              initial={{ opacity: 0, y: -6, scale: 0.98 }}
+              animate={{ opacity: 1, y: 0, scale: 1 }}
+              exit={{ opacity: 0, y: -4, scale: 0.97 }}
+              transition={{ duration: 0.18, ease: DIALOG_EASE }}
+              style={{
+                position: "fixed",
+                top: position.top,
+                left: position.left,
+                width: position.width,
+              }}
+              className="z-[9999999] overflow-hidden rounded-3xl border border-[var(--border)] bg-[var(--surface)] shadow-hover"
+            >
             <div className="flex items-baseline justify-between gap-3 border-b border-[var(--border)] px-5 py-3">
               <span className="font-display text-lg font-medium tracking-tight text-[var(--ink)]">
                 Date
@@ -269,8 +307,10 @@ export function DatePicker({
               </div>
             </div>
           </motion.div>
-        )}
-      </AnimatePresence>
+          )}
+        </AnimatePresence>,
+        document.body,
+      )}
     </div>
   );
 }

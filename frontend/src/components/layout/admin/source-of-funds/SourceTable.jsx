@@ -1,5 +1,5 @@
 import { motion, AnimatePresence } from "framer-motion";
-import { Eye, Pencil, Trash2, Wallet } from "lucide-react";
+import { Ban, Eye, LockOpen, Pencil, Trash2, Wallet } from "lucide-react";
 import { Pager } from "../../../ui/Pager";
 import { cn, formatDate, formatMoney, formatTime, toMoney } from "@/lib/utils";
 import { InvolvedStack, StatusBadge } from "./SourceBadges";
@@ -30,10 +30,14 @@ function UtilizationBar({ used, total }) {
   );
 }
 
-function SourceCard({ source, onView, onEdit, onDelete }) {
+function SourceCard({ source, onView, onEdit, onDelete, onToggleStatus }) {
   const remaining = toMoney(source.remaining ?? 0);
   const used = toMoney(source.issued + source.expenses);
   const closed = source.status !== "open";
+  const isOpen = (source.status ?? "open") === "open";
+  // Mirror the desktop RowMenu: no Close/Open button when the source holds
+  // no funds (allocated 0 / null / undefined).
+  const hasAllocated = Number(source?.allocated) > 0;
   return (
     <div
       className={cn(
@@ -112,6 +116,24 @@ function SourceCard({ source, onView, onEdit, onDelete }) {
           <ActionButton label="Edit source" onClick={() => onEdit(source)}>
             <Pencil size={15} />
           </ActionButton>
+          {onToggleStatus &&
+            hasAllocated &&
+            (isOpen ? (
+              <ActionButton
+                label="Close source"
+                danger
+                onClick={() => onToggleStatus(source)}
+              >
+                <Ban size={15} />
+              </ActionButton>
+            ) : (
+              <ActionButton
+                label="Open source"
+                onClick={() => onToggleStatus(source)}
+              >
+                <LockOpen size={15} />
+              </ActionButton>
+            ))}
           <ActionButton
             label="Delete source"
             danger
@@ -237,6 +259,7 @@ export function SourceTable({
   onView,
   onEdit,
   onDelete,
+  onToggleStatus,
 }) {
   return (
     <>
@@ -298,13 +321,13 @@ export function SourceTable({
                 scope="col"
                 className="truncate whitespace-nowrap border-b border-[var(--border)] px-4 py-3 type-eyebrow text-[var(--ink-muted)]"
               >
-                Cut off
+                Added
               </th>
               <th
                 scope="col"
                 className="truncate whitespace-nowrap border-b border-[var(--border)] px-4 py-3 type-eyebrow text-[var(--ink-muted)]"
               >
-                Added
+                Cut off
               </th>
               <th
                 scope="col"
@@ -409,6 +432,18 @@ export function SourceTable({
                       <StatusBadge status={source.status} />
                     </td>
                     <td className="px-4 py-3.5 align-middle">
+                      <p className="whitespace-nowrap text-xs text-[var(--ink)]">
+                        {source.created_at
+                          ? formatDate(source.created_at)
+                          : "—"}
+                      </p>
+                      {source.created_at && (
+                        <p className="mt-0.5 whitespace-nowrap text-[11px] tabular-nums text-[var(--ink-muted)]">
+                          {formatTime(source.created_at)}
+                        </p>
+                      )}
+                    </td>
+                    <td className="px-4 py-3.5 align-middle">
                       {source.date_cut_off ? (
                         <>
                           <p className="whitespace-nowrap text-xs text-[var(--ink)]">
@@ -424,24 +459,14 @@ export function SourceTable({
                         </span>
                       )}
                     </td>
-                    <td className="px-4 py-3.5 align-middle">
-                      <p className="whitespace-nowrap text-xs text-[var(--ink)]">
-                        {source.created_at
-                          ? formatDate(source.created_at)
-                          : "—"}
-                      </p>
-                      {source.created_at && (
-                        <p className="mt-0.5 whitespace-nowrap text-[11px] tabular-nums text-[var(--ink-muted)]">
-                          {formatTime(source.created_at)}
-                        </p>
-                      )}
-                    </td>
+
                     <td className="px-4 py-3.5 pr-4 text-center align-middle">
                       <RowMenu
                         source={source}
                         onView={onView}
                         onEdit={onEdit}
                         onDelete={onDelete}
+                        onToggleStatus={onToggleStatus}
                       />
                     </td>
                   </motion.tr>
@@ -460,6 +485,7 @@ export function SourceTable({
             onView={onView}
             onEdit={onEdit}
             onDelete={onDelete}
+            onToggleStatus={onToggleStatus}
           />
         ))}
       </div>

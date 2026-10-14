@@ -83,6 +83,22 @@ export const expensesApi = {
       .patch(`/expenses/${id}/category`, { category_id: categoryId ?? null })
       .then((r) => r.data),
 
+  // Expense-date reassignment (ExpenseDetailsModal date pencil editor) —
+  // `expenseDate` is date-only `YYYY-MM-DD`. Admin-only on the server;
+  // closed-holding guarded there too.
+  updateDate: (id, expenseDate) =>
+    apiClient
+      .patch(`/expenses/${id}/date`, { expense_date: expenseDate })
+      .then((r) => r.data),
+
+  // Receipt-date reassignment (ExpenseDetailsModal receipt-date pencil
+  // editor) — `receiptDate` is date-only `YYYY-MM-DD`. Admin-only on the
+  // server; closed-holding guarded there too.
+  updateReceiptDate: (id, receiptDate) =>
+    apiClient
+      .patch(`/expenses/${id}/receipt-date`, { receipt_date: receiptDate })
+      .then((r) => r.data),
+
   // Admin approval for a flagged expense: clears `expenses.flag` back to 0.
   // Called by the "Approve flag" action inside the flaggedNotice of the View
   // expense modal. Admin-only on the server.

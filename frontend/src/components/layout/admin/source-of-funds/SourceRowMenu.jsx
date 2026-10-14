@@ -1,6 +1,13 @@
 import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
-import { EllipsisVertical, Eye, Pencil, Trash2 } from "lucide-react";
+import {
+  Ban,
+  EllipsisVertical,
+  Eye,
+  LockOpen,
+  Pencil,
+  Trash2,
+} from "lucide-react";
 import { cn } from "@/lib/utils";
 
 export function ActionButton({ label, onClick, danger, children }) {
@@ -22,7 +29,7 @@ export function ActionButton({ label, onClick, danger, children }) {
   );
 }
 
-export function RowMenu({ source, onView, onEdit, onDelete }) {
+export function RowMenu({ source, onView, onEdit, onDelete, onToggleStatus }) {
   const [menuOpen, setMenuOpen] = useState(false);
   const [position, setPosition] = useState(null);
   const triggerRef = useRef(null);
@@ -75,6 +82,12 @@ export function RowMenu({ source, onView, onEdit, onDelete }) {
   // reach.
   const hasConnections =
     Number(source?.transactions) > 0 || Number(source?.expenses_count) > 0;
+  // Status toggle: open -> close (danger, sets status='cut_off' + stamps
+  // date_cut_off server-side), cut_off -> reopen (clears the stamp).
+  // Offered only when the source actually holds funds — zero / empty
+  // allocated sources stay to view/edit/delete with no status flip.
+  const isOpen = (source?.status ?? "open") === "open";
+  const hasAllocated = Number(source?.allocated) > 0;
   const items = [
     {
       label: "View details",
@@ -88,12 +101,32 @@ export function RowMenu({ source, onView, onEdit, onDelete }) {
       danger: false,
       run: () => onEdit(source),
     },
+    ...(onToggleStatus && hasAllocated
+      ? [
+          isOpen
+            ? {
+                label: "Close source",
+                Icon: Ban,
+                danger: true,
+                separator: true,
+                run: () => onToggleStatus(source),
+              }
+            : {
+                label: "Open source",
+                Icon: LockOpen,
+                danger: false,
+                separator: true,
+                run: () => onToggleStatus(source),
+              },
+        ]
+      : []),
     ...(!hasConnections
       ? [
           {
             label: "Delete source",
             Icon: Trash2,
             danger: true,
+            separator: true,
             run: () => onDelete(source),
           },
         ]
@@ -123,9 +156,9 @@ export function RowMenu({ source, onView, onEdit, onDelete }) {
             style={{ top: position.top, right: position.right }}
             className="fixed z-[70] min-w-[11rem] overflow-hidden rounded-2xl border border-[var(--border)] bg-[var(--surface)] py-1 shadow-hover"
           >
-            {items.map(({ label, Icon, danger, run }) => (
+            {items.map(({ label, Icon, danger, separator, run }) => (
               <div key={label}>
-                {danger && (
+                {separator && (
                   <div
                     role="separator"
                     aria-hidden

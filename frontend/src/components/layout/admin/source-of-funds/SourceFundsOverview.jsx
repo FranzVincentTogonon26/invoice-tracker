@@ -487,8 +487,11 @@ export function AdminSourceFundsOverview() {
   };
 
   const copyPageUrl = () => {
-    navigator.clipboard.writeText(window.location.href);
-    toast.success("Overview link copied to clipboard");
+    const ref = source?.reference_id ?? referenceId;
+    if (!ref) return;
+    const shareableUrl = `${window.location.origin}/share/source-funds/${ref}`;
+    navigator.clipboard.writeText(shareableUrl);
+    toast.success("Public shareable link copied to clipboard");
   };
 
   // State guards

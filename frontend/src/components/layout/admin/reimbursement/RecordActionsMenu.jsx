@@ -29,14 +29,15 @@ export function RecordActionsMenu({ canReopen, onReopen, onPreview }) {
     <div ref={menuRef} className="relative shrink-0">
       <button
         type="button"
+        size="iconSm"
         onClick={() => setMenuOpen((v) => !v)}
         aria-label="Record actions"
         aria-haspopup="menu"
         aria-expanded={menuOpen}
         title="Record actions"
-        className="flex h-9 w-9 items-center justify-center rounded-full bg-[var(--surface)] text-[var(--ink-muted)] ring-1 ring-inset ring-[var(--border)] transition-colors hover:text-[var(--ink)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)]/30"
+        className="flex h-8 w-8 items-center justify-center rounded-full bg-[var(--surface)] text-[var(--ink)] ring-1 ring-inset ring-[var(--border)] transition-colors hover:text-[var(--ink)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)]/30"
       >
-        <EllipsisVertical size={16} aria-hidden />
+        <EllipsisVertical size={14} aria-hidden />
       </button>
       <AnimatePresence>
         {menuOpen && (

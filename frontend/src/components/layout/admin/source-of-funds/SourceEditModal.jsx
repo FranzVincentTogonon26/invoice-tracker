@@ -150,10 +150,7 @@ export function SourceEditModal({ source, saving, onClose, onSave }) {
         className="fixed inset-0 z-50 flex items-center justify-center p-4"
         exit={{ opacity: 0 }}
       >
-        <div
-          className="absolute inset-0 bg-[var(--ink)]/40 backdrop-blur-sm flex items-center justify-center px-2"
-          onClick={() => handleClose("backdrop-click")}
-        >
+        <div className="absolute inset-0 bg-[var(--ink)]/40 backdrop-blur-sm flex items-center justify-center px-2">
           <motion.form
             onSubmit={handleSave}
             onClick={(e) => e.stopPropagation()}
@@ -217,15 +214,15 @@ export function SourceEditModal({ source, saving, onClose, onSave }) {
                     maxLength={LABEL_MAX}
                   />
                 </Field>
-                  <Field label="Date cut off" optional>
-                    <DatePicker
-                      value={cutOff}
-                      onChange={(next) => setCutOff(next || "")}
-                      placeholder="Cut-off date"
-                      className="text-xs"
-                      disabled={saving}
-                    />
-                  </Field>
+                <Field label="Date cut off" optional>
+                  <DatePicker
+                    value={cutOff}
+                    onChange={(next) => setCutOff(next || "")}
+                    placeholder="Cut-off date"
+                    className="text-xs"
+                    disabled={saving}
+                  />
+                </Field>
                 <Field
                   label="Notes"
                   optional

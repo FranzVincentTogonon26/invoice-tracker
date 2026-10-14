@@ -12,6 +12,7 @@ import aiRoutes from "./ai.route.js";
 import sourceOfFundsRoutes from "./source.of.funds.route.js";
 import employeeOverviewRoutes from "./employee.overview.route.js";
 import employeeSettingsRoutes from "./employee.settings.route.js";
+import publicRoutes from "./public.source.route.js";
 
 const router = express.Router();
 
@@ -23,7 +24,9 @@ router.get("/health", (req, res) => {
   });
 });
 
+router.use("/public", publicRoutes);
 router.use("/auth", authRoutes);
+
 router.use("/budgets", budgetRoutes);
 router.use("/employees", employeesRoutes);
 router.use("/expenses", expensesRoutes);

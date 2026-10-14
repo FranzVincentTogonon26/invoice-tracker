@@ -122,11 +122,33 @@ export function useExpensesMutations() {
       mutationFn: ({ id, notes }) => expensesApi.updateNotes(id, notes),
       onSuccess: invalidate,
     }),
+    // Expense description (ExpenseDetailsModal pencil editor) —
+    // `updateDescription({ id, description })`, 2–200 chars server-side.
+    updateDescription: useMutation({
+      mutationFn: ({ id, description }) =>
+        expensesApi.updateDescription(id, description),
+      onSuccess: invalidate,
+    }),
     // Category reassignment (ExpenseDetailsModal pencil editor, draft rows);
     // `updateCategory({ id, categoryId })` — NULL clears to uncategorized.
     updateCategory: useMutation({
       mutationFn: ({ id, categoryId }) =>
         expensesApi.updateCategory(id, categoryId),
+      onSuccess: invalidate,
+    }),
+    // Expense-date reassignment (ExpenseDetailsModal date pencil editor);
+    // `updateDate({ id, expenseDate })` — date-only YYYY-MM-DD.
+    updateDate: useMutation({
+      mutationFn: ({ id, expenseDate }) =>
+        expensesApi.updateDate(id, expenseDate),
+      onSuccess: invalidate,
+    }),
+    // Receipt-date reassignment (ExpenseDetailsModal receipt-date pencil
+    // editor); `updateReceiptDate({ id, receiptDate })` — date-only
+    // YYYY-MM-DD.
+    updateReceiptDate: useMutation({
+      mutationFn: ({ id, receiptDate }) =>
+        expensesApi.updateReceiptDate(id, receiptDate),
       onSuccess: invalidate,
     }),
     // Deletes a category (UNIQUE-style feedback comes back as a 409).
