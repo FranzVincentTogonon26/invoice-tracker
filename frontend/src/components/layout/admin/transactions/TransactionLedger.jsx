@@ -24,6 +24,7 @@ export function TransactionLedger({
   rangeStart,
   rangeEnd,
   rangeLabel,
+  viewOnly = false,
 }) {
   if (isLoading) return <LoadingSkeleton rows={6} />;
 
@@ -61,6 +62,7 @@ export function TransactionLedger({
         rows={pageRows}
         pending={pending}
         onAction={onAction}
+        viewOnly={viewOnly}
       />
       <div className="mt-5 flex flex-col gap-3 border-t border-[var(--border)] pt-4 sm:flex-row sm:items-center sm:justify-between">
         <p className="text-xs tabular-nums text-[var(--ink-muted)]">

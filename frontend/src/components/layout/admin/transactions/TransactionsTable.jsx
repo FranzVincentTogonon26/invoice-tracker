@@ -225,8 +225,10 @@ function isClosedSentLink(row) {
   );
 }
 
-// Action menu per ledger kind
-function actionsForRow(row) {
+// Action menu per ledger kind. `viewOnly` forces the read-only menu
+// ("View details" alone) regardless of row state — used by embedded ledgers
+// that must not mutate (e.g. the source overview table).
+function actionsForRow(row, { viewOnly = false } = {}) {
   const viewItem = {
     key: "view",
     label: "View details",
@@ -234,6 +236,8 @@ function actionsForRow(row) {
     danger: false,
     group: "view",
   };
+
+  if (viewOnly) return [viewItem];
 
   // Finalized holdings (and expenses spent from them) are read-only —
   // "View details" is the only action. Settled abono is consumed spend
@@ -384,7 +388,7 @@ function actionsForRow(row) {
   return items;
 }
 
-function RowActions({ row, pending, onAction }) {
+function RowActions({ row, pending, onAction, viewOnly = false }) {
   const [open, setOpen] = useState(false);
   const [position, setPosition] = useState(null);
   const btnRef = useRef(null);
@@ -443,7 +447,7 @@ function RowActions({ row, pending, onAction }) {
     };
   }, [open]);
 
-  const items = actionsForRow(row);
+  const items = actionsForRow(row, { viewOnly });
 
   const sections = ["view", "lifecycle", "danger"]
     .map((group) => items.filter((item) => item.group === group))
@@ -548,7 +552,7 @@ function RowActions({ row, pending, onAction }) {
   );
 }
 
-function LedgerRow({ row, pending, onAction }) {
+function LedgerRow({ row, pending, onAction, viewOnly = false }) {
   const isIn = row.direction === "in";
   const isOut = row.direction === "out";
   const isVoid = row.direction === "void";
@@ -727,14 +731,19 @@ function LedgerRow({ row, pending, onAction }) {
       {/* 9. Actions */}
       <td className="px-4 py-3.5 pr-5 text-right align-middle">
         <div className="flex justify-end">
-          <RowActions row={row} pending={pending} onAction={onAction} />
+          <RowActions
+            row={row}
+            pending={pending}
+            onAction={onAction}
+            viewOnly={viewOnly}
+          />
         </div>
       </td>
     </motion.tr>
   );
 }
 
-function LedgerCard({ row, pending, onAction }) {
+function LedgerCard({ row, pending, onAction, viewOnly = false }) {
   const meta = TRANSACTION_KIND_META[row.kind];
   const isIn = row.direction === "in";
   const isOut = row.direction === "out";
@@ -847,7 +856,12 @@ function LedgerCard({ row, pending, onAction }) {
           {formatDate(row.date)}
         </span>
 
-        <RowActions row={row} pending={pending} onAction={onAction} />
+        <RowActions
+          row={row}
+          pending={pending}
+          onAction={onAction}
+          viewOnly={viewOnly}
+        />
       </div>
 
       {meta && <span className="sr-only">{meta.label}</span>}
@@ -879,7 +893,7 @@ const HEADERS = [
   { label: "Actions", srOnly: true, align: "right" },
 ];
 
-const TransactionsTable = ({ rows, pending = false, onAction }) => (
+const TransactionsTable = ({ rows, pending = false, onAction, viewOnly = false }) => (
   <>
     {/* Desktop — plain fluid wrapper, NOT a trapped scroll region.
         `overflow-x-auto` + `overflow-y-clip` means: horizontal scroll only
@@ -942,6 +956,7 @@ const TransactionsTable = ({ rows, pending = false, onAction }) => (
                   row={row}
                   pending={pending}
                   onAction={onAction}
+                  viewOnly={viewOnly}
                 />
               ))}
             </AnimatePresence>
@@ -957,6 +972,7 @@ const TransactionsTable = ({ rows, pending = false, onAction }) => (
           row={row}
           pending={pending}
           onAction={onAction}
+          viewOnly={viewOnly}
         />
       ))}
     </div>
