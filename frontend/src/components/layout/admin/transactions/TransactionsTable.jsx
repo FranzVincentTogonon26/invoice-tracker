@@ -593,23 +593,14 @@ function LedgerRow({ row, pending, onAction, viewOnly = false }) {
       <td className="min-w-0 max-w-0 px-4 py-3.5 align-middle">
         <div className="flex min-w-0 items-center gap-1.5">
           {row.flagged && (
-            <span
-              role="img"
-              aria-label="Flagged transaction"
-              title="Flagged"
-              className="relative flex h-5 w-5 shrink-0"
+            <Badge
+              tone="danger"
+              title="Flagged for review"
+              className="shrink-0 gap-1 px-1.5 py-0.5 text-[10px]"
             >
-              <span
-                aria-hidden
-                className="absolute inline-flex h-full w-full animate-ping rounded-full bg-[var(--danger)] opacity-40"
-              />
-              <Badge
-                tone="danger"
-                className="relative flex h-5 w-5 items-center justify-center rounded-full bg-[var(--danger)] p-0 text-white"
-              >
-                <Flag size={10} aria-hidden fill="currentColor" />
-              </Badge>
-            </span>
+              <Flag size={10} aria-hidden />
+              <span>Flagged</span>
+            </Badge>
           )}
           <p
             title={row.description}

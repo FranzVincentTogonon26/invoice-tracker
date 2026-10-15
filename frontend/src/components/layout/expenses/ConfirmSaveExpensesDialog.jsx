@@ -63,13 +63,17 @@ const ConfirmSaveExpensesDialog = ({
       {open && (
         <motion.div
           key="save-expenses-confirm"
-          className="fixed inset-0 z-[70] flex items-center justify-center p-4"
+          // Overlay scrolls so the scrollbar sits outside the modal (same
+          // pattern as ExpenseDetailsModal) — the inner lines table keeps
+          // its own capped scroll.
+          className="scrollbar-slim fixed inset-0 z-[70] overflow-y-auto"
           animate={{ opacity: 1 }}
           exit={{ opacity: 0 }}
           transition={{ duration: 0.2, ease: DIALOG_EASE }}
         >
+          <div className="flex min-h-full p-4">
           <div
-            className="absolute inset-0 bg-[var(--ink)]/30 backdrop-blur-sm"
+            className="fixed inset-0 bg-[var(--ink)]/30 backdrop-blur-sm"
             onClick={() => {
               if (!saving) onCancel?.();
             }}
@@ -86,7 +90,7 @@ const ConfirmSaveExpensesDialog = ({
             animate={{ opacity: 1, y: 0, scale: 1 }}
             exit={{ opacity: 0, y: 8, scale: 0.97 }}
             transition={{ duration: 0.22, ease: DIALOG_EASE }}
-            className="relative max-h-[85dvh] w-full max-w-md overflow-y-auto scrollbar-slim rounded-3xl border border-[var(--border)] bg-[var(--surface)] p-6 shadow-hover"
+            className="relative m-auto w-full max-w-md rounded-3xl border border-[var(--border)] bg-[var(--surface)] p-6 shadow-hover"
           >
             <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-[var(--accent-soft)] text-[var(--accent-strong)]">
               <CircleCheck size={20} aria-hidden />
@@ -214,6 +218,7 @@ const ConfirmSaveExpensesDialog = ({
               </Button>
             </div>
           </motion.div>
+          </div>
         </motion.div>
       )}
     </AnimatePresence>,

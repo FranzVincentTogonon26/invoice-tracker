@@ -92,14 +92,18 @@ export function ReimbursementPreviewModal({
       {open && (
         <motion.div
           key="reimbursement-preview"
-          className="fixed inset-0 z-[70] flex items-center justify-center p-4 sm:p-6"
+          // Overlay scrolls so the scrollbar sits outside the modal (same
+          // pattern as ExpenseDetailsModal) — `m-auto` centers the dialog
+          // when it fits and keeps long content fully scrollable.
+          className="scrollbar-slim fixed inset-0 z-[70] overflow-y-auto"
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           exit={{ opacity: 0 }}
           transition={{ duration: 0.18 }}
         >
+          <div className="flex min-h-full p-4 sm:p-6">
           <div
-            className="absolute inset-0 bg-[var(--ink)]/40 backdrop-blur-sm"
+            className="fixed inset-0 bg-[var(--ink)]/40 backdrop-blur-sm"
             onClick={() => onClose?.()}
             aria-hidden="true"
           />
@@ -111,7 +115,7 @@ export function ReimbursementPreviewModal({
             animate={{ opacity: 1, y: 0, scale: 1 }}
             exit={{ opacity: 0, y: 8, scale: 0.98 }}
             transition={{ duration: 0.22, ease: [0.16, 1, 0.3, 1] }}
-            className="relative max-h-[calc(100dvh-2rem)] w-full max-w-4xl overflow-y-auto rounded-3xl border border-[var(--border)] bg-[var(--surface)] shadow-hover scrollbar-slim"
+            className="relative m-auto w-full max-w-4xl rounded-3xl border border-[var(--border)] bg-[var(--surface)] shadow-hover"
           >
             {/* ── Header ── */}
             <div className="flex items-center gap-3 border-b border-[var(--border)] px-5 py-4">
@@ -461,6 +465,7 @@ export function ReimbursementPreviewModal({
               </div>
             </div>
           </motion.div>
+          </div>
         </motion.div>
       )}
     </AnimatePresence>

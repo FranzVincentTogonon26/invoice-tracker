@@ -104,14 +104,18 @@ const EmployeeExpenseDetailsModal = ({ open, expense, onClose }) => {
       {open && row && (
         <motion.div
           key="employee-expense-dialog"
-          className="fixed inset-0 z-[70] flex items-center justify-center p-4"
+          // Overlay scrolls so the scrollbar sits outside the modal (same
+          // pattern as ExpenseDetailsModal) — `m-auto` centers the dialog
+          // when it fits and keeps long content fully scrollable.
+          className="scrollbar-slim fixed inset-0 z-[70] overflow-y-auto"
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           exit={{ opacity: 0 }}
           transition={{ duration: 0.2, ease: "easeOut" }}
         >
+          <div className="flex min-h-full p-4">
           <motion.div
-            className="absolute inset-0 bg-[var(--ink)]/40 backdrop-blur-sm"
+            className="fixed inset-0 bg-[var(--ink)]/40 backdrop-blur-sm"
             onClick={handleClose}
             aria-hidden="true"
             initial={{ opacity: 0 }}
@@ -131,7 +135,7 @@ const EmployeeExpenseDetailsModal = ({ open, expense, onClose }) => {
             exit={{ opacity: 0, y: 8, scale: 0.97 }}
             transition={{ duration: 0.22, ease: PANEL_EASE }}
             className={cn(
-              "relative max-h-[85dvh] w-full overflow-y-auto scrollbar-slim rounded-3xl border border-[var(--border)] bg-[var(--surface)] p-5 shadow-hover outline-none sm:p-6 transition-all duration-200",
+              "relative m-auto w-full rounded-3xl border border-[var(--border)] bg-[var(--surface)] p-5 shadow-hover outline-none sm:p-6 transition-all duration-200",
               hasReceipt && activeTab === "receipt" ? "max-w-2xl" : "max-w-lg",
             )}
           >
@@ -262,6 +266,7 @@ const EmployeeExpenseDetailsModal = ({ open, expense, onClose }) => {
               </Button>
             </div>
           </motion.div>
+          </div>
         </motion.div>
       )}
     </AnimatePresence>,

@@ -587,12 +587,15 @@ const BudgetModal = ({
   const issuedConflictMessage =
     isAddBudget || !guardReady ? null : guardQuery.data?.message;
 
-  const bodyRef = useSmoothScroll();
+  // Wheel-scrub smoothing + error-banner scroll target. Attached to the
+  // OVERLAY (the scrollport since the inner scrollbar moved outside the
+  // modal) — same pattern as ExpenseDetailsModal.
+  const overlayRef = useSmoothScroll();
 
   const errRef = useRef(null);
   useEffect(() => {
     if (!err) return undefined;
-    const container = bodyRef.current;
+    const container = overlayRef.current;
     if (!container) return undefined;
 
     const margin = 16; // breathing room around the banner
@@ -800,10 +803,15 @@ const BudgetModal = ({
     <AnimatePresence>
       {open && (
         <motion.div
-          className="fixed inset-0 z-50 flex items-center justify-center p-4"
+          ref={overlayRef}
+          // Overlay scrolls so the scrollbar sits outside the modal (same
+          // pattern as ExpenseDetailsModal) — `m-auto` on the form centers
+          // it when it fits and keeps long forms fully scrollable.
+          className="scrollbar-slim fixed inset-0 z-50 overflow-y-auto"
           exit={{ opacity: 0 }}
         >
-          <div className="absolute inset-0 bg-[var(--ink)]/40 backdrop-blur-sm flex items-center justify-center px-2">
+          <div className="flex min-h-full p-4">
+          <div className="fixed inset-0 bg-[var(--ink)]/40 backdrop-blur-sm" />
             <motion.form
               onSubmit={onSubmit}
               onClick={(e) => e.stopPropagation()}
@@ -812,7 +820,7 @@ const BudgetModal = ({
               animate={{ opacity: 1, y: 0, scale: 1 }}
               exit={{ opacity: 0, y: 8, scale: 0.98 }}
               transition={{ duration: 0.2, ease: [0.16, 1, 0.3, 1] }}
-              className="relative flex w-full max-w-[500px] flex-col max-h-[calc(100dvh-2rem)] rounded-3xl bg-[var(--surface)] border border-[var(--border)] shadow-hover p-6 sm:p-7"
+              className="relative m-auto flex w-full max-w-[500px] flex-col rounded-3xl bg-[var(--surface)] border border-[var(--border)] shadow-hover p-6 sm:p-7"
             >
               <div className="flex shrink-0 items-start justify-between mb-6">
                 <div className="min-w-0">
@@ -839,10 +847,7 @@ const BudgetModal = ({
                 </button>
               </div>
 
-              <div
-                ref={bodyRef}
-                className="scrollbar-slim min-h-0 flex-1 overflow-y-auto overscroll-contain"
-              >
+              <div className="min-h-0 flex-1">
                 {transaction === "addBudget" ? (
                   <div className="space-y-5">
                     <ContextCard

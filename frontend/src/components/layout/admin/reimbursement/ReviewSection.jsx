@@ -696,8 +696,12 @@ export function ReviewSection({
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
             transition={{ duration: 0.18 }}
-            className="fixed inset-0 z-[70] flex items-center justify-center bg-[var(--ink)]/40 p-6 backdrop-blur-sm"
+            // Overlay scrolls so the scrollbar sits outside the modal (same
+            // pattern as ExpenseDetailsModal) — `m-auto` centers the dialog
+            // when it fits and keeps long content fully scrollable.
+            className="scrollbar-slim fixed inset-0 z-[70] overflow-y-auto bg-[var(--ink)]/40 p-6 backdrop-blur-sm"
           >
+            <div className="flex min-h-full">
             <motion.div
               key="submit-card"
               role="alertdialog"
@@ -707,7 +711,7 @@ export function ReviewSection({
               animate={{ opacity: 1, y: 0, scale: 1 }}
               exit={{ opacity: 0, y: 8, scale: 0.97 }}
               transition={{ duration: 0.22 }}
-              className="max-h-[calc(100dvh-3rem)] w-full max-w-md overflow-y-auto rounded-3xl border border-[var(--border)] bg-[var(--surface)] p-6 shadow-hover scrollbar-slim"
+              className="relative m-auto w-full max-w-md rounded-3xl border border-[var(--border)] bg-[var(--surface)] p-6 shadow-hover"
             >
               <div className="flex items-start gap-3">
                 <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-[var(--accent-strong)] text-white shadow-card">
@@ -816,6 +820,7 @@ export function ReviewSection({
                 </Button>
               </div>
             </motion.div>
+            </div>
           </motion.div>
         )}
       </AnimatePresence>

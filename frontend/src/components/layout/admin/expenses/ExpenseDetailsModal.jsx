@@ -906,11 +906,21 @@ const LineItemsSection = ({
         role="status"
         className="overflow-hidden rounded-2xl border border-[var(--border)] bg-[var(--surface)] shadow-xs"
       >
-        <div className="space-y-3 px-4 py-3">
-          <div className="items-center gap-3 space-y-3">
-            <span className="flex h-5 w-20 animate-pulse rounded-full bg-[var(--surface-2)]" />
-            <div className="flex h-3 flex-1 animate-pulse rounded-full bg-[var(--surface-2)]" />
+        <span className="sr-only">Loading receipt items…</span>
+        {/* Mirrors the loaded toggle-button header (title + count pill +
+            toggle pill) so the real content swaps in with no layout shift. */}
+        <div
+          aria-hidden
+          className="flex w-full items-center justify-between gap-3 px-4 py-3"
+        >
+          <div className="min-w-0 flex-1">
+            <div className="flex flex-wrap items-center gap-2">
+              <span className="h-3.5 w-28 animate-pulse rounded bg-[var(--surface-2)]" />
+              <span className="h-[22px] w-14 animate-pulse rounded-full bg-[var(--surface-2)]" />
+            </div>
+            <div className="mt-1.5 h-3 w-40 max-w-full animate-pulse rounded bg-[var(--surface-2)]" />
           </div>
+          <span className="h-[30px] w-[104px] shrink-0 animate-pulse rounded-full bg-[var(--surface-2)]" />
         </div>
       </section>
     );
@@ -1066,6 +1076,90 @@ const LineItemsSection = ({
   );
 };
 
+// Full-body skeleton for the details tab — mirrors the real blocks
+// (amount hero, receipt link card, details section) with the same shells,
+// padding and gaps, so the content swaps in with no layout shift. Shown
+// while the detail query loads (rows with a receipt); rows without one
+// render their content immediately.
+const ExpenseDetailsSkeleton = ({ hasReceipt }) => (
+  <div
+    role="status"
+    aria-busy="true"
+    aria-label="Loading expense details"
+    className="mt-4 space-y-3"
+  >
+    <span className="sr-only">Loading expense details…</span>
+    {/* Amount hero */}
+    <div
+      aria-hidden
+      className="flex items-center justify-between gap-3 rounded-2xl border border-[var(--border)] bg-[var(--surface-2)]/60 px-4 py-3.5"
+    >
+      <div className="min-w-0">
+        <div className="h-2.5 w-16 animate-pulse rounded bg-[var(--surface-2)]" />
+        <div className="mt-2 h-7 w-36 animate-pulse rounded-lg bg-[var(--surface-2)]" />
+        <div className="mt-2 h-3 w-44 max-w-full animate-pulse rounded bg-[var(--surface-2)]" />
+      </div>
+      <span className="h-6 w-16 shrink-0 animate-pulse rounded-full bg-[var(--surface-2)]" />
+    </div>
+    {/* Receipt link card */}
+    {hasReceipt && (
+      <div
+        aria-hidden
+        className="flex w-full items-center justify-between gap-3 rounded-2xl border border-[var(--border)] bg-[var(--surface-2)]/60 p-3.5"
+      >
+        <div className="flex min-w-0 flex-1 items-center gap-3">
+          <span className="h-9 w-9 shrink-0 animate-pulse rounded-xl bg-[var(--surface-2)]" />
+          <div className="min-w-0 flex-1">
+            <div className="h-3 w-40 max-w-full animate-pulse rounded bg-[var(--surface-2)]" />
+            <div className="mt-1.5 h-2.5 w-56 max-w-full animate-pulse rounded bg-[var(--surface-2)]" />
+          </div>
+        </div>
+        <span className="h-[26px] w-24 shrink-0 animate-pulse rounded-full bg-[var(--surface-2)]" />
+      </div>
+    )}
+    {/* Details section */}
+    <div
+      aria-hidden
+      className="space-y-2 rounded-2xl border border-[var(--border)] bg-[var(--surface-2)]/60 px-4 py-3.5"
+    >
+      {/* Vendor / Description */}
+      <div className="border-b border-[var(--border)] py-2.5 first:pt-0">
+        <div className="h-2.5 w-32 animate-pulse rounded bg-[var(--surface-2)]" />
+        <div className="mt-2 h-4 w-3/4 animate-pulse rounded bg-[var(--surface-2)]" />
+      </div>
+      {/* Date, Time, Method */}
+      <div className="grid grid-cols-3 gap-3 border-b border-[var(--border)] py-2.5">
+        {[0, 1, 2].map((i) => (
+          <div key={i} className="min-w-0">
+            <div className="h-2.5 w-12 animate-pulse rounded bg-[var(--surface-2)]" />
+            <div className="mt-2 h-4 w-4/5 animate-pulse rounded bg-[var(--surface-2)]" />
+          </div>
+        ))}
+      </div>
+      {/* Category & Source of Funds */}
+      <div className="grid grid-cols-2 gap-3 border-b border-[var(--border)] py-2.5">
+        {[0, 1].map((i) => (
+          <div key={i} className="min-w-0">
+            <div className="h-2.5 w-20 animate-pulse rounded bg-[var(--surface-2)]" />
+            <div className="mt-2 h-4 w-3/4 animate-pulse rounded bg-[var(--surface-2)]" />
+          </div>
+        ))}
+      </div>
+      {/* Submitted By */}
+      <div className="py-2.5">
+        <div className="mb-2 h-2.5 w-24 animate-pulse rounded bg-[var(--surface-2)]" />
+        <div className="flex items-center gap-2.5 rounded-xl border border-[var(--border)] bg-[var(--surface)] p-2.5">
+          <span className="h-8 w-8 shrink-0 animate-pulse rounded-full bg-[var(--surface-2)]" />
+          <div className="min-w-0 flex-1">
+            <div className="h-3 w-2/5 animate-pulse rounded bg-[var(--surface-2)]" />
+            <div className="mt-1.5 h-2.5 w-1/4 animate-pulse rounded bg-[var(--surface-2)]" />
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+);
+
 const ExpenseDetailsModal = ({
   open,
   expense,
@@ -1144,6 +1238,10 @@ const ExpenseDetailsModal = ({
     refetch: refetchLines,
   } = useExpenseDetail(detailExpenseId);
   const linesRefetching = linesFetching && !linesLoading;
+  // Full-body gate: rows WITH a receipt wait for the detail query (vendor +
+  // scanned lines) before painting the body; rows without one have no async
+  // dependency, so the query stays disabled and the body shows immediately.
+  const detailLoading = Boolean(detailExpenseId) && linesLoading;
 
   const receiptLines = useMemo(
     () =>
@@ -1232,14 +1330,19 @@ const ExpenseDetailsModal = ({
       {open && row && (
         <motion.div
           key="overview-dialog"
-          className="fixed inset-0 z-[70] flex items-center justify-center p-4"
+          // The OVERLAY scrolls, not the dialog box — the scrollbar sits at
+          // the viewport edge (outside the modal) and long content is never
+          // cut. `m-auto` on the dialog keeps it centered when it fits and
+          // fully scrollable when it overflows.
+          className="scrollbar-slim fixed inset-0 z-[70] overflow-y-auto"
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           exit={{ opacity: 0 }}
           transition={{ duration: 0.2, ease: "easeOut" }}
         >
+          <div className="flex min-h-full p-4">
           <motion.div
-            className="absolute inset-0 bg-[var(--ink)]/40 backdrop-blur-sm"
+            className="fixed inset-0 bg-[var(--ink)]/40 backdrop-blur-sm"
             onClick={handleClose}
             aria-hidden="true"
             initial={{ opacity: 0 }}
@@ -1259,7 +1362,7 @@ const ExpenseDetailsModal = ({
             exit={{ opacity: 0, y: 8, scale: 0.97 }}
             transition={{ duration: 0.22, ease: DIALOG_EASE }}
             className={cn(
-              "relative max-h-[85dvh] w-full overflow-y-auto scrollbar-slim rounded-3xl border border-[var(--border)] bg-[var(--surface)] p-5 shadow-hover outline-none sm:p-6 transition-all duration-200",
+              "relative m-auto w-full rounded-3xl border border-[var(--border)] bg-[var(--surface)] p-5 shadow-hover outline-none sm:p-6 transition-all duration-200",
               hasReceipt && activeTab === "receipt" ? "max-w-2xl" : "max-w-lg",
             )}
           >
@@ -1335,6 +1438,9 @@ const ExpenseDetailsModal = ({
 
             {/* ── Dialog Body ── */}
             {activeTab === "details" ? (
+              detailLoading ? (
+                <ExpenseDetailsSkeleton hasReceipt={hasReceipt} />
+              ) : (
               <div className="mt-4 space-y-3">
                 {/* Flagged Banner */}
                 {row?.flagged && clearedFlagId !== row?.id ? (
@@ -1595,6 +1701,7 @@ const ExpenseDetailsModal = ({
                   ) : null}
                 </div>
               </div>
+              )
             ) : (
               /* ── Receipt & Scanned Items View ── */
               <div className="mt-4 space-y-4">
@@ -1750,6 +1857,7 @@ const ExpenseDetailsModal = ({
               </Button>
             </div>
           </motion.div>
+          </div>
         </motion.div>
       )}
 
