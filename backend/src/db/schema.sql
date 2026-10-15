@@ -239,7 +239,6 @@ CREATE TABLE IF NOT EXISTS expenses (
                    REFERENCES category(category_id)
                    ON DELETE SET NULL,
     total_amount   DECIMAL(12,2) NOT NULL,
-    expense_date   DATE NOT NULL DEFAULT CURRENT_DATE,
     receipt_id     UUID
                    REFERENCES receipt(id)
                    ON DELETE SET NULL,
@@ -352,25 +351,25 @@ CREATE INDEX IF NOT EXISTS idx_category_name
 
 -- EXPENSES
 CREATE INDEX IF NOT EXISTS idx_expenses_reference_date
-    ON expenses (reference_id, expense_date DESC);
+    ON expenses (reference_id, created_at DESC);
 
 CREATE INDEX IF NOT EXISTS idx_expenses_issued_ref_date
-    ON expenses (issued_ref_id, expense_date DESC);
+    ON expenses (issued_ref_id, created_at DESC);
 
 CREATE INDEX IF NOT EXISTS idx_expenses_user_date
-    ON expenses (user_id, expense_date DESC);
+    ON expenses (user_id, created_at DESC);
 
 CREATE INDEX IF NOT EXISTS idx_expenses_category_date
-    ON expenses (category_id, expense_date DESC);
+    ON expenses (category_id, created_at DESC);
 
 CREATE INDEX IF NOT EXISTS idx_expenses_receipt
     ON expenses (receipt_id);
 
 CREATE INDEX IF NOT EXISTS idx_expenses_status_date
-    ON expenses (status, expense_date DESC);
+    ON expenses (status, created_at DESC);
 
 CREATE INDEX IF NOT EXISTS idx_expenses_review_date
-    ON expenses (review, expense_date DESC);
+    ON expenses (review, created_at DESC);
 
 CREATE INDEX IF NOT EXISTS idx_expenses_created_at
     ON expenses (created_at DESC);

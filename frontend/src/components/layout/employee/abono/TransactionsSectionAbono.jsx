@@ -38,6 +38,25 @@ import { tableRowVariants } from "@/lib/tableAnimation";
 import DateRangePicker from "../../../ui/DateRangePicker";
 import ConfirmActionDialog from "../../admin/expenses/ConfirmActionDialog";
 import { AbonoStatusBadge } from "./AbonoStatusBadge";
+
+// Premium staggered entrance for the mobile sheet: once the panel slides up,
+// its inner sections rise in sequence (grabber → header → body → actions)
+// with a soft rise-and-fade. Re-keyed per row so switching rows replays it.
+const sheetContentVariants = {
+  hidden: {},
+  show: {
+    transition: { staggerChildren: 0.07, delayChildren: 0.12 },
+  },
+};
+
+const sheetItemVariants = {
+  hidden: { opacity: 0, y: 16 },
+  show: {
+    opacity: 1,
+    y: 0,
+    transition: { duration: 0.45, ease: [0.22, 1, 0.36, 1] },
+  },
+};
 import { USER_ROLES } from "../../../../constants";
 import { useAuth } from "../../../../context/AuthContext";
 
@@ -366,12 +385,21 @@ function TransactionSheetBody({
   }, [actionable, pending, isSettled, title]);
 
   return (
-    <>
-      <div
+    <motion.div
+      key={row?.id ?? "abono-sheet-content"}
+      variants={sheetContentVariants}
+      initial="hidden"
+      animate="show"
+    >
+      <motion.div
         aria-hidden
+        variants={sheetItemVariants}
         className="mx-auto h-1.5 w-10 rounded-full bg-[var(--ink-muted)]/25"
       />
-      <div className="flex items-center gap-3 pt-4">
+      <motion.div
+        variants={sheetItemVariants}
+        className="flex items-center gap-3 pt-4"
+      >
         <span
           aria-hidden
           className={cn(
@@ -398,8 +426,8 @@ function TransactionSheetBody({
         >
           <X size={16} aria-hidden />
         </button>
-      </div>
-      <div className="mt-4 space-y-3">
+      </motion.div>
+      <motion.div variants={sheetItemVariants} className="mt-4 space-y-3">
         <div className="space-y-2 rounded-2xl border border-[var(--border)] bg-[var(--surface-2)]/60 px-4 py-3.5">
           <div className="border-b border-[var(--border)] py-3">
             <div className="flex items-center">
@@ -487,7 +515,7 @@ function TransactionSheetBody({
             </div>
           ) : null}
         </div>
-      </div>
+      </motion.div>
       {/* A settled abono is closed out — hide the delete action (mirrors the
           desktop row menu below). A spent OPEN abono (its amount already
           covered by expenses) is also locked: deleting it would overdraw the
@@ -495,7 +523,7 @@ function TransactionSheetBody({
       {actionable &&
         row?.status === "open" &&
         !isAbonoSpent(row, totalBalance) && (
-          <div className="mt-4 space-y-2">
+          <motion.div variants={sheetItemVariants} className="mt-4 space-y-2">
             <Button
               type="button"
               variant="outline"
@@ -506,13 +534,14 @@ function TransactionSheetBody({
               <Trash2 size={15} aria-hidden />
               Delete abono
             </Button>
-          </div>
+          </motion.div>
         )}
       {actionable &&
         row?.status !== "settled" &&
         isAbonoSpent(row, totalBalance) && (
-          <div
+          <motion.div
             role="note"
+            variants={sheetItemVariants}
             className="mt-4 rounded-2xl border border-[var(--border)] bg-[var(--surface-2)]/60 px-4 py-3"
           >
             <p className="text-xs font-bold text-[var(--ink-muted)]">
@@ -522,9 +551,9 @@ function TransactionSheetBody({
               The amount of this abono has already been used. Deleting it would
               overdraw your remaining balance.
             </p>
-          </div>
+          </motion.div>
         )}
-    </>
+    </motion.div>
   );
 }
 

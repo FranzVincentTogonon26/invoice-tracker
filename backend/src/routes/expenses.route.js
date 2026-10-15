@@ -117,13 +117,13 @@ router.patch(
   expensesController.updateNotes,
 );
 
-// Category reassignment (ExpenseDetailsModal pencil editor, draft rows) —
-// points the row at another category, or NULL for uncategorized. Admin-only;
-// the controller enforces the draft-only and closed-holding guards.
+// Category reassignment (transaction sheet quick editor + ExpenseDetailsModal
+// pencil editor) — points the row at another category, or NULL for
+// uncategorized. Owner-or-admin (same rule as description/status edits);
+// the controller enforces the closed-holding guard.
 router.patch(
   "/:id/category",
   authMiddleware,
-  requireAdminAccess,
   expensesController.updateCategory,
 );
 

@@ -801,12 +801,12 @@ const DescriptionEditor = ({ row, vendorName }) => {
               <TextArea
                 value={draft}
                 onChange={(e) => setDraft(e.target.value)}
-                rows={2}
+                rows={4}
                 maxLength={DESCRIPTION_MAX}
                 disabled={saving}
                 placeholder="What is this expense for…"
                 aria-label="Expense description"
-                className="w-full text-xs"
+                className="w-full text-sm"
               />
               {error ? (
                 <p
@@ -1341,522 +1341,530 @@ const ExpenseDetailsModal = ({
           transition={{ duration: 0.2, ease: "easeOut" }}
         >
           <div className="flex min-h-full p-4">
-          <motion.div
-            className="fixed inset-0 bg-[var(--ink)]/40 backdrop-blur-sm"
-            onClick={handleClose}
-            aria-hidden="true"
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            transition={{ duration: 0.22, ease: "easeOut" }}
-          />
+            <motion.div
+              className="fixed inset-0 bg-[var(--ink)]/40 backdrop-blur-sm"
+              onClick={handleClose}
+              aria-hidden="true"
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              transition={{ duration: 0.22, ease: "easeOut" }}
+            />
 
-          <motion.div
-            ref={dialogRef}
-            tabIndex={-1}
-            role="dialog"
-            aria-modal="true"
-            aria-label={title}
-            initial={{ opacity: 0, y: 14, scale: 0.97 }}
-            animate={{ opacity: 1, y: 0, scale: 1 }}
-            exit={{ opacity: 0, y: 8, scale: 0.97 }}
-            transition={{ duration: 0.22, ease: DIALOG_EASE }}
-            className={cn(
-              "relative m-auto w-full rounded-3xl border border-[var(--border)] bg-[var(--surface)] p-5 shadow-hover outline-none sm:p-6 transition-all duration-200",
-              hasReceipt && activeTab === "receipt" ? "max-w-2xl" : "max-w-lg",
-            )}
-          >
-            {/* ── Dialog Header matching Overview design ── */}
-            <div className="flex items-center gap-3">
-              <span
-                aria-hidden
-                className={cn(
-                  "flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl",
-                  row?.flagged && clearedFlagId !== row?.id
-                    ? "bg-[var(--warning)]/15 text-[var(--warning)]"
-                    : "bg-[var(--accent-soft)] text-[var(--accent-strong)]",
-                )}
-              >
-                <ReceiptText size={20} />
-              </span>
-              <div className="min-w-0 flex-1">
-                <p className="truncate font-display text-base font-medium tracking-tight text-[var(--ink)]">
-                  Expense details
-                </p>
-                <p className="mt-0.5 truncate text-xs tabular-nums text-[var(--ink-muted)]">
-                  {formatDate(row?.date)}
-                  {row?.date ? ` · ${formatTime(row.date)}` : ""}
-                </p>
-              </div>
-              <button
-                type="button"
-                onClick={handleClose}
-                aria-label="Close transaction details"
-                className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-[var(--surface-2)] text-[var(--ink-muted)] transition-colors hover:text-[var(--ink)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)]/30"
-              >
-                <X size={16} aria-hidden />
-              </button>
-            </div>
-
-            {/* ── Optional tabs if receipt exists ── */}
-            {hasReceipt && (
-              <div className="mt-4 flex rounded-xl bg-[var(--surface-2)] p-1">
-                <button
-                  type="button"
+            <motion.div
+              ref={dialogRef}
+              tabIndex={-1}
+              role="dialog"
+              aria-modal="true"
+              aria-label={title}
+              initial={{ opacity: 0, y: 14, scale: 0.97 }}
+              animate={{ opacity: 1, y: 0, scale: 1 }}
+              exit={{ opacity: 0, y: 8, scale: 0.97 }}
+              transition={{ duration: 0.22, ease: DIALOG_EASE }}
+              className={cn(
+                "relative m-auto w-full rounded-3xl border border-[var(--border)] bg-[var(--surface)] p-5 shadow-hover outline-none sm:p-6 transition-all duration-200",
+                hasReceipt && activeTab === "receipt"
+                  ? "max-w-3xl"
+                  : "max-w-xl",
+              )}
+            >
+              {/* ── Dialog Header matching Overview design ── */}
+              <div className="flex items-center gap-3">
+                <span
+                  aria-hidden
                   className={cn(
-                    "flex-1 rounded-lg py-1.5 text-xs font-medium transition-all",
-                    activeTab === "details"
-                      ? "bg-[var(--surface)] text-[var(--ink)] shadow-xs"
-                      : "text-[var(--ink-muted)] hover:text-[var(--ink)]",
+                    "flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl",
+                    row?.flagged && clearedFlagId !== row?.id
+                      ? "bg-[var(--warning)]/15 text-[var(--warning)]"
+                      : "bg-[var(--accent-soft)] text-[var(--accent-strong)]",
                   )}
                 >
-                  Overview
-                </button>
-                <button
-                  type="button"
-                  className={cn(
-                    "flex-1 flex items-center justify-center gap-1.5 rounded-lg py-1.5 text-xs font-medium transition-all",
-                    activeTab === "receipt"
-                      ? "bg-[var(--surface)] text-[var(--ink)] shadow-xs"
-                      : "text-[var(--ink-muted)] hover:text-[var(--ink)]",
-                  )}
-                >
-                  {receiptIsPdf ? (
-                    <FileText size={13} aria-hidden />
-                  ) : (
-                    <ImageIcon size={13} aria-hidden />
-                  )}
-                  <span>Receipt & Items</span>
-                  {receiptLines.length > 0 && (
-                    <span className="rounded-full bg-[var(--surface-2)] px-1.5 py-0.2 text-[10px] font-normal tabular-nums text-[var(--ink)]">
-                      {receiptLines.length}
-                    </span>
-                  )}
-                </button>
-              </div>
-            )}
-
-            {/* ── Dialog Body ── */}
-            {activeTab === "details" ? (
-              detailLoading ? (
-                <ExpenseDetailsSkeleton hasReceipt={hasReceipt} />
-              ) : (
-              <div className="mt-4 space-y-3">
-                {/* Flagged Banner */}
-                {row?.flagged && clearedFlagId !== row?.id ? (
-                  <div
-                    role="note"
-                    className="flex items-start gap-2.5 rounded-2xl border border-[var(--warning)]/40 bg-[var(--warning)]/[0.1] px-4 py-3"
-                  >
-                    <TriangleAlert
-                      size={16}
-                      aria-hidden
-                      className="mt-0.5 shrink-0 text-[var(--warning)]"
-                    />
-                    <div className="min-w-0 flex-1">
-                      <p className="text-xs font-bold text-[var(--warning)]">
-                        Receipt date predates the budget issuance date
-                      </p>
-                      <p className="mt-0.5 text-xs leading-relaxed text-[var(--warning)]/90">
-                        This receipt is dated before the budget was issued to
-                        the employee. Please verify details before approving.
-                      </p>
-                      <div className="mt-2.5 flex items-center justify-end gap-2 border-t border-[var(--warning)]/20 pt-2.5">
-                        <Button
-                          type="button"
-                          variant="outline"
-                          size="sm"
-                          onClick={() => setFlagConfirmOpen(true)}
-                          disabled={approving}
-                          className="h-7 rounded-full border-[var(--warning)]/40 px-3 text-xs hover:bg-[var(--warning)]/15"
-                        >
-                          <ShieldCheck size={14} aria-hidden />
-                          Approve flag
-                        </Button>
-                      </div>
-                      {approveError ? (
-                        <p
-                          role="alert"
-                          className="mt-1 text-[11px] font-medium text-[var(--danger)]"
-                        >
-                          {approveError}
-                        </p>
-                      ) : null}
-                    </div>
-                  </div>
-                ) : clearedFlagId === row?.id ? (
-                  <div
-                    role="status"
-                    className="flex items-start gap-2.5 rounded-2xl border border-emerald-500/30 bg-emerald-500/10 px-4 py-3"
-                  >
-                    <ShieldCheck
-                      size={16}
-                      aria-hidden
-                      className="mt-0.5 shrink-0 text-emerald-600"
-                    />
-                    <div className="min-w-0 flex-1">
-                      <p className="text-xs font-bold text-emerald-700">
-                        Approved by admin
-                      </p>
-                      <p className="mt-0.5 text-xs leading-relaxed text-emerald-700/90">
-                        Flag cleared — this expense is no longer marked for
-                        review.
-                      </p>
-                    </div>
-                  </div>
-                ) : null}
-
-                {/* Amount Hero Card */}
-                <div className="flex items-center justify-between gap-3 rounded-2xl border border-[var(--border)] bg-[var(--surface-2)]/60 px-4 py-3.5">
-                  <div className="min-w-0">
-                    <p className="type-eyebrow text-[var(--ink-muted)]">
-                      Amount
-                    </p>
-                    <p className="mt-1 font-display text-2xl font-medium leading-none tracking-tight tabular-nums text-[var(--ink)]">
-                      {formatMoney(row?.amount)}
-                    </p>
-                    <p className="mt-1.5 truncate text-xs text-[var(--ink-muted)]">
-                      {[row?.category, methodLabel(row?.method)]
-                        .filter(Boolean)
-                        .join(" · ")}
-                    </p>
-                  </div>
-                  <ExpenseStatusBadge
-                    status={row?.status}
-                    className="shrink-0"
-                  />
+                  <ReceiptText size={20} />
+                </span>
+                <div className="min-w-0 flex-1">
+                  <p className="truncate font-display text-base font-medium tracking-tight text-[var(--ink)]">
+                    Expense details
+                  </p>
+                  <p className="mt-0.5 truncate text-xs tabular-nums text-[var(--ink-muted)]">
+                    {formatDate(row?.date)}
+                    {row?.date ? ` · ${formatTime(row.date)}` : ""}
+                  </p>
                 </div>
+                <button
+                  type="button"
+                  onClick={handleClose}
+                  aria-label="Close transaction details"
+                  className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-[var(--surface-2)] text-[var(--ink-muted)] transition-colors hover:text-[var(--ink)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)]/30"
+                >
+                  <X size={16} aria-hidden />
+                </button>
+              </div>
 
-                {/* Receipt Quick Preview Link Card */}
-                {hasReceipt && (
-                  <div className="w-full rounded-2xl border border-[var(--border)] bg-[var(--surface-2)]/60 p-3.5 text-left transition-colors ">
-                    <div className="flex w-full items-center justify-between gap-3">
-                      <div className="flex min-w-0 items-center gap-3">
-                        <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-[var(--accent-soft)] text-[var(--accent-strong)]">
-                          {receiptIsPdf ? (
-                            <FileText size={16} />
-                          ) : (
-                            <ImageIcon size={16} />
-                          )}
-                        </span>
-                        <div className="min-w-0">
-                          <p className="truncate text-xs font-medium text-[var(--ink)]">
-                            {receiptIsPdf
-                              ? "PDF receipt document attached"
-                              : "Receipt image attached"}
+              {/* ── Optional tabs if receipt exists ── */}
+              {hasReceipt && (
+                <div className="mt-4 flex rounded-xl bg-[var(--surface-2)] p-1">
+                  <button
+                    type="button"
+                    className={cn(
+                      "flex-1 rounded-lg py-1.5 text-xs font-medium transition-all",
+                      activeTab === "details"
+                        ? "bg-[var(--surface)] text-[var(--ink)] shadow-xs"
+                        : "text-[var(--ink-muted)] hover:text-[var(--ink)]",
+                    )}
+                  >
+                    Overview
+                  </button>
+                  <button
+                    type="button"
+                    className={cn(
+                      "flex-1 flex items-center justify-center gap-1.5 rounded-lg py-1.5 text-xs font-medium transition-all",
+                      activeTab === "receipt"
+                        ? "bg-[var(--surface)] text-[var(--ink)] shadow-xs"
+                        : "text-[var(--ink-muted)] hover:text-[var(--ink)]",
+                    )}
+                  >
+                    {receiptIsPdf ? (
+                      <FileText size={13} aria-hidden />
+                    ) : (
+                      <ImageIcon size={13} aria-hidden />
+                    )}
+                    <span>Receipt & Items</span>
+                    {receiptLines.length > 0 && (
+                      <span className="rounded-full bg-[var(--surface-2)] px-1.5 py-0.2 text-[10px] font-normal tabular-nums text-[var(--ink)]">
+                        {receiptLines.length}
+                      </span>
+                    )}
+                  </button>
+                </div>
+              )}
+
+              {/* ── Dialog Body ── */}
+              {activeTab === "details" ? (
+                detailLoading ? (
+                  <ExpenseDetailsSkeleton hasReceipt={hasReceipt} />
+                ) : (
+                  <div className="mt-4 space-y-3">
+                    {/* Flagged Banner */}
+                    {row?.flagged && clearedFlagId !== row?.id ? (
+                      <div
+                        role="note"
+                        className="flex items-start gap-2.5 rounded-2xl border border-[var(--warning)]/40 bg-[var(--warning)]/[0.1] px-4 py-3"
+                      >
+                        <TriangleAlert
+                          size={16}
+                          aria-hidden
+                          className="mt-0.5 shrink-0 text-[var(--warning)]"
+                        />
+                        <div className="min-w-0 flex-1">
+                          <p className="text-xs font-bold text-[var(--warning)]">
+                            Receipt date predates the budget issuance date
                           </p>
-                          <p className="truncate text-[11px] text-[var(--ink-muted)]">
-                            {receiptLines.length > 0
-                              ? `${receiptLines.length} itemized lines scanned · View receipt`
-                              : "Click to inspect receipt document"}
+                          <p className="mt-0.5 text-xs leading-relaxed text-[var(--warning)]/90">
+                            This receipt is dated before the budget was issued
+                            to the employee. Please verify details before
+                            approving.
+                          </p>
+                          <div className="mt-2.5 flex items-center justify-end gap-2 border-t border-[var(--warning)]/20 pt-2.5">
+                            <Button
+                              type="button"
+                              variant="outline"
+                              size="sm"
+                              onClick={() => setFlagConfirmOpen(true)}
+                              disabled={approving}
+                              className="h-7 rounded-full border-[var(--warning)]/40 px-3 text-xs hover:bg-[var(--warning)]/15"
+                            >
+                              <ShieldCheck size={14} aria-hidden />
+                              Approve flag
+                            </Button>
+                          </div>
+                          {approveError ? (
+                            <p
+                              role="alert"
+                              className="mt-1 text-[11px] font-medium text-[var(--danger)]"
+                            >
+                              {approveError}
+                            </p>
+                          ) : null}
+                        </div>
+                      </div>
+                    ) : clearedFlagId === row?.id ? (
+                      <div
+                        role="status"
+                        className="flex items-start gap-2.5 rounded-2xl border border-emerald-500/30 bg-emerald-500/10 px-4 py-3"
+                      >
+                        <ShieldCheck
+                          size={16}
+                          aria-hidden
+                          className="mt-0.5 shrink-0 text-emerald-600"
+                        />
+                        <div className="min-w-0 flex-1">
+                          <p className="text-xs font-bold text-emerald-700">
+                            Approved by admin
+                          </p>
+                          <p className="mt-0.5 text-xs leading-relaxed text-emerald-700/90">
+                            Flag cleared — this expense is no longer marked for
+                            review.
                           </p>
                         </div>
                       </div>
-                      <button
-                        type="button"
-                        onClick={() => setActiveTab("receipt")}
-                        className="shrink-0 rounded-full border border-[var(--border)] bg-[var(--surface)] hover:bg-[var(--surface-2)]/90 px-2.5 py-1 text-xs font-normal text-[var(--ink)] shadow-2xs"
-                      >
-                        View receipt →
-                      </button>
+                    ) : null}
+
+                    {/* Amount Hero Card */}
+                    <div className="flex items-center justify-between gap-3 rounded-2xl border border-[var(--border)] bg-[var(--surface-2)]/60 px-4 py-3.5">
+                      <div className="min-w-0">
+                        <p className="type-eyebrow text-[var(--ink-muted)]">
+                          Amount
+                        </p>
+                        <p className="mt-1 font-display text-2xl font-medium leading-none tracking-tight tabular-nums text-[var(--ink)]">
+                          {formatMoney(row?.amount)}
+                        </p>
+                        <p className="mt-1.5 truncate text-xs text-[var(--ink-muted)]">
+                          {[row?.category, methodLabel(row?.method)]
+                            .filter(Boolean)
+                            .join(" · ")}
+                        </p>
+                      </div>
+                      <ExpenseStatusBadge
+                        status={row?.status}
+                        className="shrink-0"
+                      />
                     </div>
-                    {/* Receipt date gets its own full-width row so the value
+
+                    {/* Receipt Quick Preview Link Card */}
+                    {hasReceipt && (
+                      <div className="w-full rounded-2xl border border-[var(--border)] bg-[var(--surface-2)]/60 p-3.5 text-left transition-colors ">
+                        <div className="flex w-full items-center justify-between gap-3">
+                          <div className="flex min-w-0 items-center gap-3">
+                            <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-[var(--accent-soft)] text-[var(--accent-strong)]">
+                              {receiptIsPdf ? (
+                                <FileText size={16} />
+                              ) : (
+                                <ImageIcon size={16} />
+                              )}
+                            </span>
+                            <div className="min-w-0">
+                              <p className="truncate text-xs font-medium text-[var(--ink)]">
+                                {receiptIsPdf
+                                  ? "PDF receipt document attached"
+                                  : "Receipt image attached"}
+                              </p>
+                              <p className="truncate text-[11px] text-[var(--ink-muted)]">
+                                {receiptLines.length > 0
+                                  ? `${receiptLines.length} itemized lines scanned · View receipt`
+                                  : "Click to inspect receipt document"}
+                              </p>
+                            </div>
+                          </div>
+                          <button
+                            type="button"
+                            onClick={() => setActiveTab("receipt")}
+                            className="shrink-0 rounded-full border border-[var(--border)] bg-[var(--surface)] hover:bg-[var(--surface-2)]/90 px-2.5 py-1 text-xs font-normal text-[var(--ink)] shadow-2xs"
+                          >
+                            View receipt →
+                          </button>
+                        </div>
+                        {/* Receipt date gets its own full-width row so the value
                         reads at a glance and the editor has room to breathe. */}
-                    {(canEditDate || row?.receiptDate) && (
-                      <div className="mt-2.5 border-t border-[var(--border)] pt-2.5">
-                        {canEditDate ? (
-                          <ReceiptDateEditor row={row} danger={isFlagged} />
-                        ) : (
-                          <ReceiptDatePill
-                            formatted={`${formatDate(row.receiptDate)} · ${formatTime(row.receiptDate)}`}
-                            danger={isFlagged}
-                          />
+                        {(canEditDate || row?.receiptDate) && (
+                          <div className="mt-2.5 border-t border-[var(--border)] pt-2.5">
+                            {canEditDate ? (
+                              <ReceiptDateEditor row={row} danger={isFlagged} />
+                            ) : (
+                              <ReceiptDatePill
+                                formatted={`${formatDate(row.receiptDate)} · ${formatTime(row.receiptDate)}`}
+                                danger={isFlagged}
+                              />
+                            )}
+                          </div>
                         )}
                       </div>
                     )}
-                  </div>
-                )}
 
-                {/* Details Section */}
-                <div className="space-y-2 rounded-2xl border border-[var(--border)] bg-[var(--surface-2)]/60 px-4 py-3.5">
-                  {/* Vendor / Description */}
-                  <div className="border-b border-[var(--border)] py-2.5 first:pt-0">
-                    <p className="type-eyebrow text-[var(--ink-muted)]">
-                      Vendor / Description
-                    </p>
-                    {canEditDescription ? (
-                      <DescriptionEditor row={row} vendorName={vendorName} />
-                    ) : (
-                      <>
-                        <p className="mt-1 break-words text-sm font-medium leading-snug text-[var(--ink)] normal-case">
-                          {vendorName || row?.description || "—"}
+                    {/* Details Section */}
+                    <div className="space-y-2 rounded-2xl border border-[var(--border)] bg-[var(--surface-2)]/60 px-4 py-3.5">
+                      {/* Vendor / Description */}
+                      <div className="border-b border-[var(--border)] py-2.5 first:pt-0">
+                        <p className="type-eyebrow text-[var(--ink-muted)]">
+                          Vendor / Description
                         </p>
-                        {vendorName &&
-                        row?.description &&
-                        vendorName !== row.description ? (
-                          <p className="mt-0.5 break-words text-xs text-[var(--ink-muted)]">
-                            {row.description}
-                          </p>
-                        ) : null}
-                      </>
-                    )}
-                  </div>
+                        {canEditDescription ? (
+                          <DescriptionEditor
+                            row={row}
+                            vendorName={vendorName}
+                          />
+                        ) : (
+                          <>
+                            <p className="mt-1 break-words text-sm font-medium leading-snug text-[var(--ink)] normal-case">
+                              {vendorName || row?.description || "—"}
+                            </p>
+                            {vendorName &&
+                            row?.description &&
+                            vendorName !== row.description ? (
+                              <p className="mt-0.5 break-words text-xs text-[var(--ink-muted)]">
+                                {row.description}
+                              </p>
+                            ) : null}
+                          </>
+                        )}
+                      </div>
 
-                  {/* Date, Time, Method */}
-                  <div className="grid grid-cols-3 gap-3 border-b border-[var(--border)] py-2.5">
-                    <div className={cn("min-w-0", dateEditing && "col-span-3")}>
-                      {canEditDate ? (
-                        <DateEditor
-                          row={row}
-                          onEditingChange={setDateEditing}
-                        />
-                      ) : (
-                        <>
-                          <p className="type-eyebrow text-[var(--ink-muted)]">
-                            Date
-                          </p>
-                          <p className="mt-1 truncate text-sm font-medium tabular-nums text-[var(--ink)]">
-                            {formatDate(row?.date)}
-                          </p>
-                        </>
-                      )}
-                    </div>
-                    <div className="min-w-0">
-                      <p className="type-eyebrow text-[var(--ink-muted)]">
-                        Time
-                      </p>
-                      <p className="mt-1 truncate text-sm font-medium tabular-nums text-[var(--ink)]">
-                        {formatTime(row?.date || row?.timeDate)}
-                      </p>
-                    </div>
-                    <div className="min-w-0">
-                      <p className="type-eyebrow text-[var(--ink-muted)]">
-                        Method
-                      </p>
-                      <p className="mt-1 flex items-center gap-1.5 truncate text-sm font-medium text-[var(--ink)]">
-                        <span className="text-[var(--ink-muted)]">
-                          {getMethodIcon(row?.method)}
-                        </span>
-                        <span className="truncate">
-                          {methodLabel(row?.method)}
-                        </span>
-                      </p>
-                    </div>
-                  </div>
-
-                  {/* Category & Source of Funds */}
-                  {(row?.category || canEditCategory || referenceLabel) && (
-                    <div className="grid grid-cols-2 gap-3 border-b border-[var(--border)] py-2.5">
-                      {row?.category || canEditCategory ? (
-                        <div className="min-w-0">
-                          {canEditCategory ? (
-                            <CategoryEditor row={row} />
+                      {/* Date, Time, Method */}
+                      <div className="grid grid-cols-3 gap-3 border-b border-[var(--border)] py-2.5">
+                        <div
+                          className={cn("min-w-0", dateEditing && "col-span-3")}
+                        >
+                          {canEditDate ? (
+                            <DateEditor
+                              row={row}
+                              onEditingChange={setDateEditing}
+                            />
                           ) : (
                             <>
                               <p className="type-eyebrow text-[var(--ink-muted)]">
-                                Category
+                                Date
                               </p>
-                              <p className="mt-1 truncate text-sm font-medium text-[var(--ink)]">
-                                {row.category}
+                              <p className="mt-1 truncate text-sm font-medium tabular-nums text-[var(--ink)]">
+                                {formatDate(row?.date)}
                               </p>
                             </>
                           )}
                         </div>
-                      ) : null}
-                      {referenceLabel ? (
                         <div className="min-w-0">
                           <p className="type-eyebrow text-[var(--ink-muted)]">
-                            Source of Funds
+                            Time
                           </p>
-                          <p className="mt-1 truncate text-sm font-medium text-[var(--ink)]">
-                            {referenceLabel}
+                          <p className="mt-1 truncate text-sm font-medium tabular-nums text-[var(--ink)]">
+                            {formatTime(row?.date || row?.timeDate)}
+                          </p>
+                        </div>
+                        <div className="min-w-0">
+                          <p className="type-eyebrow text-[var(--ink-muted)]">
+                            Method
+                          </p>
+                          <p className="mt-1 flex items-center gap-1.5 truncate text-sm font-medium text-[var(--ink)]">
+                            <span className="text-[var(--ink-muted)]">
+                              {getMethodIcon(row?.method)}
+                            </span>
+                            <span className="truncate">
+                              {methodLabel(row?.method)}
+                            </span>
+                          </p>
+                        </div>
+                      </div>
+
+                      {/* Category & Source of Funds */}
+                      {(row?.category || canEditCategory || referenceLabel) && (
+                        <div className="grid grid-cols-2 gap-3 border-b border-[var(--border)] py-2.5">
+                          {row?.category || canEditCategory ? (
+                            <div className="min-w-0">
+                              {canEditCategory ? (
+                                <CategoryEditor row={row} />
+                              ) : (
+                                <>
+                                  <p className="type-eyebrow text-[var(--ink-muted)]">
+                                    Category
+                                  </p>
+                                  <p className="mt-1 truncate text-sm font-medium text-[var(--ink)]">
+                                    {row.category}
+                                  </p>
+                                </>
+                              )}
+                            </div>
+                          ) : null}
+                          {referenceLabel ? (
+                            <div className="min-w-0">
+                              <p className="type-eyebrow text-[var(--ink-muted)]">
+                                Source of Funds
+                              </p>
+                              <p className="mt-1 truncate text-sm font-medium text-[var(--ink)]">
+                                {referenceLabel}
+                              </p>
+                            </div>
+                          ) : null}
+                        </div>
+                      )}
+
+                      {/* Submitted By */}
+                      <div className="py-2.5">
+                        <p className="mb-2 type-eyebrow text-[var(--ink-muted)]">
+                          Submitted By
+                        </p>
+                        <CreatorRow row={row} />
+                      </div>
+
+                      {/* Review Notes (for draft) or Notes */}
+                      {row?.status === "draft" ? (
+                        <div className="pt-2">
+                          <ReviewNotesCard row={row} />
+                        </div>
+                      ) : row?.notes ? (
+                        <div className="pt-2">
+                          <p className="type-eyebrow text-[var(--ink-muted)]">
+                            Notes
+                          </p>
+                          <p className="mt-1 break-words text-sm text-[var(--ink)]">
+                            {row.notes}
                           </p>
                         </div>
                       ) : null}
                     </div>
-                  )}
-
-                  {/* Submitted By */}
-                  <div className="py-2.5">
-                    <p className="mb-2 type-eyebrow text-[var(--ink-muted)]">
-                      Submitted By
-                    </p>
-                    <CreatorRow row={row} />
                   </div>
-
-                  {/* Review Notes (for draft) or Notes */}
-                  {row?.status === "draft" ? (
-                    <div className="pt-2">
-                      <ReviewNotesCard row={row} />
-                    </div>
-                  ) : row?.notes ? (
-                    <div className="pt-2">
-                      <p className="type-eyebrow text-[var(--ink-muted)]">
-                        Notes
-                      </p>
-                      <p className="mt-1 break-words text-sm text-[var(--ink)]">
-                        {row.notes}
-                      </p>
-                    </div>
-                  ) : null}
-                </div>
-              </div>
-              )
-            ) : (
-              /* ── Receipt & Scanned Items View ── */
-              <div className="mt-4 space-y-4">
-                <section
-                  aria-label="Receipt document"
-                  className="overflow-hidden rounded-2xl border border-[var(--border)] bg-[var(--surface)] shadow-xs"
-                >
-                  <div className="flex flex-wrap items-center justify-between gap-2 border-b border-[var(--border)] bg-[var(--surface-2)]/60 px-3.5 py-2.5">
-                    <span className="flex min-w-0 items-center gap-1.5 text-[11px] font-medium text-[var(--ink)]">
-                      <ImageIcon size={13} aria-hidden className="shrink-0" />
-                      <span className="truncate">Receipt preview</span>
-                      {zoomLevel !== 1 ? (
-                        <span className="rounded bg-[var(--accent-soft)] px-1.5 py-0.5 text-[10px] font-bold tabular-nums text-[var(--accent-strong)]">
-                          {Math.round(zoomLevel * 100)}%
-                        </span>
-                      ) : null}
-                    </span>
-                    <div className="flex shrink-0 items-center gap-1">
-                      <button
-                        type="button"
-                        onClick={zoomOut}
-                        disabled={zoomLevel <= 0.75}
-                        title="Zoom out"
-                        aria-label="Zoom out receipt image"
-                        className="flex h-7 w-7 items-center justify-center rounded-lg bg-[var(--surface)] text-[var(--ink-muted)] transition-colors hover:text-[var(--ink)] disabled:opacity-40"
-                      >
-                        <ZoomOut size={13} aria-hidden />
-                      </button>
-                      <button
-                        type="button"
-                        onClick={zoomReset}
-                        disabled={zoomLevel === 1}
-                        title="Reset zoom"
-                        aria-label="Reset receipt zoom"
-                        className="flex h-7 w-7 items-center justify-center rounded-lg bg-[var(--surface)] text-[var(--ink-muted)] transition-colors hover:text-[var(--ink)] disabled:opacity-40"
-                      >
-                        <RotateCcw size={12} aria-hidden />
-                      </button>
-                      <button
-                        type="button"
-                        onClick={zoomIn}
-                        disabled={zoomLevel >= 2.2}
-                        title="Zoom in"
-                        aria-label="Zoom in receipt image"
-                        className="flex h-7 w-7 items-center justify-center rounded-lg bg-[var(--surface)] text-[var(--ink-muted)] transition-colors hover:text-[var(--ink)] disabled:opacity-40"
-                      >
-                        <ZoomIn size={13} aria-hidden />
-                      </button>
-                      <span
-                        aria-hidden
-                        className="mx-1 h-3 w-px bg-[var(--border)]"
-                      />
-                      <button
-                        type="button"
-                        onClick={() => openReceiptFile(receiptUrl)}
-                        className="inline-flex items-center gap-1 rounded-lg bg-[var(--accent-soft)] px-2.5 py-1 text-xs font-medium text-[var(--accent-strong)] transition-opacity hover:opacity-90"
-                      >
-                        <Maximize2 size={12} aria-hidden />
-                        Full size
-                      </button>
-                    </div>
-                  </div>
-
-                  {canPreviewImage ? (
-                    <div className="scrollbar-slim relative max-h-[460px] min-h-[240px] overflow-auto bg-[var(--surface-2)]/30 p-3 sm:p-4">
-                      <img
-                        src={receiptUrl}
-                        alt="Scanned receipt"
-                        onError={() => setFailedUrl(receiptUrl)}
-                        style={{ transform: `scale(${zoomLevel})` }}
-                        className="mx-auto block w-auto max-w-full rounded-lg bg-white object-contain shadow-md transition-transform duration-150"
-                      />
-                    </div>
-                  ) : receiptUrl ? (
-                    <div className="flex min-h-[220px] w-full flex-col items-center justify-center gap-3 bg-[var(--surface-2)]/40 p-6 text-center">
-                      <span className="flex h-12 w-12 items-center justify-center rounded-2xl bg-[var(--accent-soft)] text-[var(--accent-strong)]">
-                        {receiptIsPdf ? (
-                          <FileText size={24} aria-hidden />
-                        ) : (
-                          <ImageIcon size={24} aria-hidden />
-                        )}
+                )
+              ) : (
+                /* ── Receipt & Scanned Items View ── */
+                <div className="mt-4 space-y-4">
+                  <section
+                    aria-label="Receipt document"
+                    className="overflow-hidden rounded-2xl border border-[var(--border)] bg-[var(--surface)] shadow-xs"
+                  >
+                    <div className="flex flex-wrap items-center justify-between gap-2 border-b border-[var(--border)] bg-[var(--surface-2)]/60 px-3.5 py-2.5">
+                      <span className="flex min-w-0 items-center gap-1.5 text-[11px] font-medium text-[var(--ink)]">
+                        <ImageIcon size={13} aria-hidden className="shrink-0" />
+                        <span className="truncate">Receipt preview</span>
+                        {zoomLevel !== 1 ? (
+                          <span className="rounded bg-[var(--accent-soft)] px-1.5 py-0.5 text-[10px] font-bold tabular-nums text-[var(--accent-strong)]">
+                            {Math.round(zoomLevel * 100)}%
+                          </span>
+                        ) : null}
                       </span>
-                      <div className="max-w-[280px] space-y-1">
-                        <p className="text-sm font-medium text-[var(--ink)]">
-                          {receiptIsPdf
-                            ? "PDF document receipt"
-                            : "Receipt attachment"}
-                        </p>
-                        <p className="text-xs leading-relaxed text-[var(--ink-muted)]">
-                          {receiptIsPdf
-                            ? "This expense is linked to a PDF file."
-                            : "Open the original file to view it."}
+                      <div className="flex shrink-0 items-center gap-1">
+                        <button
+                          type="button"
+                          onClick={zoomOut}
+                          disabled={zoomLevel <= 0.75}
+                          title="Zoom out"
+                          aria-label="Zoom out receipt image"
+                          className="flex h-7 w-7 items-center justify-center rounded-lg bg-[var(--surface)] text-[var(--ink-muted)] transition-colors hover:text-[var(--ink)] disabled:opacity-40"
+                        >
+                          <ZoomOut size={13} aria-hidden />
+                        </button>
+                        <button
+                          type="button"
+                          onClick={zoomReset}
+                          disabled={zoomLevel === 1}
+                          title="Reset zoom"
+                          aria-label="Reset receipt zoom"
+                          className="flex h-7 w-7 items-center justify-center rounded-lg bg-[var(--surface)] text-[var(--ink-muted)] transition-colors hover:text-[var(--ink)] disabled:opacity-40"
+                        >
+                          <RotateCcw size={12} aria-hidden />
+                        </button>
+                        <button
+                          type="button"
+                          onClick={zoomIn}
+                          disabled={zoomLevel >= 2.2}
+                          title="Zoom in"
+                          aria-label="Zoom in receipt image"
+                          className="flex h-7 w-7 items-center justify-center rounded-lg bg-[var(--surface)] text-[var(--ink-muted)] transition-colors hover:text-[var(--ink)] disabled:opacity-40"
+                        >
+                          <ZoomIn size={13} aria-hidden />
+                        </button>
+                        <span
+                          aria-hidden
+                          className="mx-1 h-3 w-px bg-[var(--border)]"
+                        />
+                        <button
+                          type="button"
+                          onClick={() => openReceiptFile(receiptUrl)}
+                          className="inline-flex items-center gap-1 rounded-lg bg-[var(--accent-soft)] px-2.5 py-1 text-xs font-medium text-[var(--accent-strong)] transition-opacity hover:opacity-90"
+                        >
+                          <Maximize2 size={12} aria-hidden />
+                          Full size
+                        </button>
+                      </div>
+                    </div>
+
+                    {canPreviewImage ? (
+                      <div className="scrollbar-slim relative max-h-[460px] min-h-[240px] overflow-auto bg-[var(--surface-2)]/30 p-3 sm:p-4">
+                        <img
+                          src={receiptUrl}
+                          alt="Scanned receipt"
+                          onError={() => setFailedUrl(receiptUrl)}
+                          style={{ transform: `scale(${zoomLevel})` }}
+                          className="mx-auto block w-auto max-w-full rounded-lg bg-white object-contain shadow-md transition-transform duration-150"
+                        />
+                      </div>
+                    ) : receiptUrl ? (
+                      <div className="flex min-h-[220px] w-full flex-col items-center justify-center gap-3 bg-[var(--surface-2)]/40 p-6 text-center">
+                        <span className="flex h-12 w-12 items-center justify-center rounded-2xl bg-[var(--accent-soft)] text-[var(--accent-strong)]">
+                          {receiptIsPdf ? (
+                            <FileText size={24} aria-hidden />
+                          ) : (
+                            <ImageIcon size={24} aria-hidden />
+                          )}
+                        </span>
+                        <div className="max-w-[280px] space-y-1">
+                          <p className="text-sm font-medium text-[var(--ink)]">
+                            {receiptIsPdf
+                              ? "PDF document receipt"
+                              : "Receipt attachment"}
+                          </p>
+                          <p className="text-xs leading-relaxed text-[var(--ink-muted)]">
+                            {receiptIsPdf
+                              ? "This expense is linked to a PDF file."
+                              : "Open the original file to view it."}
+                          </p>
+                        </div>
+                        <Button
+                          type="button"
+                          variant="accent"
+                          size="sm"
+                          onClick={() => openReceiptFile(receiptUrl)}
+                          className="gap-1.5"
+                        >
+                          <Eye size={14} aria-hidden />
+                          {receiptIsPdf ? "Open PDF document" : "Open file"}
+                        </Button>
+                      </div>
+                    ) : (
+                      <div className="flex min-h-[200px] w-full flex-col items-center justify-center gap-2 p-6 text-center">
+                        <ReceiptText
+                          size={22}
+                          className="text-[var(--ink-muted)]"
+                        />
+                        <p className="text-xs text-[var(--ink-muted)]">
+                          No receipt image attached
                         </p>
                       </div>
-                      <Button
-                        type="button"
-                        variant="accent"
-                        size="sm"
-                        onClick={() => openReceiptFile(receiptUrl)}
-                        className="gap-1.5"
-                      >
-                        <Eye size={14} aria-hidden />
-                        {receiptIsPdf ? "Open PDF document" : "Open file"}
-                      </Button>
-                    </div>
-                  ) : (
-                    <div className="flex min-h-[200px] w-full flex-col items-center justify-center gap-2 p-6 text-center">
-                      <ReceiptText
-                        size={22}
-                        className="text-[var(--ink-muted)]"
-                      />
-                      <p className="text-xs text-[var(--ink-muted)]">
-                        No receipt image attached
-                      </p>
-                    </div>
-                  )}
-                </section>
+                    )}
+                  </section>
 
-                <LineItemsSection
-                  lines={receiptLines}
-                  open={itemsOpen}
-                  onToggle={() => setItemsOpen((prev) => !prev)}
-                  loading={linesLoading}
-                  error={linesError}
-                  onRetry={() => refetchLines()}
-                  refetching={linesRefetching}
-                  regionId={itemsRegionId}
-                />
-              </div>
-            )}
-
-            {/* ── Dialog Footer ── */}
-            <div className="mt-5 flex items-center justify-between border-t border-[var(--border)] pt-4">
-              {hasReceipt && activeTab === "receipt" ? (
-                <button
-                  type="button"
-                  onClick={() => setActiveTab("details")}
-                  className="inline-flex shrink-0 items-center gap-1.5 rounded-full border border-[var(--border)] bg-[var(--surface)] px-3 py-2.5 text-xs font-medium text-[var(--ink)]  transition-colors hover:bg-[var(--surface-2)]"
-                >
-                  <ArrowLeft size={13} aria-hidden />
-                  Back to overview
-                </button>
-              ) : (
-                <span />
+                  <LineItemsSection
+                    lines={receiptLines}
+                    open={itemsOpen}
+                    onToggle={() => setItemsOpen((prev) => !prev)}
+                    loading={linesLoading}
+                    error={linesError}
+                    onRetry={() => refetchLines()}
+                    refetching={linesRefetching}
+                    regionId={itemsRegionId}
+                  />
+                </div>
               )}
-              <Button
-                type="button"
-                variant="outline"
-                onClick={handleClose}
-                className="rounded-full px-5 text-xs font-medium"
-              >
-                Close
-              </Button>
-            </div>
-          </motion.div>
+
+              {/* ── Dialog Footer ── */}
+              <div className="mt-5 flex items-center justify-between border-t border-[var(--border)] pt-4">
+                {hasReceipt && activeTab === "receipt" ? (
+                  <button
+                    type="button"
+                    onClick={() => setActiveTab("details")}
+                    className="inline-flex shrink-0 items-center gap-1.5 rounded-full border border-[var(--border)] bg-[var(--surface)] px-3 py-2.5 text-xs font-medium text-[var(--ink)]  transition-colors hover:bg-[var(--surface-2)]"
+                  >
+                    <ArrowLeft size={13} aria-hidden />
+                    Back to overview
+                  </button>
+                ) : (
+                  <span />
+                )}
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={handleClose}
+                  className="rounded-full px-5 text-xs font-medium"
+                >
+                  Close
+                </Button>
+              </div>
+            </motion.div>
           </div>
         </motion.div>
       )}

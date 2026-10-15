@@ -303,7 +303,7 @@ const BudgetTransfer = () => {
           </div>
 
           {/* ── Direction cue pointing at the recipient picker ── */}
-          <div className="flex justify-center -my-2.5 relative z-10">
+          <div className="flex justify-center -my-3.5 relative z-10">
             <span
               aria-hidden
               className="flex h-8 w-8 items-center justify-center rounded-full border border-[var(--border)] bg-[var(--surface)] text-[var(--ink-muted)] shadow-card"

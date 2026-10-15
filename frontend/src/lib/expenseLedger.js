@@ -17,7 +17,7 @@ export const dayOf = (value) => {
   return parsed ? startOfDay(parsed) : null;
 };
 
-export const rowDay = (row) => dayOf(row?.expense_date ?? row?.date);
+export const rowDay = (row) => dayOf(row?.created_at ?? row?.expense_date ?? row?.date);
 
 export const matchesDayRange = (value, start, end) => {
   const day = dayOf(value);

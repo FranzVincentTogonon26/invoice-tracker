@@ -406,8 +406,10 @@ class Budget {
   // issuances), expenses (paid, non-employee — employee spend already left
   // as `issued`), remaining = allocated − issued − expenses + forwarded
   // (finalized holdings hand their leftover back — the same formula as
-  // AdminBudget's per-source Remaining breakdown), transactions
-  // (budget_issued_reference rows), budgets (budget rows).
+  // AdminBudget's per-source Remaining breakdown), transactions (total
+  // ledger records: budget + issued + expenses + abono + both transfer
+  // legs — the overview's record badge with no filters), budgets (budget
+  // rows).
   static async sourceFunds({ search, referenceId } = {}) {
     const params = [];
     let searchClause = "";
@@ -486,9 +488,36 @@ class Budget {
                AND bir.status = 'close'
           ), 0)::float8 AS forwarded,
           (
-            SELECT COUNT(*)::int
-              FROM budget_issued_reference bir
-             WHERE bir.reference_id = br.reference_id
+            -- Total ledger records for this source — the same rows the
+            -- overview's Related Transactions ledger lists (budget + issued
+            -- + expenses + abono + both transfer legs), so the table's Txns
+            -- cell matches the overview's record badge with no filters.
+            COALESCE((
+              SELECT COUNT(*)::int
+                FROM budget b
+               WHERE b.reference_id = br.reference_id
+            ), 0) +
+            COALESCE((
+              SELECT COUNT(*)::int
+                FROM budget_issued_reference bir
+                JOIN issued_budget ib ON ib.issued_ref_id = bir.id
+               WHERE bir.reference_id = br.reference_id
+            ), 0) +
+            COALESCE((
+              SELECT COUNT(*)::int
+                FROM expenses e
+               WHERE e.reference_id = br.reference_id
+            ), 0) +
+            COALESCE((
+              SELECT COUNT(*)::int
+                FROM employee_abono ea
+               WHERE ea.reference_id = br.reference_id
+            ), 0) +
+            COALESCE((
+              SELECT COUNT(*)::int * 2
+                FROM budget_transfer bt
+               WHERE bt.reference_id = br.reference_id
+            ), 0)
           ) AS transactions,
           (
             SELECT COUNT(*)::int
@@ -595,7 +624,8 @@ class Budget {
 
   // Update a source of funds (label / notes / status). Closing
   // ('open' → 'cut_off') disconnects the source from every flow; reopening
-  // restores it. Resolves null when the reference does not exist.
+  // restores it. Status flips touch ONLY the status column — `date_cut_off`
+  // is never written here. Resolves null when the reference does not exist.
   static async updateReference(reference_id, { label, notes, status, date_cut_off }) {
     const sets = [];
     const params = [];
@@ -616,18 +646,11 @@ class Budget {
       sets.push(`date_cut_off = $${params.length}::timestamptz`);
     }
     if (status !== undefined) {
-      // NOTE: status is bound as TWO separate params (not one reused `$n`
-      // twice). Reusing a single placeholder in both `status = $n`
-      // (varchar) and `CASE WHEN $n = 'cut_off'` (text) makes Postgres
-      // raise 42P08 "text versus character varying", which surfaced as a
-      // 500 Internal Server Error on every close/reopen.
+      // Close / reopen touches ONLY the status column — `date_cut_off` is
+      // never written here (it is owned by the create / edit date picker).
       params.push(status);
       const statusParam = params.length;
-      params.push(status);
-      const statusCheck = params.length;
-      sets.push(
-        `status = $${statusParam}, date_cut_off = CASE WHEN $${statusCheck} = 'cut_off' THEN COALESCE(date_cut_off, NOW()) ELSE NULL END`,
-      );
+      sets.push(`status = $${statusParam}`);
     }
     if (sets.length === 0) return null;
     params.push(reference_id);

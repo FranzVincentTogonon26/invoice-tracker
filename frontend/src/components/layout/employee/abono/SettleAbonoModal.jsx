@@ -2,7 +2,7 @@ import { useCallback, useEffect, useId, useMemo, useState } from "react";
 import { createPortal } from "react-dom";
 import { AnimatePresence, motion } from "framer-motion";
 import toast from "react-hot-toast";
-import { BadgeCheck, Loader2, TriangleAlert, X } from "lucide-react";
+import { BadgeCheck, Check, CheckCircle2, Loader2, TriangleAlert, Wallet, X } from "lucide-react";
 import { Button } from "../../../ui/Button";
 import { cn, formatDate, formatMoney } from "../../../../lib/utils";
 import ConfirmActionDialog from "../../admin/expenses/ConfirmActionDialog";
@@ -130,15 +130,16 @@ const SettleAbonoModal = ({
   );
 
   return createPortal(
-    <AnimatePresence
-      // Fires once the closed dialog has finished fading out — the selection
-      // resets here, so the next open always starts clean without an effect.
-      onExitComplete={() => {
-        setChecked(new Set());
-        setConfirmOpen(false);
-      }}
-    >
-      {open && (
+    <>
+      <AnimatePresence
+        // Fires once the closed dialog has finished fading out — the selection
+        // resets here, so the next open always starts clean without an effect.
+        onExitComplete={() => {
+          setChecked(new Set());
+          setConfirmOpen(false);
+        }}
+      >
+        {open && (
         <motion.div
           key="settle-abono"
           className="fixed inset-0 z-[80] flex items-center justify-center p-4"
@@ -164,21 +165,25 @@ const SettleAbonoModal = ({
             animate={{ opacity: 1, y: 0, scale: 1 }}
             exit={{ opacity: 0, y: 12, scale: 0.97 }}
             transition={{ duration: 0.26, ease: DIALOG_EASE }}
-            className="relative flex max-h-[calc(100dvh-2rem)] w-full max-w-lg flex-col overflow-hidden rounded-3xl border border-[var(--border)] bg-[var(--surface)] shadow-hover"
+            className="relative flex max-h-[calc(100dvh-2rem)] w-full max-w-lg flex-col overflow-hidden rounded-[28px] border border-[var(--border)] bg-[var(--surface)] shadow-hover ring-1 ring-white/10"
           >
+            <div
+              aria-hidden
+              className="pointer-events-none absolute inset-x-10 top-0 z-10 h-px bg-[linear-gradient(90deg,transparent,var(--accent)/70,transparent)]"
+            />
             {/* ── Header ── */}
-            <div className="flex items-center justify-between gap-3 border-b border-[var(--border)] px-5 py-4">
-              <div className="flex min-w-0 items-center gap-3">
+            <div className="flex items-center justify-between gap-3 border-b border-[var(--border)] bg-[var(--surface-2)]/40 px-6 py-5">
+              <div className="flex min-w-0 items-center gap-3.5">
                 <span
                   aria-hidden
-                  className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-[var(--accent-soft)] text-[var(--accent-strong)]"
+                  className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-[var(--accent-soft)] text-[var(--accent-strong)] shadow-card ring-1 ring-[var(--accent)]/25"
                 >
-                  <BadgeCheck size={18} />
+                  <BadgeCheck size={19} />
                 </span>
                 <div className="min-w-0">
                   <h2
                     id={titleId}
-                    className="font-display truncate text-base font-medium tracking-tight text-[var(--ink)]"
+                    className="font-display truncate text-lg font-medium tracking-tight text-[var(--ink)]"
                   >
                     Settle Abono
                   </h2>
@@ -198,22 +203,38 @@ const SettleAbonoModal = ({
               </button>
             </div>
             {/* ── Body ── */}
-            <div className="scrollbar-slim min-h-0 flex-1 space-y-4 overflow-y-auto overscroll-contain px-5 py-4">
+            <div className="scrollbar-slim min-h-0 flex-1 space-y-4 overflow-y-auto overscroll-contain px-6 py-5">
               {/* Centre: what is left, with the checked total deducted live. */}
-              <div className="rounded-2xl border border-[var(--border)] bg-[var(--surface-2)]/60 px-4 py-5 text-center">
+              <div
+                className={cn(
+                  "relative overflow-hidden rounded-2xl border px-4 py-6 text-center transition-colors",
+                  insufficient
+                    ? "border-[var(--danger)]/40 bg-[var(--danger)]/[0.07]"
+                    : "border-[var(--accent)]/25 bg-[linear-gradient(160deg,var(--accent-soft)_0%,transparent_70%)]",
+                )}
+              >
                 <p className="type-eyebrow text-[var(--ink-muted)]">
                   Remaining balance
                 </p>
-                <p
-                  className={cn(
-                    "mt-1.5 font-display text-3xl font-medium leading-none tracking-tight tabular-nums",
-                    insufficient ? "text-[var(--danger)]" : "text-[var(--ink)]",
-                  )}
-                >
-                  {formatMoney(projected)}
-                </p>
+                <AnimatePresence mode="popLayout" initial={false}>
+                  <motion.p
+                    key={projected}
+                    initial={{ opacity: 0, y: 8 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={{ opacity: 0, y: -8 }}
+                    transition={{ duration: 0.22, ease: DIALOG_EASE }}
+                    className={cn(
+                      "mt-2 font-display text-4xl font-medium leading-none tracking-tight tabular-nums",
+                      insufficient
+                        ? "text-[var(--danger)]"
+                        : "text-[var(--ink)]",
+                    )}
+                  >
+                    {formatMoney(projected)}
+                  </motion.p>
+                </AnimatePresence>
                 {hasSelection && (
-                  <p className="mt-2 text-xs tabular-nums text-[var(--ink-muted)]">
+                  <p className="mt-2.5 text-xs tabular-nums text-[var(--ink-muted)]">
                     {formatMoney(balance)} − {formatMoney(selectedTotal)}{" "}
                     checked
                   </p>
@@ -222,25 +243,42 @@ const SettleAbonoModal = ({
 
               {/* Open abono total stays fixed; Checked tracks the selection. */}
               <div className="grid grid-cols-2 gap-3">
-                <div className="rounded-2xl border border-[var(--border)] bg-[var(--surface-2)]/60 px-3.5 py-3">
-                  <p className="type-eyebrow text-[var(--ink-muted)]">
+                <div className="rounded-2xl border border-[var(--border)] bg-[var(--surface-2)]/60 px-3.5 py-3.5 text-center shadow-xs">
+                  <p className="flex items-center justify-center gap-1.5 type-eyebrow text-[var(--ink-muted)]">
+                    <Wallet
+                      size={12}
+                      aria-hidden
+                      className="text-[var(--accent-strong)]"
+                    />
                     Open abono
                   </p>
-                  <p className="mt-1 font-display text-lg font-medium leading-none tracking-tight tabular-nums text-[var(--ink)]">
+                  <p className="mt-1.5 font-display text-xl font-medium leading-none tracking-tight tabular-nums text-[var(--ink)]">
                     {formatMoney(openTotal)}
                   </p>
-                  <p className="mt-1 text-[11px] font-medium text-[var(--ink-muted)]">
+                  <p className="mt-1 text-[11px] font-medium tabular-nums text-[var(--ink-muted)]">
                     {rows.length} {rows.length === 1 ? "record" : "records"}
                   </p>
                 </div>
-                <div className="rounded-2xl border border-[var(--border)] bg-[var(--surface-2)]/60 px-3.5 py-3">
-                  <p className="type-eyebrow text-[var(--ink-muted)]">
+                <div
+                  className={cn(
+                    "rounded-2xl border px-3.5 py-3.5 text-center shadow-xs transition-colors",
+                    hasSelection
+                      ? "border-[var(--accent)]/40 bg-[var(--accent-soft)]/40"
+                      : "border-[var(--border)] bg-[var(--surface-2)]/60",
+                  )}
+                >
+                  <p className="flex items-center justify-center gap-1.5 type-eyebrow text-[var(--ink-muted)]">
+                    <CheckCircle2
+                      size={12}
+                      aria-hidden
+                      className="text-[var(--accent-strong)]"
+                    />
                     Checked
                   </p>
-                  <p className="mt-1 font-display text-lg font-medium leading-none tracking-tight tabular-nums text-[var(--ink)]">
+                  <p className="mt-1.5 font-display text-xl font-medium leading-none tracking-tight tabular-nums text-[var(--ink)]">
                     {formatMoney(selectedTotal)}
                   </p>
-                  <p className="mt-1 text-[11px] font-medium text-[var(--ink-muted)]">
+                  <p className="mt-1 text-[11px] font-medium tabular-nums text-[var(--ink-muted)]">
                     {checkedRows.length} selected
                   </p>
                 </div>
@@ -285,10 +323,10 @@ const SettleAbonoModal = ({
                       <label
                         key={row.id}
                         className={cn(
-                          "flex items-center justify-between gap-3 rounded-2xl border px-3.5 py-3 transition-colors",
+                          "flex items-center justify-between gap-3 rounded-2xl border px-4 py-3.5 shadow-xs transition-all",
                           isChecked
-                            ? "border-[var(--accent)]/50 bg-[var(--accent-soft)]/40"
-                            : "border-[var(--border)] bg-[var(--surface-2)]/60",
+                            ? "border-[var(--accent)]/60 bg-[var(--accent-soft)]/50 shadow-card ring-1 ring-[var(--accent)]/20"
+                            : "border-[var(--border)] bg-[var(--surface-2)]/60 hover:border-[var(--accent)]/30 hover:bg-[var(--surface-2)]",
                           pending
                             ? "cursor-not-allowed opacity-70"
                             : "cursor-pointer",
@@ -297,12 +335,13 @@ const SettleAbonoModal = ({
                         <span className="min-w-0">
                           <span className="block truncate text-xs font-medium text-[var(--ink)]">
                             {row.description || "Abono"}
-                          </span>
-                          <span className="mt-1 block truncate text-[11px] font-medium text-[var(--ink-muted)]">
-                            {formatDate(row.date)}
-                            {row.reference_label
-                              ? ` · ${row.reference_label}`
-                              : ""}
+                            <span className="font-normal text-[var(--ink-muted)]">
+                              {" "}
+                              · {formatDate(row.date)}
+                              {row.reference_label
+                                ? ` · ${row.reference_label}`
+                                : ""}
+                            </span>
                           </span>
                         </span>
                         <span className="flex shrink-0 items-center gap-3">
@@ -315,8 +354,26 @@ const SettleAbonoModal = ({
                             onChange={() => toggleRow(row.id)}
                             disabled={pending}
                             aria-label={`Check ${row.description || "abono"}`}
-                            className="h-4 w-4 shrink-0 accent-[var(--accent)]"
+                            className="peer sr-only"
                           />
+                          <span
+                            aria-hidden
+                            className={cn(
+                              "flex h-6 w-6 shrink-0 items-center justify-center rounded-lg border transition-all",
+                              isChecked
+                                ? "border-[var(--accent)] bg-[var(--accent)] text-white shadow-card"
+                                : "border-[var(--border)] bg-[var(--surface)] text-transparent",
+                            )}
+                          >
+                            <Check
+                              size={13}
+                              strokeWidth={3}
+                              className={cn(
+                                "transition-transform duration-150",
+                                isChecked ? "scale-100" : "scale-50",
+                              )}
+                            />
+                          </span>
                         </span>
                       </label>
                     );
@@ -326,12 +383,13 @@ const SettleAbonoModal = ({
             </div>
 
             {/* ── Footer ── */}
-            <div className="flex items-center justify-end gap-2 border-t border-[var(--border)] px-5 py-4">
+            <div className="flex items-center justify-end gap-2 border-t border-[var(--border)] bg-[var(--surface-2)]/30 px-6 py-4">
               <Button
                 type="button"
                 variant="outline"
                 onClick={close}
                 disabled={pending}
+                className="rounded-full px-5"
               >
                 Cancel
               </Button>
@@ -340,6 +398,7 @@ const SettleAbonoModal = ({
                 variant="accent"
                 onClick={() => setConfirmOpen(true)}
                 disabled={pending || !hasSelection || insufficient}
+                className="rounded-full px-5 shadow-card"
                 title={
                   insufficient
                     ? "Cannot proceed your request due to insufficient balance"
@@ -355,8 +414,11 @@ const SettleAbonoModal = ({
           </motion.div>
         </motion.div>
       )}
+      </AnimatePresence>
 
-      {/* Final gate: the employee confirms before anything is written. */}
+      {/* Final gate: the employee confirms before anything is written.
+          Portalled on its own (z-[90]) so it always floats above this
+          dialog instead of competing with it at the same z-index. */}
       <ConfirmActionDialog
         open={confirmOpen}
         icon={<BadgeCheck size={20} aria-hidden />}
@@ -372,7 +434,7 @@ const SettleAbonoModal = ({
         onCancel={() => setConfirmOpen(false)}
         onConfirm={handleSettle}
       />
-    </AnimatePresence>,
+    </>,
     document.body,
   );
 };

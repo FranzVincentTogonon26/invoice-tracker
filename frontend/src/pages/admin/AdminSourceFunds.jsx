@@ -170,9 +170,9 @@ export default function AdminSourceFunds() {
     }
   };
 
-  // Open <-> cut_off flip behind a confirmation. Closing sets
-  // budget_reference.status = 'cut_off' and stamps date_cut_off (NOW())
-  // server-side; reopening sets status = 'open' and clears the stamp.
+  // Open <-> cut_off flip behind a confirmation. Only the status column
+  // moves — date_cut_off is left untouched (it is owned by the create /
+  // edit date picker).
   const toggleIsOpen = (toggleSource?.status ?? "open") === "open";
   const handleToggleStatus = async () => {
     if (!toggleSource) return;
@@ -364,8 +364,8 @@ export default function AdminSourceFunds() {
         title={toggleIsOpen ? "Close this source?" : "Reopen this source?"}
         description={
           toggleIsOpen
-            ? "Sets status to cut_off and stamps the cut-off date — the source disconnects from every flow until reopened."
-            : "Sets status back to open and clears the cut-off date — the source reconnects to every flow."
+            ? "Sets status to cut_off — the source disconnects from every flow until reopened. The cut-off date is left untouched."
+            : "Sets status back to open — the source reconnects to every flow. The cut-off date is left untouched."
         }
         summary={toggleSummary}
         cancelLabel="Cancel"

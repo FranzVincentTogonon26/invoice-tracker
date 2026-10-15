@@ -646,10 +646,11 @@ export const updateNotes = async (req, res, next) => {
   }
 };
 
-// Update expense category — the pencil editor in ExpenseDetailsModal (draft
-// rows only in the UI). Admin-only via the route middleware. Draft-only and
-// closed-holding guards are enforced here too so a direct API call can't
-// retag a paid row or a finalized holding.
+// Update expense category — the quick editor in the transaction sheet and
+// the pencil editor in ExpenseDetailsModal. Owner-or-admin (same rule as
+// description edits: an employee may only touch their own row, admins keep
+// the full ledger, strangers see "not found"). The closed-holding guard is
+// enforced here too so a direct API call can't retag a finalized holding.
 export const updateCategory = async (req, res, next) => {
   try {
     const { id } = req.params;
@@ -659,7 +660,7 @@ export const updateCategory = async (req, res, next) => {
     const payload = validate(updateExpenseCategorySchema, req.body);
 
     const existing = await Expenses.findExpenseById(id);
-    if (!existing)
+    if (!existing || !canTouchRow(req, existing))
       throw ApiError.notFound("Expense not found", "EXPENSE_NOT_FOUND");
     assertExpenseMutable(existing);
 
@@ -671,11 +672,6 @@ export const updateCategory = async (req, res, next) => {
       throw ApiError.notFound("Expense not found", "EXPENSE_NOT_FOUND");
     if (result?.badCategory)
       throw ApiError.notFound("Category not found", "CATEGORY_NOT_FOUND");
-    if (result?.notDraft)
-      throw ApiError.conflict(
-        `Only a draft expense can change category (current status: ${result.status}).`,
-        "EXPENSE_NOT_DRAFT",
-      );
 
     emitTransaction({
       action: "update",

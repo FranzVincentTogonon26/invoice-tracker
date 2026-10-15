@@ -123,7 +123,7 @@ export function toExpenseModalRow(e) {
     category: e.category_name,
     categoryId: e.category_id ?? null,
     timeDate: e.created_at,
-    date: e.expense_date,
+    date: e.created_at ?? e.expense_date,
     amount: Number(e.total_amount) || 0,
     method: e.payment_method,
     status: e.status,

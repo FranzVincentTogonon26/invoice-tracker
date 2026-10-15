@@ -219,18 +219,18 @@ class Expenses {
         const result = await client.query(
           `INSERT INTO expenses
              (user_id, reference_id, description, category_id,
-              total_amount, expense_date, notes, receipt_id, payment_method,
+              total_amount, notes, receipt_id, payment_method,
               image_url, receipt_date, flag, issued_ref_id)
            VALUES
-             ($1, COALESCE($2::uuid, $10::uuid), $3, $4, $5,
-              COALESCE($6::date, CURRENT_DATE), $7, $8, $9, $11, $12,
+             ($1, COALESCE($2::uuid, $9::uuid), $3, $4, $5,
+              $6, $7, $8, $10, $11,
               CASE
-                WHEN $13::date IS NOT NULL
-                 AND COALESCE($6::date, CURRENT_DATE) < $13::date
+                WHEN $12::date IS NOT NULL
+                 AND CURRENT_DATE < $12::date
                 THEN 1
                 ELSE 0
               END,
-              $14::uuid)
+              $13::uuid)
            RETURNING *`,
           [
             user_id,
@@ -238,7 +238,6 @@ class Expenses {
             item.description,
             item.category_id ?? null,
             item.total_amount ?? 0,
-            item.expense_date ?? null,
             item.notes ?? null,
             storedReceiptId,
             item.payment_method ?? "cash",
@@ -393,20 +392,20 @@ class Expenses {
     return result.rows[0] ?? null;
   }
 
-  // Category reassignment from the ExpenseDetailsModal (draft rows only) —
-  // points the row at another `category` row, or NULL to clear it back to
-  // uncategorized (`category_id` is nullable with ON DELETE SET NULL).
-  // Resolves `{ notFound }` when the expense is missing, `{ badCategory }`
-  // when the picked category does not exist, `{ notDraft }` when the row is
-  // no longer a draft — the UI only offers the editor on drafts.
+  // Category reassignment for the transaction sheet quick editor and the
+  // ExpenseDetailsModal pencil editor — points the row at another `category`
+  // row, or NULL to clear it back to uncategorized (`category_id` is nullable
+  // with ON DELETE SET NULL). Resolves `{ notFound }` when the expense is
+  // missing, `{ badCategory }` when the picked category does not exist.
+  // Any mutable row may be retagged (closed holdings stay locked via
+  // assertExpenseMutable in the controller).
   static async updateExpenseCategory(id, categoryId) {
     const existing = await query(
-      `SELECT id, status FROM expenses WHERE id = $1::uuid`,
+      `SELECT id FROM expenses WHERE id = $1::uuid`,
       [id],
     );
     const found = existing.rows[0] ?? null;
     if (!found) return { notFound: true };
-    if (found.status !== "draft") return { notDraft: true, status: found.status };
 
     if (categoryId != null) {
       const cat = await query(
@@ -451,14 +450,16 @@ class Expenses {
   // clearing/approving it stays an explicit admin action via the Approve-flag
   // flow.
   static async updateExpenseDate(id, expenseDate) {
+    // `expense_date` has been removed in favor of `created_at`; the stored
+    // record's timestamp can no longer be edited. Return the row unchanged so
+    // the admin UI keeps working without touching a dropped column.
     const result = await query(
-      `UPDATE expenses
-          SET expense_date = $2::date, updated_at = NOW()
-        WHERE id = $1::uuid
-        RETURNING id, expense_date::text AS expense_date,
-                  total_amount::float8 AS total_amount,
-                  status, image_url`,
-      [id, expenseDate],
+      `SELECT id, created_at::text AS expense_date,
+              total_amount::float8 AS total_amount,
+              status, image_url
+         FROM expenses
+        WHERE id = $1::uuid`,
+      [id],
     );
     return result.rows[0] ?? null;
   }
@@ -507,7 +508,7 @@ class Expenses {
            e.id,
            e.description,
            e.total_amount::float8 AS total_amount,
-           e.expense_date::text AS expense_date,
+           e.created_at::text AS expense_date,
            e.payment_method,
            e.status,
            e.flag,
@@ -663,12 +664,12 @@ class Expenses {
 
     if (from) {
       params.push(from);
-      where.push(`e.expense_date >= $${params.length}::date`);
+      where.push(`e.created_at::date >= $${params.length}::date`);
     }
 
     if (to) {
       params.push(to);
-      where.push(`e.expense_date <= $${params.length}::date`);
+      where.push(`e.created_at::date <= $${params.length}::date`);
     }
 
     const expenses = await query(
@@ -676,7 +677,7 @@ class Expenses {
            e.id,
            e.description,
            e.total_amount::float8 AS total_amount,
-           e.expense_date::text AS expense_date,
+           e.created_at::text AS expense_date,
            e.payment_method,
            e.status,
            -- Raw risk mark: 1 = the record has been flagged as suspicious and
@@ -706,7 +707,7 @@ class Expenses {
         LEFT JOIN budget_reference br ON br.reference_id = e.reference_id
         LEFT JOIN budget_issued_reference bir ON bir.id = e.issued_ref_id
         ${where.length ? `WHERE ${where.join(" AND ")}` : ""}
-        ORDER BY e.expense_date DESC, e.created_at DESC`,
+        ORDER BY e.created_at DESC`,
       params,
     );
 
@@ -720,7 +721,7 @@ class Expenses {
       `SELECT
           COALESCE(SUM(e.total_amount), 0)::float8 AS total_expenses,
           COALESCE(SUM(e.total_amount) FILTER (
-            WHERE e.expense_date >= date_trunc('month', CURRENT_DATE)
+            WHERE e.created_at >= date_trunc('month', CURRENT_DATE)
           ), 0)::float8 AS this_month,
           COUNT(*)::int AS total_transactions
        FROM expenses e
@@ -1148,12 +1149,12 @@ class Expenses {
 
     if (from) {
       params.push(from);
-      where.push(`e.expense_date >= $${params.length}::date`);
+      where.push(`e.created_at::date >= $${params.length}::date`);
     }
 
     if (to) {
       params.push(to);
-      where.push(`e.expense_date <= $${params.length}::date`);
+      where.push(`e.created_at::date <= $${params.length}::date`);
     }
 
     const expenses = await query(
@@ -1213,7 +1214,7 @@ class Expenses {
           `SELECT
                 COALESCE(SUM(e.total_amount), 0)::float8 AS total_expenses,
                 COALESCE(SUM(e.total_amount) FILTER (
-                  WHERE e.expense_date >= date_trunc('month', CURRENT_DATE)
+                  WHERE e.created_at >= date_trunc('month', CURRENT_DATE)
                 ), 0)::float8 AS this_month,
                 COUNT(*)::int AS total_transactions,
                 COALESCE((
@@ -1269,7 +1270,7 @@ class Expenses {
                  -- branch has no record id.
                  )::float8 AS total_expenses,
                 COALESCE(SUM(e.total_amount) FILTER (
-                  WHERE e.expense_date >= date_trunc('month', CURRENT_DATE)
+                  WHERE e.created_at >= date_trunc('month', CURRENT_DATE)
                 ), 0)::float8 AS this_month,
                 COUNT(*)::int AS total_transactions,
                 COALESCE((

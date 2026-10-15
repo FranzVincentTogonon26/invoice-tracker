@@ -361,6 +361,25 @@ function TransactionCard({ tx, onOpen }) {
 }
 
 /* ── Mobile bottom sheet — same slide-up animation as the expenses sheet ── */
+// Premium staggered entrance: once the panel slides up, its inner sections
+// rise in sequence (grabber → header → body) with a soft rise-and-fade.
+// Re-keyed per row so switching rows replays the sequence.
+const sheetContentVariants = {
+  hidden: {},
+  show: {
+    transition: { staggerChildren: 0.07, delayChildren: 0.12 },
+  },
+};
+
+const sheetItemVariants = {
+  hidden: { opacity: 0, y: 16 },
+  show: {
+    opacity: 1,
+    y: 0,
+    transition: { duration: 0.45, ease: [0.22, 1, 0.36, 1] },
+  },
+};
+
 function TransactionSheet({
   row,
   pending,
@@ -432,11 +451,21 @@ function TransactionSheet({
               "px-4 pt-3 pb-[calc(env(safe-area-inset-bottom)+1.25rem)]",
             )}
           >
-            <div
+            <motion.div
+              key={row?.id ?? "issued-sheet-content"}
+              variants={sheetContentVariants}
+              initial="hidden"
+              animate="show"
+            >
+            <motion.div
               aria-hidden
+              variants={sheetItemVariants}
               className="mx-auto h-1.5 w-10 rounded-full bg-[var(--ink-muted)]/25"
             />
-            <div className="flex items-center gap-3 pt-4">
+            <motion.div
+              variants={sheetItemVariants}
+              className="flex items-center gap-3 pt-4"
+            >
               <span
                 aria-hidden
                 className={cn(
@@ -463,17 +492,20 @@ function TransactionSheet({
               >
                 <X size={16} aria-hidden />
               </button>
-            </div>
-            {isTransfer(row) ? (
-              <TransferDetailsBody
-                row={row}
-                pending={pending}
-                onCancel={onCancel}
-                actionable={actionable}
-              />
-            ) : (
-              <IssuedDetailsBody row={row} />
-            )}
+            </motion.div>
+            <motion.div variants={sheetItemVariants}>
+              {isTransfer(row) ? (
+                <TransferDetailsBody
+                  row={row}
+                  pending={pending}
+                  onCancel={onCancel}
+                  actionable={actionable}
+                />
+              ) : (
+                <IssuedDetailsBody row={row} />
+              )}
+            </motion.div>
+            </motion.div>
           </motion.div>
         </motion.div>
       )}

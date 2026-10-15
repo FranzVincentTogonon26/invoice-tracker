@@ -14,7 +14,7 @@ export const expenseToTransaction = (exp) => ({
   kind: "expense",
   id: exp.id,
   description: exp.description,
-  date: exp.expense_date,
+  date: exp.created_at,
   timeDate: exp.created_at,
   amount: Number(exp.total_amount) || 0,
   method: exp.payment_method,

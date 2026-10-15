@@ -234,6 +234,24 @@ function MobileDock({ onOpenMenu }) {
   );
 }
 
+// Staggered entrance for the mobile sheet: sections rise in sequence
+// behind the panel slide with a soft rise-and-fade.
+const menuContentVariants = {
+  hidden: {},
+  show: {
+    transition: { staggerChildren: 0.06, delayChildren: 0.14 },
+  },
+};
+
+const menuItemVariants = {
+  hidden: { opacity: 0, y: 14 },
+  show: {
+    opacity: 1,
+    y: 0,
+    transition: { duration: 0.4, ease: [0.22, 1, 0.36, 1] },
+  },
+};
+
 /**
  * Bottom-sheet navigation for small screens — the mobile counterpart of the
  * rail: brand + signed-in account, the full nav grid, then Settings and
@@ -292,7 +310,7 @@ function MobileMenuSheet({ open, onClose, onLogout, user }) {
             initial={{ y: "100%" }}
             animate={{ y: 0 }}
             exit={{ y: "100%" }}
-            transition={{ duration: 0.34, ease: SHEET_EASE }}
+            transition={{ duration: 0.38, ease: SHEET_EASE, delay: 0.08 }}
             className={cn(
               "relative w-full max-h-[88dvh] overflow-y-auto scrollbar-slim outline-none",
               "rounded-t-[15px] border border-b-0 border-[var(--border)]",
@@ -300,9 +318,20 @@ function MobileMenuSheet({ open, onClose, onLogout, user }) {
               "px-4 pt-3 pb-[calc(env(safe-area-inset-bottom)+1.25rem)]",
             )}
           >
-            <div className="mx-auto h-1.5 w-10 rounded-full bg-[var(--ink-muted)]/25" />
+            <motion.div
+              variants={menuContentVariants}
+              initial="hidden"
+              animate="show"
+            >
+            <motion.div
+              variants={menuItemVariants}
+              className="mx-auto h-1.5 w-10 rounded-full bg-[var(--ink-muted)]/25"
+            />
 
-            <div className="flex items-center gap-3 pt-4">
+            <motion.div
+              variants={menuItemVariants}
+              className="flex items-center gap-3 pt-4"
+            >
               <AILogo />
               <div className="min-w-0 flex-1">
                 <div className="font-display text-base font-medium text-[var(--ink)]">
@@ -320,10 +349,13 @@ function MobileMenuSheet({ open, onClose, onLogout, user }) {
               >
                 <X size={16} />
               </button>
-            </div>
+            </motion.div>
 
             {/* Signed-in account */}
-            <div className="mt-4 flex items-center gap-3 rounded-2xl border border-[var(--border)] bg-[var(--surface-2)] px-3.5 py-3">
+            <motion.div
+              variants={menuItemVariants}
+              className="mt-4 flex items-center gap-3 rounded-2xl border border-[var(--border)] bg-[var(--surface-2)] px-3.5 py-3"
+            >
               <EmployeeAvatar
                 name={user?.name}
                 avatarUrl={user?.avatar_url}
@@ -339,8 +371,9 @@ function MobileMenuSheet({ open, onClose, onLogout, user }) {
                   </div>
                 )}
               </div>
-            </div>
+            </motion.div>
 
+            <motion.div variants={menuItemVariants}>
             <div className={SHEET_LABEL}>Menu</div>
             <div className="mt-2 grid grid-cols-2 gap-2">
               {NAV.map((item) => {
@@ -379,7 +412,9 @@ function MobileMenuSheet({ open, onClose, onLogout, user }) {
                 );
               })}
             </div>
+            </motion.div>
 
+            <motion.div variants={menuItemVariants}>
             <div className={SHEET_LABEL}>Account</div>
             <div className="mt-2 flex flex-col gap-1">
               <NavLink
@@ -427,7 +462,9 @@ function MobileMenuSheet({ open, onClose, onLogout, user }) {
                 Log out
               </button>
             </div>
-          </motion.div>
+            </motion.div>
+            </motion.div>
+        </motion.div>
         </motion.div>
       )}
     </AnimatePresence>

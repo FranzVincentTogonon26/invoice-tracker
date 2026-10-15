@@ -66,9 +66,7 @@ export function ExpenseDetailsOverview({
           <p className="mt-1 break-words text-sm font-medium leading-snug text-[var(--ink)] normal-case">
             {vendorName || row?.description || "—"}
           </p>
-          {vendorName &&
-          row?.description &&
-          vendorName !== row.description ? (
+          {vendorName && row?.description && vendorName !== row.description ? (
             <p className="mt-0.5 break-words text-xs text-[var(--ink-muted)]">
               {row.description}
             </p>
@@ -144,11 +142,7 @@ export function ExpenseDetailsOverview({
         >
           <div className="flex items-center gap-3">
             <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-[var(--accent-soft)] text-[var(--accent-strong)]">
-              {receiptIsPdf ? (
-                <FileText size={16} />
-              ) : (
-                <ImageIcon size={16} />
-              )}
+              {receiptIsPdf ? <FileText size={16} /> : <ImageIcon size={16} />}
             </span>
             <div>
               <p className="text-xs font-medium text-[var(--ink)]">

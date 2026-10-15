@@ -6,7 +6,7 @@ import {
   errorHandler,
   notFoundHandler,
 } from "./middleware/error.handler.middleware.js";
-import apiRoutes from "./routes/index.js";
+import apiRoutes from "./routes/index.route.js";
 import { UPLOADS_ROOT } from "./utils/receiptImage.js";
 
 const app = express();

@@ -84,7 +84,7 @@ const EmployeeOverview = () => {
     <div className="space-y-4 sm:space-y-5">
       {/* Header — desktop only, mobile uses its own compact title */}
 
-      <PageHeader title="Overview" description="Your money at a glance." />
+      <PageHeader title="Overview" description="Your budget at a glance." />
 
       {/* ── Finance overview — one hero + three essentials ── */}
       <section aria-label="Budget overview">

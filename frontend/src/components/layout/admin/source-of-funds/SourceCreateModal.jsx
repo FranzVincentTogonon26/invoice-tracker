@@ -178,6 +178,7 @@ export function SourceCreateModal({ open, saving, onClose, onSave }) {
                       placeholder="Cut-off date"
                       className="text-xs"
                       disabled={saving}
+                      minDate={new Date()}
                     />
                   </Field>
                   <Field

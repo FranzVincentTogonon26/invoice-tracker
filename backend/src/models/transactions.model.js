@@ -205,7 +205,7 @@ class Transactions {
         counterpartyRole: null,
         approvedBy: null,
         flagged: Number(row.flag) === 1,
-        expenseDate: row.expense_date ?? null,
+        expenseDate: row.created_at ?? null,
         dateSettled: null,
         receiptId: row.receipt_id ?? null,
         imageUrl: row.image_url ?? null,

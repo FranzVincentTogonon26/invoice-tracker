@@ -117,7 +117,7 @@ const AdminExpenses = () => {
       (expenses ?? [])
         .map((e) => ({
           id: e.id,
-          date: e.expense_date,
+          date: e.created_at,
           timeDate: e.created_at,
           description: e.description,
           category: e.category_name,
