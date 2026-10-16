@@ -285,6 +285,22 @@ export function AdminEmployeeReimbursementDetails() {
   const isClosed = record
     ? record.status === "close"
     : statuses.includes("close") && !statuses.includes("open");
+  // Reopen would fail server-side (409) when the employee already holds a
+  // live sibling issuance for this source — detect it upfront so the menu
+  // never offers a doomed confirm. Plain derivation (no hook): it must run
+  // before the early returns below.
+  const liveSibling = (() => {
+    if (!record || record.status !== "close") return false;
+    const refId = String(record.referenceId ?? record.reference_id ?? "");
+    const userId = String(record.userId ?? record.user_id ?? "");
+    return (records ?? []).some(
+      (r) =>
+        String(r.id) !== String(record.id) &&
+        String(r.referenceId ?? r.reference_id ?? "") === refId &&
+        String(r.userId ?? r.user_id ?? "") === userId &&
+        String(r.status ?? "").trim().toLowerCase() === "open",
+    );
+  })();
   // Finalized-card context: the finalization date, the display balance and
   // the submit-time issuance note (`budget_issued_reference.notes`, selected
   // per record — legacy per-user aggregates carry no single note, so the
@@ -331,11 +347,20 @@ export function AdminEmployeeReimbursementDetails() {
               </p>
             </div>
             <RecordActionsMenu
-              canReopen={Boolean(record?.id)}
+              canReopen={Boolean(record?.id) && !liveSibling}
               onReopen={() => setReopenConfirmOpen(true)}
               onPreview={() => setPreviewOpen(true)}
             />
           </div>
+          {record && liveSibling && (
+            <p
+              role="note"
+              className="border-b border-[var(--border)] bg-[var(--warning)]/[0.07] px-4 py-2.5 text-xs leading-snug text-[var(--warning)] sm:px-5"
+            >
+              Reopen unavailable — {row?.name || "this employee"} already holds
+              an open issuance for this source. Reimburse it first.
+            </p>
+          )}
           <dl
             className={`grid grid-cols-1 gap-px bg-[var(--border)]/60 sm:grid-cols-3 ${
               showRecordNote ? "" : "overflow-hidden rounded-b-3xl"
