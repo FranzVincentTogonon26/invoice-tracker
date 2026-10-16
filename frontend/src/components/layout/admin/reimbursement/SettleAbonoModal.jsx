@@ -32,10 +32,10 @@ const DIALOG_EASE = [0.16, 1, 0.3, 1];
 const TOP_UP_NOTE_MAX = 150;
 
 // Admin → Reimbursement → personnel row → Settle abono. Settles the checked
-// OPEN abono rows (status → 'settled', `date_settled` stamped) and books each
-// amount back as an `issued_budget` row under the same budget reference, so
-// the fund pool stays whole. The server re-checks coverage — a request the
-// employee's remaining balance can't cover is refused with nothing written.
+// OPEN abono rows (status → 'settled', `date_settled` stamped). Settle-only:
+// nothing is booked back to `issued_budget` — settled amounts leave the
+// spendable pool. The server re-checks coverage — a request the employee's
+// remaining balance can't cover is refused with nothing written.
 //
 // Shape lives in siblings: SourceBalanceRow (per-source summary),
 // SettleAbonoRow (checkbox row) and the shared ConfirmActionDialog.
@@ -173,7 +173,7 @@ function SettleBody({ employee, onClose }) {
       {
         onSuccess: (res) => {
           toast.success(
-            `Settled ${res?.settled?.length ?? selectedRows.length} abono (${formatMoney(res?.requested ?? requested)}) — re-issued to the pool.`,
+            `Settled ${res?.settled?.length ?? selectedRows.length} abono (${formatMoney(res?.requested ?? requested)}).`,
           );
           onClose?.();
         },
@@ -572,8 +572,8 @@ function SettleBody({ employee, onClose }) {
               {selectedRows.length === 1 ? "abono" : "abonos"}
             </span>{" "}
             ({formatMoney(requested)}) for {employee?.name || "the employee"}?
-            Each amount returns to the pool as issued budget, and the rows flip
-            to settled — this can&apos;t be undone.
+            The rows flip to settled and leave the spendable pool — this
+            can&apos;t be undone.
           </>
         }
         cancelLabel="Go back"

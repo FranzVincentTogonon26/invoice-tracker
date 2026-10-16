@@ -1195,7 +1195,8 @@ const AddExpenses = () => {
                   !isActiveSession ||
                   insufficientFunds ||
                   sourceUnselected ||
-                  noSources
+                  noSources ||
+                  total <= 0
                 }
                 title={
                   !isActiveSession
@@ -1206,7 +1207,9 @@ const AddExpenses = () => {
                         ? "Select a budget source to fund these expenses"
                         : insufficientFunds
                           ? "Cannot proceed — the selected budget source is insufficient"
-                          : undefined
+                          : total <= 0
+                            ? "Add an amount greater than zero on at least one line to proceed"
+                            : undefined
                 }
               >
                 {saving ? (

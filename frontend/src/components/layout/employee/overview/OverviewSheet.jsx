@@ -32,7 +32,7 @@ import { OverviewDetailsBody } from "./OverviewDetailsBody";
 const contentVariants = {
   hidden: {},
   show: {
-    transition: { staggerChildren: 0.08, delayChildren: 0.22 },
+    transition: { staggerChildren: 0.05, delayChildren: 0.14 },
   },
 };
 
@@ -41,7 +41,7 @@ const itemVariants = {
   show: {
     opacity: 1,
     y: 0,
-    transition: { duration: 0.5, ease: [0.22, 1, 0.36, 1] },
+    transition: { duration: 0.32, ease: [0.22, 1, 0.36, 1] },
   },
 };
 
@@ -49,7 +49,7 @@ const itemVariants = {
 // back out the same way), so the receipt opens inside the sheet instead of
 // a separate modal.
 const receiptPaneTransition = {
-  duration: 0.38,
+  duration: 0.26,
   ease: [0.22, 1, 0.36, 1],
 };
 
@@ -58,7 +58,7 @@ const receiptPaneTransition = {
 const receiptContentVariants = {
   hidden: {},
   show: {
-    transition: { staggerChildren: 0.09, delayChildren: 0.14 },
+    transition: { staggerChildren: 0.06, delayChildren: 0.1 },
   },
 };
 
@@ -69,7 +69,7 @@ const receiptItemVariants = {
   show: {
     opacity: 1,
     x: 0,
-    transition: { duration: 0.4, ease: [0.22, 1, 0.36, 1] },
+    transition: { duration: 0.28, ease: [0.22, 1, 0.36, 1] },
   },
 };
 
@@ -335,10 +335,10 @@ export function OverviewSheet({ row, onClose }) {
             animate={{ y: "0%" }}
             exit={{ y: "100%" }}
             transition={{
-              duration: 0.46,
+              duration: 0.3,
               ease: PANEL_EASE,
-              delay: 0.12,
-              layout: { duration: 0.35, ease: [0.22, 1, 0.36, 1] },
+              delay: 0.08,
+              layout: { duration: 0.25, ease: [0.22, 1, 0.36, 1] },
             }}
             layout
             className={cn(
@@ -356,12 +356,12 @@ export function OverviewSheet({ row, onClose }) {
                   animate={{
                     x: "0%",
                     opacity: 1,
-                    transition: { ...receiptPaneTransition, delay: 0.06 },
+                    transition: { ...receiptPaneTransition, delay: 0.04 },
                   }}
                   exit={{
                     x: "100%",
                     opacity: 0,
-                    transition: { duration: 0.28, ease: [0.32, 0, 0.67, 0] },
+                    transition: { duration: 0.2, ease: [0.32, 0, 0.67, 0] },
                   }}
                 >
                   <SheetReceiptView
@@ -378,7 +378,7 @@ export function OverviewSheet({ row, onClose }) {
                   exit={{
                     opacity: 0,
                     x: "-40%",
-                    transition: { duration: 0.25 },
+                    transition: { duration: 0.18 },
                   }}
                 >
                   <motion.div

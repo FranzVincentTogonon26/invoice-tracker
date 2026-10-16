@@ -137,10 +137,10 @@ class Employee {
   //     - `total_spent`:   SUM(expenses.total_amount) of PAID rows only, so a
   //                        soft-deleted row parked in 'draft' or a voided one
   //                        in 'cancel' never reads as spent ("Total Spent").
-  //                        Settled abono is NOT spent: settling hands the
-  //                        pesos back (re-booked as an issued_budget child),
-  //                        so adding it here would charge the same money
-  //                        twice — once as spent, once as issued.
+  //                        Settled abono is NOT spent: settling writes
+  //                        nothing back, so settled amounts simply left the
+  //                        pool — adding them here would charge the same
+  //                        money twice.
   //     - `total_abono`:   SUM(employee_abono.amount) of OPEN rows only — a
   //                        settled (reimbursed) or draft abono no longer funds
   //                        spending
@@ -319,8 +319,7 @@ class Employee {
             ), 0)
             - (COALESCE((
               -- Same paid-expenses-only spent as total_spent above: settled
-              -- abono returns to the pool as an issued child, so it must not
-              -- be subtracted here as well.
+              -- abono writes nothing back, so it simply never enters spent.
               SELECT SUM(e.total_amount)
               FROM expenses e
               LEFT JOIN budget_reference br ON br.reference_id = e.reference_id

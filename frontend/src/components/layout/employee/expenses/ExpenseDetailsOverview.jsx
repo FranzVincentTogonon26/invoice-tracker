@@ -1,7 +1,61 @@
-import { FileText, Image as ImageIcon, TriangleAlert } from "lucide-react";
-import { formatDate, formatMoney, formatTime, methodLabel } from "@/lib/utils";
+import {
+  CalendarDays,
+  FileText,
+  Image as ImageIcon,
+  TriangleAlert,
+} from "lucide-react";
+import {
+  cn,
+  formatDate,
+  formatMoney,
+  formatTime,
+  methodLabel,
+} from "@/lib/utils";
 import { ExpenseStatusBadge } from "../../admin/expenses/ExpensesTable";
 import { ExpenseMethodIcon } from "./ExpenseBadges";
+
+const ReceiptDatePill = ({ formatted, danger, children }) => (
+  <div
+    className={cn(
+      "flex min-w-0 items-center gap-2 rounded-xl px-2.5 py-3 ring-1 ring-inset",
+      danger
+        ? "bg-[var(--danger)]/10 ring-[var(--danger)]/30"
+        : "bg-[var(--accent-soft)]/50 ring-[var(--accent)]/25",
+    )}
+  >
+    <span
+      className={cn(
+        "shrink-0",
+        danger ? "text-[var(--danger)]" : "text-[var(--accent-strong)]",
+      )}
+    >
+      {danger ? (
+        <TriangleAlert size={14} aria-hidden />
+      ) : (
+        <CalendarDays size={14} aria-hidden />
+      )}
+    </span>
+    <p className="min-w-0 flex-1 truncate text-xs tabular-nums">
+      <span
+        className={cn(
+          "font-medium",
+          danger ? "text-[var(--danger)]" : "text-[var(--ink-muted)]",
+        )}
+      >
+        Receipt date ·{" "}
+      </span>
+      <span
+        className={cn(
+          "font-semibold",
+          danger ? "text-[var(--danger)]" : "text-[var(--ink)]",
+        )}
+      >
+        {formatted}
+      </span>
+    </p>
+    {children}
+  </div>
+);
 
 // "Overview" tab of the expense details modal: flagged banner, amount hero,
 // vendor/date/method/category/source/notes grid, and the quick-switch card
@@ -55,6 +109,52 @@ export function ExpenseDetailsOverview({
         </div>
         <ExpenseStatusBadge status={row?.status} className="shrink-0" />
       </div>
+
+      {/* Receipt Quick Preview Link Card */}
+      {hasReceipt && (
+        <div className="w-full rounded-2xl border border-[var(--border)] bg-[var(--surface-2)]/60 p-3.5 text-left transition-colors ">
+          <div className="flex w-full items-center justify-between gap-3">
+            <div className="flex min-w-0 items-center gap-3">
+              <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-[var(--accent-soft)] text-[var(--accent-strong)]">
+                {receiptIsPdf ? (
+                  <FileText size={16} />
+                ) : (
+                  <ImageIcon size={16} />
+                )}
+              </span>
+              <div className="min-w-0">
+                <p className="truncate text-xs font-medium text-[var(--ink)]">
+                  {receiptIsPdf
+                    ? "PDF receipt document attached"
+                    : "Receipt image attached"}
+                </p>
+                <p className="truncate text-[11px] text-[var(--ink-muted)]">
+                  {receiptCount > 0
+                    ? `${receiptCount} itemized lines scanned · View receipt`
+                    : "Click to inspect receipt document"}
+                </p>
+              </div>
+            </div>
+            <button
+              type="button"
+              onClick={onShowReceipt}
+              className="shrink-0 rounded-full border border-[var(--border)] bg-[var(--surface)] hover:bg-[var(--surface-2)]/90 px-2.5 py-1 text-xs font-normal text-[var(--ink)] shadow-2xs"
+            >
+              View receipt →
+            </button>
+          </div>
+          {/* Receipt date gets its own full-width row so the value
+                                                reads at a glance and the editor has room to breathe. */}
+          {(row?.receiptDate ?? row?.receipt_date) && (
+            <div className="mt-2.5 border-t border-[var(--border)] pt-2.5">
+              <ReceiptDatePill
+                formatted={`${formatDate(row.receiptDate ?? row.receipt_date)} · ${formatTime(row.receiptDate ?? row.receipt_date)}`}
+                danger={Boolean(row?.flagged)}
+              />
+            </div>
+          )}
+        </div>
+      )}
 
       {/* Details Section */}
       <div className="space-y-2 rounded-2xl border border-[var(--border)] bg-[var(--surface-2)]/60 px-4 py-3.5">
@@ -125,43 +225,13 @@ export function ExpenseDetailsOverview({
         {/* Notes */}
         {row?.notes ? (
           <div className="pt-2">
-            <p className="type-eyebrow text-[var(--ink-muted)]">Notes</p>
+            <p className="type-eyebrow text-[var(--ink-muted)]">Category</p>
             <p className="mt-1 break-words text-sm text-[var(--ink)]">
               {row.notes}
             </p>
           </div>
         ) : null}
       </div>
-
-      {/* Receipt Quick-switch Link Card */}
-      {hasReceipt && (
-        <button
-          type="button"
-          onClick={onShowReceipt}
-          className="flex w-full items-center justify-between gap-3 rounded-2xl border border-[var(--border)] bg-[var(--surface-2)]/60 p-3.5 text-left transition-colors hover:bg-[var(--surface-2)]/90"
-        >
-          <div className="flex items-center gap-3">
-            <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-[var(--accent-soft)] text-[var(--accent-strong)]">
-              {receiptIsPdf ? <FileText size={16} /> : <ImageIcon size={16} />}
-            </span>
-            <div>
-              <p className="text-xs font-medium text-[var(--ink)]">
-                {receiptIsPdf
-                  ? "PDF receipt document attached"
-                  : "Receipt image attached"}
-              </p>
-              <p className="text-[11px] text-[var(--ink-muted)]">
-                {receiptCount > 0
-                  ? `${receiptCount} itemized lines scanned · View receipt`
-                  : "Click to inspect receipt document"}
-              </p>
-            </div>
-          </div>
-          <span className=" rounded-full border border-[var(--border)] bg-[var(--surface)] px-2.5 py-1 text-xs font-normal text-[var(--ink)] shadow-2xs">
-            View receipt →
-          </span>
-        </button>
-      )}
     </div>
   );
 }

@@ -434,7 +434,6 @@ export default function AdminEmployeesDetails() {
     received,
     abono,
     sent,
-    settledAbono,
     funded,
     spentShare,
   } = budgetBreakdown(
@@ -671,7 +670,6 @@ export default function AdminEmployeesDetails() {
         spent={spent}
         sent={sent}
         abono={abono}
-        settledAbono={settledAbono}
         traceData={traceData}
         traceLoading={traceLoading}
       />

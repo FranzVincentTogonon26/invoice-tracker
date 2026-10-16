@@ -41,7 +41,7 @@ import { ExpenseStatusBadge } from "../../admin/expenses/ExpensesTable";
 const sheetContentVariants = {
   hidden: {},
   show: {
-    transition: { staggerChildren: 0.07, delayChildren: 0.12 },
+    transition: { staggerChildren: 0.05, delayChildren: 0.14 },
   },
 };
 
@@ -50,7 +50,7 @@ const sheetItemVariants = {
   show: {
     opacity: 1,
     y: 0,
-    transition: { duration: 0.45, ease: [0.22, 1, 0.36, 1] },
+    transition: { duration: 0.32, ease: [0.22, 1, 0.36, 1] },
   },
 };
 
@@ -58,14 +58,14 @@ const sheetItemVariants = {
 // in from the right over the details (and back out the same way) instead
 // of opening a separate modal.
 const receiptPaneTransition = {
-  duration: 0.38,
+  duration: 0.26,
   ease: [0.22, 1, 0.36, 1],
 };
 
 const receiptContentVariants = {
   hidden: {},
   show: {
-    transition: { staggerChildren: 0.09, delayChildren: 0.14 },
+    transition: { staggerChildren: 0.06, delayChildren: 0.1 },
   },
 };
 
@@ -76,7 +76,7 @@ const receiptItemVariants = {
   show: {
     opacity: 1,
     x: 0,
-    transition: { duration: 0.4, ease: [0.22, 1, 0.36, 1] },
+    transition: { duration: 0.28, ease: [0.22, 1, 0.36, 1] },
   },
 };
 
@@ -336,7 +336,7 @@ export function ExpenseTransactionSheet({
             initial={{ y: "100%" }}
             animate={{ y: "0%" }}
             exit={{ y: "100%" }}
-            transition={{ duration: 0.38, ease: PANEL_EASE }}
+            transition={{ duration: 0.3, ease: PANEL_EASE, delay: 0.08 }}
             className={cn(
               "relative max-h-[88dvh] w-full overflow-y-auto scrollbar-slim outline-none overscroll-contain",
               "rounded-t-[15px] border border-b-0 border-[var(--border)]",
@@ -584,12 +584,12 @@ function ExpenseTransactionSheetBody({
           animate={{
             x: "0%",
             opacity: 1,
-            transition: { ...receiptPaneTransition, delay: 0.06 },
+            transition: { ...receiptPaneTransition, delay: 0.04 },
           }}
           exit={{
             x: "100%",
             opacity: 0,
-            transition: { duration: 0.28, ease: [0.32, 0, 0.67, 0] },
+            transition: { duration: 0.2, ease: [0.32, 0, 0.67, 0] },
           }}
         >
           <SheetReceiptView
@@ -603,7 +603,7 @@ function ExpenseTransactionSheetBody({
           variants={sheetContentVariants}
           initial="hidden"
           animate="show"
-          exit={{ opacity: 0, x: "-40%", transition: { duration: 0.25 } }}
+          exit={{ opacity: 0, x: "-40%", transition: { duration: 0.18 } }}
         >
           <motion.div
             aria-hidden

@@ -204,11 +204,7 @@ export function ReimbursementPreviewModal({
                         title: `${formatMoney(row.sent)} sent via budget transfers`,
                         className: "text-[var(--danger)]",
                       },
-                      Number(row?.settledAbono) > 0 && {
-                        text: `- ${formatMoney(row.settledAbono)}`,
-                        title: `${formatMoney(row.settledAbono)} settled abono deducted from issued budget`,
-                        className: "text-[var(--warning)]",
-                      },
+
                     ].filter(Boolean),
                   },
                   {

@@ -367,7 +367,7 @@ function TransactionCard({ tx, onOpen }) {
 const sheetContentVariants = {
   hidden: {},
   show: {
-    transition: { staggerChildren: 0.07, delayChildren: 0.12 },
+    transition: { staggerChildren: 0.05, delayChildren: 0.14 },
   },
 };
 
@@ -376,7 +376,7 @@ const sheetItemVariants = {
   show: {
     opacity: 1,
     y: 0,
-    transition: { duration: 0.45, ease: [0.22, 1, 0.36, 1] },
+    transition: { duration: 0.32, ease: [0.22, 1, 0.36, 1] },
   },
 };
 
@@ -443,7 +443,7 @@ function TransactionSheet({
             initial={{ y: "100%" }}
             animate={{ y: "0%" }}
             exit={{ y: "100%" }}
-            transition={{ duration: 0.38, ease: SHEET_EASE }}
+            transition={{ duration: 0.3, ease: SHEET_EASE, delay: 0.08 }}
             className={cn(
               "scrollbar-slim relative max-h-[88dvh] w-full overflow-y-auto overscroll-contain outline-none",
               "rounded-t-[15px] border border-b-0 border-[var(--border)]",

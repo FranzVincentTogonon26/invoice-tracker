@@ -411,9 +411,7 @@ export function ReviewSection({
                           type="checkbox"
                           className="sr-only"
                           checked={isChecked}
-                          disabled={
-                            busy || bulkBusy || isCancelled || locked
-                          }
+                          disabled={busy || bulkBusy || isCancelled || locked}
                           onChange={() => toggle(e)}
                           aria-label={`Mark "${e.description || "expense"}" as reviewed`}
                         />
@@ -426,18 +424,10 @@ export function ReviewSection({
                               : isChecked
                                 ? "border-transparent bg-[var(--success)] text-white"
                                 : "border-[var(--border)] text-transparent",
-                            !(
-                              busy ||
-                              bulkBusy ||
-                              isCancelled ||
-                              locked
-                            ) &&
+                            !(busy || bulkBusy || isCancelled || locked) &&
                               !isChecked &&
                               "hover:border-[var(--success)]/60",
-                            (busy ||
-                              bulkBusy ||
-                              isCancelled ||
-                              locked) &&
+                            (busy || bulkBusy || isCancelled || locked) &&
                               "opacity-60",
                           )}
                         >
@@ -517,7 +507,7 @@ export function ReviewSection({
                           status={e.status}
                           busy={acting}
                           viewOnly={locked}
-                          onView={() => setViewRow(toExpenseModalRow(e))}
+                          onView={() => setViewRow(toExpenseModalRow(e, locked))}
                           onCancel={() => changeStatus(e, "cancel", "cancel")}
                           onRestore={() => changeStatus(e, "paid", "restore")}
                         />
@@ -702,124 +692,124 @@ export function ReviewSection({
             className="scrollbar-slim fixed inset-0 z-[70] overflow-y-auto bg-[var(--ink)]/40 p-6 backdrop-blur-sm"
           >
             <div className="flex min-h-full">
-            <motion.div
-              key="submit-card"
-              role="alertdialog"
-              aria-modal="true"
-              aria-labelledby="submit-confirm-title"
-              initial={{ opacity: 0, y: 12, scale: 0.97 }}
-              animate={{ opacity: 1, y: 0, scale: 1 }}
-              exit={{ opacity: 0, y: 8, scale: 0.97 }}
-              transition={{ duration: 0.22 }}
-              className="relative m-auto w-full max-w-md rounded-3xl border border-[var(--border)] bg-[var(--surface)] p-6 shadow-hover"
-            >
-              <div className="flex items-start gap-3">
-                <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-[var(--accent-strong)] text-white shadow-card">
-                  <Check size={18} aria-hidden />
-                </span>
-                <div className="min-w-0 flex-1">
-                  <h4
-                    id="submit-confirm-title"
-                    className="font-display text-lg font-medium tracking-tight text-[var(--ink)]"
-                  >
-                    Submit this reimbursement?
-                  </h4>
-                  <p className="mt-0.5 truncate text-xs text-[var(--ink-muted)]">
-                    {row?.name || "This employee"} · all {total} reviewed
-                  </p>
+              <motion.div
+                key="submit-card"
+                role="alertdialog"
+                aria-modal="true"
+                aria-labelledby="submit-confirm-title"
+                initial={{ opacity: 0, y: 12, scale: 0.97 }}
+                animate={{ opacity: 1, y: 0, scale: 1 }}
+                exit={{ opacity: 0, y: 8, scale: 0.97 }}
+                transition={{ duration: 0.22 }}
+                className="relative m-auto w-full max-w-md rounded-3xl border border-[var(--border)] bg-[var(--surface)] p-6 shadow-hover"
+              >
+                <div className="flex items-start gap-3">
+                  <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-[var(--accent-strong)] text-white shadow-card">
+                    <Check size={18} aria-hidden />
+                  </span>
+                  <div className="min-w-0 flex-1">
+                    <h4
+                      id="submit-confirm-title"
+                      className="font-display text-lg font-medium tracking-tight text-[var(--ink)]"
+                    >
+                      Submit this reimbursement?
+                    </h4>
+                    <p className="mt-0.5 truncate text-xs text-[var(--ink-muted)]">
+                      {row?.name || "This employee"} · all {total} reviewed
+                    </p>
+                  </div>
                 </div>
-              </div>
-              <div className="mt-4 flex items-center gap-3 rounded-2xl border border-[var(--border)] bg-[var(--surface-2)]/60 px-4 py-3">
-                <div className="min-w-0 flex-1">
-                  <p className="truncate text-base font-medium text-[var(--ink)]">
-                    {checked} of {total} transactions
-                  </p>
-                  <p className="mt-0.5 truncate text-xs text-[var(--ink-muted)]">
-                    Review complete — ready for processing
-                  </p>
-                </div>
-                <span className="shrink-0 font-display text-2xl font-medium tabular-nums text-[var(--accent-strong)]">
-                  {pct}%
-                </span>
-              </div>
-              <div className="mt-3 rounded-2xl border border-[var(--border)] bg-[var(--surface-2)]/60 px-4 py-3 text-center">
-                <p className="type-eyebrow text-[var(--ink-muted)]">
-                  Balance forwarded
-                </p>
-                <p className="mt-1 text-lg font-medium tabular-nums text-[var(--ink)]">
-                  {Math.abs(Number(row?.balance) || 0) < 0.005
-                    ? "No more remaining balance forwarded"
-                    : `${formatMoney(row?.balance ?? 0)}`}
-                </p>
-              </div>
-              <div className="mt-3">
-                <div className="flex items-baseline justify-between gap-2">
-                  <label
-                    htmlFor="submit-note"
-                    className="type-eyebrow text-[var(--ink-muted)]"
-                  >
-                    Note{" "}
-                    <span className="font-normal normal-case opacity-70">
-                      (optional)
-                    </span>
-                  </label>
-                  <span className="text-[11px] tabular-nums text-[var(--ink-muted)]">
-                    {note.trim().length}/500
+                <div className="mt-4 flex items-center gap-3 rounded-2xl border border-[var(--border)] bg-[var(--surface-2)]/60 px-4 py-3">
+                  <div className="min-w-0 flex-1">
+                    <p className="truncate text-base font-medium text-[var(--ink)]">
+                      {checked} of {total} transactions
+                    </p>
+                    <p className="mt-0.5 truncate text-xs text-[var(--ink-muted)]">
+                      Review complete — ready for processing
+                    </p>
+                  </div>
+                  <span className="shrink-0 font-display text-2xl font-medium tabular-nums text-[var(--accent-strong)]">
+                    {pct}%
                   </span>
                 </div>
-                <textarea
-                  id="submit-note"
-                  value={note}
-                  maxLength={500}
-                  rows={3}
-                  onChange={(e) => setNote(e.target.value)}
-                  placeholder="Handover note recorded on the closed issuance — e.g. where the forwarded balance goes."
-                  disabled={submit.isPending}
-                  className="mt-1.5 block w-full resize-y rounded-2xl border border-[var(--border)] bg-[var(--surface)] px-3.5 py-2.5 text-sm leading-relaxed text-[var(--ink)] placeholder:text-[var(--ink-muted)]/70 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)]/30 disabled:opacity-60"
-                />
-              </div>
-              <p className="mt-3 text-xs leading-snug text-[var(--ink-muted)]">
-                Submitting closes this reimbursement for processing.
-                Transactions stay viewable afterward, but no further edits are
-                allowed.
-              </p>
-              <div className="mt-5 flex items-center justify-end gap-2">
-                <Button
-                  type="button"
-                  variant="outline"
-                  onClick={closeSubmitConfirm}
-                  disabled={submit.isPending}
-                >
-                  Go back
-                </Button>
-                <Button
-                  type="button"
-                  variant="accent"
-                  onClick={() => {
-                    submit.mutate(
-                      { userId: employeeId, note },
-                      {
-                        onSuccess: (res) => {
-                          closeSubmitConfirm();
-                          toast.success(
-                            res?.message ??
-                              `Reimbursement submitted for ${row?.name || "this employee"}.`,
-                          );
+                <div className="mt-3 rounded-2xl border border-[var(--border)] bg-[var(--surface-2)]/60 px-4 py-3 text-center">
+                  <p className="type-eyebrow text-[var(--ink-muted)]">
+                    Balance forwarded
+                  </p>
+                  <p className="mt-1 text-lg font-medium tabular-nums text-[var(--ink)]">
+                    {Math.abs(Number(row?.balance) || 0) < 0.005
+                      ? "No more remaining balance forwarded"
+                      : `${formatMoney(row?.balance ?? 0)}`}
+                  </p>
+                </div>
+                <div className="mt-3">
+                  <div className="flex items-baseline justify-between gap-2">
+                    <label
+                      htmlFor="submit-note"
+                      className="type-eyebrow text-[var(--ink-muted)]"
+                    >
+                      Note{" "}
+                      <span className="font-normal normal-case opacity-70">
+                        (optional)
+                      </span>
+                    </label>
+                    <span className="text-[11px] tabular-nums text-[var(--ink-muted)]">
+                      {note.trim().length}/500
+                    </span>
+                  </div>
+                  <textarea
+                    id="submit-note"
+                    value={note}
+                    maxLength={500}
+                    rows={3}
+                    onChange={(e) => setNote(e.target.value)}
+                    placeholder="Handover note recorded on the closed issuance — e.g. where the forwarded balance goes."
+                    disabled={submit.isPending}
+                    className="mt-1.5 block w-full resize-y rounded-2xl border border-[var(--border)] bg-[var(--surface)] px-3.5 py-2.5 text-sm leading-relaxed text-[var(--ink)] placeholder:text-[var(--ink-muted)]/70 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)]/30 disabled:opacity-60"
+                  />
+                </div>
+                <p className="mt-3 text-xs leading-snug text-[var(--ink-muted)]">
+                  Submitting closes this reimbursement for processing.
+                  Transactions stay viewable afterward, but no further edits are
+                  allowed.
+                </p>
+                <div className="mt-5 flex items-center justify-end gap-2">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={closeSubmitConfirm}
+                    disabled={submit.isPending}
+                  >
+                    Go back
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="accent"
+                    onClick={() => {
+                      submit.mutate(
+                        { userId: employeeId, note },
+                        {
+                          onSuccess: (res) => {
+                            closeSubmitConfirm();
+                            toast.success(
+                              res?.message ??
+                                `Reimbursement submitted for ${row?.name || "this employee"}.`,
+                            );
+                          },
+                          onError: (err) =>
+                            toast.error(
+                              err?.message || "Couldn't submit reimbursement",
+                            ),
                         },
-                        onError: (err) =>
-                          toast.error(
-                            err?.message || "Couldn't submit reimbursement",
-                          ),
-                      },
-                    );
-                  }}
-                  disabled={submit.isPending}
-                  className="transition-transform active:scale-[0.98]"
-                >
-                  {submit.isPending ? "Submitting…" : "Yes, submit it"}
-                </Button>
-              </div>
-            </motion.div>
+                      );
+                    }}
+                    disabled={submit.isPending}
+                    className="transition-transform active:scale-[0.98]"
+                  >
+                    {submit.isPending ? "Submitting…" : "Yes, submit it"}
+                  </Button>
+                </div>
+              </motion.div>
             </div>
           </motion.div>
         )}

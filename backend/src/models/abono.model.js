@@ -406,24 +406,21 @@ class Abono {
   }
 
   // Admin settlement (reimbursement personnel table): settles an `amount`
-  // against the employee's checked OPEN abono rows (oldest first) and books
-  // each settled piece back as an `issued_budget` row under the SAME budget
-  // reference — the advance converts into regular issued holdings, so the
-  // fund pool stays whole. Omit `amount` (or pass the checked total) to
-  // settle the checked rows in full; pass less for a partial settlement,
-  // which shrinks the boundary row and records the settled piece as its own
-  // 'settled' row stamped with `date_settled`. One transaction:
+  // against the employee's checked OPEN abono rows (oldest first). Settle-only:
+  // each settled piece flips to 'settled' (stamping `date_settled`) and leaves
+  // the spendable pool — NO `issued_budget` row is booked back. Omit `amount`
+  // (or pass the checked total) to settle the checked rows in full; pass less
+  // for a partial settlement, which shrinks the boundary row and records the
+  // settled piece as its own 'settled' row stamped with `date_settled`.
+  // One transaction:
   //   1. lock the still-open rows (parallel settle/delete can't interleave),
   //   2. re-apply the money rule: settling takes amounts OUT of the spendable
   //      pool (open issuances + OPEN abono − PAID expenses − sent + received),
   //      so a request the remaining balance can't cover — or one larger than
   //      the checked rows — fails BEFORE writes,
-  //   3. flip whole rows / split the boundary row + stamp,
-  //   4. per settled piece, reuse the OPEN parent for (user, reference) — or
-  //      insert it when missing (same 23505 race handling as
-  //      Budget.issueBudgetToEmployee) — then insert the `issued_budget`
-  //      child carrying the settlement.
-  // Resolves `{ insufficient, requested, totalBalance, settled, issued }`.
+  //   3. flip whole rows / split the boundary row + stamp.
+  // Resolves `{ insufficient, requested, totalBalance, settled, issued }`
+  // (`issued` is always `[]`, kept so existing callers keep working).
   static async settleAndReissue(userId, ids, { method, note = null, amount = null } = {}) {
     return withTransaction(async (client) => {
       const q = (text, params) => client.query(text, params);
@@ -554,62 +551,10 @@ class Abono {
         };
       }
 
-      const resolveParent = async (referenceId) => {
-        let parent =
-          (
-            await q(
-              `SELECT *
-                 FROM budget_issued_reference
-                WHERE user_id = $1
-                  AND reference_id = $2
-                  AND status = 'open'
-                ORDER BY created_at DESC
-                LIMIT 1
-                FOR UPDATE`,
-              [userId, referenceId],
-            )
-          ).rows[0] ?? null;
-
-        if (!parent) {
-          try {
-            parent =
-              (
-                await q(
-                  `INSERT INTO budget_issued_reference
-                     (reference_id, user_id, date_cut_off)
-                   VALUES
-                     ($1, $2, NOW() + INTERVAL '1 month')
-                   RETURNING *`,
-                  [referenceId, userId],
-                )
-              ).rows[0] ?? null;
-          } catch (err) {
-            if (err?.code !== "23505") throw err;
-            parent =
-              (
-                await q(
-                  `SELECT *
-                     FROM budget_issued_reference
-                    WHERE user_id = $1
-                      AND reference_id = $2
-                      AND status = 'open'
-                    ORDER BY created_at DESC
-                    LIMIT 1`,
-                  [userId, referenceId],
-                )
-              ).rows[0] ?? null;
-          }
-        }
-
-        if (!parent)
-          throw new Error("Could not resolve issued budget reference.");
-        return parent;
-      };
-
       // Allocate oldest-first: whole rows flip, and a short remainder splits
       // the boundary row (open part shrinks, settled piece is recorded as its
-      // own 'settled' row). Every settled piece books one `issued_budget`
-      // child, so settled ⇄ issued stays 1:1 and traceable.
+      // own 'settled' row). Settle-only: nothing is written to
+      // `issued_budget` — settled amounts leave the spendable pool.
       const settledShape = `id, reference_id, issued_ref_id, user_id, amount::float8 AS amount,
                       description, status, date_settled, created_at, updated_at`;
       let left = requested;
@@ -663,30 +608,6 @@ class Abono {
             throw new Error("Abono row changed mid-settlement.");
         }
         settled.push(settledRow);
-
-        const parent = await resolveParent(ab.reference_id);
-        // Settlement booking shape: a clean `description` label plus the
-        // settled abono's own description in `notes` (truncated like the
-        // ledger displays it), so the issued row reads on its own. (Any
-        // caller-supplied `note` is intentionally not stored here — the
-        // row's note is always its abono's description.)
-        const child = (
-          await q(
-            `INSERT INTO issued_budget
-               (issued_ref_id, amount, description, method, notes)
-             VALUES
-               ($1, $2, $3, $4, $5)
-             RETURNING *`,
-            [
-              parent.id,
-              take,
-              partial ? "Abono partial settlement" : "Abono settlement",
-              method,
-              String(ab.description || "abono").slice(0, 100),
-            ],
-          )
-        ).rows[0];
-        issued.push(child);
       }
 
       return { insufficient: false, requested, totalBalance, settled, issued };

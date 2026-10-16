@@ -240,8 +240,8 @@ function actionsForRow(row, { viewOnly = false } = {}) {
   if (viewOnly) return [viewItem];
 
   // Finalized holdings (and expenses spent from them) are read-only —
-  // "View details" is the only action. Settled abono is consumed spend
-  // (re-booked as an issued child), so it locks the same way. Transfers
+  // "View details" is the only action. Settled abono is finalized
+  // history, so it locks the same way. Transfers
   // stamped to a closed receiving holding lock both legs — cancelling
   // would pull money back out of closed books.
   if (isClosedHolding(row) || isSettledAbono(row) || isClosedSentLink(row))

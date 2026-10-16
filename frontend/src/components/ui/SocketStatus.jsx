@@ -15,7 +15,7 @@ export function SocketStatus() {
         : "bg-zinc-400";
   const label =
     status === "connected"
-      ? "Live"
+      ? "Connected"
       : status === "connecting"
         ? "Connecting…"
         : "Offline";

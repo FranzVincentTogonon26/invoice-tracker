@@ -518,7 +518,7 @@ const DateEditor = ({ row, onEditingChange }) => {
 const ReceiptDatePill = ({ formatted, danger, children }) => (
   <div
     className={cn(
-      "flex min-w-0 items-center gap-2 rounded-xl px-2.5 py-1.5 ring-1 ring-inset",
+      "flex min-w-0 items-center gap-2 rounded-xl px-2.5 py-3 ring-1 ring-inset",
       danger
         ? "bg-[var(--danger)]/10 ring-[var(--danger)]/30"
         : "bg-[var(--accent-soft)]/50 ring-[var(--accent)]/25",
@@ -1405,6 +1405,7 @@ const ExpenseDetailsModal = ({
                 <div className="mt-4 flex rounded-xl bg-[var(--surface-2)] p-1">
                   <button
                     type="button"
+                    onClick={() => setActiveTab("details")}
                     className={cn(
                       "flex-1 rounded-lg py-1.5 text-xs font-medium transition-all",
                       activeTab === "details"
@@ -1416,6 +1417,7 @@ const ExpenseDetailsModal = ({
                   </button>
                   <button
                     type="button"
+                    onClick={() => setActiveTab("receipt")}
                     className={cn(
                       "flex-1 flex items-center justify-center gap-1.5 rounded-lg py-1.5 text-xs font-medium transition-all",
                       activeTab === "receipt"

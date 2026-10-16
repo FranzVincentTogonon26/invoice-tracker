@@ -160,9 +160,8 @@ export const updateDescription = async (req, res, next) => {
 // reimbursement lifecycle, not deletions). Guard: an OPEN abono funds the
 // spendable pool, so when its amount has already been spent (remaining
 // balance can't cover it) the delete is rejected — removing it would
-// overdraw the employee. Settled rows are consumed spend (re-booked as an
-// issued child) and stay read-only. Draft rows never fund the pool and stay
-// deletable.
+// overdraw the employee. Settled rows are finalized history and stay
+// read-only. Draft rows never fund the pool and stay deletable.
 export const removeAbono = async (req, res, next) => {
   try {
     const { id } = req.params;

@@ -37,8 +37,8 @@ const issuedFlow = (row) => (row.status === "cancel" ? "void" : "out");
 
 const expenseFlow = (row) => (row.status === "paid" ? "out" : "void");
 
-// Open abono funds the pool ('in'); settled abono is handed back ('void',
-// matching the heroes — the issued child carries the outflow); drafts are
+// Open abono funds the pool ('in'); settled abono leaves it ('void',
+// matching the heroes — settling writes no issued row back); drafts are
 // parked ('void'). Every status stays in the ledger with its badge.
 const abonoDirection = (row) => (row.status === "open" ? "in" : "void");
 
@@ -209,6 +209,7 @@ class Transactions {
         dateSettled: null,
         receiptId: row.receipt_id ?? null,
         imageUrl: row.image_url ?? null,
+        receiptDate: row.receipt_date ?? null,
       });
     }
 

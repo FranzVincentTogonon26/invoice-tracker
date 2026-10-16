@@ -239,7 +239,8 @@ class EmployeeReimbursement {
                 GROUP BY e.user_id
              ) ex ON ex.user_id = u.user_id
              -- Settled abono under open holdings (same pinning as the
-             -- roster): backed out of issued/funded/remaining everywhere.
+             -- roster): informational only — settled amounts simply leave
+             -- every pool leg (never subtracted again).
              LEFT JOIN (
                SELECT ea.user_id,
                       SUM(ea.amount)::float8 AS settled_abono
@@ -458,9 +459,8 @@ class EmployeeReimbursement {
                   AND e.issued_ref_id IS NOT NULL
                 GROUP BY e.issued_ref_id
              ) sp ON sp.bir_id = bir.id
-             -- Spent is PAID expenses only: this record's settled abono is
-             -- handed back (re-booked as an issued child, already in the
-             -- record's issued leg), so it must not inflate spent as well.
+             -- Spent is PAID expenses only: this record's settled abono
+             -- writes nothing back, so it must not inflate spent as well.
              -- Sent keys on this record's own id; received is the user's
              -- money however it arrived (sender-stamped, so keyed by user —
              -- same unscoped figure the employees-details record view uses).
@@ -483,8 +483,8 @@ class EmployeeReimbursement {
                   AND btr.issued_ref_id_sent IS NOT NULL
                 GROUP BY btr.issued_ref_id_sent
              ) rc ON rc.bir_id = bir.id
-             -- Record-scoped settled abono: backed out of the balance like
-             -- every other surface.
+             -- Record-scoped settled abono: informational only (never
+             -- subtracted from the balance).
              LEFT JOIN (
                SELECT ea.issued_ref_id AS bir_id,
                       SUM(ea.amount)::float8 AS settled_abono
@@ -598,7 +598,10 @@ class EmployeeReimbursement {
           birStatuses: r.bir_statuses || "",
           dateCreated: r.first_issued_at ?? null,
           dateClosed: r.last_forwarded_at ?? null,
-          balance: toMoney(rowIssued + rowAbono - rowSpent - rowSent + rowReceived - rowSettledAbono),
+          // Settle-only: settled abono already left `open_abono` with no
+          // `issued_budget` child replacing it, so it must NOT be subtracted
+          // again here (that would count it twice).
+          balance: toMoney(rowIssued + rowAbono - rowSpent - rowSent + rowReceived),
         };
       }),
       records: (issuanceRecordsResult.rows ?? []).map((r) => {
@@ -631,7 +634,7 @@ class EmployeeReimbursement {
           sent: rowSent,
           received: rowReceived,
           settledAbono: rowSettledAbono,
-          balance: toMoney(rowIssued + rowAbono - rowSpent - rowSent + rowReceived - rowSettledAbono),
+          balance: toMoney(rowIssued + rowAbono - rowSpent - rowSent + rowReceived),
         };
       }),
     };

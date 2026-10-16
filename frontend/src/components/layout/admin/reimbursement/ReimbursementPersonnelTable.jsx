@@ -180,175 +180,159 @@ export function ReimbursementPersonnelTable({
             <tbody className="divide-y divide-[var(--border)]">
               <AnimatePresence initial={false}>
                 {filtered.map((r) => (
-                <motion.tr
-                  key={r.id ?? r.userId}
-                  layout
-                  initial="hidden"
-                  animate="visible"
-                  exit={{ opacity: 0 }}
-                  variants={tableRowVariants}
-                  className="transition-colors duration-150 hover:bg-[var(--accent)]/[0.05]"
-                >
-                  <td className="px-4 py-3.5 first:pl-5 align-middle">
-                    <div className="flex min-w-0 items-center gap-2.5">
-                      <EmployeeAvatar
-                        name={r.name}
-                        avatarUrl={r.avatarUrl}
-                        className="h-7 w-7 text-[11px]"
-                      />
-                      <div className="min-w-0">
-                        <p className="truncate text-[13px] font-medium text-[var(--ink)]">
-                          {r.name || "—"}
-                        </p>
-                        <p className="mt-0.5 truncate text-[11px] capitalize text-[var(--ink-muted)]">
-                          {r.role || "employee"}
-                        </p>
-                      </div>
-                    </div>
-                  </td>
-                  <td className="px-4 py-3.5 align-middle">
-                    {(r.referenceLabel ?? r.referenceLabels) ? (
-                      <span className="flex flex-wrap items-center gap-1.5">
-                        {String(r.referenceLabel ?? r.referenceLabels)
-                          .split(",")
-                          .map((s) => s.trim())
-                          .filter(Boolean)
-                          .map((label, i) => (
-                            <Badge
-                              key={`${r.id ?? r.userId}-ref-${i}`}
-                              tone="neutral"
-                              title={label}
-                              className="max-w-full truncate text-xs"
-                            >
-                              {label}
-                            </Badge>
-                          ))}
-                      </span>
-                    ) : (
-                      <span className="text-[13px] text-[var(--ink-muted)]">
-                        —
-                      </span>
-                    )}
-                  </td>
-                  <td className="px-4 py-3.5 text-right align-middle">
-                    <span className="whitespace-nowrap font-display text-sm font-medium tabular-nums text-[var(--ink)]">
-                      {formatMoney(r.issued)}
-                    </span>
-                  </td>
-                  <td className="px-4 py-3.5 text-right align-middle">
-                    {!(
-                      Number(r.openAbono) > 0 || Number(r.settledAbono) > 0
-                    ) ? (
-                      <span className="text-sm leading-none text-[var(--ink-muted)]">
-                        —
-                      </span>
-                    ) : (
-                      <div className="space-y-0.5">
-                        {Number(r.settledAbono) > 0 && (
-                          <p
-                            className="flex items-center justify-end gap-1.5 text-xs tabular-nums"
-                            title={`${formatMoney(r.settledAbono)} settled abono`}
-                          >
-                            <span className="text-sm font-medium tabular-nums  text-[var(--warning)]">
-                              - {formatMoney(r.settledAbono)}
-                            </span>
+                  <motion.tr
+                    key={r.id ?? r.userId}
+                    layout
+                    initial="hidden"
+                    animate="visible"
+                    exit={{ opacity: 0 }}
+                    variants={tableRowVariants}
+                    className="transition-colors duration-150 hover:bg-[var(--accent)]/[0.05]"
+                  >
+                    <td className="px-4 py-3.5 first:pl-5 align-middle">
+                      <div className="flex min-w-0 items-center gap-2.5">
+                        <EmployeeAvatar
+                          name={r.name}
+                          avatarUrl={r.avatarUrl}
+                          className="h-7 w-7 text-[11px]"
+                        />
+                        <div className="min-w-0">
+                          <p className="truncate text-[13px] font-medium text-[var(--ink)]">
+                            {r.name || "—"}
                           </p>
-                        )}
-                        {Number(r.openAbono) > 0 && (
-                          <p
-                            className="whitespace-nowrap font-display text-sm font-medium tabular-nums  text-[var(--warning)]"
-                            title={`${formatMoney(r.openAbono)} open abono held`}
-                          >
-                            + {formatMoney(r.openAbono)}
+                          <p className="mt-0.5 truncate text-[11px] capitalize text-[var(--ink-muted)]">
+                            {r.role || "employee"}
                           </p>
-                        )}
+                        </div>
                       </div>
-                    )}
-                  </td>
-                  <td className="px-4 py-3.5 text-right align-middle">
-                    <div className="space-y-0.5">
-                      {Number(r.received) > 0 && (
-                        <p
-                          className="flex items-center justify-end gap-1.5 text-xs tabular-nums"
-                          title={`${formatMoney(r.received)} received from budget transfers`}
-                        >
-                          <span className="text-sm font-medium tabular-nums  text-[var(--success)]">
-                            + {formatMoney(r.received)}
-                          </span>
-                        </p>
-                      )}
-                      {Number(r.sent) > 0 && (
-                        <p
-                          className="flex items-center justify-end gap-1.5 text-xs tabular-nums"
-                          title={`${formatMoney(r.sent)} sent via budget transfers`}
-                        >
-                          <span className="text-sm font-medium tabular-nums  text-[var(--danger)]">
-                            - {formatMoney(r.sent)}
-                          </span>
-                        </p>
-                      )}
-                      {!(Number(r.received) > 0 || Number(r.sent) > 0) && (
-                        <span className="text-sm font-medium tabular-nums  leading-none text-[var(--ink-muted)]">
+                    </td>
+                    <td className="px-4 py-3.5 align-middle">
+                      {(r.referenceLabel ?? r.referenceLabels) ? (
+                        <span className="flex flex-wrap items-center gap-1.5">
+                          {String(r.referenceLabel ?? r.referenceLabels)
+                            .split(",")
+                            .map((s) => s.trim())
+                            .filter(Boolean)
+                            .map((label, i) => (
+                              <Badge
+                                key={`${r.id ?? r.userId}-ref-${i}`}
+                                tone="neutral"
+                                title={label}
+                                className="max-w-full truncate text-xs"
+                              >
+                                {label}
+                              </Badge>
+                            ))}
+                        </span>
+                      ) : (
+                        <span className="text-[13px] text-[var(--ink-muted)]">
                           —
                         </span>
                       )}
-                    </div>
-                  </td>
-                  <td className="px-4 py-3.5 text-right align-middle">
-                    <span className="whitespace-nowrap font-display text-sm font-medium tabular-nums text-[var(--danger)]">
-                      {formatMoney(r.spent)}
-                    </span>
-                  </td>
-
-                  <td className="px-4 py-3.5 text-right align-middle">
-                    <span
-                      className={cn(
-                        "whitespace-nowrap font-display text-sm font-medium tabular-nums",
-                        r.balance < 0
-                          ? "text-[var(--danger)]"
-                          : "text-[var(--accent-strong)]",
+                    </td>
+                    <td className="px-4 py-3.5 text-right align-middle">
+                      <span className="whitespace-nowrap font-display text-sm font-medium tabular-nums text-[var(--ink)]">
+                        {formatMoney(r.issued)}
+                      </span>
+                    </td>
+                    <td className="px-4 py-3.5 text-right align-middle truncate">
+                      {!(Number(r.openAbono) > 0) ? (
+                        <span className="text-sm leading-none text-[var(--ink-muted)]">
+                          —
+                        </span>
+                      ) : (
+                        <p
+                          className="whitespace-nowrap font-display text-sm font-medium tabular-nums text-[var(--warning)]"
+                          title={`${formatMoney(r.openAbono)} open abono held`}
+                        >
+                          + {formatMoney(r.openAbono)}
+                        </p>
                       )}
-                    >
-                      {formatMoney(r.balance)}
-                    </span>
-                  </td>
-                  <td className="px-4 py-3.5 text-center align-middle">
-                    <Badge
-                      tone="accent"
-                      className="font-medium"
-                      title={`${r.issuedCount ?? 0} live issuance entries`}
-                    >
-                      {r.issuedCount ?? 0}
-                    </Badge>
-                  </td>
-                  <td className="px-4 py-3.5 align-middle">
-                    <DateTimeCell value={r.dateCreated} />
-                  </td>
-                  <td className="px-4 py-3.5 align-middle">
-                    <DateTimeCell value={r.dateClosed} />
-                  </td>
-                  <td className="px-4 py-3.5 align-middle">
-                    <span className="flex flex-wrap items-center gap-1.5">
-                      {String(r.status ?? r.birStatuses ?? "")
-                        .split(",")
-                        .map((s) => s.trim())
-                        .filter(Boolean)
-                        .map((s) => (
-                          <StatusBadge
-                            key={`${r.id ?? r.userId}-${s}`}
-                            status={s}
-                            dot={false}
-                          />
-                        ))}
-                    </span>
-                  </td>
-                  <td className="px-4 py-3.5 pr-5 text-right align-middle">
-                    <PersonnelActions
-                      onViewEmployee={() => onViewEmployee?.(r)}
-                      onViewReimbursement={() => onViewReimbursement?.(r)}
-                    />
-                  </td>
-                </motion.tr>
+                    </td>
+                    <td className="px-4 py-3.5 text-right align-middle">
+                      <div className="space-y-0.5">
+                        {Number(r.received) > 0 && (
+                          <p
+                            className="flex items-center justify-end gap-1.5 text-xs tabular-nums"
+                            title={`${formatMoney(r.received)} received from budget transfers`}
+                          >
+                            <span className="text-sm font-medium tabular-nums  text-[var(--success)]">
+                              + {formatMoney(r.received)}
+                            </span>
+                          </p>
+                        )}
+                        {Number(r.sent) > 0 && (
+                          <p
+                            className="flex items-center justify-end gap-1.5 text-xs tabular-nums"
+                            title={`${formatMoney(r.sent)} sent via budget transfers`}
+                          >
+                            <span className="text-sm font-medium tabular-nums  text-[var(--danger)]">
+                              - {formatMoney(r.sent)}
+                            </span>
+                          </p>
+                        )}
+                        {!(Number(r.received) > 0 || Number(r.sent) > 0) && (
+                          <span className="text-sm font-medium tabular-nums  leading-none text-[var(--ink-muted)]">
+                            —
+                          </span>
+                        )}
+                      </div>
+                    </td>
+                    <td className="px-4 py-3.5 text-right align-middle">
+                      <span className="whitespace-nowrap font-display text-sm font-medium tabular-nums text-[var(--danger)]">
+                        {formatMoney(r.spent)}
+                      </span>
+                    </td>
+
+                    <td className="px-4 py-3.5 text-right align-middle">
+                      <span
+                        className={cn(
+                          "whitespace-nowrap font-display text-sm font-medium tabular-nums",
+                          r.balance < 0
+                            ? "text-[var(--danger)]"
+                            : "text-[var(--accent-strong)]",
+                        )}
+                      >
+                        {formatMoney(r.balance)}
+                      </span>
+                    </td>
+                    <td className="px-4 py-3.5 text-center align-middle">
+                      <Badge
+                        tone="accent"
+                        className="font-medium"
+                        title={`${r.issuedCount ?? 0} live issuance entries`}
+                      >
+                        {r.issuedCount ?? 0}
+                      </Badge>
+                    </td>
+                    <td className="px-4 py-3.5 align-middle">
+                      <DateTimeCell value={r.dateCreated} />
+                    </td>
+                    <td className="px-4 py-3.5 align-middle">
+                      <DateTimeCell value={r.dateClosed} />
+                    </td>
+                    <td className="px-4 py-3.5 align-middle">
+                      <span className="flex flex-wrap items-center gap-1.5">
+                        {String(r.status ?? r.birStatuses ?? "")
+                          .split(",")
+                          .map((s) => s.trim())
+                          .filter(Boolean)
+                          .map((s) => (
+                            <StatusBadge
+                              key={`${r.id ?? r.userId}-${s}`}
+                              status={s}
+                              dot={false}
+                            />
+                          ))}
+                      </span>
+                    </td>
+                    <td className="px-4 py-3.5 pr-5 text-right align-middle">
+                      <PersonnelActions
+                        onViewEmployee={() => onViewEmployee?.(r)}
+                        onViewReimbursement={() => onViewReimbursement?.(r)}
+                      />
+                    </td>
+                  </motion.tr>
                 ))}
               </AnimatePresence>
             </tbody>

@@ -98,8 +98,8 @@ class EmployeeOverview {
               ))
           ), 0)::float8 AS total_expenses,
           -- Settled abono under open holdings (same pinning as every other
-          -- leg): backed out of issued/funded/remaining everywhere, since
-          -- its re-booked children read as funding.
+          -- leg): informational only — settling writes no issued_budget
+          -- row back, so settled amounts simply leave every pool leg.
           COALESCE((
             SELECT SUM(ea.amount)
             FROM employee_abono ea
@@ -431,8 +431,10 @@ class EmployeeOverview {
       totalSent,
       totalReceived,
       totalSettledAbono,
+      // Settle-only: settled abono already left `total_abono` with no
+      // `issued_budget` row replacing it, so it is NOT subtracted again.
       totalBalance: toMoney(
-        totalBudget + totalAbono - totalExpenses - totalSent + totalReceived - totalSettledAbono,
+        totalBudget + totalAbono - totalExpenses - totalSent + totalReceived,
       ),
       activeReferences: Number(row.active_references) || 0,
       expenseCount: Number(row.expense_count) || 0,
@@ -480,9 +482,8 @@ class EmployeeOverview {
             WHERE e.issued_ref_id = $2 AND e.user_id = $1 AND e.status = 'paid'
               AND (e.reference_id IS NULL OR br.status = 'open')
           ), 0)::float8 AS total_expenses,
-          -- Record-scoped settled abono: backed out of issued/funded/
-          -- remaining everywhere, since its re-booked children read as
-          -- funding.
+          -- Record-scoped settled abono: informational only — settling
+          -- writes no issued_budget row back.
           COALESCE((
             SELECT SUM(ea.amount)
             FROM employee_abono ea
@@ -712,8 +713,10 @@ class EmployeeOverview {
       totalSent,
       totalReceived,
       totalSettledAbono,
+      // Settle-only: settled abono already left `total_abono` with no
+      // `issued_budget` row replacing it, so it is NOT subtracted again.
       totalBalance: toMoney(
-        totalBudget + totalAbono - totalExpenses - totalSent + totalReceived - totalSettledAbono,
+        totalBudget + totalAbono - totalExpenses - totalSent + totalReceived,
       ),
       activeReferences: Number(row.active_references) || 0,
       expenseCount: Number(row.expense_count) || 0,

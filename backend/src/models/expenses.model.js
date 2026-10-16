@@ -1051,9 +1051,9 @@ class Expenses {
     // same (reference_id, user_id) via `issued_ref_id`
     // (`budget_issued_reference.status = 'open'`) — spend under closed
     // holdings or cut-off sources never reaches any source. Settled abono
-    // is NOT spend here: settling hands the pesos back (re-booked as an
-    // issued child, already counted in the source's issued leg), so adding
-    // it to spend would charge the same money twice. Untagged rows
+    // is NOT spend here: settling writes nothing back, so settled amounts
+    // simply left the pool — adding them to spend would charge the same
+    // money twice. Untagged rows
     // (reference_id IS NULL) connect to no holding and join the spread pool
     // below (oldest-source-first, capped at what each source received so no
     // source ever offers more cash than the pool holds). Grouping by
@@ -1264,8 +1264,8 @@ class Expenses {
       : await query(
           `SELECT
                 (COALESCE(SUM(e.total_amount), 0)
-                 -- Paid-expenses-only spent: settled abono is handed back
-                 -- (re-booked as an issued child), not spent. Pinned to its
+                 -- Paid-expenses-only spent: settled abono writes nothing
+                 -- back, not spent. Pinned to its
                  -- own OPEN holding like every other leg ($1 only — this
                  -- branch has no record id.
                  )::float8 AS total_expenses,

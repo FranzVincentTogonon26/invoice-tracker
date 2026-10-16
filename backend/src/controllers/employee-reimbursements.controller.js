@@ -77,10 +77,10 @@ export async function submit(req, res, next) {
 }
 
 // POST /employee-reimbursements/settle — admin settles an employee's checked
-// OPEN abono rows: each flips to 'settled' (stamping `date_settled`) and its
-// amount is booked back as an `issued_budget` row under the same budget
-// reference. Refuses with 400 when the employee's balance can't cover the
-// checked total, or when none of the rows are still open.
+// OPEN abono rows: each flips to 'settled' (stamping `date_settled`).
+// Settle-only: nothing is booked back to `issued_budget`. Refuses with 400
+// when the employee's balance can't cover the checked total, or when none of
+// the rows are still open.
 export async function settleAbono(req, res, next) {
   try {
     const payload = validate(settleAbonoForEmployeeSchema, req.body);
@@ -125,7 +125,7 @@ export async function settleAbono(req, res, next) {
       issued,
       requested,
       totalBalance,
-      message: `Settled ${settled.length} abono and re-issued ${requested ?? ""} to the pool.`,
+      message: `Settled ${settled.length} abono (${requested ?? ""}).`,
     });
   } catch (err) {
     return next(err);

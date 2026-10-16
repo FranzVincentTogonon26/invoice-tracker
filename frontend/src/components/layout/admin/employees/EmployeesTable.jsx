@@ -232,7 +232,6 @@ function EmployeeRow({ employee, pending, onAction }) {
     received,
     abono,
     sent,
-    settledAbono,
     funded,
     spentShare,
   } = budgetBreakdown(employee);
@@ -287,22 +286,10 @@ function EmployeeRow({ employee, pending, onAction }) {
               </span>
             </p>
           )}
-          {settledAbono > 0 && (
-            <p
-              className="flex items-center justify-end gap-1.5 text-xs tabular-nums"
-              title={`${formatMoney(settledAbono)} settled abono deducted from issued budget`}
-            >
-              <span className="font-medium uppercase tracking-wide text-[var(--warning)]/80">
-                Settled
-              </span>
-              <span className="font-medium text-[var(--warning)]">
-                - {formatMoney(settledAbono)}
-              </span>
-            </p>
-          )}
+
           <p
             className="font-display text-sm font-medium tabular-nums text-[var(--ink)]"
-            title={`${formatMoney(netIssued)} issued budget net of settled abono`}
+            title={`${formatMoney(netIssued)} issued budget`}
           >
             {formatMoney(netIssued)}
           </p>
@@ -434,7 +421,6 @@ function EmployeeCard({ employee, pending, onAction }) {
     received,
     abono,
     sent,
-    settledAbono,
     funded,
     spentShare,
   } = budgetBreakdown(employee);
@@ -531,22 +517,7 @@ function EmployeeCard({ employee, pending, onAction }) {
             </span>
           </p>
         )}
-        {settledAbono > 0 && (
-          <p
-            className="col-span-3 flex items-center gap-1.5 text-xs tabular-nums"
-            title={`${formatMoney(settledAbono)} settled abono deducted from issued budget`}
-          >
-            <span className="font-medium uppercase tracking-wide text-[var(--warning)]/80">
-              Settled
-            </span>
-            <span className="font-medium text-[var(--warning)]">
-              - {formatMoney(settledAbono)}
-            </span>
-            <span className="truncate font-normal text-[var(--ink-muted)]">
-              abono
-            </span>
-          </p>
-        )}
+
       </div>
 
       {/* Remaining-balance bar — the same animated component as the table row */}

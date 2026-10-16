@@ -114,9 +114,12 @@ export function distinctSourcesByReference(openRows) {
 
 /**
  * Shape an employee-ledger row into what ExpenseDetailsModal reads
- * (receipt image/PDF, itemized lines, flag tools).
+ * (receipt image/PDF, itemized lines, flag tools). `forceClosed` stamps the
+ * row as closed-holding so the modal hides its edit pencils (view-only) —
+ * used when the caller already knows the record/account is closed but the
+ * list row itself carries no parent status.
  */
-export function toExpenseModalRow(e) {
+export function toExpenseModalRow(e, forceClosed = false) {
   return {
     id: e.id,
     description: e.description,
@@ -131,7 +134,8 @@ export function toExpenseModalRow(e) {
     notes: e.notes,
     referenceId: e.reference_id,
     issuedRefId: e.issued_ref_id ?? null,
-    issuedParentStatus: e.issued_parent_status ?? null,
+    issuedParentStatus:
+      forceClosed === true ? "close" : (e.issued_parent_status ?? null),
     sourceOfFunds: e.reference_label || "No source of funds",
     receiptId: e.receipt_id,
     imageUrl: e.image_url,

@@ -1251,15 +1251,15 @@ class Budget {
   //     notes when no note was given).
   //   - `balance_forwarded`: that record's leftover at close time — its own
   //     live issued children + its own OPEN abono − its own PAID expenses −
-  //     its own sent transfers + its own stamped received transfers −
-  //     its own settled abono, i.e. EXACTLY the balance the review page
-  //     shows (`records` endpoint formula), so the stored figure never
-  //     disagrees with the submitted display. All legs key on this
-  //     record's own id (`issued_ref_id` / `issued_ref_id_sent = bir.id`)
-  //     so sibling records sharing the source never leak into each other.
-  //     Settled abono is NOT spent, but it IS backed out of funding (its
-  //     re-booked children read as issued), matching every display.
-  //     Computed BEFORE the status flips, in the same statement (0 stays 0).
+  //     its own sent transfers + its own stamped received transfers,
+  //     i.e. EXACTLY the balance the review page shows (`records`
+  //     endpoint formula), so the stored figure never disagrees with the
+  //     submitted display. All legs key on this record's own id
+  //     (`issued_ref_id` / `issued_ref_id_sent = bir.id`) so sibling
+  //     records sharing the source never leak into each other. Settled
+  //     abono already left OPEN abono with no re-booking, so it is NOT
+  //     subtracted again. Computed BEFORE the status flips, in the same
+  //     statement (0 stays 0).
   // Resolves `{ closedCount }`.
   static async closeOpenIssuedReferences(userId, { note } = {}) {
     const result = await query(
@@ -1309,17 +1309,6 @@ class Budget {
                     FROM budget_transfer btr
                    WHERE btr.issued_ref_id_sent = bir.id
                      AND btr.status = 'success'
-                ), 0)
-                - COALESCE((
-                  -- Record-scoped settled: backed out of funding like every
-                  -- display, so stored equals submitted.
-                  SELECT SUM(ea.amount)
-                    FROM employee_abono ea
-                    JOIN budget_reference br2 ON br2.reference_id = ea.reference_id
-                   WHERE ea.issued_ref_id = bir.id
-                     AND ea.user_id = bir.user_id
-                     AND ea.status = 'settled'
-                     AND br2.status = 'open'
                 ), 0)
               )
          FROM budget_reference br

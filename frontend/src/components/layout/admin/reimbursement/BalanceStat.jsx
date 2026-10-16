@@ -44,7 +44,6 @@ export function BalanceStat({
   hint,
   received,
   sent,
-  settled,
   tone = "neutral",
 }) {
   const m = toneMeta[tone];
@@ -95,14 +94,7 @@ export function BalanceStat({
             - {formatMoney(sent)} sent
           </p>
         )}
-        {Number(settled) > 0 && (
-          <p
-            className="mt-0.5 truncate text-xs font-medium tabular-nums text-[var(--warning)]"
-            title={`${formatMoney(settled)} settled abono deducted from issued budget`}
-          >
-            - {formatMoney(settled)} settled
-          </p>
-        )}
+
         {hint && (
           <p className="mt-0.5 hidden truncate text-[11px] tabular-nums text-[var(--ink-muted)] sm:block">
             {hint}

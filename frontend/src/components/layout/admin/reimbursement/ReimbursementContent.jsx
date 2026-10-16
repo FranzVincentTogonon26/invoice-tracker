@@ -433,7 +433,6 @@ export function AdminEmployeeReimbursementDetails() {
                 value={formatMoney(row.issued)}
                 received={Number(row?.received) || 0}
                 sent={Number(row?.sent) || 0}
-                settled={Number(row?.settledAbono) || 0}
                 hint={
                   record
                     ? `${record.issuedCount ?? 0} transactions · 1 source`
@@ -459,7 +458,7 @@ export function AdminEmployeeReimbursementDetails() {
                 icon={PhilippinePesoIcon}
                 label="Remaining Balance"
                 value={formatMoney(row.balance)}
-                hint="Issued + abono − spent − sent + received − settled"
+                hint="Issued + abono − spent − sent + received"
                 tone={Number(row.balance) < 0 ? "danger" : "neutral"}
               />
             </div>
@@ -499,7 +498,7 @@ export function AdminEmployeeReimbursementDetails() {
               </p>
               <p className="mt-0.5 truncate text-xs text-[var(--ink-muted)]">
                 {record?.referenceLabel || labels[0] || "Issuance record"} ·{" "}
-                {formatMoney(row?.balance ?? 0)} balance  
+                {formatMoney(row?.balance ?? 0)} balance
               </p>
             </div>
           </div>

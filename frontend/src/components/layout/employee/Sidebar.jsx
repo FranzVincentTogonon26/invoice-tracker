@@ -239,7 +239,7 @@ function MobileDock({ onOpenMenu }) {
 const menuContentVariants = {
   hidden: {},
   show: {
-    transition: { staggerChildren: 0.06, delayChildren: 0.14 },
+    transition: { staggerChildren: 0.05, delayChildren: 0.1 },
   },
 };
 
@@ -248,7 +248,7 @@ const menuItemVariants = {
   show: {
     opacity: 1,
     y: 0,
-    transition: { duration: 0.4, ease: [0.22, 1, 0.36, 1] },
+    transition: { duration: 0.28, ease: [0.22, 1, 0.36, 1] },
   },
 };
 
@@ -310,7 +310,7 @@ function MobileMenuSheet({ open, onClose, onLogout, user }) {
             initial={{ y: "100%" }}
             animate={{ y: 0 }}
             exit={{ y: "100%" }}
-            transition={{ duration: 0.38, ease: SHEET_EASE, delay: 0.08 }}
+            transition={{ duration: 0.3, ease: SHEET_EASE, delay: 0.08 }}
             className={cn(
               "relative w-full max-h-[88dvh] overflow-y-auto scrollbar-slim outline-none",
               "rounded-t-[15px] border border-b-0 border-[var(--border)]",
