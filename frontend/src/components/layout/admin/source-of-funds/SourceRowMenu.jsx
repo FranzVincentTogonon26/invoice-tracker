@@ -82,56 +82,76 @@ export function RowMenu({ source, onView, onEdit, onDelete, onToggleStatus }) {
   // reach.
   const hasConnections =
     Number(source?.transactions) > 0 || Number(source?.expenses_count) > 0;
-  // Status toggle: open -> close (danger, sets status='cut_off' + stamps
-  // date_cut_off server-side), cut_off -> reopen (clears the stamp).
-  // Offered only when the source actually holds funds — zero / empty
-  // allocated sources stay to view/edit/delete with no status flip.
+  // Status toggle: open -> close (danger), cut_off -> reopen. Offered
+  // only when the source actually holds funds — zero / empty allocated
+  // sources stay to view/edit/delete with no status flip. Status flips
+  // touch only the status column (the cut-off date is owned by the
+  // create / edit picker).
   const isOpen = (source?.status ?? "open") === "open";
   const hasAllocated = Number(source?.allocated) > 0;
-  const items = [
-    {
-      label: "View details",
-      Icon: Eye,
-      danger: false,
-      run: () => onView(source),
-    },
-    {
-      label: "Edit source",
-      Icon: Pencil,
-      danger: false,
-      run: () => onEdit(source),
-    },
+  // A closed source is disconnected from every flow — its dropdown offers
+  // only the way back: "Open source". No view/edit/delete while closed.
+  // (When reopening itself is unavailable — no handler or nothing
+  // allocated — fall back to View so the menu never opens empty.)
+  const closedItems = [
     ...(onToggleStatus && hasAllocated
       ? [
-          isOpen
-            ? {
+          {
+            label: "Open source",
+            Icon: LockOpen,
+            danger: false,
+            run: () => onToggleStatus(source),
+          },
+        ]
+      : []),
+  ];
+  const items = !isOpen
+    ? closedItems.length > 0
+      ? closedItems
+      : [
+          {
+            label: "View details",
+            Icon: Eye,
+            danger: false,
+            run: () => onView(source),
+          },
+        ]
+    : [
+        {
+          label: "View details",
+          Icon: Eye,
+          danger: false,
+          run: () => onView(source),
+        },
+        {
+          label: "Edit source",
+          Icon: Pencil,
+          danger: false,
+          run: () => onEdit(source),
+        },
+        ...(onToggleStatus && hasAllocated
+          ? [
+              {
                 label: "Close source",
                 Icon: Ban,
                 danger: true,
                 separator: true,
                 run: () => onToggleStatus(source),
-              }
-            : {
-                label: "Open source",
-                Icon: LockOpen,
-                danger: false,
-                separator: true,
-                run: () => onToggleStatus(source),
               },
-        ]
-      : []),
-    ...(!hasConnections
-      ? [
-          {
-            label: "Delete source",
-            Icon: Trash2,
-            danger: true,
-            separator: true,
-            run: () => onDelete(source),
-          },
-        ]
-      : []),
-  ];
+            ]
+          : []),
+        ...(!hasConnections
+          ? [
+              {
+                label: "Delete source",
+                Icon: Trash2,
+                danger: true,
+                separator: true,
+                run: () => onDelete(source),
+              },
+            ]
+          : []),
+      ];
 
   return (
     <>
