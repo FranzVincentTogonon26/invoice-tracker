@@ -1,3 +1,4 @@
+import { useEffect } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import { createPortal } from "react-dom";
 import { Download, FileText, Printer, X } from "lucide-react";
@@ -8,7 +9,8 @@ const DIALOG_EASE = [0.16, 1, 0.3, 1];
 
 // Read-only report preview: the exact summary + rows the print document
 // and CSV export carry, so what you see is what you get. Print/CSV fire
-// through the callbacks the page wires up.
+// through the callbacks the page wires up. An optional `chart` node renders
+// between the summary and the records table for reports that chart well.
 export function ReportPreviewModal({
   open,
   onClose,
@@ -17,10 +19,25 @@ export function ReportPreviewModal({
   summaryRows = [],
   columns = [],
   rows = [],
-  totalOut = 0,
+  totalOut,
+  totalOutLabel = "total out",
+  chart = null,
   onPrint,
   onDownloadCSV,
 }) {
+  // Escape closes the preview — capture phase so the shortcut can never
+  // leak to whatever sits behind the dialog.
+  useEffect(() => {
+    if (!open) return undefined;
+    const onKey = (event) => {
+      if (event.key !== "Escape") return;
+      event.stopPropagation();
+      onClose?.();
+    };
+    window.addEventListener("keydown", onKey, true);
+    return () => window.removeEventListener("keydown", onKey, true);
+  }, [open, onClose]);
+
   return createPortal(
     <AnimatePresence>
       {open && (
@@ -98,6 +115,12 @@ export function ReportPreviewModal({
                   </table>
                 </div>
 
+                {chart ? (
+                  <div className="rounded-2xl border border-[var(--border)] bg-[var(--surface-2)]/40 p-4 sm:p-5">
+                    {chart}
+                  </div>
+                ) : null}
+
                 <div className="overflow-x-auto rounded-2xl border border-[var(--border)]">
                   <table className="w-full min-w-[640px] border-collapse text-left text-[13px]">
                     <thead className="bg-[var(--surface-2)]">
@@ -141,8 +164,13 @@ export function ReportPreviewModal({
                   </table>
                 </div>
                 <p className="text-xs tabular-nums text-[var(--ink-muted)]">
-                  {rows.length} {rows.length === 1 ? "record" : "records"} ·{" "}
-                  {formatMoney(totalOut)} total out
+                  {rows.length} {rows.length === 1 ? "record" : "records"}
+                  {totalOut != null ? (
+                    <>
+                      {" · "}
+                      {formatMoney(totalOut)} {totalOutLabel}
+                    </>
+                  ) : null}
                 </p>
               </div>
 

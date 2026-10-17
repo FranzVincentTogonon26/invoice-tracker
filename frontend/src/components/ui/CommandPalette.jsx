@@ -103,7 +103,7 @@ const ADMIN_NAV = [
     kind: "nav",
     label: "Settings",
     hint: "Account settings",
-    to: "/admin/profile",
+    to: "/admin/settings",
     icon: Settings,
   },
 ];
