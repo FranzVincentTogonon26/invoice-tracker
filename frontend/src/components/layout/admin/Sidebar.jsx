@@ -44,7 +44,7 @@ const NAV_GROUPS = [
         icon: Users,
         label: "Employees",
         primary: true,
-      },  
+      },
       {
         to: "/admin/budget",
         icon: FileText,
@@ -161,7 +161,7 @@ function ActionRow({ icon: Icon, label, onClick, to }) {
       className={cn(
         ROW_BASE,
         isActive
-          ? "bg-[var(--ink)] text-[var(--bg)] shadow-card"
+          ? "bg-[var(--accent-soft)] text-[var(--accent-strong)] shadow-card"
           : "text-[var(--ink-muted)] hover:bg-[var(--surface-2)] hover:text-[var(--ink)]",
       )}
     >
@@ -445,7 +445,7 @@ function MobileMenuSheet({ open, onClose, onLogout, user }) {
             <div className={SHEET_LABEL}>Account</div>
             <div className="mt-2 flex flex-col gap-1">
               <NavLink
-                to="/settings"
+                to="/admin/settings"
                 onClick={onClose}
                 className="block focus-visible:outline-none"
               >
@@ -603,7 +603,7 @@ export function Sidebar() {
         </div>
 
         <div className="flex flex-col items-center gap-2 w-full">
-          <ActionRow icon={Settings} label="Settings" to="/settings" />
+          <ActionRow icon={Settings} label="Settings" to="/admin/settings" />
           <ActionRow icon={LogOut} label="Log out" onClick={requestLogout} />
 
           <div

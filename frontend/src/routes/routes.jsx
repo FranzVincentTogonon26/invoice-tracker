@@ -16,7 +16,7 @@ import AdminDashboard from "../pages/admin/AdminDashboard";
 import AdminEmployees from "../pages/admin/AdminEmployees";
 import AdminEmployeesDetails from "../components/layout/admin/employees/EmployeesDetails";
 import AdminBudget from "../pages/admin/AdminBudget";
-import AdminProfile from "../pages/admin/AdminProfile";
+import AdminSettings from "../pages/admin/AdminSettings";
 import AdminTransaction from "../pages/admin/AdminTransaction";
 import AdminExpenses from "../pages/admin/AdminExpenses";
 import AdminAuditLogs from "../pages/admin/AdminAuditLogs";
@@ -79,8 +79,8 @@ export const router = createBrowserRouter([
                 element: <AdminSourceFundsOverview />,
               },
               { path: "reports", element: <AdminReports /> },
-              { path: "profile", element: <AdminProfile /> },
               { path: "audit-logs", element: <AdminAuditLogs /> },
+              { path: "settings", element: <AdminSettings /> },
             ],
           },
         ],
