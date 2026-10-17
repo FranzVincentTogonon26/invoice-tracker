@@ -269,6 +269,29 @@ export const updateReference = async (req, res, next) => {
     if (!updated)
       throw ApiError.notFound("Reference not found", "REFERENCE_NOT_FOUND");
 
+    // Status flips are holder-visible money events: closing dissolves every
+    // open holding under the source into history (each holder's remaining
+    // pool recomputes without it), reopening reconnects them. Fan the event
+    // to those holders' personal rooms; plain label/notes edits stay
+    // admin-scoped (employees never render source metadata).
+    let holderNotifyIds = [];
+    if (
+      payload.status === "cut_off" ||
+      payload.status === "open"
+    ) {
+      try {
+        holderNotifyIds = await Budget.openReferenceHolderIds(referenceId);
+      } catch (fanErr) {
+        // A failed fan-out must never turn a committed status flip into a
+        // 500 — admins already got the broadcast; holders refetch on their
+        // next natural event.
+        console.error(
+          "reference holder fan-out failed:",
+          fanErr?.message ?? fanErr,
+        );
+      }
+    }
+
     emitTransaction({
       action: "update",
       entity: "budget-reference",
@@ -280,6 +303,7 @@ export const updateReference = async (req, res, next) => {
             ? `Reopened budget source "${updated?.label ?? referenceId}".`
             : `Updated budget source "${updated?.label ?? referenceId}".`,
       metadata: { reference_id: referenceId, label: updated?.label ?? null, status: updated?.status ?? null },
+      notifyUserIds: holderNotifyIds,
     });
 
     return res.status(200).json({ reference: updated });

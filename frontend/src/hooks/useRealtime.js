@@ -5,6 +5,9 @@ import { connectSocket, getSocket } from "../lib/socket";
 import { useAuth } from "../context/AuthContext";
 
 // Query keys that show money — refreshed on every `transactions:changed`.
+// Prefix matching (exact: false) means a bare ["employees"] also covers
+// ["employees", params] variants; arrays keyed by the feature root stay
+// covered as new param-shaped keys appear.
 const MONEY_KEYS = [
   ["transactions"],
   ["budgets"],
@@ -15,8 +18,19 @@ const MONEY_KEYS = [
   ["budgetTransfer"],
   ["employeeOverview"],
   ["employeeBudget"],
+  // Admin per-employee detail pages (Employees -> Overview/Budget/Expenses/
+  // Abono sections): every section is a money view and must follow the ledger.
+  ["employeeDetails"],
   ["employees"],
   ["reimbursements"],
+  // Account book + invoicing records — user-maintained rows that reference
+  // the same clients/money, so any money event refreshes them too.
+  ["invoices"],
+  ["invoice"],
+  ["clients"],
+  ["client"],
+  ["dashboard"],
+  ["employeeSettings"],
   // Admin audit trail (sourced from backend/logs/transactions.md) — every
   // money event appends a row there, so the visible page refetches live.
   ["auditLogs"],
@@ -57,8 +71,16 @@ const isValidPayload = (p) =>
 
 const safeText = (v, max = 200) => {
   if (typeof v !== "string") return "";
-  // Strip control chars (terminal/ANSI injection) and bound length.
-  return v.replace(/[\u0000-\u001F\u007F]/g, " ").slice(0, max);
+  // Strip control chars (terminal/ANSI injection) and bound length. Char-code
+  // filtering instead of a regex keeps `no-control-regex` happy while the
+  // behavior (each control char -> one space) stays identical to the old
+  // /[\u0000-\u001F\u007F]/g pass.
+  return [...v]
+    .map((ch) =>
+      ch.charCodeAt(0) <= 0x1f || ch.charCodeAt(0) === 0x7f ? " " : ch,
+    )
+    .join("")
+    .slice(0, max);
 };
 
 /**

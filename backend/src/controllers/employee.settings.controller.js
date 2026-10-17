@@ -125,7 +125,9 @@ export const updateAccount = async (req, res, next) => {
       message: `${updated?.name ?? "Employee"} updated their account profile.`,
       metadata: { userId: updated?.user_id ?? user.user_id },
       notifyUserIds: [updated?.user_id ?? user.user_id],
-      adminOnly: true,
+      // NOT adminOnly: the updater's own personal rooms get it, so their
+      // other sessions/tabs refresh the profile without a manual reload.
+      adminOnly: false,
     });
 
     // Tripwire for session theft: if the email itself moved, tell the

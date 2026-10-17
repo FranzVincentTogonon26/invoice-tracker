@@ -141,7 +141,7 @@ const EmployeesModal = ({ open, onClose, create }) => {
                       Icon={UserRound}
                       value={form.fullname}
                       onChange={set("fullname")}
-                      placeholder="e.g. Juan Dela Cruz"
+                      placeholder="e.g. Franz Gwapo"
                     />
                   </Field>
                   <Field label="Email">

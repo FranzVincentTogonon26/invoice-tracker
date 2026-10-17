@@ -79,11 +79,16 @@ class Abono {
 
     const result = await query(
       `SELECT ${ABONO_COLUMNS},
+              bir.status AS holding_status,
               u.name AS employee_name,
               u.email AS employee_email,
               u.avatar_url AS employee_avatar
          FROM employee_abono ea
          LEFT JOIN budget_reference br ON br.reference_id = ea.reference_id
+         -- The abono is pinned to its issuance holding, so every consumer can
+         -- tell whether that holding is still OPEN (finalized holdings hand
+         -- their leftover back and stop funding the holder's pool).
+         LEFT JOIN budget_issued_reference bir ON bir.id = ea.issued_ref_id
          LEFT JOIN users u ON u.user_id = ea.user_id
         ${where ? `WHERE ${where}` : ""}
         ORDER BY ea.created_at DESC`,

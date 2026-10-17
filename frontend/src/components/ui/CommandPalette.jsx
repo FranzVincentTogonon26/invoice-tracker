@@ -12,8 +12,9 @@ import {
   UserRound,
   Plus,
   HandCoins,
-  Wallet,
-  House,
+  HandshakeIcon,
+  BarChart3,
+  Settings,
   CornerDownLeft,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -66,6 +67,30 @@ const ADMIN_NAV = [
     icon: Receipt,
   },
   {
+    id: "nav:reimbursement",
+    kind: "nav",
+    label: "Reimbursement",
+    hint: "Open abono & holdings",
+    to: "/admin/reimbursement",
+    icon: HandshakeIcon,
+  },
+  {
+    id: "nav:source-funds",
+    kind: "nav",
+    label: "Source of Funds",
+    hint: "Origin of funds",
+    to: "/admin/source-funds",
+    icon: HandCoins,
+  },
+  {
+    id: "nav:reports",
+    kind: "nav",
+    label: "Reports",
+    hint: "Summary & exports",
+    to: "/admin/reports",
+    icon: BarChart3,
+  },
+  {
     id: "nav:audit",
     kind: "nav",
     label: "Audit Logs",
@@ -73,8 +98,19 @@ const ADMIN_NAV = [
     to: "/admin/audit-logs",
     icon: Logs,
   },
+  {
+    id: "nav:settings",
+    kind: "nav",
+    label: "Settings",
+    hint: "Account settings",
+    to: "/admin/profile",
+    icon: Settings,
+  },
 ];
 
+// Admin-only. Employees never mount the palette (AdminShell is the only
+// host) and the component itself refuses non-admin users — so there are no
+// employee items here at all.
 const ADMIN_ACTIONS = [
   {
     id: "action:add-expense",
@@ -83,60 +119,6 @@ const ADMIN_ACTIONS = [
     hint: "New expense lines",
     to: "/admin/expenses/add",
     icon: Plus,
-  },
-];
-
-const EMPLOYEE_NAV = [
-  {
-    id: "nav:overview",
-    kind: "nav",
-    label: "Overview",
-    hint: "My summary",
-    to: "/employee/overview",
-    icon: House,
-  },
-  {
-    id: "nav:budget",
-    kind: "nav",
-    label: "My Budget",
-    hint: "Issued & transfers",
-    to: "/employee/budget",
-    icon: Wallet,
-  },
-  {
-    id: "nav:expenses",
-    kind: "nav",
-    label: "Expenses",
-    hint: "My ledger",
-    to: "/employee/expenses",
-    icon: FileText,
-  },
-  {
-    id: "nav:abono",
-    kind: "nav",
-    label: "Abono",
-    hint: "Top-ups",
-    to: "/employee/abono",
-    icon: HandCoins,
-  },
-];
-
-const EMPLOYEE_ACTIONS = [
-  {
-    id: "action:add-expense",
-    kind: "action",
-    label: "Add Expense",
-    hint: "New expense lines",
-    to: "/employee/expenses/add",
-    icon: Plus,
-  },
-  {
-    id: "action:transfer",
-    kind: "action",
-    label: "Transfer Budget",
-    hint: "Move funds",
-    to: "/employee/budget-transfer",
-    icon: ArrowLeftRight,
   },
 ];
 
@@ -155,27 +137,30 @@ function scoreMatch(query, text) {
 }
 
 export function CommandPalette({ open, onClose }) {
+  // Admin-only feature: the palette never renders for employees, even if a
+  // future shell mounts it outside AdminShell. The roster search below is
+  // router-guarded to admins too, so this is redundant by design — one gate
+  // at the component edge, one at the API.
+  const { user } = useAuth();
+  const isAdmin = user?.role === USER_ROLES.ADMIN;
   return (
     <AnimatePresence>
-      {open && <PaletteBody onClose={onClose} />}
+      {open && isAdmin && <PaletteBody onClose={onClose} />}
     </AnimatePresence>
   );
 }
 
 function PaletteBody({ onClose }) {
   const navigate = useNavigate();
-  const { user } = useAuth();
-  const isAdmin = user?.role === USER_ROLES.ADMIN;
   const [query, setQuery] = useState("");
-  const [activeIdx, setActiveIdx] = useState(0);
+  const [rawIdx, setActiveIdx] = useState(0);
   const inputRef = useRef(null);
   const listRef = useRef(null);
 
-  // Admin-only directory search — employees never see the roster, so the
-  // request fires for admins only (the endpoint itself is admin-guarded).
-  const { data: employees } = useEmployees(undefined, {
-    enabled: Boolean(isAdmin),
-  });
+  // Admin-only roster search — the palette refuses non-admin users before
+  // this body mounts, so the request fires for admins only (the endpoint
+  // itself is admin-guarded too).
+  const { data: employees } = useEmployees(undefined, { enabled: true });
 
   // Fresh mount on every open, so query/activeIdx start clean.
   useEffect(() => {
@@ -184,10 +169,7 @@ function PaletteBody({ onClose }) {
   }, []);
 
   const items = useMemo(() => {
-    const nav = isAdmin ? ADMIN_NAV : EMPLOYEE_NAV;
-    const actions = isAdmin ? ADMIN_ACTIONS : EMPLOYEE_ACTIONS;
-
-    const employeeItems = (isAdmin ? employees || [] : []).map((e) => ({
+    const employeeItems = (employees || []).map((e) => ({
       id: `employee:${e.user_id}`,
       kind: "employee",
       label: e.name || "Unnamed employee",
@@ -197,7 +179,7 @@ function PaletteBody({ onClose }) {
       avatarUrl: e.avatar_url || "",
     }));
 
-    const pool = [...nav, ...actions, ...employeeItems];
+    const pool = [...ADMIN_NAV, ...ADMIN_ACTIONS, ...employeeItems];
     if (!query.trim()) return pool;
 
     return pool
@@ -208,13 +190,14 @@ function PaletteBody({ onClose }) {
       .filter((x) => x.score > 0)
       .sort((a, b) => b.score - a.score)
       .map((x) => x.it);
-  }, [employees, isAdmin, query]);
+  }, [employees, query]);
 
-  // The pool shrinks as data loads / the query changes — clamp the cursor so
-  // Enter can never fire on a stale out-of-range index.
-  useEffect(() => {
-    setActiveIdx((i) => Math.min(i, Math.max(0, items.length - 1)));
-  }, [items.length]);
+  // The pool shrinks as data loads / the query changes — the cursor is
+  // clamped at every READ (highlight, Enter, scroll) instead of syncing
+  // state inside an effect, so Enter can never fire on a stale
+  // out-of-range index and the set-state-in-effect lint stays satisfied.
+  const maxIdx = Math.max(0, items.length - 1);
+  const activeIdx = Math.min(rawIdx, maxIdx);
 
   useEffect(() => {
     const el = listRef.current?.querySelector(`[data-idx="${activeIdx}"]`);
@@ -252,15 +235,11 @@ function PaletteBody({ onClose }) {
       title: "Quick actions",
       items: items.filter((i) => i.kind === "action"),
     },
-    ...(isAdmin
-      ? [
-          {
-            key: "employee",
-            title: "Employees",
-            items: items.filter((i) => i.kind === "employee"),
-          },
-        ]
-      : []),
+    {
+      key: "employee",
+      title: "Employees",
+      items: items.filter((i) => i.kind === "employee"),
+    },
   ];
 
   let renderIdx = -1;
@@ -351,11 +330,7 @@ function PaletteBody({ onClose }) {
               setActiveIdx(0);
             }}
             onKeyDown={handleKeyDown}
-            placeholder={
-              isAdmin
-                ? "Search employees or jump to a page..."
-                : "Jump to a page..."
-            }
+            placeholder="Search employees or jump to a page..."
             className="flex-1 bg-transparent outline-none text-sm text-[var(--ink)] placeholder:text-[var(--ink-muted)]"
           />
           <kbd className="hidden sm:inline-flex items-center gap-1 text-xs px-2 h-6 rounded-md bg-[var(--surface-2)] text-[var(--ink-muted)] border border-[var(--border)] font-medium">

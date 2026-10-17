@@ -12,6 +12,20 @@ import { AnimatePresence, motion } from "framer-motion";
 import { Check, ChevronDown, Search } from "lucide-react";
 import { cn } from "@/lib/utils";
 
+// Trigger tones: "surface" is the neutral bordered pill; "soft" carries the
+// accent tone (soft fill, accent ink) for primary pickers like the dashboard
+// source switcher. Per-call `buttonClassName` still wins over either.
+const triggerTones = {
+  surface: cn(
+    "border-[var(--border)] bg-[var(--surface)] text-[var(--ink)]",
+    "hover:border-[var(--accent)]/40 focus-visible:border-[var(--accent)]/50 focus-visible:ring-2 focus-visible:ring-[var(--accent)]/15",
+  ),
+  soft: cn(
+    "border-[var(--accent)]/30 bg-[var(--accent-soft)] text-[var(--accent-strong)]",
+    "hover:border-[var(--accent)]/55 focus-visible:border-[var(--accent)]/60 focus-visible:ring-2 focus-visible:ring-[var(--accent)]/25",
+  ),
+};
+
 function initialsOf(label) {
   return (
     String(label || "?")
@@ -90,6 +104,8 @@ export default function Listbox({
   renderTrigger,
   renderOption,
   buttonClassName,
+  // Trigger tone: "surface" (default) or "soft" — see `triggerTones` above.
+  variant = "surface",
   disabled = false,
   align = "start",
   searchable = false,
@@ -144,24 +160,31 @@ export default function Listbox({
     return -1;
   };
 
+  // Centralized close: resets the panel's transient state (search filter,
+  // measured portal position) in the same synchronous update that flips
+  // `open` off, instead of cleaning up from an effect afterward.
+  const shut = useCallback(
+    ({ restoreFocus = false } = {}) => {
+      setOpen(false);
+      setActiveIndex(-1);
+      setSearch("");
+      setPos(null);
+      if (restoreFocus) buttonRef.current?.focus();
+    },
+    [],
+  );
+
   const commit = (option) => {
     if (isDisabled(option)) return;
-    setOpen(false);
-    setActiveIndex(-1);
+    shut({ restoreFocus: true });
     onChange(option.value);
-    buttonRef.current?.focus();
   };
 
-  const close = useCallback(() => {
-    setOpen(false);
-    setActiveIndex(-1);
-    buttonRef.current?.focus();
-  }, []);
+  const close = useCallback(() => shut({ restoreFocus: true }), [shut]);
 
   // Fixed placement for the portaled panel: anchored to the trigger, kept
   // inside the viewport, and flipped above the trigger when the space below
-  // runs out. Returns the previous object when nothing moved so the
-  // every-render re-measure never loops.
+  // runs out. Position resets happen via `shut()` at the close sites.
   const place = useCallback(() => {
     const trigger = buttonRef.current;
     if (!trigger) return;
@@ -185,10 +208,7 @@ export default function Listbox({
   }, [align]);
 
   useLayoutEffect(() => {
-    if (!open || !portal) {
-      setPos(null);
-      return undefined;
-    }
+    if (!open || !portal) return undefined;
 
     place();
     window.addEventListener("scroll", place, true);
@@ -207,11 +227,6 @@ export default function Listbox({
     if (open && portal && pos) place();
   });
 
-  // Clear the search whenever the dropdown closes
-  useEffect(() => {
-    if (!open) setSearch("");
-  }, [open]);
-
   // Close on outside click while open
   useEffect(() => {
     if (!open) return;
@@ -221,11 +236,11 @@ export default function Listbox({
         !rootRef.current?.contains(e.target) &&
         !panelRef.current?.contains(e.target)
       )
-        setOpen(false);
+        shut();
     };
     window.addEventListener("pointerdown", handlePointerDown);
     return () => window.removeEventListener("pointerdown", handlePointerDown);
-  }, [open]);
+  }, [open, shut]);
 
   const handleTriggerKeyDown = (e) => {
     if (disabled) return;
@@ -272,8 +287,7 @@ export default function Listbox({
         close();
         break;
       case "Tab":
-        setOpen(false);
-        setActiveIndex(-1);
+        shut();
         break;
       default:
         break;
@@ -428,14 +442,16 @@ export default function Listbox({
         ref={buttonRef}
         type="button"
         disabled={disabled}
-        onClick={() => setOpen((o) => !o)}
+        onClick={() => (open ? shut() : setOpen(true))}
         onKeyDown={handleTriggerKeyDown}
         aria-haspopup="listbox"
         aria-expanded={open}
         aria-controls={open ? listId : undefined}
         className={cn(
-          "group flex  w-full items-center justify-between gap-2 rounded-full border border-[var(--border)] bg-[var(--surface)] px-4 h-10  text-sm text-[var(--ink)] outline-none transition-colors",
-          "hover:border-[var(--accent)]/40 focus-visible:border-[var(--accent)]/50 focus-visible:ring-2 focus-visible:ring-[var(--accent)]/15",
+          // `border` (width) lives here once — tone strings only carry color.
+          // Shadow parity with `SearchInput`: card shadow resting, hover lift.
+          "group flex w-full items-center justify-between gap-2 rounded-full border px-4 h-10 text-sm outline-none shadow-card transition-[border-color,box-shadow] hover:shadow-hover",
+          triggerTones[variant] ?? triggerTones.surface,
           "disabled:cursor-not-allowed disabled:opacity-50",
           buttonClassName,
         )}
@@ -447,8 +463,10 @@ export default function Listbox({
             <OptionAvatar option={selectedOption} size="sm" />
             <span
               className={cn(
-                "min-w-0 flex-1 truncate text-xs font-medium text-[var(--ink-muted)] transition-colors",
-                !selectedOption && "text-[var(--ink-muted)]",
+                "min-w-0 flex-1 truncate text-xs font-medium transition-colors",
+                variant === "soft"
+                  ? "text-[var(--accent-strong)]"
+                  : "text-[var(--ink-muted)]",
               )}
             >
               {selectedOption ? selectedOption.label : placeholder}
@@ -458,7 +476,10 @@ export default function Listbox({
         <ChevronDown
           size={16}
           className={cn(
-            "shrink-0 text-[var(--ink-muted)] transition-transform",
+            "shrink-0 transition-transform",
+            variant === "soft"
+              ? "text-[var(--accent-strong)]/70"
+              : "text-[var(--ink-muted)]",
             open && "rotate-180",
           )}
         />

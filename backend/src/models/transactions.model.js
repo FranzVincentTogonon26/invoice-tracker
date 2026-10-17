@@ -231,6 +231,11 @@ class Transactions {
         method: null,
         referenceId: row.reference_id ?? null,
         referenceLabel: row.reference_label || "No source of funds",
+        // Pinned holding: `budget_issued_reference.status` so balance math can
+        // gate the abono leg on an OPEN holding (finalized holdings stop
+        // funding the holder's pool).
+        issuedRefId: row.issued_ref_id ?? null,
+        holdingStatus: row.holding_status ?? null,
         categoryId: null,
         categoryName: null,
         employeeId: row.user_id ?? null,
@@ -283,6 +288,10 @@ class Transactions {
         flagged: false,
         expenseDate: null,
         dateSettled: null,
+        // Sender-side holding (`budget_transfer.issued_ref_id`): balance math
+        // gates the sent leg on this holding being OPEN.
+        issuedRefId: row.issued_ref_id ?? null,
+        holdingStatus: row.sending_holding_status ?? null,
         issuedRefIdSent: row.issued_ref_id_sent ?? null,
         sentParentStatus: row.sent_parent_status ?? null,
       });
@@ -314,6 +323,10 @@ class Transactions {
         flagged: false,
         expenseDate: null,
         dateSettled: null,
+        // Same sender-side holding on the mirrored leg (informational for the
+        // recipient view; the RECIPIENT gate reads issuedRefIdSent below).
+        issuedRefId: row.issued_ref_id ?? null,
+        holdingStatus: row.sending_holding_status ?? null,
         issuedRefIdSent: row.issued_ref_id_sent ?? null,
         sentParentStatus: row.sent_parent_status ?? null,
       });

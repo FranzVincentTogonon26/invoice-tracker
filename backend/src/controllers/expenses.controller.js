@@ -346,8 +346,14 @@ export const remove = async (req, res, next) => {
       entity: "expense",
       actor: req.user,
       message: `Deleted expense "${expense.description ?? expense.id}" (${expense.amount ?? "?"}).`,
-      metadata: { id, amount: expense.amount ?? null, userId: expense.user_id ?? null },
-      notifyUserIds: expense.user_id ? [expense.user_id] : [],
+      metadata: {
+        id,
+        amount: expense.amount ?? null,
+        userId: expense.user_id ?? existing?.user_id ?? null,
+      },
+      notifyUserIds: (expense.user_id ?? existing?.user_id)
+        ? [expense.user_id ?? existing.user_id]
+        : [],
     });
 
     return res
@@ -421,13 +427,18 @@ export const markEmployeeDraft = async (req, res, next) => {
 
     const expense = await Expenses.markEmployeeExpenseDraft(id);
     if (expense) {
+      // The owning employee's personal room is the delivery target: their
+      // device hears `transactions:changed` and refetches the ledger live.
+      // `pre.user_id` is the fallback so the notify can never silently no-op
+      // if a model update ever drops user_id from its RETURNING again.
+      const ownerId = expense.user_id ?? pre?.user_id ?? null;
       emitTransaction({
         action: "status",
         entity: "expense",
         actor: req.user,
         message: `Moved employee expense back to draft (${expense.description ?? id}).`,
-        metadata: { id, status: "draft", amount: expense.amount ?? null, userId: expense.user_id ?? null },
-        notifyUserIds: expense.user_id ? [expense.user_id] : [],
+        metadata: { id, status: "draft", amount: expense.amount ?? null, userId: ownerId },
+        notifyUserIds: ownerId ? [ownerId] : [],
       });
       return res.status(200).json({
         expense,
@@ -473,13 +484,16 @@ export const markEmployeePaid = async (req, res, next) => {
 
     const expense = await Expenses.markEmployeeExpensePaid(id);
     if (expense) {
+      // Same owner-notify discipline as markEmployeeDraft above — the personal
+      // `user:<id>` room is what carries the sync to the employee's devices.
+      const ownerId = expense.user_id ?? pre?.user_id ?? null;
       emitTransaction({
         action: "status",
         entity: "expense",
         actor: req.user,
         message: `Moved employee expense back to paid (${expense.description ?? id}).`,
-        metadata: { id, status: "paid", amount: expense.amount ?? null, userId: expense.user_id ?? null },
-        notifyUserIds: expense.user_id ? [expense.user_id] : [],
+        metadata: { id, status: "paid", amount: expense.amount ?? null, userId: ownerId },
+        notifyUserIds: ownerId ? [ownerId] : [],
       });
       return res.status(200).json({
         expense,
@@ -533,6 +547,9 @@ export const clearFlag = async (req, res, next) => {
       actor: req.user,
       message: `Approved flag on expense (${expense?.description ?? id}).`,
       metadata: { id, userId: expense?.user_id ?? existing?.user_id ?? null },
+      // The row owner's personal room must hear every edit to their ledger —
+      // notify-less events only reach admin rooms.
+      notifyUserIds: existing?.user_id ? [existing.user_id] : [],
     });
     return res.status(200).json({
       expense,
@@ -596,6 +613,10 @@ export const updateDescription = async (req, res, next) => {
       actor: req.user,
       message: `Updated expense description (${id}).`,
       metadata: { id, userId: expense.user_id ?? existing?.user_id ?? null },
+      // Owner room must hear it — their ledger refetches live.
+      notifyUserIds: (expense.user_id ?? existing?.user_id)
+        ? [expense.user_id ?? existing.user_id]
+        : [],
     });
 
     return res.status(200).json({
@@ -635,6 +656,10 @@ export const updateNotes = async (req, res, next) => {
       actor: req.user,
       message: `Saved review notes on expense (${id}).`,
       metadata: { id, userId: expense.user_id ?? existing?.user_id ?? null },
+      // Owner room must hear it — their ledger refetches live.
+      notifyUserIds: (expense.user_id ?? existing?.user_id)
+        ? [expense.user_id ?? existing.user_id]
+        : [],
     });
 
     return res.status(200).json({
@@ -679,6 +704,8 @@ export const updateCategory = async (req, res, next) => {
       actor: req.user,
       message: `Updated expense category (${result.expense?.category_name ?? "Uncategorized"}).`,
       metadata: { id, userId: existing?.user_id ?? null },
+      // Owner room must hear it — their ledger refetches live.
+      notifyUserIds: existing?.user_id ? [existing.user_id] : [],
     });
 
     return res.status(200).json({
@@ -717,6 +744,8 @@ export const updateDate = async (req, res, next) => {
       actor: req.user,
       message: `Updated expense date (${expense?.expense_date ?? payload.expense_date}).`,
       metadata: { id, userId: existing?.user_id ?? null },
+      // Owner room must hear it — their ledger refetches live.
+      notifyUserIds: existing?.user_id ? [existing.user_id] : [],
     });
 
     return res.status(200).json({
@@ -758,6 +787,8 @@ export const updateReceiptDate = async (req, res, next) => {
       actor: req.user,
       message: `Updated receipt date (${payload.receipt_date}).`,
       metadata: { id, userId: existing?.user_id ?? null },
+      // Owner room must hear it — their ledger refetches live.
+      notifyUserIds: existing?.user_id ? [existing.user_id] : [],
     });
 
     return res.status(200).json({

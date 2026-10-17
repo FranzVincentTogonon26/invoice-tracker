@@ -398,6 +398,22 @@ class Budget {
     return day < today;
   }
 
+  // Distinct employees holding an OPEN issued reference under one source.
+  // Fan-out target when that source's status flips: closing ('cut_off')
+  // dissolves every open holding into history, reopening reconnects them —
+  // either way each holder's remaining-balance pool changes on their own
+  // device, so their personal room must hear the event to refetch live.
+  static async openReferenceHolderIds(referenceId) {
+    const result = await query(
+      `SELECT DISTINCT bir.user_id::text AS user_id
+         FROM budget_issued_reference bir
+        WHERE bir.reference_id = $1
+          AND bir.status = 'open'`,
+      [referenceId],
+    );
+    return result.rows.map((row) => row.user_id).filter(Boolean);
+  }
+
   // Source of Funds management list — EVERY reference (open AND cut-off),
   // each with its live aggregates, newest first. Unlike the picker lists,
   // management must also see disconnected sources to edit, reopen or

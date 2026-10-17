@@ -188,7 +188,9 @@ export const updateAvatar = async (req, res, next) => {
       message: `Updated photo for employee ${updated?.name ?? employee.user_id}.`,
       metadata: { userId: employee.user_id },
       notifyUserIds: [employee.user_id],
-      adminOnly: true,
+      // NOT adminOnly: the affected employee's own rooms must hear it too, so
+      // their other devices/sessions pick up the new photo without a refresh.
+      adminOnly: false,
     });
 
     return res.status(200).json({

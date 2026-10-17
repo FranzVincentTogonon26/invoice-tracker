@@ -181,9 +181,11 @@ const emitTransaction = (opts = {}) => {
 
   // 3) Personal rooms get the redacted copy (skipped for adminOnly events).
   if (!adminOnly) {
+    // Cap guards against a controller bug stuffing thousands of ids in; a
+    // legitimate fan-out (household-wide source close) can hit hundreds.
     const targets = [
       ...new Set(notifyUserIds.map(cleanId).filter(Boolean)),
-    ].slice(0, 10);
+    ].slice(0, 200);
     for (const uid of targets) {
       emit("balance:changed", personalPayload, { to: userRoom(uid) });
       emit("transactions:changed", personalPayload, { to: userRoom(uid) });

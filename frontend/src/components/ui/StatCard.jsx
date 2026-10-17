@@ -1,8 +1,68 @@
-import { ResponsiveContainer, LineChart, Line, BarChart, Bar } from "recharts";
+import { useEffect, useMemo } from "react";
+import { motion, useSpring, useTransform } from "framer-motion";
+import { ResponsiveContainer, AreaChart, Area, BarChart, Bar } from "recharts";
 import { Minus, TrendingDown, TrendingUp } from "lucide-react";
 import { Card } from "./Card";
 import { Badge } from "./Badge";
 import { cn } from "../../lib/utils";
+
+/* ── Animated headline number ─────────────────────────────────────────────
+   The dashboard's AnimatedMoney approach, generalized: a framer spring
+   drives the numeric core of the rendered value (count-up on mount, quick
+   roll on every update) while the surrounding text is rebuilt from the
+   original string — prefix (₱), suffix (%), thousands separators and the
+   exact decimal count — so the settled frame reads back precisely what a
+   static render would have shown. Wordy or empty values ("—", names) fall
+   back to plain text. */
+const STAT_SPRING = { stiffness: 190, damping: 26, mass: 0.5 };
+
+function deconstructStatValue(raw) {
+  const text = String(raw ?? "").trim();
+  if (!text || text === "—" || /[A-Za-z]/.test(text)) return null;
+  const match = text.match(/^([+-]?)([^\d]*)([\d,]+(?:\.\d+)?)([^\d]*)$/);
+  if (!match) return null;
+  const [, sign, prefix, num, suffix] = match;
+  const decimals = (num.split(".")[1] ?? "").length;
+  const target = Number(sign + num.replace(/,/g, ""));
+  if (!Number.isFinite(target)) return null;
+  return {
+    sign,
+    prefix,
+    suffix,
+    decimals,
+    grouped: num.includes(","),
+    target,
+  };
+}
+
+function AnimatedStatValue({ value, className }) {
+  const parsed = useMemo(() => deconstructStatValue(value), [value]);
+
+  const formatter = useMemo(
+    () =>
+      parsed
+        ? new Intl.NumberFormat("en-US", {
+            useGrouping: parsed.grouped,
+            minimumFractionDigits: parsed.decimals,
+            maximumFractionDigits: parsed.decimals,
+          })
+        : null,
+    [parsed],
+  );
+
+  const spring = useSpring(0, STAT_SPRING);
+  const text = useTransform(spring, (v) => {
+    if (!formatter) return "";
+    return `${parsed.sign}${parsed.prefix}${formatter.format(Math.abs(v))}${parsed.suffix}`;
+  });
+
+  useEffect(() => {
+    if (parsed) spring.set(parsed.target);
+  }, [parsed, spring]);
+
+  if (!formatter) return <span className={className}>{value}</span>;
+  return <motion.span className={className}>{text}</motion.span>;
+}
 
 /** Dot color for a breakdown row. `warning` is supported so amber states
    (draft, closed) can mirror the badges used in the ledger tables. */
@@ -29,19 +89,37 @@ const breakdownValueTone = (tone, accent) =>
           ? "text-white"
           : "text-[var(--ink)]";
 
+// Gradient ids must not collide across the many sparklines on a page — key
+// them off the color; the same color always yields the same (identical)
+// definition, so aliasing is harmless while different colors get their own.
+const washId = (color) => `stat-wash-${color.replace(/[^a-zA-Z0-9]/g, "")}`;
+
 function MiniLine({ data, color }) {
+  const gid = washId(color);
   return (
     <ResponsiveContainer width="100%" height={42}>
-      <LineChart data={data} margin={{ top: 6, right: 0, bottom: 0, left: 0 }}>
-        <Line
+      <AreaChart data={data} margin={{ top: 6, right: 0, bottom: 0, left: 0 }}>
+        {/* Soft wash under the curve — the same depth treatment the main
+            dashboard graph uses, scaled down to the stat-card lane. `style`
+            is used because CSS variables don't resolve in SVG attributes. */}
+        <defs>
+          <linearGradient id={gid} x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%" style={{ stopColor: color, stopOpacity: 0.28 }} />
+            <stop offset="100%" style={{ stopColor: color, stopOpacity: 0 }} />
+          </linearGradient>
+        </defs>
+        <Area
           type="monotone"
           dataKey="v"
           stroke={color}
           strokeWidth={2}
+          strokeLinecap="round"
+          fill={`url(#${gid})`}
+          fillOpacity={1}
           dot={false}
           isAnimationActive={false}
         />
-      </LineChart>
+      </AreaChart>
     </ResponsiveContainer>
   );
 }
@@ -50,12 +128,25 @@ function MiniLine({ data, color }) {
 // must be painted on the first frame the card is visible (the card itself
 // already animates in via framer-motion).
 function MiniBars({ data, color }) {
+  const gid = `stat-bar-wash-${color.replace(/[^a-zA-Z0-9]/g, "")}`;
   return (
     <ResponsiveContainer width="100%" height={42}>
       <BarChart data={data} margin={{ top: 6, right: 0, bottom: 0, left: 0 }}>
+        {/* Color-dense at the bar tops melting down — same depth treatment
+            as the line wash, so line and bar sparklines stay siblings.
+            `style` is used because CSS variables don't resolve everywhere. */}
+        <defs>
+          <linearGradient id={gid} x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%" style={{ stopColor: color, stopOpacity: 1 }} />
+            <stop
+              offset="100%"
+              style={{ stopColor: color, stopOpacity: 0.45 }}
+            />
+          </linearGradient>
+        </defs>
         <Bar
           dataKey="v"
-          fill={color}
+          fill={`url(#${gid})`}
           radius={[3, 3, 0, 0]}
           barSize={6}
           isAnimationActive={false}
@@ -183,7 +274,11 @@ export function StatCard({
     return (
       <Card
         variant={accent ? "accent" : "default"}
-        className={cn("relative overflow-hidden", accent && "text-white")}
+        className={cn(
+          "group relative overflow-hidden before:absolute before:inset-x-0 before:top-0 before:h-px before:content-[''] before:opacity-70",
+          accent &&
+            "text-white before:bg-[linear-gradient(90deg,transparent,rgba(255,255,255,0.55),transparent)]",
+        )}
       >
         <div className="flex items-center gap-2.5">
           <div
@@ -258,8 +353,9 @@ export function StatCard({
             {Icon && (
               <span
                 className={cn(
-                  "flex h-9 w-9 shrink-0 items-center justify-center rounded-xl",
+                  "flex h-9 w-9 shrink-0 items-center justify-center rounded-xl transition-transform duration-300 group-hover:scale-105",
                   iconTile,
+                  "shadow-[inset_0_0_0_1px_color-mix(in_srgb,currentColor_25%,transparent)]",
                 )}
               >
                 <Icon size={18} />
@@ -280,7 +376,7 @@ export function StatCard({
                   valueColor,
                 )}
               >
-                {displayValue}
+                <AnimatedStatValue value={displayValue} />
                 {suffix && (
                   <span
                     className={cn(
@@ -380,11 +476,33 @@ export function StatCard({
     <Card
       variant={accent ? "accent" : "default"}
       className={cn(
-        "relative overflow-hidden",
+        "group relative overflow-hidden before:absolute before:inset-x-0 before:top-0 before:h-px before:content-[''] before:opacity-70",
         accent && "text-white hover:shadow-hover",
         !accent && "hover:-translate-y-0.5",
         !accent && tone === "warning" && "border-[var(--warning)]/45",
         !accent && tone === "danger" && "border-[var(--danger)]/45",
+        // Per-tone tinted hairline along the top edge + matching inner
+        // ring on hover — the card leans into its own color identity.
+        !accent &&
+          tone === "success" &&
+          "before:bg-[linear-gradient(90deg,transparent,color-mix(in_srgb,var(--success)_45%,transparent),transparent)] hover:ring-1 hover:ring-inset hover:ring-[var(--success)]/30",
+        !accent &&
+          tone === "warning" &&
+          "before:bg-[linear-gradient(90deg,transparent,color-mix(in_srgb,var(--warning)_45%,transparent),transparent)] hover:ring-1 hover:ring-inset hover:ring-[var(--warning)]/30",
+        !accent &&
+          tone === "danger" &&
+          "before:bg-[linear-gradient(90deg,transparent,color-mix(in_srgb,var(--danger)_45%,transparent),transparent)] hover:ring-1 hover:ring-inset hover:ring-[var(--danger)]/30",
+        !accent &&
+          !tone &&
+          "before:bg-[linear-gradient(90deg,transparent,color-mix(in_srgb,var(--accent)_40%,transparent),transparent)] hover:ring-1 hover:ring-inset hover:ring-[var(--accent)]/25",
+        !accent &&
+          tone &&
+          tone !== "success" &&
+          tone !== "warning" &&
+          tone !== "danger" &&
+          "before:bg-[linear-gradient(90deg,transparent,color-mix(in_srgb,var(--accent)_40%,transparent),transparent)] hover:ring-1 hover:ring-inset hover:ring-[var(--accent)]/25",
+        accent &&
+          "before:bg-[linear-gradient(90deg,transparent,rgba(255,255,255,0.55),transparent)]",
       )}
     >
       {accent && (
@@ -406,8 +524,9 @@ export function StatCard({
             {Icon && (
               <span
                 className={cn(
-                  "flex h-9 w-9 shrink-0 items-center justify-center rounded-xl",
+                  "flex h-9 w-9 shrink-0 items-center justify-center rounded-xl transition-transform duration-300 group-hover:scale-105",
                   iconTile,
+                  "shadow-[inset_0_0_0_1px_color-mix(in_srgb,currentColor_25%,transparent)]",
                 )}
               >
                 <Icon size={18} />
@@ -425,11 +544,11 @@ export function StatCard({
           <div className="flex min-w-0 items-center gap-1">
             <span
               className={cn(
-                "font-display tabular-nums text-2xl sm:text-3xl font-medium tracking-tight truncate",
+                "min-w-0 truncate font-display tabular-nums text-2xl sm:text-3xl font-medium tracking-tight",
                 valueColor,
               )}
             >
-              {displayValue}
+              <AnimatedStatValue value={displayValue} />
             </span>
             {status?.label != null &&
               (() => {
@@ -457,41 +576,61 @@ export function StatCard({
               </span>
             )}
           </div>
-          {delta != null && (
-            <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
-              <Badge
-                tone={deltaTone}
-                className={cn(accent && "bg-white/15 text-white")}
-              >
-                <DeltaIcon size={13} aria-hidden />
-                {deltaFlat ? "0%" : `${deltaUp ? "+" : ""}${delta}%`}
-                <span className="sr-only">
-                  {deltaWord}
-                  {deltaCaption ? ` ${deltaCaption}` : ""}
-                </span>
-              </Badge>
-              {deltaCaption && (
-                <span
+
+          {(hasCaption || delta != null) && (
+            <div className="flex min-w-0 flex-wrap items-center justify-between gap-x-2 gap-y-1">
+              {hasCaption && (
+                <p
                   className={cn(
-                    "text-xs font-medium",
+                    "type-eyebrow truncate text-[12px] leading-snug",
                     accent ? "text-white/60" : "text-[var(--ink-muted)]",
                   )}
                 >
-                  {deltaCaption}
-                </span>
+                  {breakdownCaption}
+                </p>
+              )}
+              {delta != null && (
+                <div
+                  className={cn(
+                    "flex min-w-0 shrink-0 items-center gap-1.5",
+                    !hasCaption && "ml-auto",
+                  )}
+                >
+                  <motion.span
+                    key={delta}
+                    initial={{ opacity: 0, scale: 0.7 }}
+                    animate={{ opacity: 1, scale: 1 }}
+                    transition={{ duration: 0.3, ease: [0.16, 1, 0.3, 1] }}
+                    className="inline-flex"
+                  >
+                    <Badge
+                      tone={deltaTone}
+                      className={cn(
+                        "shrink-0 gap-1 px-1.5 py-0.5 text-[10px]",
+                        accent && "bg-white/15 text-white",
+                      )}
+                    >
+                      <DeltaIcon size={10} aria-hidden />
+                      {deltaFlat ? "0%" : `${deltaUp ? "+" : ""}${delta}%`}
+                      <span className="sr-only">
+                        {deltaWord}
+                        {deltaCaption ? ` ${deltaCaption}` : ""}
+                      </span>
+                    </Badge>
+                  </motion.span>
+                  {deltaCaption && (
+                    <span
+                      className={cn(
+                        "truncate text-xs font-medium",
+                        accent ? "text-white/60" : "text-[var(--ink-muted)]",
+                      )}
+                    >
+                      {deltaCaption}
+                    </span>
+                  )}
+                </div>
               )}
             </div>
-          )}
-
-          {hasCaption && (
-            <p
-              className={cn(
-                "text-xs leading-relaxed",
-                accent ? "text-white/60" : "text-[var(--ink-muted)]",
-              )}
-            >
-              {breakdownCaption}
-            </p>
           )}
 
           {hasBreakdown && (

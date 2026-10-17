@@ -704,6 +704,7 @@ class BudgetTransfer {
               bt.issued_ref_id,
               bt.issued_ref_id_sent,
               birs.status AS sent_parent_status,
+              birf.status AS sending_holding_status,
               br.label AS reference_label,
               bt.user_id AS sender_id,
               su.name AS sender_name,
@@ -726,6 +727,11 @@ class BudgetTransfer {
          LEFT JOIN users su ON su.user_id = bt.user_id
          LEFT JOIN users ru ON ru.user_id = bt.transfer_to
          LEFT JOIN budget_issued_reference birs ON birs.id = bt.issued_ref_id_sent
+         -- Sender-side holding: the issuance record the sent money drew
+         -- from. employee.model's canonical total_sent counts a transfer
+         -- only while this holding is OPEN, so the ledger must expose its
+         -- status for the same gating on the dashboard.
+         LEFT JOIN budget_issued_reference birf ON birf.id = bt.issued_ref_id
          WHERE ${where}
         ORDER BY bt.created_at DESC`,
       params,

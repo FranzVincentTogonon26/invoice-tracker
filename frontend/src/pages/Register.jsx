@@ -53,8 +53,7 @@ export default function Register() {
       // Employees get no token (pending approval) — stay on this page and
       // explain why, instead of showing it as an error.
       setNotice(
-        result.message ||
-          "Your account is awaiting administrator approval.",
+        result.message || "Your account is awaiting administrator approval.",
       );
       setForm({
         name: "",
@@ -99,7 +98,7 @@ export default function Register() {
             autoComplete="name"
             value={form.name}
             onChange={(v) => setForm({ ...form, name: v })}
-            placeholder="Ada Lovelace"
+            placeholder="Franz Gwapo"
             icon={User}
           />
 

@@ -281,7 +281,7 @@ class Expenses {
     const result = await query(
       `DELETE FROM expenses
         WHERE id = $1
-        RETURNING id, description, total_amount, image_url`,
+        RETURNING id, user_id, description, total_amount, image_url`,
       [id],
     );
     return result.rows[0] ?? null;
@@ -296,7 +296,7 @@ class Expenses {
       `UPDATE expenses
           SET status = $2, updated_at = NOW()
         WHERE id = $1
-        RETURNING id, description, total_amount::float8 AS total_amount,
+        RETURNING id, user_id, description, total_amount::float8 AS total_amount,
                   status, image_url`,
       [id, status],
     );
@@ -334,7 +334,7 @@ class Expenses {
           AND u.user_id = e.user_id
           AND u.role = 'employee'
           AND e.status IN ('paid', 'cancel')
-        RETURNING e.id, e.description,
+        RETURNING e.id, e.user_id, e.description,
                   e.total_amount::float8 AS total_amount,
                   e.status, e.image_url`,
       [id],
@@ -357,7 +357,7 @@ class Expenses {
           AND u.user_id = e.user_id
           AND u.role = 'employee'
           AND e.status = 'draft'
-        RETURNING e.id, e.description,
+        RETURNING e.id, e.user_id, e.description,
                   e.total_amount::float8 AS total_amount,
                   e.status, e.image_url`,
       [id],
