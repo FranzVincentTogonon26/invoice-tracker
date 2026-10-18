@@ -686,17 +686,22 @@ class BudgetTransfer {
   // list (`reference_id` is NOT NULL, so the inner condition is safe).
   // Optional filter:
   //   - `search`: matched against notes, method and both account names (ILIKE)
-  static async listAll({ search } = {}) {
+  static async listAll({ search, includeClosed } = {}) {
     const params = [];
-    let where = "br.status = 'open'";
+    const clauses = [];
+    // Closed sources leave no footsteps (see transactions.model): rows
+    // booked to a cut-off source never list unless `includeClosed` lifts
+    // the gate — only the Source of Funds overview page sends it.
+    if (!includeClosed) clauses.push("br.status = 'open'");
     if (search && search.trim()) {
       params.push(`%${search.trim()}%`);
-      where = `(${where}) AND (bt.notes ILIKE $1
+      clauses.push(`(bt.notes ILIKE $1
                     OR bt.method ILIKE $1
                     OR su.name ILIKE $1
                     OR ru.name ILIKE $1
-                    OR br.label ILIKE $1)`;
+                    OR br.label ILIKE $1)`);
     }
+    const where = clauses.join(" AND ") || "TRUE";
 
     const result = await query(
       `SELECT bt.id,

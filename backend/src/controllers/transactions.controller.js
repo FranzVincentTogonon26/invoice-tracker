@@ -7,8 +7,13 @@ import Transactions from "../models/transactions.model.js";
 // from. Admin-only at the route layer.
 export const transactions = async (req, res, next) => {
   try {
+    // `includeClosed=true` lifts the "closed sources leave no footsteps"
+    // gate so a closed source's history still renders. Sent ONLY by the
+    // Source of Funds overview page; every other ledger consumer keeps the
+    // default hidden behavior.
+    const includeClosed = String(req.query.includeClosed ?? "") === "true";
     const { transactions, summary, categories, references } =
-      await Transactions.ledger();
+      await Transactions.ledger({ includeClosed });
     return res.status(200).json({
       transactions,
       summary,

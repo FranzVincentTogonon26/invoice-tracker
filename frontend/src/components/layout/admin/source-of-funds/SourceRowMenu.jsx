@@ -89,33 +89,30 @@ export function RowMenu({ source, onView, onEdit, onDelete, onToggleStatus }) {
   // create / edit picker).
   const isOpen = (source?.status ?? "open") === "open";
   const hasAllocated = Number(source?.allocated) > 0;
-  // A closed source is disconnected from every flow — its dropdown offers
-  // only the way back: "Open source". No view/edit/delete while closed.
-  // (When reopening itself is unavailable — no handler or nothing
-  // allocated — fall back to View so the menu never opens empty.)
-  const closedItems = [
-    ...(onToggleStatus && hasAllocated
-      ? [
-          {
-            label: "Open source",
-            Icon: LockOpen,
-            danger: false,
-            run: () => onToggleStatus(source),
-          },
-        ]
-      : []),
-  ];
+  // A closed source is disconnected from every flow — its dropdown stays to
+  // "View details", plus the way back ("Open source") when reopening is
+  // available (handler present and funds allocated). No edit/delete while
+  // closed.
   const items = !isOpen
-    ? closedItems.length > 0
-      ? closedItems
-      : [
-          {
-            label: "View details",
-            Icon: Eye,
-            danger: false,
-            run: () => onView(source),
-          },
-        ]
+    ? [
+        {
+          label: "View details",
+          Icon: Eye,
+          danger: false,
+          run: () => onView(source),
+        },
+        ...(onToggleStatus && hasAllocated
+          ? [
+              {
+                label: "Open source",
+                Icon: LockOpen,
+                danger: false,
+                separator: true,
+                run: () => onToggleStatus(source),
+              },
+            ]
+          : []),
+      ]
     : [
         {
           label: "View details",

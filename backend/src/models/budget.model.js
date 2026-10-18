@@ -414,6 +414,26 @@ class Budget {
     return result.rows.map((row) => row.user_id).filter(Boolean);
   }
 
+  // Open holdings under one source — the close guard's scan. A source only
+  // closes while NO `budget_issued_reference` row for it is still 'open':
+  // every open row is budget an employee still holds and never liquidated
+  // (expenses) or returned, so closing would dissolve the outstanding
+  // amounts into history. Rows are unique per (reference_id, user_id), so
+  // one row per holder — callers read out `employee_name` to explain
+  // exactly who blocks the close.
+  static async openIssuances(referenceId) {
+    const result = await query(
+      `SELECT u.name AS employee_name
+         FROM budget_issued_reference bir
+         JOIN users u ON u.user_id = bir.user_id
+        WHERE bir.reference_id = $1
+          AND bir.status = 'open'
+        ORDER BY u.name`,
+      [referenceId],
+    );
+    return result.rows;
+  }
+
   // Source of Funds management list — EVERY reference (open AND cut-off),
   // each with its live aggregates, newest first. Unlike the picker lists,
   // management must also see disconnected sources to edit, reopen or
@@ -426,17 +446,14 @@ class Budget {
   // ledger records: budget + issued + expenses + abono + both transfer
   // legs — the overview's record badge with no filters), budgets (budget
   // rows).
-  static async sourceFunds({ search, referenceId } = {}) {
+  static async sourceFunds({ search } = {}) {
     const params = [];
     let searchClause = "";
-    if (referenceId) {
-      params.push(referenceId);
-      searchClause += ` AND br.reference_id = $${params.length}`;
-    }
     if (search && search.trim()) {
       params.push(`%${search.trim()}%`);
-      searchClause += ` AND (br.label ILIKE $${params.length} OR br.notes ILIKE $${params.length})`;
+      searchClause = `AND (br.label ILIKE $1 OR br.notes ILIKE $1)`;
     }
+
     const result = await query(
       `SELECT
           br.reference_id,
@@ -444,6 +461,7 @@ class Budget {
           br.notes,
           br.status,
           br.date_cut_off,
+          br.balance_amount,
           br.created_at,
 
           COALESCE((
@@ -545,6 +563,25 @@ class Budget {
               FROM budget b
              WHERE b.reference_id = br.reference_id
           ) AS budgets,
+          -- Open holdings' holder identities (budget_issued_reference still
+          -- 'open') — the close pre-flight gate: a source only closes once
+          -- every holder has liquidated or returned their budget, so the
+          -- close dialog can show exactly who still blocks it (avatar
+          -- stack + count) before the admin even confirms.
+          COALESCE((
+            SELECT json_agg(
+                     json_build_object(
+                       'user_id', u.user_id,
+                       'name', u.name,
+                       'avatar_url', u.avatar_url
+                     )
+                     ORDER BY u.name
+                   )
+              FROM budget_issued_reference bir
+              JOIN users u ON u.user_id = bir.user_id
+             WHERE bir.reference_id = br.reference_id
+               AND bir.status = 'open'
+          ), '[]'::json) AS open_holders,
           -- People involved with this source: every distinct account behind
           -- its issuances, expenses, abono and transfers (employees AND
           -- admins), with avatar + role for identity display. Capped list
@@ -632,6 +669,7 @@ class Budget {
         expenses,
         employeeExpenses: Number(row.employee_expenses) || 0,
         settledAbono: Number(row.settled_abono) || 0,
+        openHolders: Array.isArray(row.open_holders) ? row.open_holders : [],
         forwarded,
         remaining: allocated - issued - expenses + forwarded,
       };
@@ -642,7 +680,27 @@ class Budget {
   // ('open' → 'cut_off') disconnects the source from every flow; reopening
   // restores it. Status flips touch ONLY the status column — `date_cut_off`
   // is never written here. Resolves null when the reference does not exist.
+  // Close guard: the open → cut_off flip is REFUSED while any
+  // `budget_issued_reference` row under the source is still 'open' — those
+  // are employees who never liquidated or returned their budget, and
+  // closing would dissolve the outstanding amounts into history. Resolves
+  // `{ blocked: true, openIssuances }` (the controller turns it into a 409);
+  // an already-closed source skips the scan and stays a plain write.
+  // Closing also snapshots the leftover pool onto the row as
+  // `balance_amount` (the balance surrender amount) — computed BEFORE the
+  // flip, because `referenceBalance` reads a closed source as 0.
   static async updateReference(reference_id, { label, notes, status, date_cut_off }) {
+    let surrenderAmount = null;
+    if (status === "cut_off" && (await Budget.isReferenceOpen(reference_id))) {
+      const openIssuances = await Budget.openIssuances(reference_id);
+      if (openIssuances.length > 0) {
+        return { blocked: true, openIssuances };
+      }
+      // The column's CHECK refuses negatives — an overdrawn source records
+      // a 0 surrender instead of a negative one.
+      const { balance } = await Budget.referenceBalance(reference_id);
+      surrenderAmount = Math.max(0, toMoney(balance));
+    }
     const sets = [];
     const params = [];
     if (label !== undefined) {
@@ -662,11 +720,18 @@ class Budget {
       sets.push(`date_cut_off = $${params.length}::timestamptz`);
     }
     if (status !== undefined) {
-      // Close / reopen touches ONLY the status column — `date_cut_off` is
-      // never written here (it is owned by the create / edit date picker).
+      // Close / reopen never writes `date_cut_off` (it is owned by the
+      // create / edit date picker) — the close path adds only the
+      // `balance_amount` snapshot below.
       params.push(status);
       const statusParam = params.length;
       sets.push(`status = $${statusParam}`);
+    }
+    // The close snapshot rides the same UPDATE as the status flip. Reopen
+    // leaves the column untouched — it keeps the LAST surrender figure.
+    if (surrenderAmount !== null) {
+      params.push(surrenderAmount);
+      sets.push(`balance_amount = $${params.length}`);
     }
     if (sets.length === 0) return null;
     params.push(reference_id);
@@ -674,7 +739,8 @@ class Budget {
       `UPDATE budget_reference
           SET ${sets.join(", ")}
         WHERE reference_id = $${params.length}
-        RETURNING reference_id, label, notes, status, date_cut_off, created_at`,
+        RETURNING reference_id, label, notes, status, date_cut_off,
+                  balance_amount, created_at`,
       params,
     );
     return result.rows[0] ?? null;
@@ -1414,32 +1480,36 @@ class Budget {
   // Budget Issued Transaction — every `issued_budget` row joined to its parent
   // `budget_issued_reference`, the receiving employee, and the source budget
   // reference label (shown as "Source of Funds").
-  // Optional filter:
+  // Optional filters:
   //   - `search`: matched against employee name, description, notes and the
   //     reference label (ILIKE)
+  //   - `includeClosed`: keep rows whose source of funds is cut off (default
+  //     false — closed sources leave no footsteps; the Source of Funds
+  //     overview page lifts the gate for the source it renders)
   // NOTE: `RETURNING` is only valid on INSERT/UPDATE/DELETE — this is a
   // SELECT, so the columns are selected directly and ALL rows are returned
   // (the UI renders a list, not a single row). `bib.*` / `ib.*` shorthand is
   // deliberately avoided: both tables share `id`, `notes` and `created_at`,
   // so the column names would collide in the result set.
-  static async budgetIssuedTransaction({ search } = {}) {
+  static async budgetIssuedTransaction({ search, includeClosed } = {}) {
     const params = [];
+    const clauses = [];
 
     if (search && search.trim()) {
       params.push(`%${search.trim()}%`);
-    }
-
-    const searchClause = params.length
-      ? `WHERE (u.name ILIKE $1
+      clauses.push(`(u.name ILIKE $1
               OR ib.description ILIKE $1
               OR ib.notes ILIKE $1
-              OR br.label ILIKE $1)
-            AND br.status = 'open'`
-      : `WHERE br.status = 'open'`;
+              OR br.label ILIKE $1)`);
+    }
+
+    if (!includeClosed) clauses.push(`br.status = 'open'`);
+    const searchClause = clauses.length ? `WHERE ${clauses.join(" AND ")}` : "";
 
     // `::float8` casts DECIMAL (returned by pg as strings) to a JS number.
     // Closed sources leave no footsteps: rows under a cut-off source never
-    // list here (`bib.reference_id` is NOT NULL, so the condition is safe).
+    // list here (`bib.reference_id` is NOT NULL, so the condition is safe)
+    // unless `includeClosed` lifts the gate.
     // The displayed status is the PARENT's when it is closed — every child
     // under a 'close' parent reads 'Closed' and its actions lock — else the
     // CHILD's when it is cancelled, else the parent's. `parent_status` is
@@ -1481,10 +1551,13 @@ class Budget {
   // Optional filters:
   //   - `status`: 'closed' | 'cancelled' | 'added'; 'all' (or falsy) skips the filter
   //   - `search`: matched against description and reference label (ILIKE)
+  //   - `includeClosed`: keep rows whose source of funds is cut off (default
+  //     false — closed sources leave no footsteps; the Source of Funds
+  //     overview page lifts the gate for the source it renders)
   // NOTE: `RETURNING` is only valid on INSERT/UPDATE/DELETE — this is a SELECT,
   // so the columns are selected directly and ALL rows are returned (the UI
   // renders a list, not a single row).
-  static async budgetTransaction({ status, search } = {}) {
+  static async budgetTransaction({ status, search, includeClosed } = {}) {
     const where = [];
     const params = [];
 
@@ -1502,7 +1575,8 @@ class Budget {
     // `::float8` casts DECIMAL (returned by pg as strings) to a JS number.
     // Closed sources leave no footsteps: rows under a cut-off source never
     // list here (`budget.reference_id` is NOT NULL, so the inner condition
-    // is safe).
+    // is safe) unless `includeClosed` lifts the gate.
+    if (!includeClosed) where.push(`br.status = 'open'`);
     const result = await query(
       `SELECT
           b.id,
@@ -1517,7 +1591,7 @@ class Budget {
           br.label
        FROM budget b
        LEFT JOIN budget_reference br ON br.reference_id = b.reference_id
-       ${where.length ? `WHERE ${where.join(" AND ")} AND br.status = 'open'` : `WHERE br.status = 'open'`}
+       ${where.length ? `WHERE ${where.join(" AND ")}` : ""}
        ORDER BY b.created_at DESC`,
       params,
     );

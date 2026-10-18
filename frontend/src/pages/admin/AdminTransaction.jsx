@@ -26,10 +26,9 @@ import {
 } from "../../hooks/useTransactions";
 import TransactionDetailsModal from "../../components/layout/admin/transactions/TransactionDetailsModal";
 import { TransactionOverview } from "../../components/layout/admin/transactions/TransactionOverview";
-import {
-  TransactionFilterBar,
-  TYPE_TABS,
-} from "../../components/layout/admin/transactions/TransactionFilterBar";
+import { TransactionFilterBar } from "../../components/layout/admin/transactions/TransactionFilterBar";
+import { TYPE_TABS } from "@/constants";
+
 import { TransactionLedger } from "../../components/layout/admin/transactions/TransactionLedger";
 import ConfirmActionDialog from "../../components/layout/admin/expenses/ConfirmActionDialog";
 import {

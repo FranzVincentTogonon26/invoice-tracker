@@ -71,19 +71,3 @@ export const rateLimit = ({
 export const userKey = (prefix) => (req) =>
   `${prefix}:${req.user?.id ?? req.ip}`;
 
-// Public visitor limiter: 60 requests per minute per IP for viewing public shared source
-export const publicOverviewLimiter = rateLimit({
-  windowMs: 60 * 1000,
-  max: 60,
-  message: "Too many overview requests. Please wait a moment before trying again.",
-  code: "PUBLIC_OVERVIEW_RATE_LIMITED",
-});
-
-// Public action limiter: 30 requests per minute per IP for logging visitor interactions
-export const publicActionLimiter = rateLimit({
-  windowMs: 60 * 1000,
-  max: 30,
-  message: "Too many interaction events. Please slow down.",
-  code: "PUBLIC_ACTION_RATE_LIMITED",
-});
-

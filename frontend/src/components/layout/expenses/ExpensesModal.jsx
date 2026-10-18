@@ -138,7 +138,7 @@ const ExpensesModal = ({
     setScanErr("");
     setErr("");
     setReceipt(blankReceipt());
-  }, [releasePreview]);
+  }, [releasePreview, setScanErr]);
 
   const hasScannedContent = scanning || (hasReceiptData && !scanErr);
   const scanFailed = Boolean(scanErr);
@@ -153,10 +153,16 @@ const ExpensesModal = ({
     setAdding(false);
     setDeletingId(null);
     setSaving(false);
-    releasePreview();
     setReceipt(blankReceipt());
     setConfirmClear(false);
   }
+
+  useEffect(() => {
+    if (!open) {
+      releasePreview();
+    }
+  }, [open, releasePreview]);
+
 
   const handleClose = () => {
     if (busy || scanning) return;

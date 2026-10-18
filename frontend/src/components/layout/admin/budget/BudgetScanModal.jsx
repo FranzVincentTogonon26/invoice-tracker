@@ -80,8 +80,14 @@ const BudgetScanModal = ({ open, onClose, onConfirm }) => {
     setFileName("");
     setPreviewUrl("");
     setPickedFile(null);
-    releasePreview();
   }
+
+  useEffect(() => {
+    if (!open) {
+      releasePreview();
+    }
+  }, [open, releasePreview]);
+
 
   const fail = useCallback(
     (message) => {

@@ -272,3 +272,116 @@ body {
     transform: translateX(420%);
   }
 }
+
+/* ── Source preview — print report ─────────────────────────────────── */
+/* While the SourcePreviewModal is open the body carries
+   `.source-preview-open`. Printing then becomes a clean one-document
+   report: the running app and every other overlay is hidden, the dialog
+   drops its fixed positioning / max-height / scroll containment and flows
+   onto the paper, and interactive chrome (backdrop, close button, footer)
+   is stripped. Colors are kept exact so the stat cards, badges and ledger
+   tones read the same on paper as on screen. */
+@page {
+  margin: 12mm;
+}
+
+@media print {
+  body.source-preview-open {
+    overflow: visible !important;
+    height: auto !important;
+    background: #fff !important;
+  }
+
+  /* The app pins html/body/#root to full viewport height; let the report
+     own the full scroll length instead. */
+  html:has(body.source-preview-open) {
+    height: auto !important;
+    overflow: visible !important;
+  }
+
+  /* Only the preview portal prints — #root and any toasts stay out. */
+  body.source-preview-open > *:not(.source-preview-overlay) {
+    display: none !important;
+  }
+
+  .source-preview-overlay {
+    position: static !important;
+    inset: auto !important;
+    display: block !important;
+    padding: 0 !important;
+    transform: none !important;
+    opacity: 1 !important;
+  }
+
+  .source-preview-backdrop,
+  .source-preview-footer,
+  .source-preview-no-print {
+    display: none !important;
+  }
+
+  .source-preview-dialog {
+    /* Pin the light palette so the report always prints on paper tones,
+       even while the admin runs the dark theme. */
+    --bg: #f5f9f8;
+    --surface: #ffffff;
+    --surface-2: #f2f8f6;
+    --border: rgba(13, 42, 37, 0.07);
+    --ink: #0c1a17;
+    --ink-muted: #5c7570;
+    --accent: #0d9488;
+    --accent-strong: #0f766e;
+    --accent-soft: #d3f4ec;
+    --success: #059669;
+    --warning: #d97706;
+    --danger: #e11d48;
+
+    display: block !important;
+    width: 100% !important;
+    max-width: none !important;
+    max-height: none !important;
+    overflow: visible !important;
+    border: none !important;
+    border-radius: 0 !important;
+    box-shadow: none !important;
+    transform: none !important;
+    opacity: 1 !important;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+
+  .source-preview-scroll {
+    overflow: visible !important;
+    max-height: none !important;
+    overscroll-behavior: auto !important;
+  }
+
+  /* Keep the small report blocks whole — the notes, the stat row, the
+     people list and every single ledger record should never be sliced
+     across two sheets. The transaction list itself is deliberately NOT
+     protected: it routinely spans several pages, and an
+     unbreakable-too-tall block gets bumped onto a fresh sheet (or, in
+     WebKit, dropped), printing half-empty pages. */
+  .source-preview-block,
+  .source-preview-record {
+    break-inside: avoid;
+    page-break-inside: avoid;
+  }
+
+  /* On paper the picker is hidden — force the list header back into one
+     row so the record-count badge stays pinned to the right edge, and
+     never strand the title alone at the foot of a sheet. */
+  .source-preview-list-head {
+    flex-direction: row !important;
+    align-items: center !important;
+    justify-content: space-between !important;
+    break-after: avoid;
+    page-break-after: avoid;
+  }
+
+  /* The rounded-corner clip is a screen affordance; across page breaks an
+     overflow-hidden box can swallow rows in some engines. */
+  .source-preview-list {
+    overflow: visible !important;
+    border-radius: 0 !important;
+  }
+}

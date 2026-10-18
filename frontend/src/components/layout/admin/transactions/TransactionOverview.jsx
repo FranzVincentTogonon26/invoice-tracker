@@ -1,5 +1,5 @@
 import { motion } from "framer-motion";
-import { ArrowLeftRight, ClipboardList, Plus } from "lucide-react";
+import { ArrowUpFromLine, ClipboardList, ArrowDownToLine } from "lucide-react";
 import { StatCard } from "../../../ui/StatCard";
 import { formatMoney } from "@/lib/utils";
 
@@ -38,7 +38,7 @@ export function TransactionOverview({
           <StatCard
             label="Money In"
             value={formatMoney(totals.moneyIn)}
-            icon={Plus}
+            icon={ArrowDownToLine}
             loading={isLoading}
             accent
             chart="bars"
@@ -70,7 +70,7 @@ export function TransactionOverview({
                 (Number(totals.spent) + Number(totals.employeeSpent)) * 100,
               ) / 100,
             )}
-            icon={ArrowLeftRight}
+            icon={ArrowUpFromLine}
             loading={isLoading}
             tone="danger"
             chart="bars"

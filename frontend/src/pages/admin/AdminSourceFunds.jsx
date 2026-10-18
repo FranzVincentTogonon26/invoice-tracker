@@ -21,6 +21,7 @@ import {
 import { formatMoney, toMoney } from "../../lib/utils";
 import { SourceStats } from "../../components/layout/admin/source-of-funds/SourceStats";
 import { SourceFilters } from "../../components/layout/admin/source-of-funds/SourceFilters";
+import { InvolvedStack } from "../../components/layout/admin/source-of-funds/SourceBadges";
 import {
   SourceTable,
   SourceTableSkeleton,
@@ -174,8 +175,25 @@ export default function AdminSourceFunds() {
   // moves — date_cut_off is left untouched (it is owned by the create /
   // edit date picker).
   const toggleIsOpen = (toggleSource?.status ?? "open") === "open";
+
+  // Pre-flight close guard: each row carries its open holders (`openHolders`
+  // — employees with a still-'open' budget_issued_reference under the
+  // source). Closing is refused while any exist — they must liquidate their
+  // expenses or return the remaining funds first — so the dialog blocks the
+  // action BEFORE the request; the backend enforces the same rule when the
+  // list data is stale.
+  const openHolders = useMemo(() => {
+    if (!toggleIsOpen || !toggleSource) return [];
+    return Array.isArray(toggleSource.openHolders)
+      ? toggleSource.openHolders.filter(Boolean)
+      : [];
+  }, [toggleIsOpen, toggleSource]);
+  const toggleBlocked = openHolders.length > 0;
+
   const handleToggleStatus = async () => {
     if (!toggleSource) return;
+    // Belt-and-braces: the confirm button is disabled while blocked.
+    if (toggleBlocked) return;
     try {
       await updateReference.mutateAsync({
         referenceId: toggleSource.reference_id,
@@ -193,17 +211,50 @@ export default function AdminSourceFunds() {
   };
 
   const toggleSummary = toggleSource ? (
-    <div className="mt-4 flex items-center gap-3 rounded-2xl border border-[var(--border)] bg-[var(--surface-2)]/60 px-4 py-3">
-      <div className="min-w-0 flex-1">
-        <p className="truncate text-base font-medium text-[var(--ink)]">
-          {toggleSource.label || "Untitled source"}
-        </p>
-        <p className="mt-0.5 truncate text-xs tabular-nums text-[var(--ink-muted)]">
-          {formatMoney(toggleSource.allocated)} allocated ·{" "}
-          {Number(toggleSource.transactions) || 0} transactions
-        </p>
+    <>
+      {toggleIsOpen && !toggleBlocked && (
+        <div className="mt-3 rounded-2xl border border-[var(--border)] bg-[var(--surface-2)]/60 px-4 py-4 text-center">
+          <p className="type-eyebrow text-[var(--ink-muted)]">
+            Balance Surrender Amount
+          </p>
+          <p className="mt-1.5 font-display text-4xl font-semibold tabular-nums tracking-tight text-[var(--ink)]">
+            {formatMoney(toMoney(toggleSource.remaining))}
+          </p>
+          <p className="mt-1 text-[11px] leading-relaxed text-[var(--ink-muted)]">
+            Recorded on this source when you close it.
+          </p>
+        </div>
+      )}
+      <div className="mt-2 flex items-center gap-3 rounded-2xl border border-[var(--border)] bg-[var(--surface-2)]/60 px-4 py-3">
+        <div className="min-w-0 flex-1">
+          <p className="truncate text-base font-medium text-[var(--ink)]">
+            {toggleSource.label || "Untitled source"}
+          </p>
+          <p className="mt-0.5 truncate text-xs tabular-nums text-[var(--ink-muted)]">
+            {formatMoney(toggleSource.allocated)} allocated ·{" "}
+            {Number(toggleSource.transactions) || 0} transactions
+          </p>
+        </div>
       </div>
-    </div>
+
+      {toggleBlocked && (
+        <div className="mt-3 rounded-2xl border border-[var(--warning)]/30 bg-[var(--warning)]/10 px-4 py-3">
+          <p className="text-xs font-semibold text-[var(--warning)]">
+            {openHolders.length}{" "}
+            {openHolders.length === 1
+              ? "employee still holds"
+              : "employees still hold"}{" "}
+            open budget issuances
+          </p>
+          <div className="mt-1.5 flex items-center gap-1.5">
+            <span className="text-xs leading-relaxed text-[var(--warning)]/90">
+              Held by
+            </span>
+            <InvolvedStack people={openHolders} total={openHolders.length} />
+          </div>
+        </div>
+      )}
+    </>
   ) : null;
 
   const deleteSummary = deleteSource ? (
@@ -361,16 +412,31 @@ export default function AdminSourceFunds() {
             ? "bg-[var(--danger)]/12 text-[var(--danger)]"
             : "bg-[var(--accent-soft)] text-[var(--accent-strong)]"
         }
-        title={toggleIsOpen ? "Close this source?" : "Reopen this source?"}
+        title={
+          toggleBlocked
+            ? "Cannot close this source"
+            : toggleIsOpen
+              ? "Close this source?"
+              : "Reopen this source?"
+        }
         description={
-          toggleIsOpen
-            ? "Sets status to cut_off — the source disconnects from every flow until reopened. The cut-off date is left untouched."
-            : "Sets status back to open — the source reconnects to every flow. The cut-off date is left untouched."
+          toggleBlocked
+            ? "Employees are still using this source's issued budget — they must liquidate their expenses or return the remaining funds before it can be closed. The source stays open."
+            : toggleIsOpen
+              ? "Sets status to cut_off — the source disconnects from every flow until reopened. The cut-off date is left untouched."
+              : "Sets status back to open — the source reconnects to every flow. The cut-off date is left untouched."
         }
         summary={toggleSummary}
-        cancelLabel="Cancel"
-        confirmLabel={toggleIsOpen ? "Yes, close it" : "Yes, reopen it"}
+        cancelLabel={toggleBlocked ? "Got it" : "Cancel"}
+        confirmLabel={
+          toggleBlocked
+            ? "Cannot close"
+            : toggleIsOpen
+              ? "Yes, close it"
+              : "Yes, reopen it"
+        }
         confirmVariant={toggleIsOpen ? "danger" : "accent"}
+        confirmDisabled={toggleBlocked}
         pendingLabel={toggleIsOpen ? "Closing…" : "Reopening…"}
         pending={updateReference.isPending}
         onCancel={() => {

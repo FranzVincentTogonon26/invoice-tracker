@@ -3,8 +3,8 @@ import { motion } from "framer-motion";
 import { HandCoins } from "lucide-react";
 import { Badge, StatusBadge } from "../../../ui/Badge";
 import { MethodIcon } from "../../../ui/Select";
-import { cn, formatDate, formatMoney, formatTime } from "../../../../lib/utils";
-import { methodLabel } from "./PaymentMethod";
+import { cn, formatDate, formatMoney, formatTime, methodLabel } from "../../../../lib/utils";
+
 import { IssuedTransactionActions } from "./IssuedTransactionActions";
 import { tableRowVariants } from "@/lib/tableAnimation";
 

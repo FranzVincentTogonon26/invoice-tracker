@@ -1,4 +1,5 @@
-import { useEffect, useState } from "react";
+import { useState } from "react";
+
 import Listbox from "../../../ui/Listbox";
 import {
   FilterSheet,
@@ -37,15 +38,19 @@ const TransactionsMobileFilters = ({
   const [draftCategory, setDraftCategory] = useState(category);
   const [draftStatus, setDraftStatus] = useState(status);
 
-  useEffect(() => {
-    if (!open) return;
-    setDraftType(type);
-    setDraftDirection(direction);
-    setDraftEmployee(employee);
-    setDraftReference(reference);
-    setDraftCategory(category);
-    setDraftStatus(status);
-  }, [open, type, direction, employee, reference, category, status]);
+  const [prevOpen, setPrevOpen] = useState(open);
+  if (prevOpen !== open) {
+    setPrevOpen(open);
+    if (open) {
+      setDraftType(type);
+      setDraftDirection(direction);
+      setDraftEmployee(employee);
+      setDraftReference(reference);
+      setDraftCategory(category);
+      setDraftStatus(status);
+    }
+  }
+
 
   const draft = {
     type: draftType,

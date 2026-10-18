@@ -3,19 +3,17 @@ import { useLocation, useNavigate, useSearchParams } from "react-router-dom";
 import {
   Activity,
   ArrowLeft,
-  ArrowLeftRight,
   CalendarDays,
   CalendarOff,
   CalendarRange,
   CalendarX2,
   ClipboardList,
-  Copy,
   EllipsisVertical,
-  ExternalLink,
+  Eye,
   HandCoins,
   Inbox,
-  Plus,
-  Printer,
+  Lock,
+  PhilippinePeso,
   ReceiptText,
   RefreshCw,
   Search,
@@ -71,22 +69,15 @@ import {
   TRANSACTION_KIND_META,
   TRANSACTION_TYPE_OPTIONS,
   SYSTEM_EMPLOYEE_VALUE,
+  TYPE_TABS,
 } from "@/constants";
 import { matchesFilters, shortRangeLabel } from "@/lib/transactionLedger";
 import { InvolvedStack, StatusBadge } from "./SourceBadges";
 import { TransactionLedger } from "../transactions/TransactionLedger";
 import TransactionDetailsModal from "../transactions/TransactionDetailsModal";
+import SourcePreviewModal from "./SourcePreviewModal";
 
 const PAGE_SIZE = 50;
-
-const TYPE_TABS = [
-  { value: "all", label: "All", Icon: ClipboardList },
-  { value: "budget", label: "Budget Given", Icon: Plus },
-  { value: "issued", label: "Budget Issued", Icon: HandCoins },
-  { value: "expense", label: "Expenses", Icon: ReceiptText },
-  { value: "abono", label: "Abono", Icon: Wallet },
-  { value: "transfer", label: "Transfers", Icon: ArrowLeftRight },
-];
 
 /**
  * AdminSourceFundsOverview
@@ -98,10 +89,14 @@ export function AdminSourceFundsOverview() {
   const nav = useNavigate();
   const location = useLocation();
   const [searchParams] = useSearchParams();
+  // The reference in the URL is the single source of truth: `?ref=` wins
+  // over any history state, so a deep or shared link always opens exactly
+  // the source it names (state only bridges in-app navigations that lack
+  // the param).
   const referenceId =
-    location.state?.referenceId ??
     searchParams.get("ref") ??
     searchParams.get("referenceId") ??
+    location.state?.referenceId ??
     null;
 
   // Source of Funds data hook
@@ -111,24 +106,27 @@ export function AdminSourceFundsOverview() {
     refetch: refetchSources,
   } = useSourceFunds();
 
+  // Match on the id alone — a label is NOT unique (two sources can share
+  // one), so the overview must never resolve a source by its label.
   const source = useMemo(
     () =>
       (sources ?? []).find(
-        (s) =>
-          String(s.reference_id) === String(referenceId) ||
-          (referenceId &&
-            String(s.reference_id) === String(referenceId).trim()),
+        (s) => String(s.reference_id) === String(referenceId ?? "").trim(),
       ) ?? null,
     [sources, referenceId],
   );
 
-  // Transactions ledger data (read-only)
+  // Transactions ledger data (read-only). `includeClosed` lifts the
+  // backend's "closed sources leave no footsteps" gate so this page still
+  // charts and lists a closed source's full history — including budget
+  // issued rows. Scoped to this overview: every other ledger page keeps
+  // them hidden.
   const {
     transactions,
     isLoading: isTransactionsLoading,
     error: transactionsError,
     refetch: refetchTransactions,
-  } = useTransactions();
+  } = useTransactions({ includeClosed: true });
 
   // Filter & UI States
   const [dateRange, setDateRange] = useState(() => emptyDateRange());
@@ -147,6 +145,9 @@ export function AdminSourceFundsOverview() {
   // Details Modal state
   const [viewRow, setViewRow] = useState(null);
   const [viewOpen, setViewOpen] = useState(false);
+
+  // Budget source preview modal (header action)
+  const [previewOpen, setPreviewOpen] = useState(false);
 
   useEffect(() => {
     const t = setTimeout(() => setDebouncedSearch(search), 250);
@@ -178,23 +179,29 @@ export function AdminSourceFundsOverview() {
     return { hasCutOff: true, cutOffDue: false, cutOffToday: false };
   })();
 
-  // Transactions belonging to this source
+  // Closed-source flag: a source flipped to 'cut_off' (badged "Closed") is
+  // done — no new activity can be recorded against it, so its banner must
+  // say so instead of reading out a cut-off deadline that no longer applies.
+  const isClosed = (source?.status ?? "open") !== "open";
+
+  // Transactions belonging to this source — scoped by reference id, never
+  // by label alone: two sources can share a label (e.g. a closed "Employee
+  // Budget" next to an open one), and a label fallback would blend their
+  // ledgers. A row that carries a reference id belongs to exactly one
+  // source, so the id is authoritative; the label only catches legacy rows
+  // that have no reference id at all.
   const sourceRows = useMemo(() => {
     if (!source && !referenceId) return [];
     const targetRefId = String(source?.reference_id ?? referenceId ?? "");
     const targetLabel = source?.label?.toLowerCase().trim();
 
     return (transactions ?? []).filter((row) => {
-      if (row.referenceId && String(row.referenceId) === targetRefId) {
-        return true;
+      if (row.referenceId) {
+        return String(row.referenceId) === targetRefId;
       }
-      if (
-        targetLabel &&
-        row.referenceLabel?.toLowerCase().trim() === targetLabel
-      ) {
-        return true;
-      }
-      return false;
+      return Boolean(
+        targetLabel && row.referenceLabel?.toLowerCase().trim() === targetLabel,
+      );
     });
   }, [transactions, source, referenceId]);
 
@@ -420,15 +427,16 @@ export function AdminSourceFundsOverview() {
     setPage(0);
   };
 
-  const filterLabels = {
-    direction: TRANSACTION_DIRECTION_OPTIONS.find((o) => o.value === direction)
-      ?.label,
-    employee: employeeOptions.find((o) => o.value === employee)?.label,
-    category: categoryOptions.find((o) => o.value === category)?.label,
-    status: statusOptions.find((o) => o.value === status)?.label,
-  };
-
   const mobileFilterChips = useMemo(() => {
+    const filterLabels = {
+      direction: TRANSACTION_DIRECTION_OPTIONS.find(
+        (o) => o.value === direction,
+      )?.label,
+      employee: employeeOptions.find((o) => o.value === employee)?.label,
+      category: categoryOptions.find((o) => o.value === category)?.label,
+      status: statusOptions.find((o) => o.value === status)?.label,
+    };
+
     const chips = [];
     if (tab !== "all") {
       chips.push({
@@ -458,7 +466,16 @@ export function AdminSourceFundsOverview() {
       });
     }
     return chips;
-  }, [tab, direction, employee, category, status, filterLabels]);
+  }, [
+    tab,
+    direction,
+    employee,
+    category,
+    status,
+    employeeOptions,
+    categoryOptions,
+    statusOptions,
+  ]);
 
   const handleAction = (action, row) => {
     if (action !== "view") return;
@@ -478,20 +495,6 @@ export function AdminSourceFundsOverview() {
     } finally {
       setIsRefreshing(false);
     }
-  };
-
-  const copyRefId = () => {
-    if (!source?.reference_id) return;
-    navigator.clipboard.writeText(source.reference_id);
-    toast.success("Reference ID copied to clipboard");
-  };
-
-  const copyPageUrl = () => {
-    const ref = source?.reference_id ?? referenceId;
-    if (!ref) return;
-    const shareableUrl = `${window.location.origin}/share/source-funds/${ref}`;
-    navigator.clipboard.writeText(shareableUrl);
-    toast.success("Public shareable link copied to clipboard");
   };
 
   // State guards
@@ -570,37 +573,39 @@ export function AdminSourceFundsOverview() {
         isRefreshing={isRefreshing}
         onBack={backToList}
         onRefresh={handleRefresh}
-        onCopyId={copyRefId}
-        onCopyLink={copyPageUrl}
+        onPreview={() => setPreviewOpen(true)}
       />
 
-      {/* ── Cut-off notice banner — unmissable, directly under the header.
-          The whole banner turns accent only for the scheduled message
-          ("...on the date above"); due-today stays warning, past-due stays
-          danger. */}
-      {hasCutOff &&
+      {/* ── Cut-off / closed notice banner — unmissable, directly under the
+          header. A closed source overrides every date-based variant with the
+          done message (the deadline no longer applies) and reads in the
+          informational accent tone — a done state, not an alarm. Open
+          sources keep the date reads: scheduled in accent, due-today in
+          warning, past-due in danger. */}
+      {(isClosed || hasCutOff) &&
         (() => {
           const scheduled = !cutOffDue && !cutOffToday;
-          const tone = cutOffDue
-            ? {
-                frame: "border-[var(--danger)]/40 bg-[var(--danger)]/10",
-                icon: "text-[var(--danger)]",
-                title: "text-[var(--danger)]",
-                body: "text-[var(--danger)]/90",
-              }
-            : scheduled
+          const tone =
+            isClosed || scheduled
               ? {
                   frame: "border-[var(--accent)]/25 bg-[var(--accent-soft)]/40",
                   icon: "text-[var(--accent-strong)]",
                   title: "text-[var(--accent-strong)]",
                   body: "text-[var(--accent-strong)]",
                 }
-              : {
-                  frame: "border-[var(--warning)]/40 bg-[var(--warning)]/10",
-                  icon: "text-[var(--warning)]",
-                  title: "text-[var(--warning)]",
-                  body: "text-[var(--warning)]/90",
-                };
+              : cutOffDue
+                ? {
+                    frame: "border-[var(--danger)]/40 bg-[var(--danger)]/10",
+                    icon: "text-[var(--danger)]",
+                    title: "text-[var(--danger)]",
+                    body: "text-[var(--danger)]/90",
+                  }
+                : {
+                    frame: "border-[var(--warning)]/40 bg-[var(--warning)]/10",
+                    icon: "text-[var(--warning)]",
+                    title: "text-[var(--warning)]",
+                    body: "text-[var(--warning)]/90",
+                  };
           return (
             <motion.div
               initial={{ opacity: 0, y: -6 }}
@@ -609,25 +614,37 @@ export function AdminSourceFundsOverview() {
               role="alert"
               className={`flex items-start gap-3 rounded-2xl border px-4 py-3 shadow-card ${tone.frame}`}
             >
-              <CalendarX2
-                size={18}
-                aria-hidden
-                className={`mt-0.5 shrink-0 ${tone.icon}`}
-              />
+              {isClosed ? (
+                <Lock
+                  size={18}
+                  aria-hidden
+                  className={`mt-0.5 shrink-0 ${tone.icon}`}
+                />
+              ) : (
+                <CalendarX2
+                  size={18}
+                  aria-hidden
+                  className={`mt-0.5 shrink-0 ${tone.icon}`}
+                />
+              )}
               <div className="min-w-0 flex-1">
                 <p className={`text-sm font-semibold ${tone.title}`}>
-                  {cutOffDue
-                    ? `Cut-off date already due — ${formatDate(source.date_cut_off)}`
-                    : cutOffToday
-                      ? `Today is the due date — ${formatDate(source.date_cut_off)}`
-                      : `Cut-off date notice — ${formatDate(source.date_cut_off)}`}
+                  {isClosed
+                    ? "Budget source already closed"
+                    : cutOffDue
+                      ? `Cut-off date already due — ${formatDate(source.date_cut_off)}`
+                      : cutOffToday
+                        ? `Today is the due date — ${formatDate(source.date_cut_off)}`
+                        : `Cut-off date notice — ${formatDate(source.date_cut_off)}`}
                 </p>
                 <p className={`mt-0.5 text-xs leading-relaxed ${tone.body}`}>
-                  {cutOffDue
-                    ? "This source no longer accepts new budgets, issuances, or expenses. Existing records stay viewable."
-                    : cutOffToday
-                      ? "Today is the last day this source accepts new budgets, issuances, or expenses."
-                      : "This source stops accepting new budgets, issuances, or expenses on the date above."}
+                  {isClosed
+                    ? "This source is done and transactions are closed — no new budgets, issuances, or expenses can be recorded. Existing records stay viewable below."
+                    : cutOffDue
+                      ? "This source no longer accepts new budgets, issuances, or expenses. Existing records stay viewable."
+                      : cutOffToday
+                        ? "Today is the last day this source accepts new budgets, issuances, or expenses."
+                        : "This source stops accepting new budgets, issuances, or expenses on the date above."}
                 </p>
               </div>
             </motion.div>
@@ -640,6 +657,7 @@ export function AdminSourceFundsOverview() {
         remaining={remaining}
         issued={issued}
         spentTotal={spentTotal}
+        isClosed={isClosed}
         transactionCount={sourceRows.length || source.transactions || 0}
         involvedCount={
           Array.isArray(source.involved) ? source.involved.length : 0
@@ -744,6 +762,23 @@ export function AdminSourceFundsOverview() {
         row={viewRow}
         onClose={() => setViewOpen(false)}
       />
+
+      {/* ── Budget Source Preview Modal (header action) ── */}
+      <SourcePreviewModal
+        open={previewOpen}
+        source={source}
+        rows={sourceRows}
+        isClosed={isClosed}
+        allocated={allocated}
+        remaining={remaining}
+        issued={issued}
+        spentTotal={spentTotal}
+        budgetsCount={Number(source.budgets) || 0}
+        hasCutOff={hasCutOff}
+        cutOffDue={cutOffDue}
+        cutOffToday={cutOffToday}
+        onClose={() => setPreviewOpen(false)}
+      />
     </div>
   );
 }
@@ -757,8 +792,7 @@ function SourceOverviewHeader({
   isRefreshing,
   onBack,
   onRefresh,
-  onCopyId,
-  onCopyLink,
+  onPreview,
 }) {
   return (
     <PageHeader
@@ -836,7 +870,7 @@ function SourceOverviewHeader({
             />
             <span className="hidden sm:inline">Refresh</span>
           </Button>
-          <HeaderMenu onCopyId={onCopyId} onCopyLink={onCopyLink} />
+          <HeaderMenu onPreview={onPreview} />
         </div>
       }
     />
@@ -849,6 +883,7 @@ function SourceStatCards({
   remaining,
   issued,
   spentTotal,
+  isClosed,
   transactionCount,
   involvedCount,
   budgetsCount,
@@ -865,9 +900,13 @@ function SourceStatCards({
       subtext: `${budgetsCount} top-up allocations`,
     },
     {
-      label: "Remaining Available",
+      // Closed sources have nothing "available" anymore — the leftover pool
+      // balance reads as the balance forwarded (carried forward) instead.
+      // Same figure, closed-state vocabulary — matching the reimbursement
+      // pages' "Balance Forwarded" (hint: Remaining).
+      label: isClosed ? "Balance Forwarded" : "Remaining Available",
       value: formatMoney(remaining),
-      icon: Wallet,
+      icon: PhilippinePeso,
       accent: false,
       subtext: isOverBudget
         ? "Deficit / Overdrawn"
@@ -1912,7 +1951,10 @@ function BackButton({ onClick }) {
   );
 }
 
-function HeaderMenu({ onCopyId, onCopyLink }) {
+// Compact actions menu for the overview header — a single item today (the
+// read-only budget source preview), kept as an ellipsis dropdown so future
+// actions land here without growing the header's button row.
+function HeaderMenu({ onPreview }) {
   const [open, setOpen] = useState(false);
   const [position, setPosition] = useState(null);
   const btnRef = useRef(null);
@@ -2006,45 +2048,28 @@ function HeaderMenu({ onCopyId, onCopyLink }) {
             role="menu"
             aria-label="Source actions"
             style={position}
-            className="fixed z-[70] min-w-[15rem] overflow-hidden rounded-2xl border border-[var(--border)] bg-[var(--surface)] py-1.5 shadow-hover animate-in fade-in zoom-in-95 duration-150"
+            className="fixed z-[70] w-[16rem] overflow-hidden rounded-2xl border border-[var(--border)] bg-[var(--surface)] py-1.5 shadow-hover animate-in fade-in zoom-in-95 duration-150"
           >
             <button
               type="button"
               role="menuitem"
               onClick={() => {
                 closeMenu();
-                onCopyId();
+                onPreview();
               }}
-              className="flex w-full items-center gap-2.5 px-3.5 py-2 text-left text-xs font-medium text-[var(--ink)] transition-colors hover:bg-[var(--surface-2)]"
+              className="flex w-full items-center gap-2.5 px-3.5 py-2 text-left transition-colors hover:bg-[var(--surface-2)]"
             >
-              <Copy size={14} className="text-[var(--ink-muted)]" />
-              Copy Reference ID
-            </button>
-
-            <button
-              type="button"
-              role="menuitem"
-              onClick={() => {
-                closeMenu();
-                onCopyLink();
-              }}
-              className="flex w-full items-center gap-2.5 px-3.5 py-2 text-left text-xs font-medium text-[var(--ink)] transition-colors hover:bg-[var(--surface-2)]"
-            >
-              <ExternalLink size={14} className="text-[var(--ink-muted)]" />
-              Copy Shareable Link
-            </button>
-
-            <button
-              type="button"
-              role="menuitem"
-              onClick={() => {
-                closeMenu();
-                window.print();
-              }}
-              className="flex w-full items-center gap-2.5 px-3.5 py-2 text-left text-xs font-medium text-[var(--ink)] transition-colors hover:bg-[var(--surface-2)]"
-            >
-              <Printer size={14} className="text-[var(--ink-muted)]" />
-              Print Transaction Summary
+              <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-[var(--surface-2)] text-[var(--ink-muted)]">
+                <Eye size={14} aria-hidden />
+              </span>
+              <span className="min-w-0 flex-1">
+                <span className="block text-xs font-medium text-[var(--ink)]">
+                  Preview Budget Source
+                </span>
+                <span className="mt-0.5 block text-[10px] leading-relaxed text-[var(--ink-muted)]">
+                  Balances, people and transactions.
+                </span>
+              </span>
             </button>
           </div>,
           document.body,

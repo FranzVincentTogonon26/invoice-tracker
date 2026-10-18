@@ -1,5 +1,7 @@
+/* eslint-disable react-refresh/only-export-components */
 import { useState } from "react";
 import { Check } from "lucide-react";
+
 
 // Avatar chip behind the employee dropdown — the same initials fallback the
 // ledger's EmployeeCell uses, so a user without a stored avatar still reads
@@ -45,6 +47,8 @@ const EmployeeAvatar = ({ option }) => {
  * in the trigger and in every option.
  */
 export const employeeListboxProps = (placeholder = "All Employee") => ({
+
+
   searchable: true,
   renderTrigger: (option) =>
     option ? (

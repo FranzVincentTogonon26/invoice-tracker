@@ -1,12 +1,6 @@
 import {
-  ArrowLeftRight,
-  ClipboardList,
-  HandCoins,
-  Plus,
-  ReceiptText,
   Search,
   SlidersHorizontal,
-  Wallet,
   X,
 } from "lucide-react";
 import { SearchInput } from "../../../ui/Input";
@@ -16,17 +10,9 @@ import { DateRangePicker } from "../../../ui/DateRangePicker";
 import { FilterChips } from "../../../ui/MobileFilters";
 import { Tabs, TabsList, TabsTrigger } from "../../../ui/Tabs";
 import { cn } from "@/lib/utils";
-import { TRANSACTION_FILTER_KEYS } from "@/constants";
+import { TRANSACTION_FILTER_KEYS, TYPE_TABS } from "@/constants";
 import TransactionsMobileFilters from "./TransactionsMobileFilters";
 
-export const TYPE_TABS = [
-  { value: "all", label: "All", Icon: ClipboardList },
-  { value: "budget", label: "Budget Given", Icon: Plus },
-  { value: "issued", label: "Budget Issued", Icon: HandCoins },
-  { value: "expense", label: "Expenses", Icon: ReceiptText },
-  { value: "abono", label: "Abono", Icon: Wallet },
-  { value: "transfer", label: "Transfers", Icon: ArrowLeftRight },
-];
 
 export function TransactionFilterBar({
   tab,

@@ -90,8 +90,6 @@ export function SourceEditModal({ source, saving, onClose, onSave }) {
     if (!source) return undefined;
     const onKeyDown = (e) => {
       if (e.key === "Escape" && !saving) {
-        // eslint-disable-next-line no-console
-        console.log("[edit-modal] Escape key close");
         setErr("");
         onClose?.();
       }
@@ -99,17 +97,6 @@ export function SourceEditModal({ source, saving, onClose, onSave }) {
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
   }, [source, saving, onClose]);
-
-  // TEMP-DEBUG: log mount/unmount (remove after diagnosis).
-  useEffect(() => {
-    // eslint-disable-next-line no-console
-    console.log("[edit-modal] mounted, source:", source?.reference_id);
-    return () => {
-      // eslint-disable-next-line no-console
-      console.log("[edit-modal] UNMOUNTED");
-    };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
 
   if (!source) return null;
 
@@ -129,20 +116,14 @@ export function SourceEditModal({ source, saving, onClose, onSave }) {
     });
   };
 
-  const handleClose = (reason) => {
+  const handleClose = () => {
     if (saving) return;
-    // TEMP-DEBUG: trace what closes the modal (remove after diagnosis).
-    // eslint-disable-next-line no-console
-    console.log(
-      "[edit-modal] handleClose via",
-      reason,
-      new Error("trace").stack,
-    );
     setErr("");
     onClose?.();
   };
 
   const isCutOff = source.status === "cut_off";
+
 
   return (
     <AnimatePresence>

@@ -49,7 +49,8 @@ const EmployeeExpenseDetailsModal = ({ open, expense, onClose }) => {
     };
     window.addEventListener("keydown", onKeyDown, true);
     return () => window.removeEventListener("keydown", onKeyDown, true);
-  }, [open, onClose]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [open, onClose]);
+
 
   const receiptUrl = row?.imageUrl || "";
   const receiptIsPdf = isReceiptPdf(receiptUrl);

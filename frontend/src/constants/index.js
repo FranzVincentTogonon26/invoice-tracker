@@ -1,6 +1,7 @@
 import {
   ArrowLeftRight,
   Banknote,
+  ClipboardList,
   CreditCard,
   FileText,
   HandCoins,
@@ -24,6 +25,16 @@ export const EXPENSE_LEDGER_STATUS_META = {
   cancel: { tone: "danger", label: "Cancelled" },
 };
 export const EXPENSE_LEDGER_STATUS_ORDER = ["paid", "draft", "cancel"];
+
+export const TYPE_TABS = [
+  { value: "all", label: "All", Icon: ClipboardList },
+  { value: "budget", label: "Budget Given", Icon: Plus },
+  { value: "issued", label: "Budget Issued", Icon: HandCoins },
+  { value: "expense", label: "Expenses", Icon: ReceiptText },
+  { value: "abono", label: "Abono", Icon: Wallet },
+  { value: "transfer", label: "Transfers", Icon: ArrowLeftRight },
+];
+
 
 // Unified ledger kinds (Admin Transactions) — badge tone, label and icon per
 // kind. Plain references (no JSX), so ledger tables, details modals and the

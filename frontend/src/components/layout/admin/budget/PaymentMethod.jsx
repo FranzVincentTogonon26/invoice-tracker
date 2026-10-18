@@ -1,10 +1,6 @@
 import { MethodIcon } from "../../../ui/Select";
-import { cn } from "../../../../lib/utils";
-import { PAYMENT_METHODS } from "../../../../constants";
+import { cn, methodLabel } from "../../../../lib/utils";
 
-// `method` stores the raw value ("bank_transfer") — show the friendly label.
-export const methodLabel = (method) =>
-  PAYMENT_METHODS.find((m) => m.value === method)?.label ?? method;
 
 /**
  * Payment-method cell: small circular icon chip on a soft accent background

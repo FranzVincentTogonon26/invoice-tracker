@@ -77,7 +77,8 @@ const BudgetTransaction = ({ breakdown = [] }) => {
       (b) => b.label === (row.label ?? "Untitled reference"),
     );
     if (!item) return {};
-    const value = Number(String(item.value ?? "").replace(/[^0-9.\-]/g, ""));
+    const value = Number(String(item.value ?? "").replace(/[^0-9.-]/g, ""));
+
     if (!Number.isFinite(value)) return {};
     return { value, label: "remaining budget" };
   };

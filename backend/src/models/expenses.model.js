@@ -650,7 +650,7 @@ class Expenses {
     });
   }
 
-  static async expensesOverview({ from, to } = {}) {
+  static async expensesOverview({ from, to, includeClosed } = {}) {
     const categories = await this.categoryList();
     const gemini_model = await this.geminiModel();
     const references = await this.budgetReference();
@@ -659,8 +659,11 @@ class Expenses {
 
     // Closed sources leave no footsteps: rows tagged to a cut-off source
     // never list; untagged rows (reference_id IS NULL) connect to no source
-    // and stay visible.
-    where.push(`(e.reference_id IS NULL OR br.status = 'open')`);
+    // and stay visible. `includeClosed` (Source of Funds overview page only)
+    // lifts the gate so a closed source's own history still renders there.
+    if (!includeClosed) {
+      where.push(`(e.reference_id IS NULL OR br.status = 'open')`);
+    }
 
     if (from) {
       params.push(from);

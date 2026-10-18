@@ -67,15 +67,20 @@ class Abono {
   // optionally filtered by search against the description, employee name and
   // source-of-funds label — same ILIKE style as the other admin ledgers.
   // Closed sources leave no footsteps here either.
-  static async listAll({ search } = {}) {
+  static async listAll({ search, includeClosed } = {}) {
     const params = [];
-    let where = "br.status = 'open'";
+    const clauses = [];
+    // Closed sources leave no footsteps (see transactions.model): rows
+    // booked to a cut-off source never list unless `includeClosed` lifts
+    // the gate — only the Source of Funds overview page sends it.
+    if (!includeClosed) clauses.push("br.status = 'open'");
     if (search && search.trim()) {
       params.push(`%${search.trim()}%`);
-      where = `(${where}) AND (ea.description ILIKE $1
+      clauses.push(`(ea.description ILIKE $1
                     OR u.name ILIKE $1
-                    OR br.label ILIKE $1)`;
+                    OR br.label ILIKE $1)`);
     }
+    const where = clauses.join(" AND ") || "TRUE";
 
     const result = await query(
       `SELECT ${ABONO_COLUMNS},

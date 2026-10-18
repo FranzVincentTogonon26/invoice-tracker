@@ -1,4 +1,5 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo } from "react";
+
 import { AnimatePresence, motion } from "framer-motion";
 import {
   CalendarDays,
@@ -37,7 +38,6 @@ const MetaRow = ({ label, value, Icon }) => (
 // a legacy draft that already carries a stored server URL keeps using that.
 const ReceiptDraftModal = ({ open, receipt, onClose }) => {
   const items = receipt?.items ?? [];
-  const [localPreviewUrl, setLocalPreviewUrl] = useState("");
   const itemsTotal = items.reduce(
     (sum, item) => sum + (Number(item.amount) || 0),
     0,
@@ -59,28 +59,24 @@ const ReceiptDraftModal = ({ open, receipt, onClose }) => {
     return () => window.removeEventListener("keydown", onKeyDown, true);
   }, [open, onClose]);
 
-  // Build (and tear down) the object URL for the draft's held file — only when
-  // the draft carries no stored URL of its own. Revoked on close/replace so
-  // the blob is never leaked.
-  useEffect(() => {
-    if (!open || receipt?.imageUrl) {
-      setLocalPreviewUrl("");
-      return undefined;
-    }
-
-    const file = receipt?.receiptId ? getReceiptFile(receipt.receiptId) : null;
-    if (!file) {
-      setLocalPreviewUrl("");
-      return undefined;
-    }
-
-    const url = URL.createObjectURL(file);
-    setLocalPreviewUrl(url);
-    return () => URL.revokeObjectURL(url);
+  // Stored URL first (legacy draft), then the held file's object URL.
+  const previewUrl = useMemo(() => {
+    if (receipt?.imageUrl) return receipt.imageUrl;
+    if (!open || !receipt?.receiptId) return "";
+    const file = getReceiptFile(receipt.receiptId);
+    return file ? URL.createObjectURL(file) : "";
   }, [open, receipt]);
 
-  // Stored URL first (legacy draft), then the held file's object URL.
-  const previewUrl = receipt?.imageUrl || localPreviewUrl;
+
+  // Revoke object URL on close/replace so the blob is never leaked.
+  useEffect(() => {
+    return () => {
+      if (previewUrl && previewUrl.startsWith("blob:")) {
+        URL.revokeObjectURL(previewUrl);
+      }
+    };
+  }, [previewUrl]);
+
 
   return (
     <AnimatePresence>

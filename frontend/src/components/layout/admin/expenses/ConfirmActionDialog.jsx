@@ -9,8 +9,10 @@ const DIALOG_EASE = [0.16, 1, 0.3, 1];
 
 // Shared confirmation modal for consequential actions. Danger-toned by
 // default — every existing caller relies on that; an approval flow can
-// override the icon tile tint (`iconClassName`) and the confirm button tone
-// (`confirmVariant`) without changing those defaults.
+// override the icon tile tint (`iconClassName`), the confirm button tone
+// (`confirmVariant`) or lock the confirm button entirely (`confirmDisabled`
+// — used by pre-flight guards that must explain why the action can't run)
+// without changing those defaults.
 const ConfirmActionDialog = ({
   open,
   icon,
@@ -21,6 +23,7 @@ const ConfirmActionDialog = ({
   cancelLabel = "Keep",
   confirmLabel = "Confirm",
   confirmVariant = "danger",
+  confirmDisabled = false,
   pendingLabel = "Working…",
   pending = false,
   onCancel,
@@ -131,7 +134,7 @@ const ConfirmActionDialog = ({
                 type="button"
                 variant={confirmVariant}
                 onClick={onConfirm}
-                disabled={pending}
+                disabled={pending || confirmDisabled}
               >
                 {pending && (
                   <Loader2 size={13} className="animate-spin" aria-hidden />

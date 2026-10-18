@@ -2,9 +2,9 @@ import { motion } from "framer-motion";
 import { Badge, StatusBadge } from "../../../ui/Badge";
 import { tableRowVariants } from "@/lib/tableAnimation";
 import { MethodIcon } from "../../../ui/Select";
-import { cn, formatDate, formatMoney, formatTime } from "../../../../lib/utils";
+import { cn, formatDate, formatMoney, formatTime, methodLabel } from "../../../../lib/utils";
 import { ApproverCell } from "./ApproverCell";
-import { methodLabel } from "./PaymentMethod";
+
 import { TransactionActions } from "./TransactionActions";
 
 /**
