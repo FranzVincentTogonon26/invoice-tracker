@@ -266,6 +266,22 @@ export const updateReference = async (req, res, next) => {
 
     const payload = validate(updateBudgetReferenceSchema, req.body ?? {});
     const updated = await Budget.updateReference(referenceId, payload);
+    // Close guard refusal: the model hands back the still-open holdings
+    // instead of a row. Surface it as a 409 naming the holders so the UI
+    // can explain why the source can't be closed yet.
+    if (updated?.blocked) {
+      const names = updated.openIssuances.map(
+        (row) => row.employee_name || "Unknown employee",
+      );
+      const preview = names.slice(0, 5).join(", ");
+      const extra = names.length > 5 ? ` +${names.length - 5} more` : "";
+      throw ApiError.conflict(
+        `Cannot close this source — ${names.length} ${
+          names.length === 1 ? "employee still holds" : "employees still hold"
+        } open budget issuances (${preview}${extra}). They must liquidate their expenses or return the remaining funds before it can be closed.`,
+        "SOURCE_HAS_OPEN_ISSUANCES",
+      );
+    }
     if (!updated)
       throw ApiError.notFound("Reference not found", "REFERENCE_NOT_FOUND");
 
