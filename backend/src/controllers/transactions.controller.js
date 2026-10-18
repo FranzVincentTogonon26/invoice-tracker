@@ -8,9 +8,10 @@ import Transactions from "../models/transactions.model.js";
 export const transactions = async (req, res, next) => {
   try {
     // `includeClosed=true` lifts the "closed sources leave no footsteps"
-    // gate so a closed source's history still renders. Sent ONLY by the
-    // Source of Funds overview page; every other ledger consumer keeps the
-    // default hidden behavior.
+    // gate so a closed source's history still renders. Sent by the Source
+    // of Funds overview page and the Reports library (a report counts every
+    // reference regardless of status); every other ledger consumer keeps
+    // the default hidden behavior.
     const includeClosed = String(req.query.includeClosed ?? "") === "true";
     const { transactions, summary, categories, references } =
       await Transactions.ledger({ includeClosed });

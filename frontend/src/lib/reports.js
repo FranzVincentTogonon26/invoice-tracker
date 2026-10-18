@@ -88,13 +88,29 @@ export function scopeRows(rows, { range, referenceId, kind } = {}) {
   });
 }
 
+/* A row's contribution to the Money-in figure. Internal transfer legs
+   (`transfer_received`) are movements between sources, never new money
+   entering the books — Money in counts budgets & abono only. */
+export const moneyInOf = (row) =>
+  row?.kind === "transfer_received" ? 0 : Number(row?.moneyIn) || 0;
+
+/* A row's contribution to the Money-out figure: paid expenses only — an
+   admin-side row always, an employee's row only when it is tagged to a
+   source (the same leg the transactions page's Money Out card reads).
+   Issued budgets and transfer legs move money around; they are not spend. */
+export const moneyOutOf = (row) => {
+  if (row?.kind !== "expense") return 0;
+  if (row?.employeeRole === "employee" && row.referenceId == null) return 0;
+  return Number(row?.moneyOut) || 0;
+};
+
 /** Headline range totals — money in / out / net plus the record count. */
 export function sumRows(rows) {
   let moneyIn = 0;
   let moneyOut = 0;
   for (const row of rows ?? []) {
-    moneyIn += Number(row.moneyIn) || 0;
-    moneyOut += Number(row.moneyOut) || 0;
+    moneyIn += moneyInOf(row);
+    moneyOut += moneyOutOf(row);
   }
   moneyIn = toMoney(moneyIn);
   moneyOut = toMoney(moneyOut);
@@ -152,8 +168,8 @@ export function monthlySeries(rows) {
     if (!day) continue;
     const key = `${day.getFullYear()}-${String(day.getMonth() + 1).padStart(2, "0")}`;
     const bucket = byMonth.get(key) ?? { in: 0, out: 0, count: 0 };
-    bucket.in += Number(row.moneyIn) || 0;
-    bucket.out += Number(row.moneyOut) || 0;
+    bucket.in += moneyInOf(row);
+    bucket.out += moneyOutOf(row);
     bucket.count += 1;
     byMonth.set(key, bucket);
   }

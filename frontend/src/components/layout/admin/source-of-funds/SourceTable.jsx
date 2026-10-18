@@ -60,6 +60,11 @@ function UtilizationBar({ used, total }) {
 function SourceCard({ source, onView, onEdit, onDelete, onToggleStatus }) {
   const remaining = toMoney(source.remaining ?? 0);
   const used = toMoney(source.issued + source.expenses);
+  // Same "Spent" figure the desktop cell renders: admin direct + staff
+  // field liquidations (settled abono is a reimbursement, never added).
+  const spentTotal = toMoney(
+    Number(source.expenses) + Number(source.employeeExpenses),
+  );
   const closed = source.status !== "open";
   const isOpen = (source.status ?? "open") === "open";
   const cutOff = getCutOffState(source.date_cut_off);
@@ -156,7 +161,7 @@ function SourceCard({ source, onView, onEdit, onDelete, onToggleStatus }) {
         <div className="min-w-0 border-l border-[var(--border)] pl-2">
           <p className="type-eyebrow text-[var(--ink-muted)]">Spent</p>
           <p className="mt-1 truncate text-sm font-medium tabular-nums">
-            {formatMoney(source.expenses)}
+            {formatMoney(spentTotal)}
           </p>
         </div>
         <div className="min-w-0">
@@ -523,13 +528,14 @@ export function SourceTable({
                 const txns = Number(source.transactions) || 0;
                 const closed = source.status !== "open";
                 const cutOff = getCutOffState(source.date_cut_off);
-                // Total spent for display: admin + employee + settled legs.
+                // Spent for display: admin direct + staff field liquidations.
+                // Settled abono is a reimbursement of fronted money — the
+                // purchases it funded already sit in the expense legs, so
+                // adding it again would charge the same money twice.
                 // (Remaining still subtracts the admin leg only — the other
-                // two already left as issued, so they must not reduce it.)
+                // legs already left as issued, so they must not reduce it.)
                 const spentTotal = toMoney(
-                  Number(source.expenses) +
-                    Number(source.employeeExpenses) +
-                    Number(source.settledAbono),
+                  Number(source.expenses) + Number(source.employeeExpenses),
                 );
                 return (
                   <motion.tr
@@ -578,7 +584,7 @@ export function SourceTable({
                     <td className="px-4 py-3.5 text-right align-middle">
                       <span
                         className="whitespace-nowrap text-sm font-medium tabular-nums text-[var(--ink)]"
-                        title={`Total spent: ${formatMoney(source.expenses)} admin + ${formatMoney(source.employeeExpenses)} employee + ${formatMoney(source.settledAbono)} settled`}
+                        title={`Total spent: ${formatMoney(source.expenses)} admin + ${formatMoney(source.employeeExpenses)} employee`}
                       >
                         {formatMoney(spentTotal)}
                       </span>

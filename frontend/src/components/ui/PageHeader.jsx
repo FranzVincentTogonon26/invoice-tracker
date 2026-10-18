@@ -24,7 +24,11 @@ export function PageHeader({ title, description, actions, className }) {
         )}
       </div>
       {actions && (
-        <div className="w-full shrink-0 sm:w-auto">{actions}</div>
+        // `sm:shrink` lets a wide action block give ground instead of
+        // crushing the title column into a sliver when both can't fit side
+        // by side — the block's own flex-wrap / truncation handles the rest.
+        // Small action rows fit anyway, so they are unaffected.
+        <div className="w-full shrink-0 sm:w-auto sm:shrink">{actions}</div>
       )}
     </div>
   );

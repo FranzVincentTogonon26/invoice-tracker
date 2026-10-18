@@ -76,12 +76,12 @@ const NAV_GROUPS = [
     // Records stay retrievable here even after their source of funds closes.
     label: "Records",
     items: [
+      { to: "/admin/reports", icon: BarChart3, label: "Reports" },
       {
         to: "/admin/source-funds",
         icon: HandCoins,
         label: "Source of Funds",
       },
-      { to: "/admin/reports", icon: BarChart3, label: "Reports" },
       { to: "/admin/audit-logs", icon: Logs, label: "Audit Logs" },
     ],
   },

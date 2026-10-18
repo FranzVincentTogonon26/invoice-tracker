@@ -577,6 +577,11 @@ class Expenses {
     return result.rows;
   }
 
+  // Reference list behind the pickers / filters / label maps: EVERY
+  // budget_reference, any status — a closed source is still a reference.
+  // Only the flows that attach new money to a source re-apply the open-only
+  // rule themselves (SelectReference + fundingState client-side, and the
+  // server-side creation guards).
   static async budgetReference() {
     const result = await query(
       `SELECT
@@ -625,7 +630,6 @@ class Expenses {
                AND bir.status = 'close'
           ), 0)::float8 AS forwarded
          FROM budget_reference b
-        WHERE b.status = 'open'
         ORDER BY b.created_at DESC`,
       [],
     );

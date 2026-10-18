@@ -68,9 +68,11 @@ class Transactions {
   // Also returns `summary` (all-time gross Money In / Out / net / counts)
   // and the `categories` + `references` lists the filters are built from.
   // `includeClosed` lifts the "closed sources leave no footsteps" gate for
-  // the Source of Funds overview page: a closed source's own history (budget
-  // given + issued + expenses + abono + transfer legs) still renders there,
-  // while every other ledger consumer keeps the default hidden behavior.
+  // the consumers that must see a closed source's full history anyway (the
+  // Source of Funds overview page and the Reports library): its rows
+  // (budget given + issued + expenses + abono + transfer legs) still render
+  // there, while every other ledger consumer keeps the default hidden
+  // behavior.
   static async ledger({ includeClosed = false } = {}) {
     const [
       budgetRows,

@@ -10,6 +10,7 @@ import {
 } from "recharts";
 import { motion } from "framer-motion";
 import { cn, formatMoney } from "@/lib/utils";
+import { moneyInOf, moneyOutOf } from "@/lib/reports";
 import { TRANSACTION_KIND_META } from "@/constants";
 
 const CHART_EASE = [0.16, 1, 0.3, 1];
@@ -42,6 +43,9 @@ const fullDay = (value) => {
 // Cumulative money-in vs money-out trajectory across the selected records,
 // oldest first — the tracing view: how the pool filled and drained over
 // time. Buckets one point per calendar day so long ranges stay readable.
+// Both curves follow the headline rules: Money in counts budgets & abono
+// (internal transfer legs never count), Money out counts paid expenses
+// only — so the trajectory reads exactly like the cards.
 function useTrajectory(rows) {
   return useMemo(() => {
     const sorted = [...(rows ?? [])].sort(
@@ -53,8 +57,8 @@ function useTrajectory(rows) {
       if (Number.isNaN(day.getTime())) continue;
       const key = day.toLocaleDateString("en-CA");
       const bucket = byDay.get(key) ?? { key, in: 0, out: 0 };
-      bucket.in += Number(row.moneyIn) || 0;
-      bucket.out += Number(row.moneyOut) || 0;
+      bucket.in += moneyInOf(row);
+      bucket.out += moneyOutOf(row);
       byDay.set(key, bucket);
     }
     let cumIn = 0;

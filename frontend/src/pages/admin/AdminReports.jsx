@@ -69,6 +69,8 @@ import {
   kindBreakdown,
   kindLabel,
   ledgerReport,
+  moneyInOf,
+  moneyOutOf,
   monthlySeries,
   pctDelta,
   previousWindow,
@@ -118,12 +120,16 @@ const AdminReports = () => {
 
   // Ledger + supporting lists. All keys live under the realtime bridge, so
   // every socket money event refetches them without a manual refresh.
+  // `includeClosed`: a report counts EVERY source of funds regardless of
+  // status — the source filter and the utilization breakdown already list
+  // closed references, so the figures must cover their records too. (The
+  // operational ledger pages keep the closed-source no-footsteps gate.)
   const {
     transactions,
     isLoading: txLoading,
     error: txError,
     refetch: refetchTx,
-  } = useTransactions();
+  } = useTransactions({ includeClosed: true });
   const {
     sources: rawSources,
     isLoading: srcLoading,
@@ -191,22 +197,25 @@ const AdminReports = () => {
 
   // Stat-card sparklines — one bucket per active day in the current view.
   const sparkIn = useMemo(
-    () => dailySeries(scopedRows, (row) => row.moneyIn),
+    () => dailySeries(scopedRows, moneyInOf),
     [scopedRows],
   );
   const sparkOut = useMemo(
-    () => dailySeries(scopedRows, (row) => row.moneyOut),
+    () => dailySeries(scopedRows, moneyOutOf),
     [scopedRows],
   );
   const sparkNet = useMemo(
     () =>
       dailySeries(
         scopedRows,
-        (row) => (Number(row.moneyIn) || 0) - (Number(row.moneyOut) || 0),
+        (row) => moneyInOf(row) - moneyOutOf(row),
       ),
     [scopedRows],
   );
-  const sparkCount = useMemo(() => dailySeries(scopedRows, () => 1), [scopedRows]);
+  const sparkCount = useMemo(
+    () => dailySeries(scopedRows, () => 1),
+    [scopedRows],
+  );
 
   const kinds = useMemo(() => kindBreakdown(scopedRows), [scopedRows]);
   const monthly = useMemo(() => monthlySeries(scopedRows), [scopedRows]);
@@ -235,7 +244,8 @@ const AdminReports = () => {
   );
   const sourceRows = useMemo(() => sourceBreakdown(rawSources), [rawSources]);
   const sourceRemaining = useMemo(
-    () => toMoney(sourceRows.reduce((sum, source) => sum + source.remaining, 0)),
+    () =>
+      toMoney(sourceRows.reduce((sum, source) => sum + source.remaining, 0)),
     [sourceRows],
   );
   const auditBars = useMemo(() => actionBars(logs), [logs]);
@@ -266,8 +276,7 @@ const AdminReports = () => {
         meta: `${formatMoney(totals.net)} net · ${totals.count} ${
           totals.count === 1 ? "record" : "records"
         }`,
-        chart:
-          monthly.length > 0 ? <MonthlyFlowChart data={monthly} /> : null,
+        chart: monthly.length > 0 ? <MonthlyFlowChart data={monthly} /> : null,
       },
       {
         id: "ledger",
@@ -293,7 +302,10 @@ const AdminReports = () => {
         }`,
         chart:
           categories.length > 0 ? (
-            <CategoryDonut items={categories} centerValue={formatMoney(paidTotal)} />
+            <CategoryDonut
+              items={categories}
+              centerValue={formatMoney(paidTotal)}
+            />
           ) : null,
       },
       {
@@ -440,11 +452,15 @@ const AdminReports = () => {
         actions={
           <div className="flex w-full flex-wrap items-center justify-end gap-2 sm:w-auto">
             <div className="w-full sm:w-60">
+              {/* Fill the whole 240px slot like the neighbouring Listboxes —
+                  the trigger used to hug its label, leaving a dead gap before
+                  the next filter. Below `sm` it stays the compact icon chip. */}
               <DateRangePicker
                 value={range}
                 onChange={setRange}
                 placeholder="All time"
                 compactOnMobile
+                className="sm:w-full sm:justify-start"
               />
             </div>
             <div className="w-full sm:w-44">
@@ -503,20 +519,26 @@ const AdminReports = () => {
             animate="show"
             className="grid grid-cols-1 items-stretch gap-3 sm:grid-cols-2 sm:gap-4 xl:grid-cols-4"
           >
-            <motion.div variants={statItem} className="h-full min-w-0 [&>div]:h-full">
+            <motion.div
+              variants={statItem}
+              className="h-full min-w-0 [&>div]:h-full"
+            >
               <StatCard
                 label="Money in"
                 value={formatMoney(totals.moneyIn)}
                 icon={ArrowDownToLine}
-                tone="success"
+                accent
                 chart="bars"
                 data={sparkIn}
                 delta={deltas.moneyIn}
                 deltaCaption="vs previous period"
-                breakdownCaption="Budgets, abono & transfers in"
+                breakdownCaption="Budgets & abono in"
               />
             </motion.div>
-            <motion.div variants={statItem} className="h-full min-w-0 [&>div]:h-full">
+            <motion.div
+              variants={statItem}
+              className="h-full min-w-0 [&>div]:h-full"
+            >
               <StatCard
                 label="Money out"
                 value={formatMoney(totals.moneyOut)}
@@ -527,10 +549,13 @@ const AdminReports = () => {
                 delta={deltas.moneyOut}
                 deltaCaption="vs previous period"
                 deltaPolarity="up-bad"
-                breakdownCaption="Issued, spent & transfers out"
+                breakdownCaption="My expenses & employee expenses"
               />
             </motion.div>
-            <motion.div variants={statItem} className="h-full min-w-0 [&>div]:h-full">
+            <motion.div
+              variants={statItem}
+              className="h-full min-w-0 [&>div]:h-full"
+            >
               <StatCard
                 label="Net position"
                 value={formatMoney(totals.net)}
@@ -543,7 +568,10 @@ const AdminReports = () => {
                 breakdownCaption="Money in minus money out"
               />
             </motion.div>
-            <motion.div variants={statItem} className="h-full min-w-0 [&>div]:h-full">
+            <motion.div
+              variants={statItem}
+              className="h-full min-w-0 [&>div]:h-full"
+            >
               <StatCard
                 label="Records"
                 value={String(totals.count)}
@@ -566,7 +594,11 @@ const AdminReports = () => {
             className="space-y-4 sm:space-y-5"
           >
             {/* ── Report library — preview / print / CSV per report ── */}
-            <Card padding="lg" radius="lg" className="relative overflow-visible">
+            <Card
+              padding="lg"
+              radius="lg"
+              className="relative overflow-visible"
+            >
               <CardHeader className="mb-4">
                 <div>
                   <CardTitle>Report library</CardTitle>
@@ -639,7 +671,11 @@ const AdminReports = () => {
             {/* ── Movement analysis + spending mix ── */}
             <div className="grid grid-cols-1 gap-4 sm:gap-5 lg:grid-cols-12">
               <div className="lg:col-span-7">
-                <Card padding="lg" radius="lg" className="relative overflow-visible">
+                <Card
+                  padding="lg"
+                  radius="lg"
+                  className="relative overflow-visible"
+                >
                   <CardHeader className="mb-3">
                     <div>
                       <CardTitle>Movement analysis</CardTitle>
@@ -672,7 +708,11 @@ const AdminReports = () => {
                 </Card>
               </div>
               <div className="lg:col-span-5">
-                <Card padding="lg" radius="lg" className="relative overflow-visible">
+                <Card
+                  padding="lg"
+                  radius="lg"
+                  className="relative overflow-visible"
+                >
                   <CardHeader className="mb-4">
                     <div>
                       <CardTitle>Spending by category</CardTitle>
@@ -694,7 +734,11 @@ const AdminReports = () => {
             {/* ── Source utilization + top spenders ── */}
             <div className="grid grid-cols-1 gap-4 sm:gap-5 lg:grid-cols-12">
               <div className="lg:col-span-7">
-                <Card padding="lg" radius="lg" className="relative overflow-visible">
+                <Card
+                  padding="lg"
+                  radius="lg"
+                  className="relative overflow-visible"
+                >
                   <CardHeader className="mb-4">
                     <div>
                       <CardTitle>Source utilization</CardTitle>
@@ -713,7 +757,11 @@ const AdminReports = () => {
                 </Card>
               </div>
               <div className="lg:col-span-5">
-                <Card padding="lg" radius="lg" className="relative overflow-visible">
+                <Card
+                  padding="lg"
+                  radius="lg"
+                  className="relative overflow-visible"
+                >
                   <CardHeader className="mb-4">
                     <div>
                       <CardTitle>Top spenders</CardTitle>

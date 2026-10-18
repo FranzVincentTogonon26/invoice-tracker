@@ -506,8 +506,11 @@ class Budget {
                )
           ), 0)::float8 AS employee_expenses,
           COALESCE((
-            -- Settled abono tagged to this source (display-only, same
-            -- reason as above — shown so the spent cell totals everything).
+            -- Settled abono tagged to this source (display-only: the
+            -- reimbursement never re-enters spent math — the purchases it
+            -- fronted already sit in the expense legs, and counting it
+            -- again would charge the same money twice). Shown on the source
+            -- overview's sub-composition as reimbursed out-of-pocket.
             SELECT SUM(ea.amount)
               FROM employee_abono ea
              WHERE ea.reference_id = br.reference_id
@@ -745,7 +748,10 @@ class Budget {
     );
     return result.rows[0] ?? null;
   }
-  // Budget Reference
+  // Budget reference list (budgetInfo payload) — EVERY source, any status:
+  // a closed reference is still a reference for filters, label maps and the
+  // manage-references list. Callers offering sources for NEW activity filter
+  // for 'open' at the point of picking (SelectReference / fundingState).
   static async budgetReference() {
     const result = await query(
       `SELECT
@@ -753,7 +759,6 @@ class Budget {
         label, created_at, status, date_cut_off,
         ( SELECT COUNT(id) FROM budget bi WHERE bi.reference_id = b.reference_id ) AS active
        FROM budget_reference b
-       WHERE b.status = 'open'
        ORDER BY b.created_at DESC`,
       [],
     );

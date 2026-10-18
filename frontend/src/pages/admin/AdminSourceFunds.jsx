@@ -67,15 +67,17 @@ export default function AdminSourceFunds() {
   // source from every flow, so cut-off rows must not move the totals (the
   // table below keeps its own status filter; the cards do not follow it).
   // Every figure reuses the SourceTable row definitions: allocated /
-  // remaining / issued straight off the row, spent = admin + employee +
-  // settled legs (the table's Spent column).
+  // remaining / issued straight off the row, spent = admin + employee legs
+  // (the table's Spent column). Settled abono is a reimbursement — the
+  // purchases it fronted already sit in the employee leg, so it is never
+  // added again.
   const openRows = useMemo(
     () => (sources ?? []).filter((s) => (s.status ?? "open") === "open"),
     [sources],
   );
 
   const spentTotalOf = (r) =>
-    Number(r.expenses) + Number(r.employeeExpenses) + Number(r.settledAbono);
+    Number(r.expenses) + Number(r.employeeExpenses);
 
   const totals = useMemo(() => {
     const sum = (pick) =>

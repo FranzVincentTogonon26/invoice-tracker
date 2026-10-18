@@ -297,8 +297,10 @@ export function AdminSourceFundsOverview() {
   const settledAbono = Number(source?.settledAbono) || 0;
   const forwarded = Number(source?.forwarded) || 0;
 
-  // Total liquidated spend across all legs
-  const spentTotal = toMoney(directExpenses + employeeExpenses + settledAbono);
+  // Total liquidated spend: admin direct + staff field. Settled abono is a
+  // reimbursement of fronted money — the purchases it funded already sit in
+  // the expense legs, so adding it here would charge the same money twice.
+  const spentTotal = toMoney(directExpenses + employeeExpenses);
 
   // Exact remaining balance from pool equation (allocated − issued − directExpenses + forwarded)
   const remaining = toMoney(

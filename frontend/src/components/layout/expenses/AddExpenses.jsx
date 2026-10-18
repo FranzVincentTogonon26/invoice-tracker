@@ -374,9 +374,15 @@ const AddExpenses = () => {
     return { total: sum, filledCount: filled };
   }, [items]);
 
+  // Auto-pick only among OPEN sources: the shared reference list carries
+  // every source regardless of status, but a closed one can never fund a
+  // draft (the same open-only view `fundingState` computes below).
   const selectedReferenceId = useMemo(() => {
-    if (references.length === 1) return references[0].reference_id;
-    return references.some((ref) => ref.reference_id === referenceId)
+    const open = references.filter(
+      (ref) => !ref.status || ref.status === "open",
+    );
+    if (open.length === 1) return open[0].reference_id;
+    return open.some((ref) => ref.reference_id === referenceId)
       ? referenceId
       : "";
   }, [references, referenceId]);
