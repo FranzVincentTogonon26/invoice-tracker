@@ -6,7 +6,12 @@ import AILogo from "../ui/AILogo";
 const NOISE_DATA_URI =
   "url(\"data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='180' height='180'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='2' seed='3'/></filter><rect width='180' height='180' filter='url(%23n)' opacity='0.9'/></svg>\")";
 
-export function AuthShell({ children, headline, subhead, brandLockup = false }) {
+export function AuthShell({
+  children,
+  headline,
+  subhead,
+  brandLockup = false,
+}) {
   return (
     <div className="min-h-screen flex bg-[var(--bg)] p-3 sm:p-4 gap-0 lg:gap-4">
       {/* Left — form */}
@@ -143,9 +148,7 @@ function BrandPanel({ headline, subhead }) {
           </div>
 
           {headline && (
-            <h2
-              className="font-display text-[clamp(38px,3.2vw,44px)] font-medium tracking-tight xl:text-[clamp(44px,3.4vw,52px)] leading-[1.02] text-white mt-8 max-w-[540px]"
-            >
+            <h2 className="font-display text-[clamp(38px,3.2vw,44px)] font-medium tracking-tight xl:text-[clamp(44px,3.4vw,52px)] leading-[1.02] text-white mt-8 max-w-[540px]">
               {headline}
             </h2>
           )}
@@ -175,12 +178,13 @@ export function AuthField({
   minLength,
   icon: Icon,
   trailing,
-  autoFocus,
 }) {
   return (
     <div>
       <div className="flex items-center justify-between mb-1.5">
-        <label className="text-sm font-medium tracking-tight text-[var(--ink)]">{label}</label>
+        <label className="text-sm font-medium tracking-tight text-[var(--ink)]">
+          {label}
+        </label>
         {extra}
       </div>
       <div className="relative">
@@ -192,10 +196,7 @@ export function AuthField({
           autoComplete={autoComplete}
           required={required}
           minLength={minLength}
-          autoFocus={autoFocus}
-          className={`peer w-full h-12 ${
-            Icon ? "pl-11" : "pl-4"
-          } ${
+          className={`peer w-full h-12 ${Icon ? "pl-11" : "pl-4"} ${
             trailing ? "pr-12" : "pr-4"
           } rounded-2xl border border-[var(--border)] bg-[var(--surface)] text-base tracking-tight text-[var(--ink)] placeholder:text-[var(--ink-muted)]/60 outline-none shadow-card transition-all duration-200 hover:shadow-hover focus:border-[var(--accent)]/40 focus:ring-4 focus:ring-[var(--accent)]/10`}
         />

@@ -400,7 +400,7 @@ function EmailStep({ value, onChange, onSubmit }) {
         onChange={onChange}
         placeholder="you@example.com"
         icon={Mail}
-        autoFocus
+  
       />
 
       <AuthErrorBanner>{error}</AuthErrorBanner>
@@ -711,7 +711,7 @@ function PasswordStep({ onSubmit }) {
         placeholder="At least 8 characters"
         minLength={8}
         icon={Lock}
-        autoFocus
+     
         trailing={
           <VisibilityToggle
             shown={showPw}
