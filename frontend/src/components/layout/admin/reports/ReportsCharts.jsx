@@ -22,7 +22,7 @@ import { CHART_EASE, compactPeso } from "@/lib/dashboard";
    CartesianGrid, 600–900ms ease-out entrances and hand-rolled motion bars
    where recharts would be overkill. */
 
-// Shared tooltip card — same chrome as ReportTraceChart's ChartTooltip.
+// Shared tooltip card — same chrome as ReportTraceChart's MovementTooltip.
 function ChartTip({ active, payload, label, money = true }) {
   if (!active || !payload?.length) return null;
   const title =
@@ -168,11 +168,15 @@ export function MonthlyFlowChart({ data = [], height = 220, className }) {
   );
 }
 
-// Donut + ranked legend for paid spending by category.
+// Donut + ranked legend for paid spending by category. The default lays the
+// pair side by side from sm up; `stacked` pins the donut over its legend at
+// every width — narrow columns — and trades the share column for a ratio bar
+// so the rows never squeeze.
 export function CategoryDonut({
   items = [],
   centerLabel = "Paid spend",
   centerValue,
+  stacked = false,
   className,
 }) {
   const shown = (items ?? []).filter((item) => item.total > 0);
@@ -186,11 +190,25 @@ export function CategoryDonut({
   return (
     <div
       className={cn(
-        "flex flex-col items-center gap-5 sm:flex-row sm:items-center",
+        "flex flex-col items-center gap-5",
+        !stacked && "sm:flex-row sm:items-center",
+        stacked && "mx-auto w-full max-w-sm",
         className,
       )}
     >
-      <div className="relative h-44 w-44 shrink-0">
+      <div
+        className={cn(
+          "relative shrink-0",
+          // The lg column can narrow to ~156px before xl widens it back —
+          // step the stacked ring down so it never kisses the card edge.
+          stacked ? "h-36 w-36 xl:h-40 xl:w-40" : "h-44 w-44",
+        )}
+      >
+        {/* Soft halo so the ring reads as the card's hero figure. */}
+        <div
+          aria-hidden
+          className="pointer-events-none absolute -inset-3 rounded-full bg-[var(--accent-soft)] opacity-60 blur-2xl"
+        />
         <ResponsiveContainer width="100%" height="100%">
           <PieChart>
             <Tooltip content={<ChartTip />} />
@@ -198,9 +216,10 @@ export function CategoryDonut({
               data={shown}
               dataKey="total"
               nameKey="name"
-              innerRadius="64%"
-              outerRadius="96%"
-              paddingAngle={2}
+              innerRadius="66%"
+              outerRadius="94%"
+              paddingAngle={3}
+              cornerRadius={6}
               strokeWidth={0}
               animationDuration={700}
               animationEasing="ease-out"
@@ -213,34 +232,73 @@ export function CategoryDonut({
         </ResponsiveContainer>
         <div className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center text-center">
           <span className="type-eyebrow">{centerLabel}</span>
-          <span className="mt-0.5 font-display text-base font-medium tabular-nums tracking-tight text-[var(--ink)]">
+          <span
+            className={cn(
+              "mt-0.5 max-w-[66%] truncate font-display font-semibold tabular-nums tracking-tight text-[var(--ink)]",
+              stacked ? "text-base xl:text-lg" : "text-lg",
+            )}
+          >
             {centerValue}
           </span>
         </div>
       </div>
-      <ul className="min-w-0 flex-1 space-y-2 self-stretch">
+      <ul
+        className={cn(
+          "min-w-0 flex-1 space-y-2",
+          stacked ? "w-full" : "self-stretch",
+        )}
+      >
         {shown.slice(0, 6).map((item, index) => (
           <motion.li
             key={item.key}
             initial={{ opacity: 0, x: 8 }}
             animate={{ opacity: 1, x: 0 }}
             transition={{ duration: 0.3, ease: CHART_EASE, delay: 0.05 * index }}
-            className="flex items-center gap-2 text-xs"
+            className={cn(
+              "group -mx-2 rounded-lg px-2 transition-colors duration-150 hover:bg-[var(--surface-2)]/70",
+              stacked ? "flex flex-col gap-1 py-0.5" : "flex items-center py-1",
+            )}
           >
             <span
-              aria-hidden
-              className="h-2.5 w-2.5 shrink-0 rounded-full"
-              style={{ background: item.color }}
-            />
-            <span className="min-w-0 flex-1 truncate text-[var(--ink-muted)]">
-              {item.name}
+              className={cn(
+                "flex min-w-0 items-center gap-2 text-xs",
+                !stacked && "flex-1",
+              )}
+            >
+              <span
+                aria-hidden
+                className="h-2.5 w-2.5 shrink-0 rounded-full"
+                style={{ background: item.color }}
+              />
+              <span className="min-w-0 flex-1 truncate text-[var(--ink-muted)] transition-colors group-hover:text-[var(--ink)]">
+                {item.name}
+              </span>
+              <span className="shrink-0 font-semibold tabular-nums text-[var(--ink)]">
+                {formatMoney(item.total)}
+              </span>
+              {!stacked && (
+                <span className="w-11 shrink-0 text-right tabular-nums text-[var(--ink-muted)]">
+                  {item.share}%
+                </span>
+              )}
             </span>
-            <span className="shrink-0 font-medium tabular-nums text-[var(--ink)]">
-              {formatMoney(item.total)}
-            </span>
-            <span className="w-11 shrink-0 text-right tabular-nums text-[var(--ink-muted)]">
-              {item.share}%
-            </span>
+            {stacked && (
+              <span className="block h-1 overflow-hidden rounded-full bg-[var(--surface-2)]">
+                <motion.span
+                  initial={{ width: 0 }}
+                  animate={{
+                    width: `${Math.min(100, Number(item.share) || 0)}%`,
+                  }}
+                  transition={{
+                    duration: 0.6,
+                    ease: CHART_EASE,
+                    delay: 0.05 * index,
+                  }}
+                  className="block h-full rounded-full"
+                  style={{ background: item.color }}
+                />
+              </span>
+            )}
           </motion.li>
         ))}
         {shown.length > 6 && (
@@ -371,7 +429,10 @@ export function UtilizationBars({
                   {source.statusLabel}
                 </span>
               </span>
-              <span className="ml-auto shrink-0 tabular-nums text-[var(--ink-muted)]">
+              {/* Shrinkable and right-aligned: on very narrow panels the
+                  figures wrap inside their own line instead of clipping
+                  against the scroll box. */}
+              <span className="ml-auto min-w-0 text-right tabular-nums text-[var(--ink-muted)]">
                 <span className="font-medium text-[var(--ink)]">
                   {formatMoney(source.remaining)}
                 </span>{" "}

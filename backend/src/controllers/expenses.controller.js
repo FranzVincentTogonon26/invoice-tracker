@@ -44,6 +44,14 @@ const canTouchRow = (req, expense) => {
   );
 };
 
+// Peso text for the audit sentences (mirrors the client's formatMoney: en-US
+// grouping with the PHP currency symbol), so logged messages read exactly like
+// the money figures shown in the UI.
+const formatPeso = (n) =>
+  new Intl.NumberFormat("en-US", { style: "currency", currency: "PHP" }).format(
+    Number(n) || 0,
+  );
+
 export const expenses = async (req, res, next) => {
   try {
     // authMiddleware already proved the caller is a real users row (the JWT's
@@ -206,7 +214,13 @@ export const create = async (req, res, next) => {
       issued_ref_id: issuedRefId,
     });
     {
-      const total = rows.reduce((s, r) => s + (Number(r.amount) || 0), 0);
+      // `createExpenses` returns the inserted rows (`RETURNING *`), whose
+      // amount column is `total_amount` — summing `r.amount` silently read
+      // undefined and logged every batch as ₱0.00.
+      const total = rows.reduce(
+        (s, r) => s + (Number(r.total_amount) || 0),
+        0,
+      );
       // Fan-out: the global `transactions` room + `role:admin` keep every
       // admin ledger (incl. AdminEmployees -> EmployeesTable issued / spent /
       // remaining / progressbar / %) fresh with no refresh. The actor's own
@@ -218,7 +232,7 @@ export const create = async (req, res, next) => {
         action: "create",
         entity: "expense",
         actor: req.user,
-        message: `${req.user.role === "employee" ? "Employee spent" : "Recorded"} ${rows.length} expense line${rows.length === 1 ? "" : "s"} (${new Intl.NumberFormat("en-US", { style: "currency", currency: "PHP" }).format(total)}).`,
+        message: `${req.user.role === "employee" ? "Employee spent" : "Recorded"} ${rows.length} expense line${rows.length === 1 ? "" : "s"} (${formatPeso(total)}).`,
         metadata: { count: rows.length, amount: total, userId: req.user.id, reference_id: referenceId, ids: rows.map((r) => r.id ?? null).filter(Boolean) },
         notifyUserIds: [req.user.id],
       });
@@ -341,14 +355,20 @@ export const remove = async (req, res, next) => {
       if (stillReferenced === 0) await deleteReceiptImage(expense.image_url);
     }
 
+    // The audit row must carry the deleted row's real value: `removeExpense`
+    // RETURNING uses `total_amount` (the DB column), so `expense.amount` was
+    // always undefined → "(?)" in the sentence and a phantom ₱0.00 column.
+    const deletedAmount =
+      expense.total_amount ?? existing?.total_amount ?? null;
+
     emitTransaction({
       action: "delete",
       entity: "expense",
       actor: req.user,
-      message: `Deleted expense "${expense.description ?? expense.id}" (${expense.amount ?? "?"}).`,
+      message: `Deleted expense "${expense.description ?? expense.id}" (${deletedAmount === null ? "?" : formatPeso(deletedAmount)}).`,
       metadata: {
         id,
-        amount: expense.amount ?? null,
+        amount: deletedAmount,
         userId: expense.user_id ?? existing?.user_id ?? null,
       },
       notifyUserIds: (expense.user_id ?? existing?.user_id)
@@ -393,7 +413,7 @@ export const updateStatus = async (req, res, next) => {
       entity: "expense",
       actor: req.user,
       message: `Expense status updated to ${payload.status} (${expense.description ?? id}).`,
-      metadata: { id, status: payload.status, amount: expense.amount ?? null, userId: expense.user_id ?? existing?.user_id ?? null },
+      metadata: { id, status: payload.status, amount: expense.total_amount ?? existing?.total_amount ?? null, userId: expense.user_id ?? existing?.user_id ?? null },
       notifyUserIds: (expense.user_id ?? existing?.user_id) ? [expense.user_id ?? existing.user_id] : [],
     });
 
@@ -437,7 +457,7 @@ export const markEmployeeDraft = async (req, res, next) => {
         entity: "expense",
         actor: req.user,
         message: `Moved employee expense back to draft (${expense.description ?? id}).`,
-        metadata: { id, status: "draft", amount: expense.amount ?? null, userId: ownerId },
+        metadata: { id, status: "draft", amount: expense.total_amount ?? pre?.total_amount ?? null, userId: ownerId },
         notifyUserIds: ownerId ? [ownerId] : [],
       });
       return res.status(200).json({
@@ -492,7 +512,7 @@ export const markEmployeePaid = async (req, res, next) => {
         entity: "expense",
         actor: req.user,
         message: `Moved employee expense back to paid (${expense.description ?? id}).`,
-        metadata: { id, status: "paid", amount: expense.amount ?? null, userId: ownerId },
+        metadata: { id, status: "paid", amount: expense.total_amount ?? pre?.total_amount ?? null, userId: ownerId },
         notifyUserIds: ownerId ? [ownerId] : [],
       });
       return res.status(200).json({

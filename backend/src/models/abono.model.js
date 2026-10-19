@@ -705,7 +705,7 @@ class Abono {
     const result = await query(
       `DELETE FROM employee_abono
         WHERE id = $1
-        RETURNING id`,
+        RETURNING id, user_id, description, amount::float8 AS amount`,
       [id],
     );
     return result.rows[0] ?? null;

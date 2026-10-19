@@ -98,10 +98,17 @@ const emitTransaction = (opts = {}) => {
     : [];
   const adminOnly = Boolean(opts.adminOnly);
 
+  // `Number(null)` is 0 and `Number("")` is 0, so nullish / empty amounts must
+  // be filtered out FIRST — otherwise every "no amount" event (expense status
+  // changes, abono deletes) broadcasts and logs a phantom PHP 0.00.
+  const rawAmount = metadata.amount;
   const amount =
-    Number.isFinite(Number(metadata.amount)) &&
-    String(metadata.amount).length < 32
-      ? Number(metadata.amount)
+    rawAmount !== null &&
+    rawAmount !== undefined &&
+    rawAmount !== "" &&
+    Number.isFinite(Number(rawAmount)) &&
+    String(rawAmount).length < 32
+      ? Number(rawAmount)
       : null;
 
   const fullPayload = {

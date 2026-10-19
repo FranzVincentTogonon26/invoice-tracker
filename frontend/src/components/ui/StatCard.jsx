@@ -1,6 +1,6 @@
 import { useEffect, useMemo } from "react";
 import { motion, useSpring, useTransform } from "framer-motion";
-import { ResponsiveContainer, AreaChart, Area, BarChart, Bar } from "recharts";
+import { ResponsiveContainer, AreaChart, Area, BarChart, Bar, YAxis, ReferenceLine } from "recharts";
 import { Minus, TrendingDown, TrendingUp } from "lucide-react";
 import { Card } from "./Card";
 import { Badge } from "./Badge";
@@ -96,9 +96,38 @@ const washId = (color) => `stat-wash-${color.replace(/[^a-zA-Z0-9]/g, "")}`;
 
 function MiniLine({ data, color }) {
   const gid = washId(color);
+  // The domain has to admit zero on *both* sides: the default [0, auto]
+  // clamps negative buckets to the floor, so a net-position series with
+  // spending days flattens into a fake baseline. A touch of padding keeps
+  // peaks off the frame.
+  const values = (data ?? []).map((point) => Number(point?.v) || 0);
+  let lo = Math.min(0, ...values);
+  let hi = Math.max(0, ...values);
+  if (!values.length || lo === hi) {
+    lo = -1;
+    hi = 1;
+  }
+  const pad = (hi - lo) * 0.08;
+  const lastIndex = values.length - 1;
+  // Terminal dot — where the series ended, so a one-bucket line still
+  // reads as a point instead of an empty lane.
+  const endDot = ({ cx, cy, index }) => {
+    if (index !== lastIndex || cx == null || cy == null) return null;
+    return (
+      <circle
+        key={`end-${index}`}
+        cx={cx}
+        cy={cy}
+        r={2.5}
+        fill={color}
+        stroke="var(--surface)"
+        strokeWidth={1}
+      />
+    );
+  };
   return (
     <ResponsiveContainer width="100%" height={42}>
-      <AreaChart data={data} margin={{ top: 6, right: 0, bottom: 0, left: 0 }}>
+      <AreaChart data={data} margin={{ top: 6, right: 2, bottom: 2, left: 2 }}>
         {/* Soft wash under the curve — the same depth treatment the main
             dashboard graph uses, scaled down to the stat-card lane. `style`
             is used because CSS variables don't resolve in SVG attributes. */}
@@ -108,6 +137,10 @@ function MiniLine({ data, color }) {
             <stop offset="100%" style={{ stopColor: color, stopOpacity: 0 }} />
           </linearGradient>
         </defs>
+        <YAxis hide domain={[lo - pad, hi + pad]} />
+        {/* Zero baseline — the line's true reference: money above, spending
+            below. Keeps mixed-sign days honest at a glance. */}
+        <ReferenceLine y={0} stroke="var(--border)" strokeDasharray="2 3" />
         <Area
           type="monotone"
           dataKey="v"
@@ -116,7 +149,8 @@ function MiniLine({ data, color }) {
           strokeLinecap="round"
           fill={`url(#${gid})`}
           fillOpacity={1}
-          dot={false}
+          baseValue={0}
+          dot={endDot}
           isAnimationActive={false}
         />
       </AreaChart>
@@ -131,7 +165,14 @@ function MiniBars({ data, color }) {
   const gid = `stat-bar-wash-${color.replace(/[^a-zA-Z0-9]/g, "")}`;
   return (
     <ResponsiveContainer width="100%" height={42}>
-      <BarChart data={data} margin={{ top: 6, right: 0, bottom: 0, left: 0 }}>
+      {/* Bars size themselves off the lane: three days read as chunky
+          rounded columns, thirty as a thin picket fence — the 18% category
+          gap keeps them from ever melting into one blob. */}
+      <BarChart
+        data={data}
+        margin={{ top: 6, right: 0, bottom: 0, left: 0 }}
+        barCategoryGap="18%"
+      >
         {/* Color-dense at the bar tops melting down — same depth treatment
             as the line wash, so line and bar sparklines stay siblings.
             `style` is used because CSS variables don't resolve everywhere. */}
@@ -148,7 +189,7 @@ function MiniBars({ data, color }) {
           dataKey="v"
           fill={`url(#${gid})`}
           radius={[3, 3, 0, 0]}
-          barSize={6}
+          maxBarSize={9}
           isAnimationActive={false}
         />
       </BarChart>
@@ -207,9 +248,11 @@ export function StatCard({
   const hasBreakdown = Array.isArray(breakdown);
   const hasStats = Array.isArray(stats) && stats.length > 0;
   const hasCaption = !hasBreakdown && !hasStats && Boolean(breakdownCaption);
+  // ≤84px lane: with band-adaptive bars a wider lane buys no extra
+  // legibility, and it keeps the headline comfortable at four columns.
   const chartWidth = hasData
-    ? Math.min(110, Math.max(data.length * 12, 24))
-    : 110;
+    ? Math.min(84, Math.max(data.length * 12, 24))
+    : 84;
 
   const iconTile = accent
     ? "bg-white/15 text-white"
@@ -582,7 +625,7 @@ export function StatCard({
               {hasCaption && (
                 <p
                   className={cn(
-                    "type-eyebrow truncate text-[12px] leading-snug",
+                    "type-eyebrow text-pretty text-[12px] leading-snug",
                     accent ? "text-white/60" : "text-[var(--ink-muted)]",
                   )}
                 >

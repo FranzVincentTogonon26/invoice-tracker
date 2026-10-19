@@ -27,10 +27,7 @@ import {
 import { StatCard } from "../../components/ui/StatCard";
 import { Badge } from "../../components/ui/Badge";
 import { DateRangePicker } from "../../components/ui/DateRangePicker";
-import {
-  EmptyState,
-  ErrorState,
-} from "../../components/ui/DataState";
+import { EmptyState, ErrorState } from "../../components/ui/DataState";
 import Listbox from "../../components/ui/Listbox";
 import { ReportPreviewModal } from "../../components/layout/admin/reports/ReportPreviewModal";
 import { ReportTraceChart } from "../../components/layout/admin/reports/ReportTraceChart";
@@ -679,7 +676,7 @@ const AdminReports = () => {
                 data={sparkNet}
                 delta={deltas.net}
                 deltaCaption="vs previous period"
-                breakdownCaption="Money in minus money out"
+                breakdownCaption="Remaining & Emp. CashOnHand"
               />
             </motion.div>
             <motion.div
@@ -711,26 +708,25 @@ const AdminReports = () => {
                 // panel's height, so the donut floats in the spare room.
                 className="relative flex flex-col overflow-visible"
               >
-                {/* Narrow card: stack the text over its badge so the two
-                    stop squeezing each other at ~25% width. */}
-                <CardHeader className="flex-col items-stretch">
-                  <div>
+                {/* Narrow card: title with its total wrapping over the
+                    description so nothing squeezes at ~25% width. */}
+                <CardHeader className="flex-col items-start gap-2">
+                  <div className="flex w-full min-w-0 flex-wrap items-center justify-between gap-x-3 gap-y-2">
                     <CardTitle>Spending by category</CardTitle>
-                    <CardDescription>
-                      Paid expenses in the current view, biggest first.
-                    </CardDescription>
+                    <Badge tone="warning">{formatMoney(paidTotal)}</Badge>
                   </div>
-                  <Badge tone="warning">{formatMoney(paidTotal)}</Badge>
+                  <CardDescription className="text-balance">
+                    Paid expenses in the current view, biggest first.
+                  </CardDescription>
                 </CardHeader>
                 <div className="flex w-full flex-1 items-center">
                   <CategoryDonut
                     items={categories}
                     centerLabel="Paid spend"
                     centerValue={formatMoney(paidTotal)}
-                    // Narrow column: stack the donut over its legend instead
-                    // of squeezing the pair side by side. w-full keeps the
-                    // legend from driving the container's width.
-                    className="w-full sm:flex-col"
+                    // Narrow column: always donut-over-legend — a
+                    // side-by-side pair would squeeze both at ~25% width.
+                    stacked
                   />
                 </div>
               </Card>
@@ -747,13 +743,12 @@ const AdminReports = () => {
                   <div>
                     <CardTitle>Movement analysis</CardTitle>
                     <CardDescription>
-                      Cumulative money in vs out, and where each type of
-                      record moved money.
+                      Cumulative money in vs out, and where each type of record
+                      moved money.
                     </CardDescription>
                   </div>
                   <Badge tone="neutral">
-                    {totals.count}{" "}
-                    {totals.count === 1 ? "record" : "records"}
+                    {totals.count} {totals.count === 1 ? "record" : "records"}
                   </Badge>
                 </CardHeader>
                 {hasScopedRows ? (
@@ -792,31 +787,33 @@ const AdminReports = () => {
                   radius="lg"
                   className="relative overflow-visible"
                 >
-                  <CardHeader className="flex-col items-stretch">
-                    <div>
+                  {/* Narrow card: title with its figure wrapping over the
+                      description so nothing squeezes at ~25% width. */}
+                  <CardHeader className="flex-col items-start gap-2">
+                    <div className="flex w-full min-w-0 flex-wrap items-center justify-between gap-x-3 gap-y-2">
                       <CardTitle>Source utilization</CardTitle>
-                      <CardDescription>
-                        Deployed share of every source of funds — issued plus
-                        spent against allocated.
-                      </CardDescription>
+                      <Badge tone="success">
+                        {formatMoney(sourceRemaining)} left
+                      </Badge>
                     </div>
-                    <Badge tone="success">
-                      {formatMoney(sourceRemaining)} left
-                    </Badge>
+                    <CardDescription className="text-balance">
+                      Deployed share of every source of funds — issued plus
+                      spent against allocated.
+                    </CardDescription>
                   </CardHeader>
                   <div className="scrollbar-inline max-h-[320px] overflow-y-auto pr-1">
                     <UtilizationBars items={sourceRows} />
                   </div>
 
                   {/* Top spenders — second half of the same card */}
-                  <CardHeader className="flex-col items-stretch mt-5 border-t border-[var(--border)] pt-5">
-                    <div>
+                  <CardHeader className="mt-5 flex-col items-start gap-2 border-t border-[var(--border)] pt-5">
+                    <div className="flex w-full min-w-0 flex-wrap items-center justify-between gap-x-3 gap-y-2">
                       <CardTitle>Top spenders</CardTitle>
-                      <CardDescription>
-                        Employees by paid expense amount in the current view.
-                      </CardDescription>
+                      <Badge tone="neutral">{people.length} involved</Badge>
                     </div>
-                    <Badge tone="neutral">{people.length} involved</Badge>
+                    <CardDescription className="text-balance">
+                      Employees by paid expense amount in the current view.
+                    </CardDescription>
                   </CardHeader>
                   <div className="scrollbar-inline max-h-[320px] overflow-y-auto pr-1">
                     <SimpleBars
@@ -857,8 +854,12 @@ const AdminReports = () => {
                         key={entry.id}
                         variants={statItem}
                         whileHover={{ y: -3 }}
-                        transition={{ type: "spring", stiffness: 320, damping: 26 }}
-                        className="group flex flex-col rounded-2xl border border-[var(--border)] bg-[var(--surface)] p-4 shadow-card transition-shadow hover:shadow-hover"
+                        transition={{
+                          type: "spring",
+                          stiffness: 320,
+                          damping: 26,
+                        }}
+                        className="group flex flex-col rounded-2xl border border-[var(--border)] bg-[var(--surface)] p-4 shadow-card transition-[border-color,box-shadow] hover:border-[var(--accent)]/30 hover:shadow-hover"
                       >
                         <div className="flex items-start gap-3">
                           <span
