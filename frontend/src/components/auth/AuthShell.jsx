@@ -149,7 +149,7 @@ export function AuthField({
           minLength={minLength}
           className={`peer w-full h-12 ${
             Icon ? "pl-11 pr-4" : "px-4"
-          } rounded-2xl border border-[var(--border)] bg-[var(--surface)] text-base tracking-tight text-[var(--ink)] placeholder:text-[var(--ink-muted)]/60 outline-none transition-all duration-200 focus:border-[var(--accent)]/40 focus:ring-4 focus:ring-[var(--accent)]/10`}
+          } rounded-2xl border border-[var(--border)] bg-[var(--surface)] text-base tracking-tight text-[var(--ink)] placeholder:text-[var(--ink-muted)]/60 outline-none shadow-card transition-all duration-200 hover:shadow-hover focus:border-[var(--accent)]/40 focus:ring-4 focus:ring-[var(--accent)]/10`}
         />
         {Icon && (
           <div className="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 text-[var(--ink-muted)]/55 peer-focus:text-[var(--accent-strong)] peer-[:not(:placeholder-shown)]:text-[var(--accent-strong)] transition-colors">

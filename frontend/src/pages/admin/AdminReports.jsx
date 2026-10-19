@@ -30,7 +30,6 @@ import { DateRangePicker } from "../../components/ui/DateRangePicker";
 import {
   EmptyState,
   ErrorState,
-  LoadingSkeleton,
 } from "../../components/ui/DataState";
 import Listbox from "../../components/ui/Listbox";
 import { ReportPreviewModal } from "../../components/layout/admin/reports/ReportPreviewModal";
@@ -97,6 +96,18 @@ const TILE_TONES = {
   neutral: "bg-[var(--surface-2)] text-[var(--ink-muted)]",
 };
 
+// Ghost block for skeleton layouts — same pulse language as the StatCard
+// loader: soft surface-2 blocks that pulse out of the foreground.
+const GhostBar = ({ className }) => (
+  <div
+    className={cn("animate-pulse rounded bg-[var(--surface-2)]", className)}
+  />
+);
+
+/* Reports skeleton mirrors the live layout exactly: 4 stat cards, the
+   spending-mix donut + trace-chart row, then the insights card beside the
+   report-tile grid. Columns use the same stretch helpers so nothing
+   reshuffles when the data lands. */
 function ReportsSkeleton() {
   return (
     <div className="space-y-4 sm:space-y-5">
@@ -105,9 +116,116 @@ function ReportsSkeleton() {
           <StatCard key={index} loading />
         ))}
       </div>
-      <Card padding="lg" radius="lg">
-        <LoadingSkeleton rows={5} />
-      </Card>
+
+      {/* Row 1 — spending mix (donut) + movement analysis (trace chart) */}
+      <div className="grid grid-cols-1 gap-4 sm:gap-5 lg:grid-cols-12">
+        <div className="min-w-0 lg:col-span-3 [&>div]:h-full">
+          <Card padding="lg" radius="lg" className="flex flex-col">
+            <div className="mb-5">
+              <GhostBar className="h-4 w-36" />
+              <GhostBar className="mt-2 h-3 w-full" />
+              <GhostBar className="mt-1.5 h-3 w-5/12" />
+            </div>
+            <div className="flex w-full flex-1 items-center">
+              <div className="w-full">
+                <GhostBar className="mx-auto h-44 w-44 rounded-full" />
+                <ul className="mt-5 space-y-2.5">
+                  {Array.from({ length: 4 }).map((_, index) => (
+                    <li key={index} className="flex items-center gap-2">
+                      <GhostBar className="h-2.5 w-2.5 shrink-0 rounded-full" />
+                      <GhostBar className="h-3 min-w-0 flex-1" />
+                      <GhostBar className="h-3 w-16 shrink-0" />
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            </div>
+          </Card>
+        </div>
+
+        <div className="min-w-0 lg:col-span-9 [&>div]:h-full">
+          <Card padding="lg" radius="lg" className="flex flex-col">
+            <div className="mb-3">
+              <GhostBar className="h-4 w-36" />
+              <GhostBar className="mt-2 h-3 w-2/3" />
+            </div>
+            <GhostBar className="mt-4 h-[240px] w-full rounded-2xl" />
+          </Card>
+        </div>
+      </div>
+
+      {/* Row 2 — utilization + top spenders (one card) / report library */}
+      <div className="grid grid-cols-1 gap-4 sm:gap-5 lg:grid-cols-12">
+        <div className="min-w-0 lg:col-span-3 [&>div]:h-full">
+          <Card padding="lg" radius="lg">
+            <div className="mb-4">
+              <GhostBar className="h-4 w-32" />
+              <GhostBar className="mt-2 h-3 w-full" />
+              <GhostBar className="mt-1.5 h-3 w-9/12" />
+            </div>
+            <div className="space-y-4">
+              {Array.from({ length: 3 }).map((_, index) => (
+                <div key={index} className="space-y-2">
+                  <div className="flex items-center justify-between gap-3">
+                    <GhostBar className="h-3 w-24" />
+                    <GhostBar className="h-3 w-20 shrink-0" />
+                  </div>
+                  <GhostBar className="h-2.5 w-full rounded-full" />
+                </div>
+              ))}
+            </div>
+
+            <div className="my-5 border-t border-[var(--border)]" />
+
+            <div className="mb-4">
+              <GhostBar className="h-4 w-28" />
+              <GhostBar className="mt-2 h-3 w-10/12" />
+            </div>
+            <div className="space-y-2.5">
+              {Array.from({ length: 4 }).map((_, index) => (
+                <div key={index} className="space-y-1.5">
+                  <div className="flex items-center justify-between gap-3">
+                    <GhostBar className="h-3 w-28" />
+                    <GhostBar className="h-3 w-16 shrink-0" />
+                  </div>
+                  <GhostBar className="h-2.5 w-full rounded-full" />
+                </div>
+              ))}
+            </div>
+          </Card>
+        </div>
+
+        <div className="min-w-0 lg:col-span-9 [&>div]:h-full">
+          <Card padding="lg" radius="lg" className="flex flex-col">
+            <div className="mb-4">
+              <GhostBar className="h-4 w-32" />
+              <GhostBar className="mt-2 h-3 w-2/3" />
+            </div>
+            <div className="grid flex-1 grid-cols-1 gap-3 sm:auto-rows-fr sm:grid-cols-2">
+              {Array.from({ length: 6 }).map((_, index) => (
+                <div
+                  key={index}
+                  className="flex flex-col rounded-2xl border border-[var(--border)] bg-[var(--surface)] p-4"
+                >
+                  <div className="flex items-start gap-3">
+                    <GhostBar className="h-10 w-10 shrink-0 rounded-xl" />
+                    <div className="min-w-0 flex-1 pt-0.5">
+                      <GhostBar className="h-3.5 w-28" />
+                      <GhostBar className="mt-2 h-3 w-full" />
+                      <GhostBar className="mt-1.5 h-3 w-9/12" />
+                    </div>
+                  </div>
+                  <GhostBar className="mt-4 h-3 w-24" />
+                  <div className="mt-auto flex items-center gap-2 border-t border-[var(--border)] pt-3">
+                    <GhostBar className="h-8 w-20 rounded-lg" />
+                    <GhostBar className="h-8 w-16 rounded-lg" />
+                  </div>
+                </div>
+              ))}
+            </div>
+          </Card>
+        </div>
+      </div>
     </div>
   );
 }
@@ -205,11 +323,7 @@ const AdminReports = () => {
     [scopedRows],
   );
   const sparkNet = useMemo(
-    () =>
-      dailySeries(
-        scopedRows,
-        (row) => moneyInOf(row) - moneyOutOf(row),
-      ),
+    () => dailySeries(scopedRows, (row) => moneyInOf(row) - moneyOutOf(row)),
     [scopedRows],
   );
   const sparkCount = useMemo(
@@ -587,159 +701,98 @@ const AdminReports = () => {
             </motion.div>
           </motion.div>
 
+          <div className="grid grid-cols-1 gap-4 sm:gap-5 lg:grid-cols-12">
+            {/* ── Left (~25%): spending mix ── */}
+            <div className="min-w-0 lg:col-span-3 [&>div]:h-full">
+              <Card
+                padding="lg"
+                radius="lg"
+                // flex column + centered body: the card matches the movement
+                // panel's height, so the donut floats in the spare room.
+                className="relative flex flex-col overflow-visible"
+              >
+                {/* Narrow card: stack the text over its badge so the two
+                    stop squeezing each other at ~25% width. */}
+                <CardHeader className="flex-col items-stretch">
+                  <div>
+                    <CardTitle>Spending by category</CardTitle>
+                    <CardDescription>
+                      Paid expenses in the current view, biggest first.
+                    </CardDescription>
+                  </div>
+                  <Badge tone="warning">{formatMoney(paidTotal)}</Badge>
+                </CardHeader>
+                <div className="flex w-full flex-1 items-center">
+                  <CategoryDonut
+                    items={categories}
+                    centerLabel="Paid spend"
+                    centerValue={formatMoney(paidTotal)}
+                    // Narrow column: stack the donut over its legend instead
+                    // of squeezing the pair side by side. w-full keeps the
+                    // legend from driving the container's width.
+                    className="w-full sm:flex-col"
+                  />
+                </div>
+              </Card>
+            </div>
+
+            {/* ── Right (~75%): movement analysis ── */}
+            <div className="min-w-0 lg:col-span-9 [&>div]:h-full">
+              <Card
+                padding="lg"
+                radius="lg"
+                className="relative overflow-visible"
+              >
+                <CardHeader className="mb-3">
+                  <div>
+                    <CardTitle>Movement analysis</CardTitle>
+                    <CardDescription>
+                      Cumulative money in vs out, and where each type of
+                      record moved money.
+                    </CardDescription>
+                  </div>
+                  <Badge tone="neutral">
+                    {totals.count}{" "}
+                    {totals.count === 1 ? "record" : "records"}
+                  </Badge>
+                </CardHeader>
+                {hasScopedRows ? (
+                  <ReportTraceChart rows={scopedRows} />
+                ) : (
+                  <div className="rounded-2xl border border-dashed border-[var(--border)] p-8 text-center">
+                    <p className="text-sm text-[var(--ink-muted)]">
+                      No records match the current filters.
+                    </p>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="mt-3"
+                      onClick={clearFilters}
+                    >
+                      Clear filters
+                    </Button>
+                  </div>
+                )}
+              </Card>
+            </div>
+          </div>
+
           <motion.div
             initial={{ opacity: 0, y: 14 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.45, ease: CHART_EASE, delay: 0.12 }}
             className="space-y-4 sm:space-y-5"
           >
-            {/* ── Report library — preview / print / CSV per report ── */}
-            <Card
-              padding="lg"
-              radius="lg"
-              className="relative overflow-visible"
-            >
-              <CardHeader className="mb-4">
-                <div>
-                  <CardTitle>Report library</CardTitle>
-                  <CardDescription>
-                    Each report follows the filters above — preview it, print
-                    it, or download the CSV.
-                  </CardDescription>
-                </div>
-                <Badge tone="success">Live</Badge>
-              </CardHeader>
-              <motion.div
-                variants={statContainer}
-                initial="hidden"
-                animate="show"
-                className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-3"
-              >
-                {catalog.map((entry) => (
-                  <motion.div
-                    key={entry.id}
-                    variants={statItem}
-                    whileHover={{ y: -3 }}
-                    transition={{ type: "spring", stiffness: 320, damping: 26 }}
-                    className="group flex flex-col rounded-2xl border border-[var(--border)] bg-[var(--surface)] p-4 shadow-card transition-shadow hover:shadow-hover"
-                  >
-                    <div className="flex items-start gap-3">
-                      <span
-                        aria-hidden
-                        className={cn(
-                          "flex h-10 w-10 shrink-0 items-center justify-center rounded-xl transition-transform duration-300 group-hover:scale-105",
-                          TILE_TONES[entry.tone],
-                        )}
-                      >
-                        <entry.Icon size={18} />
-                      </span>
-                      <div className="min-w-0">
-                        <p className="font-display text-sm font-medium tracking-tight text-[var(--ink)]">
-                          {entry.title}
-                        </p>
-                        <p className="mt-1 line-clamp-2 text-xs leading-relaxed text-[var(--ink-muted)]">
-                          {entry.description}
-                        </p>
-                      </div>
-                    </div>
-                    <p className="mb-3 mt-3 truncate text-xs font-medium tabular-nums text-[var(--accent-strong)]">
-                      {entry.meta}
-                    </p>
-                    <div className="mt-auto flex items-center gap-2 border-t border-[var(--border)] pt-3">
-                      <Button
-                        size="sm"
-                        variant="soft"
-                        onClick={() => setPreviewId(entry.id)}
-                      >
-                        <Eye size={14} aria-hidden />
-                        Preview
-                      </Button>
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        onClick={() => exportReport(entry)}
-                      >
-                        <Download size={14} aria-hidden />
-                        CSV
-                      </Button>
-                    </div>
-                  </motion.div>
-                ))}
-              </motion.div>
-            </Card>
-
-            {/* ── Movement analysis + spending mix ── */}
             <div className="grid grid-cols-1 gap-4 sm:gap-5 lg:grid-cols-12">
-              <div className="lg:col-span-7">
+              {/* ── Left (~25%): source utilization + top spenders stacked
+                  in a single card ── */}
+              <div className="min-w-0 lg:col-span-3 [&>div]:h-full">
                 <Card
                   padding="lg"
                   radius="lg"
                   className="relative overflow-visible"
                 >
-                  <CardHeader className="mb-3">
-                    <div>
-                      <CardTitle>Movement analysis</CardTitle>
-                      <CardDescription>
-                        Cumulative money in vs out, and where each type of
-                        record moved money.
-                      </CardDescription>
-                    </div>
-                    <Badge tone="neutral">
-                      {totals.count} {totals.count === 1 ? "record" : "records"}
-                    </Badge>
-                  </CardHeader>
-                  {hasScopedRows ? (
-                    <ReportTraceChart rows={scopedRows} />
-                  ) : (
-                    <div className="rounded-2xl border border-dashed border-[var(--border)] p-8 text-center">
-                      <p className="text-sm text-[var(--ink-muted)]">
-                        No records match the current filters.
-                      </p>
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        className="mt-3"
-                        onClick={clearFilters}
-                      >
-                        Clear filters
-                      </Button>
-                    </div>
-                  )}
-                </Card>
-              </div>
-              <div className="lg:col-span-5">
-                <Card
-                  padding="lg"
-                  radius="lg"
-                  className="relative overflow-visible"
-                >
-                  <CardHeader className="mb-4">
-                    <div>
-                      <CardTitle>Spending by category</CardTitle>
-                      <CardDescription>
-                        Paid expenses in the current view, biggest first.
-                      </CardDescription>
-                    </div>
-                    <Badge tone="warning">{formatMoney(paidTotal)}</Badge>
-                  </CardHeader>
-                  <CategoryDonut
-                    items={categories}
-                    centerLabel="Paid spend"
-                    centerValue={formatMoney(paidTotal)}
-                  />
-                </Card>
-              </div>
-            </div>
-
-            {/* ── Source utilization + top spenders ── */}
-            <div className="grid grid-cols-1 gap-4 sm:gap-5 lg:grid-cols-12">
-              <div className="lg:col-span-7">
-                <Card
-                  padding="lg"
-                  radius="lg"
-                  className="relative overflow-visible"
-                >
-                  <CardHeader className="mb-4">
+                  <CardHeader className="flex-col items-stretch">
                     <div>
                       <CardTitle>Source utilization</CardTitle>
                       <CardDescription>
@@ -754,15 +807,9 @@ const AdminReports = () => {
                   <div className="scrollbar-inline max-h-[320px] overflow-y-auto pr-1">
                     <UtilizationBars items={sourceRows} />
                   </div>
-                </Card>
-              </div>
-              <div className="lg:col-span-5">
-                <Card
-                  padding="lg"
-                  radius="lg"
-                  className="relative overflow-visible"
-                >
-                  <CardHeader className="mb-4">
+
+                  {/* Top spenders — second half of the same card */}
+                  <CardHeader className="flex-col items-stretch mt-5 border-t border-[var(--border)] pt-5">
                     <div>
                       <CardTitle>Top spenders</CardTitle>
                       <CardDescription>
@@ -771,10 +818,91 @@ const AdminReports = () => {
                     </div>
                     <Badge tone="neutral">{people.length} involved</Badge>
                   </CardHeader>
-                  <SimpleBars
-                    items={topSpenders}
-                    emptyText="No employee spending in the current view."
-                  />
+                  <div className="scrollbar-inline max-h-[320px] overflow-y-auto pr-1">
+                    <SimpleBars
+                      items={topSpenders}
+                      emptyText="No employee spending in the current view."
+                    />
+                  </div>
+                </Card>
+              </div>
+
+              {/* ── Right (~75%): report library ── */}
+              <div className="min-w-0 lg:col-span-9 [&>div]:h-full">
+                <Card
+                  padding="lg"
+                  radius="lg"
+                  // flex column so the tile grid fills the card when the
+                  // row is stretched to the utilization card's height.
+                  className="relative flex flex-col overflow-visible"
+                >
+                  <CardHeader className="mb-4">
+                    <div>
+                      <CardTitle>Report library</CardTitle>
+                      <CardDescription>
+                        Each report follows the filters above — preview it,
+                        print it, or download the CSV.
+                      </CardDescription>
+                    </div>
+                    <Badge tone="success">Live</Badge>
+                  </CardHeader>
+                  <motion.div
+                    variants={statContainer}
+                    initial="hidden"
+                    animate="show"
+                    className="grid flex-1 grid-cols-1 gap-3 sm:auto-rows-fr sm:grid-cols-2"
+                  >
+                    {catalog.map((entry) => (
+                      <motion.div
+                        key={entry.id}
+                        variants={statItem}
+                        whileHover={{ y: -3 }}
+                        transition={{ type: "spring", stiffness: 320, damping: 26 }}
+                        className="group flex flex-col rounded-2xl border border-[var(--border)] bg-[var(--surface)] p-4 shadow-card transition-shadow hover:shadow-hover"
+                      >
+                        <div className="flex items-start gap-3">
+                          <span
+                            aria-hidden
+                            className={cn(
+                              "flex h-10 w-10 shrink-0 items-center justify-center rounded-xl transition-transform duration-300 group-hover:scale-105",
+                              TILE_TONES[entry.tone],
+                            )}
+                          >
+                            <entry.Icon size={18} />
+                          </span>
+                          <div className="min-w-0">
+                            <p className="font-display text-sm font-medium tracking-tight text-[var(--ink)]">
+                              {entry.title}
+                            </p>
+                            <p className="mt-1 line-clamp-2 text-xs leading-relaxed text-[var(--ink-muted)]">
+                              {entry.description}
+                            </p>
+                          </div>
+                        </div>
+                        <p className="mb-3 mt-3 truncate text-xs font-medium tabular-nums text-[var(--accent-strong)]">
+                          {entry.meta}
+                        </p>
+                        <div className="mt-auto flex items-center gap-2 border-t border-[var(--border)] pt-3">
+                          <Button
+                            size="sm"
+                            variant="soft"
+                            onClick={() => setPreviewId(entry.id)}
+                          >
+                            <Eye size={14} aria-hidden />
+                            Preview
+                          </Button>
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={() => exportReport(entry)}
+                          >
+                            <Download size={14} aria-hidden />
+                            CSV
+                          </Button>
+                        </div>
+                      </motion.div>
+                    ))}
+                  </motion.div>
                 </Card>
               </div>
             </div>

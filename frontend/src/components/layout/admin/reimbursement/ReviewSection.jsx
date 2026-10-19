@@ -765,7 +765,7 @@ export function ReviewSection({
                     onChange={(e) => setNote(e.target.value)}
                     placeholder="Handover note recorded on the closed issuance — e.g. where the forwarded balance goes."
                     disabled={submit.isPending}
-                    className="mt-1.5 block w-full resize-y rounded-2xl border border-[var(--border)] bg-[var(--surface)] px-3.5 py-2.5 text-sm leading-relaxed text-[var(--ink)] placeholder:text-[var(--ink-muted)]/70 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)]/30 disabled:opacity-60"
+                    className="mt-1.5 block w-full resize-y rounded-2xl border border-[var(--border)] bg-[var(--surface)] px-3.5 py-2.5 text-sm leading-relaxed text-[var(--ink)] placeholder:text-[var(--ink-muted)]/70 shadow-card transition-[border-color,box-shadow] hover:shadow-hover focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)]/30 disabled:opacity-60"
                   />
                 </div>
                 <p className="mt-3 text-xs leading-snug text-[var(--ink-muted)]">

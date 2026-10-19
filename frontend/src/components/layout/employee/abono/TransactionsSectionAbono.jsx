@@ -449,7 +449,7 @@ function TransactionSheetBody({
                 onKeyDown={handleKeyDown}
                 disabled={isSettled}
                 rows={2}
-                className="mt-1.5 w-full min-h-[44px] rounded-lg border border-[var(--accent)] bg-[var(--surface)] px-3 py-2 text-sm text-[var(--ink)] placeholder-[var(--ink-muted)] focus:outline-none focus:ring-2 focus:ring-[var(--accent)]/30 resize-none"
+                className="mt-1.5 w-full min-h-[44px] rounded-lg border border-[var(--accent)] bg-[var(--surface)] px-3 py-2 text-sm text-[var(--ink)] placeholder-[var(--ink-muted)] shadow-card transition-[border-color,box-shadow] hover:shadow-hover focus:outline-none focus:ring-2 focus:ring-[var(--accent)]/30 resize-none"
                 placeholder="Enter description"
               />
             ) : (

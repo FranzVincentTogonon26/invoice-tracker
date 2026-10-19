@@ -347,7 +347,10 @@ export function UtilizationBars({
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.35, ease: CHART_EASE, delay: 0.04 * index }}
           >
-            <div className="mb-1.5 flex min-w-0 items-center justify-between gap-3 text-xs">
+            {/* Wrap-tolerant row: at narrow panel widths the money/deployed
+                figures fall to their own right-aligned line instead of
+                squeezing the label out of existence. */}
+            <div className="mb-1.5 flex min-w-0 flex-wrap items-center justify-between gap-x-3 gap-y-1 text-xs">
               <span className="flex min-w-0 items-center gap-2">
                 <span className="truncate font-medium text-[var(--ink)]">
                   {source.label}
@@ -368,7 +371,7 @@ export function UtilizationBars({
                   {source.statusLabel}
                 </span>
               </span>
-              <span className="shrink-0 tabular-nums text-[var(--ink-muted)]">
+              <span className="ml-auto shrink-0 tabular-nums text-[var(--ink-muted)]">
                 <span className="font-medium text-[var(--ink)]">
                   {formatMoney(source.remaining)}
                 </span>{" "}
