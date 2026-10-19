@@ -14,6 +14,13 @@ const authMiddleware = async (req, res, next) => {
 
     const decoded = jwtToken.verify(token);
 
+    // Purpose-scoped tokens (e.g. the password-reset credential) verify
+    // with the same secret but are NOT session tokens — they must never
+    // authenticate an API request.
+    if (decoded.purpose) {
+      throw ApiError.unauthorized("Invalid token");
+    }
+
     const user = await User.findUserById(decoded.user_id);
     if (!user) {
       throw ApiError.unauthorized("User not found");

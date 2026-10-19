@@ -9,6 +9,7 @@ import { ArrowRight, Loader2, Lock, Mail } from "lucide-react";
 import { Link, useNavigate } from "react-router-dom";
 import { useAuth } from "@/context/AuthContext";
 import { useState } from "react";
+import { ForgotPasswordModal } from "@/components/auth/ForgotPasswordModal";
 
 export default function Login() {
   const { login } = useAuth();
@@ -17,6 +18,7 @@ export default function Login() {
   const [loading, setLoading] = useState(false);
   const [form, setForm] = useState({ email: "", password: "" });
   const [err, setErr] = useState("");
+  const [showForgot, setShowForgot] = useState(false);
 
   async function onSubmit(e) {
     e.preventDefault();
@@ -34,7 +36,17 @@ export default function Login() {
   }
 
   return (
-    <AuthShell>
+    <AuthShell
+      brandLockup
+      headline={
+        <>
+          Every peso,
+          <br />
+          <em style={{ fontStyle: "italic" }}>accounted for.</em>
+        </>
+      }
+      subhead="Source of funds, staff budgets, abono, and receipts read by AI — every movement in one live ledger."
+    >
       <motion.div
         initial={{ opacity: 0, y: 12 }}
         animate={{ opacity: 1, y: 0 }}
@@ -44,7 +56,7 @@ export default function Login() {
           Welcome back
         </h1>
         <p className="text-[var(--ink-muted)] mt-2 text-sm leading-relaxed">
-          Sign in to manage your invoices and clients.
+          Sign in to track budgets, expenses, and staff liquidations.
         </p>
 
         <form onSubmit={onSubmit} className="mt-9 space-y-4">
@@ -69,9 +81,10 @@ export default function Login() {
             extra={
               <button
                 type="button"
+                onClick={() => setShowForgot(true)}
                 className="text-xs font-medium tracking-tight text-[var(--accent-strong)] hover:underline"
               >
-                Forgot?
+                Forgot password?
               </button>
             }
           />
@@ -104,6 +117,14 @@ export default function Login() {
           </Link>
         </div>
       </motion.div>
+
+      <ForgotPasswordModal
+        open={showForgot}
+        onClose={() => setShowForgot(false)}
+        // After a successful reset, prefill the sign-in email so the user
+        // only has to type the new password.
+        onDone={(email) => setForm((f) => ({ ...f, email }))}
+      />
     </AuthShell>
   );
 }

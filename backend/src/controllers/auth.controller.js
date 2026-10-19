@@ -11,6 +11,8 @@ import {
   registerSchema,
   verifyOtpSchema,
   resendOtpSchema,
+  forgotPasswordSchema,
+  resetPasswordSchema,
 } from "../validations/auth.validation.js";
 
 // Strips sensitive fields before a user object is returned to clients
@@ -79,6 +81,119 @@ const buildAuthResponse = (user) => {
   });
 
   return { user: sanitize(user), token };
+};
+
+// ── Password reset ──────────────────────────────────────────────────────────
+// The flow reuses the registration OTP table, hashing and wrong-guess guard.
+// Admins trade the emailed code for a short-lived, purpose-scoped token that
+// the final write requires; employees skip OTP and set the password directly
+// once the email is validated (see resetPassword).
+const RESET_TOKEN_TTL = "15m";
+
+// Validates a submitted code against the stored OTP: expiry check,
+// wrong-guess cap (the code is burned after too many misses) and one-time
+// deletion on success. Shared by the registration and password-reset
+// verifiers so both enforce identical rules.
+const consumeOtpOrThrow = async (email, otp) => {
+  const record = await Otp.findByEmail(email);
+
+  if (!record || new Date(record.expires_at) <= new Date()) {
+    clearOtpAttempts(email);
+    throw ApiError.badRequest("Expired verification code.", "OTP_EXPIRED");
+  }
+
+  const matches = await bcrypt.compare(otp, record.otp);
+
+  if (!matches) {
+    const attempts = registerOtpAttempt(email);
+    if (attempts >= OTP_MAX_ATTEMPTS) {
+      // Burn the code after too many wrong guesses — the 6-digit space
+      // can't be brute-forced within its window. A fresh code must be
+      // issued (which resets this counter via clearOtpAttempts).
+      clearOtpAttempts(email);
+      await Otp.deleteByEmail(email);
+      throw ApiError.tooManyRequests(
+        "Too many incorrect attempts. Please request a new code.",
+        "OTP_ATTEMPTS_EXCEEDED",
+      );
+    }
+    throw ApiError.badRequest("Invalid verification code.", "OTP_INVALID");
+  }
+
+  clearOtpAttempts(email);
+  await Otp.deleteByEmail(email);
+};
+
+// The email must belong to a registered, login-eligible account. Unknown
+// addresses get an explicit denial (product spec for this flow) and pending
+// / inactive accounts hit the same gate as login.
+const findResettableUser = async (email) => {
+  const user = await User.findUserByEmail(email);
+
+  if (!user) {
+    throw ApiError.notFound(
+      "This email is not registered. Please check the address or contact your administrator.",
+      "EMAIL_NOT_REGISTERED",
+    );
+  }
+
+  ensureUserCanLogin(user);
+  return user;
+};
+
+// Issues (or re-issues) the password-reset code for an admin: same 45s
+// anti-spam cooldown and single-active-code rule as registration OTPs.
+const issuePasswordResetOtp = async (user) => {
+  const existing = await Otp.findByEmail(user.email);
+
+  if (
+    existing &&
+    Date.now() - new Date(existing.created_at).getTime() <
+      OTP_RESEND_COOLDOWN_MS
+  ) {
+    throw ApiError.tooManyRequests(
+      "Please wait a moment before requesting another code.",
+      "OTP_RATE_LIMITED",
+    );
+  }
+
+  const { code, otpHash, expiresAt } = await generateOtp();
+
+  await Otp.upsert({ email: user.email, otpHash, expiresAt });
+  // A fresh code resets the wrong-guess counter for this email.
+  clearOtpAttempts(user.email);
+
+  await sendOtpEmail({
+    to: user.email,
+    name: user.name,
+    otp: code,
+    purpose: "password_reset",
+  });
+};
+
+// The reset token is signed with the same secret as session tokens, so the
+// `purpose` claim is what keeps the two worlds apart: auth middleware
+// rejects any token that carries one, and this check rejects session tokens.
+const verifyResetTokenOrThrow = (token, user) => {
+  let decoded = null;
+
+  try {
+    decoded = jwtToken.verify(token);
+  } catch {
+    decoded = null;
+  }
+
+  const valid =
+    decoded &&
+    decoded.purpose === "password_reset" &&
+    decoded.user_id === user.user_id;
+
+  if (!valid) {
+    throw ApiError.unauthorized(
+      "Your verification has expired. Please start over.",
+      "RESET_TOKEN_INVALID",
+    );
+  }
 };
 
 export const issuedOtp = async (req, res, next) => {
@@ -192,33 +307,8 @@ export const verifyOtp = async (req, res, next) => {
   try {
     const { email, otp } = validate(verifyOtpSchema, req.body);
 
-    const record = await Otp.findByEmail(email);
+    await consumeOtpOrThrow(email, otp);
 
-    if (!record || new Date(record.expires_at) <= new Date()) {
-      clearOtpAttempts(email);
-      throw ApiError.badRequest("Expired verification code.", "OTP_EXPIRED");
-    }
-
-    const matches = await bcrypt.compare(otp, record.otp);
-
-    if (!matches) {
-      const attempts = registerOtpAttempt(email);
-      if (attempts >= OTP_MAX_ATTEMPTS) {
-        // Burn the code after too many wrong guesses — the 6-digit space
-        // can't be brute-forced within its window. A fresh code must be
-        // issued (which resets this counter via clearOtpAttempts below).
-        clearOtpAttempts(email);
-        await Otp.deleteByEmail(email);
-        throw ApiError.tooManyRequests(
-          "Too many incorrect attempts. Please request a new code.",
-          "OTP_ATTEMPTS_EXCEEDED",
-        );
-      }
-      throw ApiError.badRequest("Invalid verification code.", "OTP_INVALID");
-    }
-
-    clearOtpAttempts(email);
-    await Otp.deleteByEmail(email);
     return res.json({
       message: "Email verified successfully.",
     });
@@ -263,6 +353,120 @@ export const resendOtp = async (req, res, next) => {
     // Generic message — never reveal whether the account exists
     return res.json({
       message: "If that account exists, a new verification code is on its way.",
+    });
+  } catch (err) {
+    next(err);
+  }
+};
+
+// ── Forgot password ─────────────────────────────────────────────────────────
+
+// POST /auth/forgot-password — first step of the reset flow. Checks the
+// email against the users table and reports the account's role so the client
+// knows which path to walk: admins receive an emailed code, employees go
+// straight to choosing a new password.
+export const forgotPassword = async (req, res, next) => {
+  try {
+    const { email } = validate(forgotPasswordSchema, req.body);
+    const user = await findResettableUser(email);
+
+    if (user.role !== "admin") {
+      return res.json({ role: "employee" });
+    }
+
+    await issuePasswordResetOtp(user);
+    return res.json({ role: "admin" });
+  } catch (err) {
+    next(err);
+  }
+};
+
+// POST /auth/forgot-password/verify-otp — admin step 2: trades the emailed
+// code for the short-lived reset token the final step requires.
+export const verifyResetOtp = async (req, res, next) => {
+  try {
+    const { email, otp } = validate(verifyOtpSchema, req.body);
+    const user = await findResettableUser(email);
+
+    if (user.role !== "admin") {
+      throw ApiError.badRequest(
+        "This account doesn't need a verification code. Please start the reset again.",
+        "RESET_RESTART_REQUIRED",
+      );
+    }
+
+    await consumeOtpOrThrow(email, otp);
+
+    const resetToken = jwtToken.sign(
+      { purpose: "password_reset", user_id: user.user_id },
+      { expiresIn: RESET_TOKEN_TTL },
+    );
+
+    return res.json({
+      resetToken,
+      message: "Code verified. You can now set a new password.",
+    });
+  } catch (err) {
+    next(err);
+  }
+};
+
+// POST /auth/forgot-password/resend-otp — fresh admin code with the same
+// cooldown as every other OTP resend.
+export const resendResetOtp = async (req, res, next) => {
+  try {
+    const { email } = validate(forgotPasswordSchema, req.body);
+    const user = await findResettableUser(email);
+
+    if (user.role !== "admin") {
+      return res.json({ role: "employee" });
+    }
+
+    await issuePasswordResetOtp(user);
+    return res.json({ role: "admin" });
+  } catch (err) {
+    next(err);
+  }
+};
+
+// POST /auth/forgot-password/reset — final step. Admins must present the
+// token minted after OTP verification; employees set the new password
+// directly once the email is validated (their flow has no OTP by design).
+export const resetPassword = async (req, res, next) => {
+  try {
+    const { email, password, resetToken } = validate(
+      resetPasswordSchema,
+      req.body,
+    );
+    const user = await findResettableUser(email);
+
+    if (user.role === "admin") {
+      if (!resetToken) {
+        throw ApiError.unauthorized(
+          "Verify the code we emailed you before setting a new password.",
+          "RESET_TOKEN_REQUIRED",
+        );
+      }
+      verifyResetTokenOrThrow(resetToken, user);
+    }
+
+    // Same hash (bcrypt, cost 10) as createUser, so the new password is
+    // verified by the existing login flow. Active-status is re-checked in
+    // the UPDATE itself — a null result means the account changed mid-flow.
+    const updated = await User.updateUserPassword({
+      id: user.user_id,
+      password,
+    });
+
+    if (!updated) {
+      throw ApiError.forbidden(
+        "Your account is not active. Please contact an administrator.",
+        "ACCOUNT_INACTIVE",
+      );
+    }
+
+    return res.json({
+      message: "Password updated. You can now sign in with your new password.",
     });
   } catch (err) {
     next(err);

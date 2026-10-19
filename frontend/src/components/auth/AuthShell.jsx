@@ -1,21 +1,47 @@
 import { motion } from "framer-motion";
 import { Sparkles } from "lucide-react";
 import { DiagonalMarquee } from "./BrandCardMarquee";
+import AILogo from "../ui/AILogo";
 
 const NOISE_DATA_URI =
   "url(\"data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='180' height='180'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='2' seed='3'/></filter><rect width='180' height='180' filter='url(%23n)' opacity='0.9'/></svg>\")";
 
-export function AuthShell({ children, headline, subhead }) {
+export function AuthShell({ children, headline, subhead, brandLockup = false }) {
   return (
     <div className="min-h-screen flex bg-[var(--bg)] p-3 sm:p-4 gap-0 lg:gap-4">
       {/* Left — form */}
-      <div className="flex-1 flex items-center justify-center px-4 sm:px-8 py-10">
+      <div className="relative flex-1 flex items-center justify-center px-4 sm:px-8 py-10">
+        {/* Brand lockup — pinned to the top-left corner (opt-in, so only
+            the pages that want it carry the mark; same AILogo + wordmark
+            pairing as the app sidebars). */}
+        {brandLockup && <BrandLockup />}
         <div className="w-full max-w-[400px]">{children}</div>
       </div>
 
       {/* Right — brand panel (desktop only) */}
       <BrandPanel headline={headline} subhead={subhead} />
     </div>
+  );
+}
+
+function BrandLockup() {
+  return (
+    <motion.div
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      transition={{ duration: 0.5, ease: [0.16, 1, 0.3, 1] }}
+      className="absolute left-4 top-5 flex items-center gap-3 sm:left-8 sm:top-8"
+    >
+      <AILogo />
+      <div className="min-w-0">
+        <div className="font-display text-lg font-medium tracking-tight text-[var(--ink)]">
+          Budget Tracker
+        </div>
+        <div className="text-xs text-[var(--ink-muted)]">
+          AI budget &amp; expense tracking
+        </div>
+      </div>
+    </motion.div>
   );
 }
 
@@ -79,8 +105,19 @@ function BrandPanel({ headline, subhead }) {
         style={{ backgroundImage: NOISE_DATA_URI }}
       />
 
-      {/* Diagonal field of scrolling invoice cards (lower-right half) */}
+      {/* Diagonal field of scrolling preview cards (lower-right half) */}
       <DiagonalMarquee />
+
+      {/* Readability scrim — darkens the upper-left text zone so the
+          headline and subhead stay legible while the cards fade behind
+          them, then clears toward the bottom-right card field. */}
+      <div
+        className="absolute inset-0 pointer-events-none"
+        style={{
+          background:
+            "linear-gradient(315deg, transparent 40%, rgba(5,23,21,0.5) 66%, rgba(5,23,21,0.62) 100%)",
+        }}
+      />
 
       {/* Soft inner vignette */}
       <div
@@ -101,19 +138,25 @@ function BrandPanel({ headline, subhead }) {
           <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-white/8 border border-white/10 backdrop-blur-md">
             <Sparkles size={12} className="text-white/80" />
             <span className="type-eyebrow text-xs tracking-widest text-white/80 uppercase font-medium">
-              AI Invoice Manager
+              AI Budget Tracker
             </span>
           </div>
 
-          <h2
-            className="font-display text-[clamp(38px,3.2vw,44px)] font-medium tracking-tight xl:text-[clamp(44px,3.4vw,52px)] leading-[1.02] text-white mt-8 max-w-[540px]"
-          >
-            {headline}
-          </h2>
+          {headline && (
+            <h2
+              className="font-display text-[clamp(38px,3.2vw,44px)] font-medium tracking-tight xl:text-[clamp(44px,3.4vw,52px)] leading-[1.02] text-white mt-8 max-w-[540px]"
+            >
+              {headline}
+            </h2>
+          )}
 
-          <p className="text-white/65 text-base xl:text-lg mt-6 max-w-md leading-relaxed">
-            {subhead}
-          </p>
+          {subhead && (
+            /* Only joins once the panel is wide enough to keep the paragraph
+               clear of the moving cards (verified at 1400px+). */
+            <p className="hidden min-[1400px]:block text-white/65 text-base xl:text-lg mt-6 max-w-md leading-relaxed">
+              {subhead}
+            </p>
+          )}
         </motion.div>
       </div>
     </div>
@@ -131,6 +174,8 @@ export function AuthField({
   required = true,
   minLength,
   icon: Icon,
+  trailing,
+  autoFocus,
 }) {
   return (
     <div>
@@ -147,13 +192,21 @@ export function AuthField({
           autoComplete={autoComplete}
           required={required}
           minLength={minLength}
+          autoFocus={autoFocus}
           className={`peer w-full h-12 ${
-            Icon ? "pl-11 pr-4" : "px-4"
+            Icon ? "pl-11" : "pl-4"
+          } ${
+            trailing ? "pr-12" : "pr-4"
           } rounded-2xl border border-[var(--border)] bg-[var(--surface)] text-base tracking-tight text-[var(--ink)] placeholder:text-[var(--ink-muted)]/60 outline-none shadow-card transition-all duration-200 hover:shadow-hover focus:border-[var(--accent)]/40 focus:ring-4 focus:ring-[var(--accent)]/10`}
         />
         {Icon && (
           <div className="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 text-[var(--ink-muted)]/55 peer-focus:text-[var(--accent-strong)] peer-[:not(:placeholder-shown)]:text-[var(--accent-strong)] transition-colors">
             <Icon size={16} strokeWidth={2} />
+          </div>
+        )}
+        {trailing && (
+          <div className="absolute right-2 top-1/2 -translate-y-1/2">
+            {trailing}
           </div>
         )}
       </div>

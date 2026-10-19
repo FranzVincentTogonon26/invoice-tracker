@@ -71,14 +71,15 @@ export default function Register() {
   }
   return (
     <AuthShell
+      brandLockup
       headline={
         <>
-          Get paid faster,
+          Allocate, spend,
           <br />
-          <em style={{ fontStyle: "italic" }}>with less effort.</em>
+          <em style={{ fontStyle: "italic" }}>liquidate.</em>
         </>
       }
-      subhead="Beautiful invoices, client tracking, and AI that reads receipts, drafts reminders, and summarizes your revenue."
+      subhead="Give staff their budgets, scan receipts straight into expenses, and settle abono — every peso stays accounted for."
     >
       <motion.div
         initial={{ opacity: 0, y: 12 }}
@@ -89,7 +90,7 @@ export default function Register() {
           Get started
         </h1>
         <p className="text-[var(--ink-muted)] mt-2 text-sm leading-relaxed">
-          Free to start. No credit card required.
+          Admins start right away; employees are activated after approval.
         </p>
 
         <form onSubmit={onSubmit} className="mt-9 space-y-4">
@@ -160,7 +161,7 @@ export default function Register() {
         <p className="text-xs text-[var(--ink-muted)]/80 text-center mt-6 leading-relaxed">
           By creating an account you agree to our terms.
           <br />
-          We never share your billing data with third parties.
+          Your financial records stay private to your workspace.
         </p>
       </motion.div>
 

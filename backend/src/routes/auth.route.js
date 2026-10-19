@@ -25,12 +25,39 @@ const otpLimiter = rateLimit({
   message: "Too many verification attempts. Please try again later.",
   code: "OTP_RATE_LIMITED",
 });
+const forgotLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 12,
+  message: "Too many password reset attempts. Please try again later.",
+  code: "FORGOT_RATE_LIMITED",
+});
+const resetLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 12,
+  message: "Too many password reset attempts. Please try again later.",
+  code: "RESET_RATE_LIMITED",
+});
 
 router.post("/register", registerLimiter, authController.register);
 router.post("/login", loginLimiter, authController.login);
 router.post("/issued-otp", otpLimiter, authController.issuedOtp);
 router.post("/verify-otp", otpLimiter, authController.verifyOtp);
 router.post("/resend-otp", otpLimiter, authController.resendOtp);
+
+// Forgot password — role-aware reset flow (admins verify an emailed code,
+// employees set the new password directly once the email is validated)
+router.post("/forgot-password", forgotLimiter, authController.forgotPassword);
+router.post(
+  "/forgot-password/verify-otp",
+  otpLimiter,
+  authController.verifyResetOtp,
+);
+router.post(
+  "/forgot-password/resend-otp",
+  otpLimiter,
+  authController.resendResetOtp,
+);
+router.post("/forgot-password/reset", resetLimiter, authController.resetPassword);
 
 // Protected Routes
 router.get("/me", authMiddleware, authController.getCurrentUser);

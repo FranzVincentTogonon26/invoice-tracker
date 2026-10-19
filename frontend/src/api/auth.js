@@ -16,5 +16,17 @@ export const authApi = {
     apiClient.post("/auth/verify-otp", payload).then((r) => r.data),
   resendOtp: (payload) =>
     apiClient.post("/auth/resend-otp", payload).then((r) => r.data),
+  forgotPassword: (payload) =>
+    apiClient.post("/auth/forgot-password", payload).then((r) => r.data),
+  verifyResetOtp: (payload) =>
+    apiClient
+      .post("/auth/forgot-password/verify-otp", payload)
+      .then((r) => r.data),
+  resendResetOtp: (payload) =>
+    apiClient
+      .post("/auth/forgot-password/resend-otp", payload)
+      .then((r) => r.data),
+  resetPassword: (payload) =>
+    apiClient.post("/auth/forgot-password/reset", payload).then((r) => r.data),
   logout: () => apiClient.post("/auth/logout").then((r) => r.data),
 };

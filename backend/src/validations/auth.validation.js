@@ -55,3 +55,28 @@ export const resendOtpSchema = z.object({
     message: "Invalid email address",
   }),
 });
+
+export const forgotPasswordSchema = z.object({
+  email: z.email({
+    message: "Invalid email address",
+  }),
+});
+
+export const resetPasswordSchema = z.object({
+  email: z.email({
+    message: "Invalid email address",
+  }),
+
+  password: z
+    .string()
+    .min(8, {
+      message: "Password must be at least 8 characters",
+    })
+    .max(72, {
+      message: "Password must be at most 72 characters",
+    }),
+
+  // Admin resets carry the short-lived proof minted after OTP verification;
+  // the employee flow skips OTP by design and sends none.
+  resetToken: z.string().optional(),
+});

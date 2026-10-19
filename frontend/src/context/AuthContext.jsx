@@ -149,6 +149,24 @@ export function AuthProvider({ children }) {
     return authApi.resendOtp(payload);
   }, []);
 
+  // Forgot-password flow — these don't touch the session (the user is
+  // signed out by definition), so each is a thin pass-through.
+  const forgotPassword = useCallback(async (payload) => {
+    return authApi.forgotPassword(payload);
+  }, []);
+
+  const verifyResetOtp = useCallback(async (payload) => {
+    return authApi.verifyResetOtp(payload);
+  }, []);
+
+  const resendResetOtp = useCallback(async (payload) => {
+    return authApi.resendResetOtp(payload);
+  }, []);
+
+  const resetPassword = useCallback(async (payload) => {
+    return authApi.resetPassword(payload);
+  }, []);
+
   return (
     <AuthContext.Provider
       value={{
@@ -160,6 +178,10 @@ export function AuthProvider({ children }) {
         issuedOtp,
         verifyOtp,
         resendOtp,
+        forgotPassword,
+        verifyResetOtp,
+        resendResetOtp,
+        resetPassword,
         logout,
       }}
     >
